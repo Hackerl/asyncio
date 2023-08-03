@@ -1,0 +1,47 @@
+{
+  "name": "asyncio",
+  "version": "1.0.0",
+  "builtin-baseline": "69efe9cc2df0015f0bb2d37d55acde4a75c9a25b",
+  "dependencies": [
+    {
+      "name": "curl",
+      "default-features": false
+    },
+    "libevent",
+    "nlohmann-json",
+    {
+      "name": "zero",
+      "version>=": "1.0.5"
+    }
+  ],
+  "default-features": [
+    "openssl",
+    "tests"
+  ],
+  "features": {
+    "openssl": {
+      "description": "Support for openssl",
+      "dependencies": [
+        {
+          "name": "curl",
+          "default-features": false,
+          "features": [
+            "openssl"
+          ]
+        },
+        {
+          "name": "libevent",
+          "features": [
+            "openssl"
+          ]
+        }
+      ]
+    },
+    "tests": {
+      "description": "Build Tests",
+      "dependencies": [
+        "catch2"
+      ]
+    }
+  }
+}
