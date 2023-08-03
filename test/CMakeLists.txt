@@ -4,8 +4,11 @@ add_executable(
         asyncio_test
         event_loop.cpp
         thread.cpp
+        ev/pipe.cpp
         ev/event.cpp
         ev/buffer.cpp
+        ev/signal.cpp
+        ev/timer.cpp
         $<$<PLATFORM_ID:Windows>:main.cpp>
 )
 

@@ -29,8 +29,11 @@ add_library(
         src/error.cpp
         src/worker.cpp
         src/event_loop.cpp
+        src/ev/pipe.cpp
         src/ev/event.cpp
         src/ev/buffer.cpp
+        src/ev/signal.cpp
+        src/ev/timer.cpp
 )
 
 if (ASYNCIO_EMBED_CA_CERT)

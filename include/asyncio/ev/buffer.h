@@ -42,8 +42,6 @@ namespace asyncio::ev {
     class Buffer : public virtual IBuffer {
     public:
         explicit Buffer(bufferevent *bev);
-
-    public:
         Buffer(const Buffer &) = delete;
         ~Buffer() override;
 

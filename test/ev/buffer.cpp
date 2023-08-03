@@ -67,6 +67,8 @@ TEST_CASE("async stream buffer", "[buffer]") {
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         });
+
+        evutil_closesocket(fds[1]);
     }
 
     SECTION("write timeout") {
@@ -86,5 +88,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         });
+
+        evutil_closesocket(fds[1]);
     }
 }

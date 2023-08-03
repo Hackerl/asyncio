@@ -17,8 +17,6 @@ namespace asyncio::ev {
     class Event {
     public:
         explicit Event(evutil_socket_t fd);
-
-    public:
         Event(const Event &) = delete;
         ~Event();
 

@@ -12,8 +12,6 @@ namespace asyncio {
     public:
         Worker();
         Worker(const Worker &) = delete;
-
-    public:
         ~Worker();
 
     public:

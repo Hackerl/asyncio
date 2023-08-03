@@ -41,10 +41,8 @@ TEST_CASE("async event notification", "[event]") {
 
                         REQUIRE(result);
                         REQUIRE(result.value() & asyncio::ev::What::WRITE);
-
                         REQUIRE(send(fds[1], "hello world", 11, 0) == 11);
 
-                        co_await asyncio::sleep(50ms);
                         evutil_closesocket(fds[1]);
                     }()
             );
@@ -58,5 +56,8 @@ TEST_CASE("async event notification", "[event]") {
             REQUIRE(result);
             REQUIRE(result.value() & asyncio::ev::What::TIMEOUT);
         });
+
+        evutil_closesocket(fds[0]);
+        evutil_closesocket(fds[1]);
     }
 }
