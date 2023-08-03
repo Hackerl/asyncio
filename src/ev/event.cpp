@@ -29,7 +29,7 @@ bool asyncio::ev::Event::cancel() {
     event_del(mEvent);
 
     auto p = std::move(mPromise);
-    p->reject(std::make_error_code(std::errc::operation_canceled));
+    p->reject(make_error_code(std::errc::operation_canceled));
 
     return true;
 }
@@ -47,7 +47,7 @@ zero::async::coroutine::Task<short, std::error_code> asyncio::ev::Event::on(
         std::optional<std::chrono::milliseconds> timeout
 ) {
     if (mPromise)
-        co_return tl::unexpected(std::make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
     co_return co_await zero::async::promise::chain<short, std::error_code>([&](const auto &promise) {
         mPromise = std::make_unique<zero::async::promise::Promise<short, std::error_code>>(promise);

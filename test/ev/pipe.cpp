@@ -58,7 +58,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
                         REQUIRE(result);
                         REQUIRE(result.value() == "world hello");
 
-                        buffer->throws(std::make_error_code(std::errc::interrupted));
+                        buffer->throws(make_error_code(std::errc::interrupted));
                     }(),
                     [&buffer = buffers[1]]() -> zero::async::coroutine::Task<void> {
                         auto result = co_await buffer->readLine();

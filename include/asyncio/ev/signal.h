@@ -8,7 +8,7 @@
 namespace asyncio::ev {
     class Signal : public zero::Interface {
     public:
-        Signal(int sig);
+        explicit Signal(int sig);
         Signal(const Signal &) = delete;
         ~Signal() override;
 

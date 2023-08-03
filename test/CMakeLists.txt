@@ -4,6 +4,7 @@ add_executable(
         asyncio_test
         event_loop.cpp
         thread.cpp
+        channel.cpp
         ev/pipe.cpp
         ev/event.cpp
         ev/buffer.cpp
