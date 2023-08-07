@@ -37,7 +37,7 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
                 });
 
                 REQUIRE(result);
-                REQUIRE(result.value() == 1024);
+                REQUIRE(*result == 1024);
             });
         }
 
@@ -50,7 +50,6 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
 
                 REQUIRE(!result);
                 REQUIRE(result.error() == -1);
-                result.value();
             });
         }
     }

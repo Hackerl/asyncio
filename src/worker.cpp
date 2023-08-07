@@ -26,7 +26,6 @@ void asyncio::Worker::work() {
             continue;
         }
 
-        std::function<void()> task = std::move(mTask);
-        task();
+        std::exchange(mTask, nullptr)();
     }
 }

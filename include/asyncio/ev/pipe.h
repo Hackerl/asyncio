@@ -13,20 +13,21 @@ namespace asyncio::ev {
     class PairedBuffer : public Buffer, public IPairedBuffer {
     public:
         PairedBuffer(bufferevent *bev, std::shared_ptr<std::error_code> ec);
+        PairedBuffer(PairedBuffer &&rhs) = default;
         ~PairedBuffer() override;
 
     public:
         tl::expected<void, std::error_code> close() override;
+        void throws(const std::error_code &ec) override;
 
     private:
         std::error_code getError() override;
-        void throws(const std::error_code &ec) override;
 
     private:
         std::shared_ptr<std::error_code> mErrorCode;
     };
 
-    std::array<std::shared_ptr<IPairedBuffer>, 2> pipe();
+    tl::expected<std::array<PairedBuffer, 2>, std::error_code> pipe();
 }
 
 #endif //ASYNCIO_PIPE_H

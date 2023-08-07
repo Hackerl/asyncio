@@ -67,9 +67,6 @@ namespace asyncio {
 
         }
 
-        Channel(const Channel &) = delete;
-        Channel &operator=(const Channel &) = delete;
-
     public:
         tl::expected<void, std::error_code> trySend(const T &element) override {
             T e = element;
@@ -111,7 +108,7 @@ namespace asyncio {
 
             std::lock_guard<std::mutex> guard(mMutex);
 
-            trigger<RECEIVER>(ev::READ);
+            trigger<RECEIVER>(ev::What::READ);
             return {};
         }
 
@@ -140,8 +137,8 @@ namespace asyncio {
 
             mClosed = true;
 
-            trigger<SENDER>(ev::CLOSED);
-            trigger<RECEIVER>(ev::CLOSED);
+            trigger<SENDER>(ev::What::CLOSED);
+            trigger<RECEIVER>(ev::What::CLOSED);
         }
 
         tl::expected<T, std::error_code> receiveSync() override {
@@ -167,7 +164,7 @@ namespace asyncio {
 
             std::lock_guard<std::mutex> guard(mMutex);
 
-            trigger<SENDER>(ev::WRITE);
+            trigger<SENDER>(ev::What::WRITE);
             return element;
         }
 
@@ -223,7 +220,7 @@ namespace asyncio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                trigger<RECEIVER>(ev::READ);
+                trigger<RECEIVER>(ev::What::READ);
                 break;
             }
 
@@ -254,24 +251,29 @@ namespace asyncio {
                         continue;
                     }
 
-                    std::shared_ptr<ev::Event> event = getEvent();
+                    auto event = ev::makeEvent(-1, ev::What::WRITE).transform([](ev::Event &&event) {
+                        return std::make_shared<ev::Event>(std::move(event));
+                    });
 
-                    mPending[SENDER].emplace_back(event);
-                    mMutex.unlock();
-
-                    auto res = co_await event->on(ev::WRITE, timeout);
-
-                    if (!res) {
-                        result = tl::unexpected(res.error());
+                    if (!event) {
+                        result = tl::unexpected(event.error());
                         break;
                     }
 
-                    short what = res.value();
+                    mPending[SENDER].emplace_back(*event);
+                    mMutex.unlock();
 
-                    if (what & ev::CLOSED) {
+                    auto what = co_await event.value()->on(timeout);
+
+                    if (!what) {
+                        result = tl::unexpected(what.error());
+                        break;
+                    }
+
+                    if (*what & ev::What::CLOSED) {
                         result = tl::unexpected<std::error_code>(Error::IO_EOF);
                         break;
-                    } else if (what & ev::TIMEOUT) {
+                    } else if (*what & ev::What::TIMEOUT) {
                         result = tl::unexpected(make_error_code(std::errc::timed_out));
                         break;
                     }
@@ -284,7 +286,7 @@ namespace asyncio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                trigger<RECEIVER>(ev::READ);
+                trigger<RECEIVER>(ev::What::READ);
                 break;
             }
 
@@ -331,7 +333,7 @@ namespace asyncio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                trigger<SENDER>(ev::WRITE);
+                trigger<SENDER>(ev::What::WRITE);
                 break;
             }
 
@@ -358,24 +360,29 @@ namespace asyncio {
                         continue;
                     }
 
-                    std::shared_ptr<ev::Event> event = getEvent();
+                    auto event = ev::makeEvent(-1, ev::What::WRITE).transform([](ev::Event &&event) {
+                        return std::make_shared<ev::Event>(std::move(event));
+                    });
 
-                    mPending[RECEIVER].emplace_back(event);
-                    mMutex.unlock();
-
-                    auto res = co_await event->on(ev::READ, timeout);
-
-                    if (!res) {
-                        result = tl::unexpected(res.error());
+                    if (!event) {
+                        result = tl::unexpected(event.error());
                         break;
                     }
 
-                    short what = res.value();
+                    mPending[RECEIVER].emplace_back(*event);
+                    mMutex.unlock();
 
-                    if (what & ev::CLOSED) {
+                    auto what = co_await event.value()->on(timeout);
+
+                    if (!what) {
+                        result = tl::unexpected(what.error());
+                        break;
+                    }
+
+                    if (*what & ev::What::CLOSED) {
                         result = tl::unexpected<std::error_code>(Error::IO_EOF);
                         break;
-                    } else if (what & ev::TIMEOUT) {
+                    } else if (*what & ev::What::TIMEOUT) {
                         result = tl::unexpected(make_error_code(std::errc::timed_out));
                         break;
                     }
@@ -388,7 +395,7 @@ namespace asyncio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                trigger<SENDER>(ev::WRITE);
+                trigger<SENDER>(ev::What::WRITE);
                 result = std::move(element);
 
                 break;
@@ -403,7 +410,7 @@ namespace asyncio {
             if (mPending[Index].empty())
                 return;
 
-            mEventLoop->post([=, pending = std::move(mPending[Index])]() {
+            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() {
                 for (const auto &event: pending) {
                     if (event.index() != 0) {
                         std::get<1>(event)->notify();
@@ -420,25 +427,11 @@ namespace asyncio {
             });
         }
 
-        std::shared_ptr<ev::Event> getEvent() {
-            auto it = std::find_if(mEvents.begin(), mEvents.end(), [](const auto &event) {
-                return event.use_count() == 1;
-            });
-
-            if (it == mEvents.end()) {
-                mEvents.push_back(std::make_shared<ev::Event>(-1));
-                return mEvents.back();
-            }
-
-            return *it;
-        }
-
     private:
         std::mutex mMutex;
         std::atomic<bool> mClosed;
         std::shared_ptr<EventLoop> mEventLoop;
         zero::atomic::CircularBuffer<T> mBuffer;
-        std::list<std::shared_ptr<ev::Event>> mEvents;
         std::array<std::list<Event>, 2> mPending;
     };
 }

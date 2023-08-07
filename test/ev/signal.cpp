@@ -7,8 +7,10 @@ using namespace std::chrono_literals;
 
 TEST_CASE("signal handler", "[signal]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
-        asyncio::ev::Signal signal(SIGINT);
-        auto task = signal.on();
+        auto signal = asyncio::ev::makeSignal(SIGINT);
+        REQUIRE(signal);
+
+        auto task = signal->on();
 
         co_await zero::async::coroutine::all(
                 []() -> zero::async::coroutine::Task<void> {

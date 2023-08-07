@@ -11,11 +11,7 @@ namespace asyncio {
     class Worker {
     public:
         Worker();
-        Worker(const Worker &) = delete;
         ~Worker();
-
-    public:
-        Worker &operator=(const Worker &) = delete;
 
     public:
         template<typename F>

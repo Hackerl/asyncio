@@ -1,49 +1,49 @@
 #include <asyncio/ev/timer.h>
 #include <asyncio/event_loop.h>
 
-asyncio::ev::Timer::Timer() {
-    mEvent = evtimer_new(
-            getEventLoop()->base(),
-            [](evutil_socket_t fd, short what, void *arg) {
-                auto promise = std::move(static_cast<Timer *>(arg)->mPromise);
-                promise->resolve();
-            },
-            this
-    );
+asyncio::ev::Timer::Timer(std::unique_ptr<event, void (*)(event *)> event) : Notifier(std::move(event)) {
+
 }
 
-asyncio::ev::Timer::~Timer() {
-    event_free(mEvent);
-}
-
-bool asyncio::ev::Timer::cancel() {
-    if (!pending())
-        return false;
-
-    event_del(mEvent);
-
-    auto p = std::move(mPromise);
-    p->reject(make_error_code(std::errc::operation_canceled));
-
-    return true;
-}
-
-bool asyncio::ev::Timer::pending() {
-    return mPromise.operator bool();
-}
-
-zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Timer::setTimeout(std::chrono::milliseconds delay) {
-    if (mPromise)
+zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Timer::after(std::chrono::milliseconds delay) {
+    if (pending())
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
     co_return co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromise = std::make_unique<zero::async::promise::Promise<void, std::error_code>>(promise);
+        context() = promise;
 
         timeval tv = {
-                (time_t) (delay.count() / 1000),
-                (suseconds_t) ((delay.count() % 1000) * 1000)
+                (decltype(timeval::tv_sec)) (delay.count() / 1000),
+                (decltype(timeval::tv_usec)) ((delay.count() % 1000) * 1000)
         };
 
-        evtimer_add(mEvent, &tv);
+        evtimer_add(mEvent.get(), &tv);
     });
+}
+
+tl::expected<asyncio::ev::Timer, std::error_code> asyncio::ev::makeTimer() {
+    auto context = new Timer::Context();
+
+    event *e = evtimer_new(
+            getEventLoop()->base(),
+            [](evutil_socket_t fd, short what, void *arg) {
+                std::exchange(*static_cast<Event::Context *>(arg), std::nullopt)->resolve();
+            },
+            context
+    );
+
+    if (!e) {
+        delete context;
+        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+    }
+
+    return Timer{
+            std::unique_ptr<event, void (*)(event *)>(
+                    e,
+                    [](event *event) {
+                        delete static_cast<Timer::Context *>(event_get_callback_arg(event));
+                        event_free(event);
+                    }
+            )
+    };
 }

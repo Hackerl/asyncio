@@ -7,9 +7,9 @@ constexpr auto READ_INDEX = 0;
 constexpr auto DRAIN_INDEX = 1;
 constexpr auto WAIT_CLOSED_INDEX = 2;
 
-asyncio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev), mClosed(false) {
+asyncio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev, bufferevent_free), mClosed(false) {
     bufferevent_setcb(
-            mBev,
+            mBev.get(),
             [](bufferevent *bev, void *arg) {
                 static_cast<Buffer *>(arg)->onBufferRead();
             },
@@ -22,22 +22,31 @@ asyncio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev), mClosed(false) {
             this
     );
 
-    bufferevent_enable(mBev, EV_READ | EV_WRITE);
-    bufferevent_setwatermark(mBev, EV_READ | EV_WRITE, 0, 0);
+    bufferevent_enable(mBev.get(), EV_READ | EV_WRITE);
+    bufferevent_setwatermark(mBev.get(), EV_READ | EV_WRITE, 0, 0);
+}
+
+asyncio::ev::Buffer::Buffer(asyncio::ev::Buffer &&rhs) noexcept
+        : mBev(std::move(rhs.mBev)), mClosed(rhs.mClosed), mPromises(std::move(rhs.mPromises)) {
+    bufferevent_data_cb rcb, wcb;
+    bufferevent_event_cb ecb;
+
+    bufferevent_getcb(mBev.get(), &rcb, &wcb, &ecb, nullptr);
+    bufferevent_setcb(mBev.get(), rcb, wcb, ecb, this);
 }
 
 asyncio::ev::Buffer::~Buffer() {
-    if (mBev) {
-        bufferevent_free(mBev);
-        mBev = nullptr;
-    }
+    if (mClosed)
+        return;
+
+    onClose(Error::IO_EOF);
 }
 
 size_t asyncio::ev::Buffer::available() {
     if (!mBev)
         return -1;
 
-    return evbuffer_get_length(bufferevent_get_input(mBev));
+    return evbuffer_get_length(bufferevent_get_input(mBev.get()));
 }
 
 zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::readLine() {
@@ -54,7 +63,7 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::
     if (mPromises[READ_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-    evbuffer *input = bufferevent_get_input(mBev);
+    evbuffer *input = bufferevent_get_input(mBev.get());
     tl::expected<std::string, std::error_code> result;
 
     while (true) {
@@ -71,12 +80,12 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::
         }
 
         auto res = co_await zero::async::promise::chain<void, std::error_code>([this](const auto &promise) {
-            mPromises[READ_INDEX] = std::make_unique<zero::async::promise::Promise<void, std::error_code>>(promise);
+            mPromises[READ_INDEX] = promise;
 
-            bufferevent_setwatermark(mBev, EV_READ, 0, 0);
-            bufferevent_enable(mBev, EV_READ);
+            bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
+            bufferevent_enable(mBev.get(), EV_READ);
         }).finally([this]() {
-            bufferevent_disable(mBev, EV_READ);
+            bufferevent_disable(mBev.get(), EV_READ);
         });
 
         if (!res) {
@@ -98,7 +107,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(st
     if (mPromises[READ_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-    evbuffer *input = bufferevent_get_input(mBev);
+    evbuffer *input = bufferevent_get_input(mBev.get());
     size_t length = evbuffer_get_length(input);
 
     if (length >= data.size()) {
@@ -110,13 +119,13 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(st
         co_return tl::unexpected(Error::IO_EOF);
 
     auto result = co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromises[READ_INDEX] = std::make_unique<zero::async::promise::Promise<void, std::error_code>>(promise);
+        mPromises[READ_INDEX] = promise;
 
-        bufferevent_setwatermark(mBev, EV_READ, data.size(), 0);
-        bufferevent_enable(mBev, EV_READ);
+        bufferevent_setwatermark(mBev.get(), EV_READ, data.size(), 0);
+        bufferevent_enable(mBev.get(), EV_READ);
     }).finally([this]() {
-        bufferevent_disable(mBev, EV_READ);
-        bufferevent_setwatermark(mBev, EV_READ, 0, 0);
+        bufferevent_disable(mBev.get(), EV_READ);
+        bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
     });
 
     if (!result)
@@ -136,7 +145,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::readExa
     if (mPromises[READ_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-    evbuffer *input = bufferevent_get_input(mBev);
+    evbuffer *input = bufferevent_get_input(mBev.get());
     size_t length = evbuffer_get_length(input);
 
     if (length >= data.size()) {
@@ -148,13 +157,13 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::readExa
         co_return tl::unexpected(Error::IO_EOF);
 
     auto result = co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromises[READ_INDEX] = std::make_unique<zero::async::promise::Promise<void, std::error_code>>(promise);
+        mPromises[READ_INDEX] = promise;
 
-        bufferevent_setwatermark(mBev, EV_READ, data.size(), 0);
-        bufferevent_enable(mBev, EV_READ);
+        bufferevent_setwatermark(mBev.get(), EV_READ, data.size(), 0);
+        bufferevent_enable(mBev.get(), EV_READ);
     }).finally([this]() {
-        bufferevent_disable(mBev, EV_READ);
-        bufferevent_setwatermark(mBev, EV_READ, 0, 0);
+        bufferevent_disable(mBev.get(), EV_READ);
+        bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
     });
 
     if (!result)
@@ -203,10 +212,13 @@ tl::expected<void, std::error_code> asyncio::ev::Buffer::writeLine(std::string_v
 }
 
 tl::expected<void, std::error_code> asyncio::ev::Buffer::submit(std::span<const std::byte> data) {
+    if (!mBev)
+        return tl::unexpected(Error::RESOURCE_DESTROYED);
+
     if (mClosed)
         return tl::unexpected(Error::IO_EOF);
 
-    bufferevent_write(mBev, data.data(), data.size());
+    bufferevent_write(mBev.get(), data.data(), data.size());
     return {};
 }
 
@@ -220,13 +232,13 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::drain()
     if (mClosed)
         co_return tl::unexpected(Error::IO_EOF);
 
-    evbuffer *output = bufferevent_get_output(mBev);
+    evbuffer *output = bufferevent_get_output(mBev.get());
 
     if (evbuffer_get_length(output) == 0)
         co_return tl::expected<void, std::error_code>{};
 
     co_return co_await zero::async::promise::chain<void, std::error_code>([this](const auto &promise) {
-        mPromises[DRAIN_INDEX] = std::make_unique<zero::async::promise::Promise<void, std::error_code>>(promise);
+        mPromises[DRAIN_INDEX] = promise;
     });
 }
 
@@ -234,7 +246,7 @@ size_t asyncio::ev::Buffer::pending() {
     if (!mBev)
         return -1;
 
-    return evbuffer_get_length(bufferevent_get_output(mBev));
+    return evbuffer_get_length(bufferevent_get_output(mBev.get()));
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::waitClosed() {
@@ -251,12 +263,12 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::waitClo
         co_return tl::unexpected(Error::IO_EOF);
 
     co_return co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromises[WAIT_CLOSED_INDEX] = std::make_unique<zero::async::promise::Promise<void, std::error_code>>(promise);
+        mPromises[WAIT_CLOSED_INDEX] = promise;
 
-        bufferevent_enable(mBev, EV_READ);
-        bufferevent_set_timeouts(mBev, nullptr, nullptr);
+        bufferevent_enable(mBev.get(), EV_READ);
+        bufferevent_set_timeouts(mBev.get(), nullptr, nullptr);
     }).finally([this]() {
-        bufferevent_disable(mBev, EV_READ);
+        bufferevent_disable(mBev.get(), EV_READ);
     });
 }
 
@@ -264,7 +276,7 @@ evutil_socket_t asyncio::ev::Buffer::fd() {
     if (!mBev)
         return -1;
 
-    return bufferevent_getfd(mBev);
+    return bufferevent_getfd(mBev.get());
 }
 
 zero::async::coroutine::Task<size_t, std::error_code> asyncio::ev::Buffer::read(std::span<std::byte> data) {
@@ -277,7 +289,7 @@ zero::async::coroutine::Task<size_t, std::error_code> asyncio::ev::Buffer::read(
     if (mPromises[READ_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-    evbuffer *input = bufferevent_get_input(mBev);
+    evbuffer *input = bufferevent_get_input(mBev.get());
     size_t length = evbuffer_get_length(input);
 
     if (length > 0) {
@@ -290,12 +302,12 @@ zero::async::coroutine::Task<size_t, std::error_code> asyncio::ev::Buffer::read(
         co_return tl::unexpected(Error::IO_EOF);
 
     auto result = co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromises[READ_INDEX] = std::make_unique<zero::async::promise::Promise<void, std::error_code>>(promise);
+        mPromises[READ_INDEX] = promise;
 
-        bufferevent_setwatermark(mBev, EV_READ, 0, 0);
-        bufferevent_enable(mBev, EV_READ);
+        bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
+        bufferevent_enable(mBev.get(), EV_READ);
     }).finally([this]() {
-        bufferevent_disable(mBev, EV_READ);
+        bufferevent_disable(mBev.get(), EV_READ);
     });
 
     if (!result)
@@ -318,13 +330,14 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::write(s
 }
 
 tl::expected<void, std::error_code> asyncio::ev::Buffer::close() {
+    if (!mBev)
+        return tl::unexpected(Error::RESOURCE_DESTROYED);
+
     if (mClosed)
         return tl::unexpected(Error::IO_EOF);
 
     onClose(Error::IO_EOF);
-
-    bufferevent_free(mBev);
-    mBev = nullptr;
+    mBev.reset();
 
     return {};
 }
@@ -340,19 +353,19 @@ void asyncio::ev::Buffer::setTimeout(std::chrono::milliseconds readTimeout, std:
     std::optional<timeval> rtv, wtv;
 
     if (readTimeout != std::chrono::milliseconds::zero())
-        rtv = timeval{
-                (time_t) (readTimeout.count() / 1000),
-                (suseconds_t) ((readTimeout.count() % 1000) * 1000)
+        rtv = {
+                (decltype(timeval::tv_sec)) (readTimeout.count() / 1000),
+                (decltype(timeval::tv_usec)) ((readTimeout.count() % 1000) * 1000)
         };
 
     if (writeTimeout != std::chrono::milliseconds::zero())
-        wtv = timeval{
-                (time_t) (writeTimeout.count() / 1000),
-                (suseconds_t) ((writeTimeout.count() % 1000) * 1000)
+        wtv = {
+                (decltype(timeval::tv_sec)) (writeTimeout.count() / 1000),
+                (decltype(timeval::tv_usec)) ((writeTimeout.count() % 1000) * 1000)
         };
 
     bufferevent_set_timeouts(
-            mBev,
+            mBev.get(),
             rtv ? &*rtv : nullptr,
             wtv ? &*wtv : nullptr
     );
@@ -361,7 +374,7 @@ void asyncio::ev::Buffer::setTimeout(std::chrono::milliseconds readTimeout, std:
 void asyncio::ev::Buffer::onClose(const std::error_code &ec) {
     mClosed = true;
 
-    auto [read, drain, waitClosed] = std::move(mPromises);
+    auto [read, drain, waitClosed] = std::exchange(mPromises, {});
 
     if (read)
         read->reject(ec);
@@ -381,7 +394,7 @@ void asyncio::ev::Buffer::onClose(const std::error_code &ec) {
 }
 
 void asyncio::ev::Buffer::onBufferRead() {
-    auto promise = std::move(mPromises[READ_INDEX]);
+    auto promise = std::exchange(mPromises[READ_INDEX], std::nullopt);
 
     if (!promise) {
         if (mPromises[WAIT_CLOSED_INDEX])
@@ -390,7 +403,7 @@ void asyncio::ev::Buffer::onBufferRead() {
         if (available() < 1024 * 1024)
             return;
 
-        bufferevent_disable(mBev, EV_READ);
+        bufferevent_disable(mBev.get(), EV_READ);
         return;
     }
 
@@ -398,7 +411,7 @@ void asyncio::ev::Buffer::onBufferRead() {
 }
 
 void asyncio::ev::Buffer::onBufferWrite() {
-    auto promise = std::move(mPromises[DRAIN_INDEX]);
+    auto promise = std::exchange(mPromises[DRAIN_INDEX], std::nullopt);
 
     if (!promise)
         return;
@@ -413,14 +426,14 @@ void asyncio::ev::Buffer::onBufferEvent(short what) {
         onClose(getError());
     } else if (what & BEV_EVENT_TIMEOUT) {
         if (what & BEV_EVENT_READING) {
-            auto promise = std::move(mPromises[READ_INDEX]);
+            auto promise = std::exchange(mPromises[READ_INDEX], std::nullopt);
 
             if (!promise)
                 return;
 
             promise->reject(make_error_code(std::errc::timed_out));
         } else {
-            auto promise = std::move(mPromises[DRAIN_INDEX]);
+            auto promise = std::exchange(mPromises[DRAIN_INDEX], std::nullopt);
 
             if (!promise)
                 return;
@@ -434,11 +447,11 @@ std::error_code asyncio::ev::Buffer::getError() {
     return {EVUTIL_SOCKET_ERROR(), std::system_category()};
 }
 
-std::shared_ptr<asyncio::ev::IBuffer> asyncio::ev::newBuffer(int fd, bool own) {
+tl::expected<asyncio::ev::Buffer, std::error_code> asyncio::ev::makeBuffer(evutil_socket_t fd, bool own) {
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), fd, own ? BEV_OPT_CLOSE_ON_FREE : 0);
 
     if (!bev)
-        return nullptr;
+        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    return std::make_shared<Buffer>(bev);
+    return Buffer{bev};
 }

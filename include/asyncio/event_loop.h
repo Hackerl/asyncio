@@ -4,17 +4,13 @@
 #include "worker.h"
 #include <queue>
 #include <event.h>
+#include <event2/dns.h>
 #include <zero/async/coroutine.h>
 
 namespace asyncio {
     class EventLoop {
     public:
         EventLoop(event_base *base, evdns_base *dnsBase, size_t maxWorkers);
-        EventLoop(const EventLoop &) = delete;
-        ~EventLoop();
-
-    public:
-        EventLoop &operator=(const EventLoop &) = delete;
 
     public:
         event_base *base();
@@ -35,14 +31,14 @@ namespace asyncio {
 
             if (ms)
                 tv = {
-                        (time_t) (ms->count() / 1000),
-                        (suseconds_t) ((ms->count() % 1000) * 1000)
+                        (decltype(timeval::tv_sec)) (ms->count() / 1000),
+                        (decltype(timeval::tv_usec)) ((ms->count() % 1000) * 1000)
                 };
 
             auto ctx = new std::decay_t<F>(std::forward<F>(f));
 
             event_base_once(
-                    mBase,
+                    mBase.get(),
                     -1,
                     EV_TIMEOUT,
                     [](evutil_socket_t, short, void *arg) {
@@ -58,9 +54,9 @@ namespace asyncio {
 
     private:
         size_t mMaxWorkers;
-        event_base *mBase;
-        evdns_base *mDnsBase;
         std::queue<std::unique_ptr<Worker>> mWorkers;
+        std::unique_ptr<event_base, decltype(event_base_free) *> mBase;
+        std::unique_ptr<evdns_base, void (*)(evdns_base *)> mDnsBase;
 
         template<typename F>
         friend zero::async::coroutine::Task<
@@ -76,24 +72,25 @@ namespace asyncio {
     std::shared_ptr<EventLoop> getEventLoop();
     bool setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
 
-    tl::expected<std::shared_ptr<EventLoop>, std::error_code> newEventLoop(size_t maxWorkers = 16);
-    zero::async::coroutine::Task<void> sleep(std::chrono::milliseconds ms);
+    tl::expected<EventLoop, std::error_code> createEventLoop(size_t maxWorkers = 16);
+    zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
     template<typename F>
     tl::expected<void, std::error_code> run(F &&f) {
-        auto result = newEventLoop();
-
-        if (!result)
-            return tl::unexpected(result.error());
-
-        auto &eventLoop = result.value();
-        setEventLoop(eventLoop);
-
-        f().promise.finally([&]() {
-            eventLoop->loopExit();
+        auto eventLoop = createEventLoop().transform([](EventLoop &&eventLoop) {
+            return std::make_shared<EventLoop>(std::move(eventLoop));
         });
 
-        eventLoop->dispatch();
+        if (!eventLoop)
+            return tl::unexpected(eventLoop.error());
+
+        setEventLoop(*eventLoop);
+
+        f().promise().finally([&]() {
+            eventLoop.value()->loopExit();
+        });
+
+        eventLoop.value()->dispatch();
         return {};
     }
 }

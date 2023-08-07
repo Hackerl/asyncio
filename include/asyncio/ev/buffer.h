@@ -2,6 +2,7 @@
 #define ASYNCIO_BUFFER_H
 
 #include <event.h>
+#include <optional>
 #include <asyncio/io.h>
 
 namespace asyncio::ev {
@@ -42,11 +43,8 @@ namespace asyncio::ev {
     class Buffer : public virtual IBuffer {
     public:
         explicit Buffer(bufferevent *bev);
-        Buffer(const Buffer &) = delete;
+        Buffer(Buffer &&rhs) noexcept;
         ~Buffer() override;
-
-    public:
-        Buffer &operator=(const Buffer &) = delete;
 
     public:
         size_t available() override;
@@ -90,13 +88,13 @@ namespace asyncio::ev {
 
     protected:
         bool mClosed;
-        bufferevent *mBev;
+        std::unique_ptr<bufferevent, decltype(bufferevent_free) *> mBev;
 
     private:
-        std::array<std::unique_ptr<zero::async::promise::Promise<void, std::error_code>>, 3> mPromises;
+        std::array<std::optional<zero::async::promise::Promise<void, std::error_code>>, 3> mPromises;
     };
 
-    std::shared_ptr<IBuffer> newBuffer(evutil_socket_t fd, bool own = true);
+    tl::expected<Buffer, std::error_code> makeBuffer(evutil_socket_t fd, bool own = true);
 }
 
 #endif //ASYNCIO_BUFFER_H

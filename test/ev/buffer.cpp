@@ -17,7 +17,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
             co_await zero::async::coroutine::all(
                     [&]() -> zero::async::coroutine::Task<void> {
-                        std::shared_ptr<asyncio::ev::IBuffer> buffer = asyncio::ev::newBuffer(fds[0]);
+                        auto buffer = asyncio::ev::makeBuffer(fds[0]);
 
                         REQUIRE(buffer);
                         REQUIRE(buffer->fd() > 0);
@@ -28,12 +28,12 @@ TEST_CASE("async stream buffer", "[buffer]") {
                         auto result = co_await buffer->readLine();
 
                         REQUIRE(result);
-                        REQUIRE(result.value() == "world hello");
+                        REQUIRE(*result == "world hello");
 
                         buffer->close();
                     }(),
                     [&]() -> zero::async::coroutine::Task<void> {
-                        std::shared_ptr<asyncio::ev::IBuffer> buffer = asyncio::ev::newBuffer(fds[1]);
+                        auto buffer = asyncio::ev::makeBuffer(fds[1]);
 
                         REQUIRE(buffer);
                         REQUIRE(buffer->fd() > 0);
@@ -41,7 +41,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
                         auto result = co_await buffer->readLine();
 
                         REQUIRE(result);
-                        REQUIRE(result.value() == "hello world");
+                        REQUIRE(*result == "hello world");
 
                         buffer->writeLine("world hello");
 
@@ -54,7 +54,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
 
     SECTION("read timeout") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            std::shared_ptr<asyncio::ev::IBuffer> buffer = asyncio::ev::newBuffer(fds[0]);
+            auto buffer = asyncio::ev::makeBuffer(fds[0]);
 
             REQUIRE(buffer);
             REQUIRE(buffer->fd() > 0);
@@ -73,7 +73,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
 
     SECTION("write timeout") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            std::shared_ptr<asyncio::ev::IBuffer> buffer = asyncio::ev::newBuffer(fds[0]);
+            auto buffer = asyncio::ev::makeBuffer(fds[0]);
 
             REQUIRE(buffer);
             REQUIRE(buffer->fd() > 0);

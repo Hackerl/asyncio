@@ -1,51 +1,48 @@
 #include <asyncio/event_loop.h>
+#include <asyncio/ev/timer.h>
 #include <event2/dns.h>
 #include <event2/thread.h>
 
 thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 
 asyncio::EventLoop::EventLoop(event_base *base, evdns_base *dnsBase, size_t maxWorkers)
-        : mBase(base), mDnsBase(dnsBase), mMaxWorkers(maxWorkers) {
+        : mMaxWorkers(maxWorkers), mBase(base, event_base_free),
+          mDnsBase(dnsBase, [](evdns_base *base) { evdns_base_free(base, 0); }) {
 
-}
-
-asyncio::EventLoop::~EventLoop() {
-    evdns_base_free(mDnsBase, 0);
-    event_base_free(mBase);
 }
 
 event_base *asyncio::EventLoop::base() {
-    return mBase;
+    return mBase.get();
 }
 
 evdns_base *asyncio::EventLoop::dnsBase() {
-    return mDnsBase;
+    return mDnsBase.get();
 }
 
 bool asyncio::EventLoop::addNameserver(const char *ip) {
-    return evdns_base_nameserver_ip_add(mDnsBase, ip) == 0;
+    return evdns_base_nameserver_ip_add(mDnsBase.get(), ip) == 0;
 }
 
 void asyncio::EventLoop::dispatch() {
-    event_base_dispatch(mBase);
+    event_base_dispatch(mBase.get());
 }
 
 void asyncio::EventLoop::loopBreak() {
-    event_base_loopbreak(mBase);
+    event_base_loopbreak(mBase.get());
 }
 
 void asyncio::EventLoop::loopExit(std::optional<std::chrono::milliseconds> ms) {
     if (!ms) {
-        event_base_loopexit(mBase, nullptr);
+        event_base_loopexit(mBase.get(), nullptr);
         return;
     }
 
     timeval tv = {
-            (time_t) (ms->count() / 1000),
-            (suseconds_t) ((ms->count() % 1000) * 1000)
+            (decltype(timeval::tv_sec)) (ms->count() / 1000),
+            (decltype(timeval::tv_usec)) ((ms->count() % 1000) * 1000)
     };
 
-    event_base_loopexit(mBase, &tv);
+    event_base_loopexit(mBase.get(), &tv);
 }
 
 std::shared_ptr<asyncio::EventLoop> asyncio::getEventLoop() {
@@ -63,7 +60,7 @@ bool asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
     return true;
 }
 
-tl::expected<std::shared_ptr<asyncio::EventLoop>, std::error_code> asyncio::newEventLoop(size_t maxWorkers) {
+tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(size_t maxWorkers) {
     static std::once_flag flag;
 
     std::call_once(flag, []() {
@@ -104,18 +101,14 @@ tl::expected<std::shared_ptr<asyncio::EventLoop>, std::error_code> asyncio::newE
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
-    return std::make_shared<EventLoop>(base, dnsBase, maxWorkers);
+    return EventLoop{base, dnsBase, maxWorkers};
 }
 
-zero::async::coroutine::Task<void> asyncio::sleep(std::chrono::milliseconds ms) {
-    zero::async::promise::Promise<void, nullptr_t> promise;
+zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(std::chrono::milliseconds ms) {
+    auto timer = ev::makeTimer();
 
-    getEventLoop()->post(
-            [=]() mutable {
-                promise.resolve();
-            },
-            ms
-    );
+    if (!timer)
+        co_return tl::unexpected(timer.error());
 
-    co_await promise;
+    co_return co_await timer->after(ms);
 }

@@ -1,48 +1,49 @@
 #include <asyncio/ev/signal.h>
 #include <asyncio/event_loop.h>
 
-asyncio::ev::Signal::Signal(int sig) {
-    mEvent = evsignal_new(
-            getEventLoop()->base(),
-            sig,
-            [](evutil_socket_t fd, short event, void *arg) {
-                auto promise = std::move(static_cast<Signal *>(arg)->mPromise);
-                promise->resolve();
-            },
-            this
-    );
-}
+asyncio::ev::Signal::Signal(std::unique_ptr<event, void (*)(event *)> event) : Notifier(std::move(event)) {
 
-asyncio::ev::Signal::~Signal() {
-    event_free(mEvent);
 }
 
 int asyncio::ev::Signal::sig() {
-    return event_get_signal(mEvent);
+    return event_get_signal(mEvent.get());
 }
 
-bool asyncio::ev::Signal::cancel() {
-    if (!pending())
-        return false;
-
-    event_del(mEvent);
-
-    auto p = std::move(mPromise);
-    p->reject(make_error_code(std::errc::operation_canceled));
-
-    return true;
-}
-
-bool asyncio::ev::Signal::pending() {
-    return mPromise.operator bool();
-}
-
-zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Signal::on() {
-    if (mPromise)
+zero::async::coroutine::Task<void, std::error_code>
+asyncio::ev::Signal::on() {
+    if (pending())
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
     co_return co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromise = std::make_unique<zero::async::promise::Promise<void, std::error_code>>(promise);
-        evsignal_add(mEvent, nullptr);
+        context() = promise;
+        evsignal_add(mEvent.get(), nullptr);
     });
+}
+
+tl::expected<asyncio::ev::Signal, std::error_code> asyncio::ev::makeSignal(int sig) {
+    auto context = new Signal::Context();
+
+    event *e = evsignal_new(
+            getEventLoop()->base(),
+            sig,
+            [](evutil_socket_t fd, short what, void *arg) {
+                std::exchange(*static_cast<Event::Context *>(arg), std::nullopt)->resolve();
+            },
+            context
+    );
+
+    if (!e) {
+        delete context;
+        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+    }
+
+    return Signal{
+            std::unique_ptr<event, void (*)(event *)>(
+                    e,
+                    [](event *event) {
+                        delete static_cast<Signal::Context *>(event_get_callback_arg(event));
+                        event_free(event);
+                    }
+            )
+    };
 }

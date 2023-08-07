@@ -9,7 +9,11 @@ std::string asyncio::Category::message(int value) const {
 
     switch (value) {
         case IO_EOF:
-            msg = "end of file";
+            msg = "eof";
+            break;
+
+        case RESOURCE_DESTROYED:
+            msg = "resource destroyed";
             break;
 
         default:

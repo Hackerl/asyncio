@@ -17,8 +17,11 @@ namespace asyncio {
         using T = std::invoke_result_t<F>;
 
         auto eventLoop = getEventLoop();
+        auto event = ev::makeEvent(-1, ev::What::READ);
 
-        std::shared_ptr<ev::Event> event = std::make_shared<ev::Event>(-1);
+        if (!event)
+            throw std::system_error(event.error());
+
         std::unique_ptr<Worker> worker;
 
         if (eventLoop->mWorkers.empty()) {
@@ -29,9 +32,9 @@ namespace asyncio {
         }
 
         if constexpr (std::is_void_v<T>) {
-            auto task = event->on(ev::What::READ);
+            auto task = event->on();
 
-            worker->execute([=, f = std::forward<F>(f)]() {
+            worker->execute([&, f = std::forward<F>(f)]() {
                 f();
                 event->trigger(ev::What::READ);
             });
@@ -44,9 +47,9 @@ namespace asyncio {
             co_return;
         } else {
             T result;
-            auto task = event->on(ev::What::READ);
+            auto task = event->on();
 
-            worker->execute([=, &result, f = std::forward<F>(f)]() {
+            worker->execute([&, f = std::forward<F>(f)]() {
                 result = f();
                 event->trigger(ev::What::READ);
             });

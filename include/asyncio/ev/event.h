@@ -14,33 +14,56 @@ namespace asyncio::ev {
         CLOSED = EV_CLOSED
     };
 
-    class Event {
+    template<typename T>
+    class Notifier {
     public:
-        explicit Event(evutil_socket_t fd);
-        Event(const Event &) = delete;
-        ~Event();
+        using Context = std::optional<zero::async::promise::Promise<T, std::error_code>>;
 
     public:
-        Event &operator=(const Event &) = delete;
+        explicit Notifier(std::unique_ptr<event, void (*)(event *)> event) : mEvent(std::move(event)) {
+
+        }
+
+    protected:
+        Context &context() {
+            return *static_cast<Context *>(event_get_callback_arg(mEvent.get()));
+        }
+
+    public:
+        bool cancel() {
+            if (!pending())
+                return false;
+
+            event_del(mEvent.get());
+            std::exchange(context(), std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+
+            return true;
+        }
+
+        bool pending() {
+            return context().has_value();
+        }
+
+    protected:
+        std::unique_ptr<event, void (*)(event *)> mEvent;
+    };
+
+    class Event : public Notifier<short> {
+    public:
+        explicit Event(std::unique_ptr<event, void (*)(event *)> event);
 
     public:
         evutil_socket_t fd();
 
     public:
-        bool cancel();
-        bool pending();
         void trigger(short events);
 
     public:
-        zero::async::coroutine::Task<short, std::error_code> on(
-                short events,
-                std::optional<std::chrono::milliseconds> timeout = std::nullopt
-        );
-
-    private:
-        event *mEvent;
-        std::unique_ptr<zero::async::promise::Promise<short, std::error_code>> mPromise;
+        zero::async::coroutine::Task<short, std::error_code>
+        on(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
     };
+
+    tl::expected<Event, std::error_code> makeEvent(evutil_socket_t fd, short events);
 }
 
 #endif //ASYNCIO_EVENT_H
