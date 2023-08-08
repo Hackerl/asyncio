@@ -70,7 +70,7 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::
         char *ptr = evbuffer_readln(input, nullptr, (evbuffer_eol_style) eol);
 
         if (ptr) {
-            result = std::unique_ptr<char>(ptr).get();
+            result = std::unique_ptr<char, decltype(free) *>(ptr, free).get();
             break;
         }
 

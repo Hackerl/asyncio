@@ -10,6 +10,8 @@ add_executable(
         ev/buffer.cpp
         ev/signal.cpp
         ev/timer.cpp
+        net/net.cpp
+        net/dgram.cpp
         $<$<PLATFORM_ID:Windows>:main.cpp>
 )
 

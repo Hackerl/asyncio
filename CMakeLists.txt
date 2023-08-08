@@ -34,6 +34,8 @@ add_library(
         src/ev/buffer.cpp
         src/ev/signal.cpp
         src/ev/timer.cpp
+        src/net/net.cpp
+        src/net/dgram.cpp
 )
 
 if (ASYNCIO_EMBED_CA_CERT)
