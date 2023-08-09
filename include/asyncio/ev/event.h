@@ -4,6 +4,7 @@
 #include <chrono>
 #include <optional>
 #include <event.h>
+#include <cassert>
 #include <zero/async/coroutine.h>
 
 namespace asyncio::ev {
@@ -22,6 +23,12 @@ namespace asyncio::ev {
     public:
         explicit Notifier(std::unique_ptr<event, void (*)(event *)> event) : mEvent(std::move(event)) {
 
+        }
+
+        Notifier(Notifier &&) = default;
+
+        ~Notifier() {
+            assert(!mEvent || !context().has_value());
         }
 
     protected:

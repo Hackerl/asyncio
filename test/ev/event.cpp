@@ -15,7 +15,7 @@ TEST_CASE("async event notification", "[event]") {
 
     SECTION("normal") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            co_await zero::async::coroutine::all(
+            co_await zero::async::coroutine::allSettled(
                     [&]() -> zero::async::coroutine::Task<void> {
                         auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::READ).value();
                         auto result = co_await event.on();

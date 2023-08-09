@@ -12,7 +12,7 @@ TEST_CASE("signal handler", "[signal]") {
 
         auto task = signal->on();
 
-        co_await zero::async::coroutine::all(
+        co_await zero::async::coroutine::allSettled(
                 []() -> zero::async::coroutine::Task<void> {
                     co_await asyncio::sleep(100ms);
                     raise(SIGINT);

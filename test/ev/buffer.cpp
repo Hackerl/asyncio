@@ -15,7 +15,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
 
     SECTION("normal") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            co_await zero::async::coroutine::all(
+            co_await zero::async::coroutine::allSettled(
                     [&]() -> zero::async::coroutine::Task<void> {
                         auto buffer = asyncio::ev::makeBuffer(fds[0]);
 

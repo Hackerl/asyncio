@@ -9,7 +9,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
             auto buffers = asyncio::ev::pipe();
             REQUIRE(buffers);
 
-            co_await zero::async::coroutine::all(
+            co_await zero::async::coroutine::allSettled(
                     [&buffer = buffers->at(0)]() -> zero::async::coroutine::Task<void> {
                         buffer.writeLine("hello world");
                         co_await buffer.drain();
@@ -44,7 +44,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
             auto buffers = asyncio::ev::pipe();
             REQUIRE(buffers);
 
-            co_await zero::async::coroutine::all(
+            co_await zero::async::coroutine::allSettled(
                     [&buffer = buffers->at(0)]() -> zero::async::coroutine::Task<void> {
                         buffer.writeLine("hello world");
                         co_await buffer.drain();

@@ -2,6 +2,7 @@
 #include <asyncio/event_loop.h>
 #include <asyncio/error.h>
 #include <optional>
+#include <cassert>
 
 constexpr auto READ_INDEX = 0;
 constexpr auto DRAIN_INDEX = 1;
@@ -27,7 +28,11 @@ asyncio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev, bufferevent_free), mCl
 }
 
 asyncio::ev::Buffer::Buffer(asyncio::ev::Buffer &&rhs) noexcept
-        : mBev(std::move(rhs.mBev)), mClosed(rhs.mClosed), mPromises(std::move(rhs.mPromises)) {
+        : mBev(std::move(rhs.mBev)), mClosed(rhs.mClosed) {
+    assert(!mPromises[READ_INDEX]);
+    assert(!mPromises[DRAIN_INDEX]);
+    assert(!mPromises[WAIT_CLOSED_INDEX]);
+
     bufferevent_data_cb rcb, wcb;
     bufferevent_event_cb ecb;
 
@@ -36,10 +41,9 @@ asyncio::ev::Buffer::Buffer(asyncio::ev::Buffer &&rhs) noexcept
 }
 
 asyncio::ev::Buffer::~Buffer() {
-    if (mClosed)
-        return;
-
-    onClose(Error::IO_EOF);
+    assert(!mPromises[READ_INDEX]);
+    assert(!mPromises[DRAIN_INDEX]);
+    assert(!mPromises[WAIT_CLOSED_INDEX]);
 }
 
 size_t asyncio::ev::Buffer::available() {

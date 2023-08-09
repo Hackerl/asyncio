@@ -1,5 +1,6 @@
 #include <asyncio/net/dgram.h>
 #include <asyncio/error.h>
+#include <cassert>
 
 constexpr auto READ_INDEX = 0;
 constexpr auto WRITE_INDEX = 1;
