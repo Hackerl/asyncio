@@ -6,8 +6,8 @@
 
 namespace asyncio::net::dgram {
     class Socket : public ISocket {
-    private:
-        Socket(evutil_socket_t fd, ev::Event events[2]);
+    public:
+        Socket(evutil_socket_t fd, std::array<ev::Event, 2> events);
         Socket(Socket &&rhs) noexcept;
         ~Socket() override;
 
@@ -15,6 +15,13 @@ namespace asyncio::net::dgram {
         zero::async::coroutine::Task<size_t, std::error_code> read(std::span<std::byte> data) override;
         zero::async::coroutine::Task<void, std::error_code> write(std::span<const std::byte> data) override;
         tl::expected<void, std::error_code> close() override;
+
+    public:
+        zero::async::coroutine::Task<std::pair<size_t, Address>, std::error_code>
+        readFrom(std::span<std::byte> data) override;
+
+        zero::async::coroutine::Task<void, std::error_code>
+        writeTo(std::span<const std::byte> data, const Address &address) override;
 
     public:
         void setTimeout(std::chrono::milliseconds timeout) override;
@@ -35,5 +42,17 @@ namespace asyncio::net::dgram {
         std::array<ev::Event, 2> mEvents;
         std::array<std::optional<std::chrono::milliseconds>, 2> mTimeouts;
     };
+
+    tl::expected<Socket, std::error_code> bind(const Address &address);
+    tl::expected<Socket, std::error_code> bind(std::span<const Address> addresses);
+    tl::expected<Socket, std::error_code> bind(const std::string &ip, unsigned short port);
+
+    zero::async::coroutine::Task<std::shared_ptr<Socket>, std::error_code> connect(const Address &address);
+    zero::async::coroutine::Task<std::shared_ptr<Socket>, std::error_code> connect(std::span<const Address> addresses);
+
+    zero::async::coroutine::Task<std::shared_ptr<Socket>, std::error_code>
+    connect(const std::string &host, unsigned short port);
+
+    tl::expected<Socket, std::error_code> makeSocket(int family);
 }
 #endif //ASYNCIO_DGRAM_H

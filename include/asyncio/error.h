@@ -15,7 +15,7 @@ namespace asyncio {
         [[nodiscard]] std::string message(int value) const override;
     };
 
-    const std::error_category &asyncio_category();
+    const std::error_category &category();
     std::error_code make_error_code(Error e);
 }
 

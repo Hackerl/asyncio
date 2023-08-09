@@ -11,6 +11,7 @@ add_executable(
         ev/signal.cpp
         ev/timer.cpp
         net/net.cpp
+        net/dns.cpp
         net/dgram.cpp
         $<$<PLATFORM_ID:Windows>:main.cpp>
 )

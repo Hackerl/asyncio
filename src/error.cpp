@@ -24,11 +24,11 @@ std::string asyncio::Category::message(int value) const {
     return msg;
 }
 
-const std::error_category &asyncio::asyncio_category() {
+const std::error_category &asyncio::category() {
     static Category instance;
     return instance;
 }
 
-std::error_code asyncio::make_error_code(asyncio::Error e) {
-    return {static_cast<int>(e), asyncio_category()};
+std::error_code asyncio::make_error_code(Error e) {
+    return {static_cast<int>(e), category()};
 }

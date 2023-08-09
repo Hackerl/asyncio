@@ -3,7 +3,6 @@
 
 #include <event.h>
 #include <variant>
-#include <optional>
 #include <asyncio/io.h>
 
 namespace asyncio::net {
@@ -69,6 +68,13 @@ namespace asyncio::net {
         virtual evutil_socket_t fd() = 0;
         virtual tl::expected<void, std::error_code> bind(const Address &address) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> connect(const Address &address) = 0;
+
+    public:
+        virtual zero::async::coroutine::Task<std::pair<size_t, Address>, std::error_code>
+        readFrom(std::span<std::byte> data) = 0;
+
+        virtual zero::async::coroutine::Task<void, std::error_code>
+        writeTo(std::span<const std::byte> data, const Address &address) = 0;
     };
 }
 
