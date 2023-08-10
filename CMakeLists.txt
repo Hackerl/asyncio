@@ -37,6 +37,7 @@ add_library(
         src/net/net.cpp
         src/net/dns.cpp
         src/net/dgram.cpp
+        src/net/stream.cpp
 )
 
 if (ASYNCIO_EMBED_CA_CERT)

@@ -1,7 +1,7 @@
 #include <asyncio/ev/event.h>
 #include <asyncio/event_loop.h>
 
-asyncio::ev::Event::Event(std::unique_ptr<event, void (*)(event *)> event) : Notifier(std::move(event)) {
+asyncio::ev::Event::Event(event *e) : Notifier(e) {
 
 }
 
@@ -53,13 +53,5 @@ tl::expected<asyncio::ev::Event, std::error_code> asyncio::ev::makeEvent(evutil_
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
-    return Event{
-            std::unique_ptr<event, void (*)(event *)>(
-                    e,
-                    [](event *event) {
-                        delete static_cast<Event::Context *>(event_get_callback_arg(event));
-                        event_free(event);
-                    }
-            )
-    };
+    return Event{e};
 }

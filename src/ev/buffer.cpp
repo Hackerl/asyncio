@@ -278,7 +278,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::waitClo
 
 evutil_socket_t asyncio::ev::Buffer::fd() {
     if (!mBev)
-        return -1;
+        return EVUTIL_INVALID_SOCKET;
 
     return bufferevent_getfd(mBev.get());
 }

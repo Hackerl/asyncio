@@ -51,6 +51,7 @@ asyncio::net::dns::getAddressInfo(
                     addresses.push_back(std::move(*address));
                 }
 
+                evutil_freeaddrinfo(res);
                 promise->resolve(std::move(addresses));
             },
             &promise

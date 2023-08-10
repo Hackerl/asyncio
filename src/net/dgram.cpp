@@ -19,7 +19,7 @@ asyncio::net::dgram::Socket::Socket(asyncio::net::dgram::Socket &&rhs) noexcept
 }
 
 asyncio::net::dgram::Socket::~Socket() {
-    if (mFD != EVUTIL_INVALID_SOCKET)
+    if (mFD == EVUTIL_INVALID_SOCKET)
         return;
 
     evutil_closesocket(mFD);

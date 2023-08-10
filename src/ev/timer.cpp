@@ -1,7 +1,7 @@
 #include <asyncio/ev/timer.h>
 #include <asyncio/event_loop.h>
 
-asyncio::ev::Timer::Timer(std::unique_ptr<event, void (*)(event *)> event) : Notifier(std::move(event)) {
+asyncio::ev::Timer::Timer(event *e) : Notifier(e) {
 
 }
 
@@ -37,13 +37,5 @@ tl::expected<asyncio::ev::Timer, std::error_code> asyncio::ev::makeTimer() {
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
-    return Timer{
-            std::unique_ptr<event, void (*)(event *)>(
-                    e,
-                    [](event *event) {
-                        delete static_cast<Timer::Context *>(event_get_callback_arg(event));
-                        event_free(event);
-                    }
-            )
-    };
+    return Timer{e};
 }

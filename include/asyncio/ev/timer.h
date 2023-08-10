@@ -9,7 +9,7 @@
 namespace asyncio::ev {
     class Timer : public Notifier<void> {
     public:
-        explicit Timer(std::unique_ptr<event, void (*)(event *)> event);
+        explicit Timer(event *e);
 
     public:
         zero::async::coroutine::Task<void, std::error_code> after(std::chrono::milliseconds delay);

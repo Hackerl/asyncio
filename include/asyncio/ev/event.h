@@ -21,7 +21,13 @@ namespace asyncio::ev {
         using Context = std::optional<zero::async::promise::Promise<T, std::error_code>>;
 
     public:
-        explicit Notifier(std::unique_ptr<event, void (*)(event *)> event) : mEvent(std::move(event)) {
+        explicit Notifier(event *e) : mEvent(
+                e,
+                [](event *e) {
+                    delete static_cast<Context *>(event_get_callback_arg(e));
+                    event_free(e);
+                }
+        ) {
 
         }
 
@@ -57,7 +63,7 @@ namespace asyncio::ev {
 
     class Event : public Notifier<short> {
     public:
-        explicit Event(std::unique_ptr<event, void (*)(event *)> event);
+        explicit Event(event *e);
 
     public:
         evutil_socket_t fd();

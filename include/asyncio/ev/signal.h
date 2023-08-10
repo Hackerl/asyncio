@@ -8,7 +8,7 @@
 namespace asyncio::ev {
     class Signal : public Notifier<void> {
     public:
-        explicit Signal(std::unique_ptr<event, void (*)(event *)> event);
+        explicit Signal(event *e);
 
     public:
         int sig();

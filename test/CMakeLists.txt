@@ -13,6 +13,7 @@ add_executable(
         net/net.cpp
         net/dns.cpp
         net/dgram.cpp
+        net/stream.cpp
         $<$<PLATFORM_ID:Windows>:main.cpp>
 )
 

@@ -57,7 +57,7 @@ namespace asyncio::net {
 
     tl::expected<sockaddr_storage, std::error_code> socketAddressFrom(const Address &address);
 
-    class IEndpoint : public zero::Interface {
+    class IEndpoint : public virtual zero::Interface {
     public:
         virtual tl::expected<Address, std::error_code> localAddress() = 0;
         virtual tl::expected<Address, std::error_code> remoteAddress() = 0;

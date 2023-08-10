@@ -1,7 +1,7 @@
 #include <asyncio/ev/signal.h>
 #include <asyncio/event_loop.h>
 
-asyncio::ev::Signal::Signal(std::unique_ptr<event, void (*)(event *)> event) : Notifier(std::move(event)) {
+asyncio::ev::Signal::Signal(event *e) : Notifier(e) {
 
 }
 
@@ -37,13 +37,5 @@ tl::expected<asyncio::ev::Signal, std::error_code> asyncio::ev::makeSignal(int s
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
-    return Signal{
-            std::unique_ptr<event, void (*)(event *)>(
-                    e,
-                    [](event *event) {
-                        delete static_cast<Signal::Context *>(event_get_callback_arg(event));
-                        event_free(event);
-                    }
-            )
-    };
+    return Signal{e};
 }
