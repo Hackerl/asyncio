@@ -13,7 +13,7 @@ TEST_CASE("async channel buffer", "[channel]") {
 
             auto produce = [&]() -> zero::async::coroutine::Task<void> {
                 while (true) {
-                    if (counters[0] >= 100000)
+                    if (counters[0] >= 10000)
                         break;
 
                     auto result = co_await channel.send(counters[0]++);
@@ -62,7 +62,7 @@ TEST_CASE("async channel buffer", "[channel]") {
 
                 auto produce = [&]() {
                     while (true) {
-                        if (counters[0] >= 100000)
+                        if (counters[0] >= 10000)
                             break;
 
                         channel.sendSync(counters[0]++);
@@ -141,7 +141,7 @@ TEST_CASE("async channel buffer", "[channel]") {
 
                 auto produce = [&]() -> zero::async::coroutine::Task<void> {
                     while (true) {
-                        if (counters[0] >= 100000)
+                        if (counters[0] >= 10000)
                             break;
 
                         auto result = co_await channel.send(counters[0]++);

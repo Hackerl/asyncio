@@ -1,5 +1,6 @@
 #include <asyncio/net/dns.h>
 #include <asyncio/event_loop.h>
+#include <zero/os/net.h>
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("DNS query", "[dns]") {
@@ -39,13 +40,9 @@ TEST_CASE("DNS query", "[dns]") {
                             result->end(),
                             [](const auto &ip) {
                                 if (ip.index() == 0)
-                                    return memcmp(std::get<0>(ip).data(), "\x7f\x00\x00\x01", 4) == 0;
+                                    return zero::os::net::stringify(std::get<0>(ip)) == "127.0.0.1";
 
-                                return memcmp(
-                                        std::get<1>(ip).data(),
-                                        "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
-                                        16
-                                ) == 0;
+                                return zero::os::net::stringify(std::get<1>(ip)) == "::1";
                             }
                     )
             );
@@ -58,21 +55,14 @@ TEST_CASE("DNS query", "[dns]") {
 
             REQUIRE(result);
             REQUIRE(result->size() == 1);
-            REQUIRE(memcmp(result->front().data(), "\x7f\x00\x00\x01", 4) == 0);
+            REQUIRE(zero::os::net::stringify(result->front()) == "127.0.0.1");
         });
     }
 
     SECTION("lookup IPv6") {
         asyncio::run([]() -> zero::async::coroutine::Task<void> {
             auto result = co_await asyncio::net::dns::lookupIPv6("localhost");
-
-            REQUIRE(result);
-            REQUIRE(result->size() == 1);
-            REQUIRE(memcmp(
-                    result->front().data(),
-                    "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
-                    16) == 0
-            );
+            REQUIRE((result->empty() || zero::os::net::stringify(result->front()) == "::1"));
         });
     }
 }

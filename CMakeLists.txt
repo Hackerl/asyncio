@@ -38,6 +38,7 @@ add_library(
         src/net/dns.cpp
         src/net/dgram.cpp
         src/net/stream.cpp
+        $<$<NOT:$<BOOL:${ASYNCIO_DISABLE_SSL}>>:src/net/ssl.cpp>
 )
 
 if (ASYNCIO_EMBED_CA_CERT)
@@ -82,7 +83,6 @@ if (ASYNCIO_DISABLE_SSL)
             EXCLUDE_HEADERS
             ${EXCLUDE_HEADERS}
             PATTERN "net/ssl.h" EXCLUDE
-            PATTERN "http/websocket.h" EXCLUDE
     )
 endif ()
 
