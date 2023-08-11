@@ -2,10 +2,8 @@
 #define ASYNCIO_CHANNEL_H
 
 #include "error.h"
-#include "ev/event.h"
 #include "event_loop.h"
 #include <chrono>
-#include <variant>
 #include <zero/interface.h>
 #include <zero/async/coroutine.h>
 #include <zero/atomic/event.h>
@@ -59,9 +57,6 @@ namespace asyncio {
         static constexpr auto SENDER = 0;
         static constexpr auto RECEIVER = 1;
 
-    private:
-        using Event = std::variant<std::shared_ptr<ev::Event>, std::shared_ptr<zero::atomic::Event>>;
-
     public:
         explicit Channel(size_t capacity) : mClosed(false), mBuffer(capacity), mEventLoop(getEventLoop()) {
 
@@ -108,7 +103,7 @@ namespace asyncio {
 
             std::lock_guard<std::mutex> guard(mMutex);
 
-            trigger<RECEIVER>(ev::What::READ);
+            trigger<RECEIVER>();
             return {};
         }
 
@@ -137,8 +132,8 @@ namespace asyncio {
 
             mClosed = true;
 
-            trigger<SENDER>(ev::What::CLOSED);
-            trigger<RECEIVER>(ev::What::CLOSED);
+            trigger<SENDER>(Error::IO_EOF);
+            trigger<RECEIVER>(Error::IO_EOF);
         }
 
         tl::expected<T, std::error_code> receiveSync() override {
@@ -164,7 +159,7 @@ namespace asyncio {
 
             std::lock_guard<std::mutex> guard(mMutex);
 
-            trigger<SENDER>(ev::What::WRITE);
+            trigger<SENDER>();
             return element;
         }
 
@@ -201,8 +196,13 @@ namespace asyncio {
                     }
 
                     std::shared_ptr<zero::atomic::Event> event = std::make_shared<zero::atomic::Event>();
+                    zero::async::promise::Promise<void, std::error_code> promise;
 
-                    mPending[SENDER].emplace_back(event);
+                    promise.finally([=]() {
+                        event->notify();
+                    });
+
+                    mPending[SENDER].push_back(promise);
                     mMutex.unlock();
 
                     auto res = event->wait(timeout);
@@ -220,7 +220,7 @@ namespace asyncio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                trigger<RECEIVER>(ev::What::READ);
+                trigger<RECEIVER>();
                 break;
             }
 
@@ -251,30 +251,25 @@ namespace asyncio {
                         continue;
                     }
 
-                    auto event = ev::makeEvent(-1, ev::What::WRITE).transform([](ev::Event &&event) {
-                        return std::make_shared<ev::Event>(std::move(event));
-                    });
+                    zero::async::promise::Promise<void, std::error_code> promise;
 
-                    if (!event) {
-                        result = tl::unexpected(event.error());
-                        break;
-                    }
-
-                    mPending[SENDER].emplace_back(*event);
+                    mPending[SENDER].emplace_back(promise);
                     mMutex.unlock();
 
-                    auto what = co_await event.value()->on(timeout);
+                    auto task = [=]() -> zero::async::coroutine::Task<void, std::error_code> {
+                        co_return co_await zero::async::coroutine::Cancellable{
+                                promise,
+                                [=]() mutable -> tl::expected<void, std::error_code> {
+                                    promise.reject(make_error_code(std::errc::operation_canceled));
+                                    return {};
+                                }
+                        };
+                    }();
 
-                    if (!what) {
-                        result = tl::unexpected(what.error());
-                        break;
-                    }
+                    auto res = timeout ? (co_await asyncio::timeout(task, *timeout)) : (co_await task);
 
-                    if (*what & ev::What::CLOSED) {
-                        result = tl::unexpected<std::error_code>(Error::IO_EOF);
-                        break;
-                    } else if (*what & ev::What::TIMEOUT) {
-                        result = tl::unexpected(make_error_code(std::errc::timed_out));
+                    if (!res) {
+                        result = tl::unexpected(res.error());
                         break;
                     }
 
@@ -286,7 +281,7 @@ namespace asyncio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                trigger<RECEIVER>(ev::What::READ);
+                trigger<RECEIVER>();
                 break;
             }
 
@@ -314,8 +309,13 @@ namespace asyncio {
                     }
 
                     std::shared_ptr<zero::atomic::Event> event = std::make_shared<zero::atomic::Event>();
+                    zero::async::promise::Promise<void, std::error_code> promise;
 
-                    mPending[RECEIVER].emplace_back(event);
+                    promise.finally([=]() {
+                        event->notify();
+                    });
+
+                    mPending[RECEIVER].push_back(std::move(promise));
                     mMutex.unlock();
 
                     auto res = event->wait(timeout);
@@ -333,7 +333,7 @@ namespace asyncio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                trigger<SENDER>(ev::What::WRITE);
+                trigger<SENDER>();
                 break;
             }
 
@@ -360,30 +360,25 @@ namespace asyncio {
                         continue;
                     }
 
-                    auto event = ev::makeEvent(-1, ev::What::WRITE).transform([](ev::Event &&event) {
-                        return std::make_shared<ev::Event>(std::move(event));
-                    });
+                    zero::async::promise::Promise<void, std::error_code> promise;
 
-                    if (!event) {
-                        result = tl::unexpected(event.error());
-                        break;
-                    }
-
-                    mPending[RECEIVER].emplace_back(*event);
+                    mPending[RECEIVER].push_back(promise);
                     mMutex.unlock();
 
-                    auto what = co_await event.value()->on(timeout);
+                    auto task = [=]() -> zero::async::coroutine::Task<void, std::error_code> {
+                        co_return co_await zero::async::coroutine::Cancellable{
+                                promise,
+                                [=]() mutable -> tl::expected<void, std::error_code> {
+                                    promise.reject(make_error_code(std::errc::operation_canceled));
+                                    return {};
+                                }
+                        };
+                    }();
 
-                    if (!what) {
-                        result = tl::unexpected(what.error());
-                        break;
-                    }
+                    auto res = timeout ? (co_await asyncio::timeout(task, *timeout)) : (co_await task);
 
-                    if (*what & ev::What::CLOSED) {
-                        result = tl::unexpected<std::error_code>(Error::IO_EOF);
-                        break;
-                    } else if (*what & ev::What::TIMEOUT) {
-                        result = tl::unexpected(make_error_code(std::errc::timed_out));
+                    if (!res) {
+                        result = tl::unexpected(res.error());
                         break;
                     }
 
@@ -395,7 +390,7 @@ namespace asyncio {
 
                 std::lock_guard<std::mutex> guard(mMutex);
 
-                trigger<SENDER>(ev::What::WRITE);
+                trigger<SENDER>();
                 result = std::move(element);
 
                 break;
@@ -406,24 +401,24 @@ namespace asyncio {
 
     private:
         template<int Index>
-        void trigger(short what) {
+        void trigger() {
             if (mPending[Index].empty())
                 return;
 
-            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() {
-                for (const auto &event: pending) {
-                    if (event.index() != 0) {
-                        std::get<1>(event)->notify();
-                        continue;
-                    }
+            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
+                for (auto &promise: pending)
+                    promise.resolve();
+            });
+        }
 
-                    auto &evt = std::get<0>(event);
+        template<int Index>
+        void trigger(const std::error_code &ec) {
+            if (mPending[Index].empty())
+                return;
 
-                    if (!evt->pending())
-                        continue;
-
-                    evt->trigger(what);
-                }
+            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
+                for (auto &promise: pending)
+                    promise.reject(ec);
             });
         }
 
@@ -432,7 +427,7 @@ namespace asyncio {
         std::atomic<bool> mClosed;
         std::shared_ptr<EventLoop> mEventLoop;
         zero::atomic::CircularBuffer<T> mBuffer;
-        std::array<std::list<Event>, 2> mPending;
+        std::array<std::list<zero::async::promise::Promise<void, std::error_code>>, 2> mPending;
     };
 }
 
