@@ -91,4 +91,24 @@ TEST_CASE("async stream buffer", "[buffer]") {
 
         evutil_closesocket(fds[1]);
     }
+
+    SECTION("cancel") {
+        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+            auto buffer = asyncio::ev::makeBuffer(fds[0]);
+
+            REQUIRE(buffer);
+            REQUIRE(buffer->fd() > 0);
+
+            std::byte data[10240];
+            auto task = buffer->read(data);
+            auto result = co_await asyncio::timeout(task, 50ms);
+
+            REQUIRE(task.done());
+            REQUIRE(task.result().error() == std::errc::operation_canceled);
+            REQUIRE(!result);
+            REQUIRE(result.error() == std::errc::timed_out);
+        });
+
+        evutil_closesocket(fds[1]);
+    }
 }

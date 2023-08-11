@@ -430,7 +430,7 @@ asyncio::net::ssl::stream::connect(
     if (!bev)
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    zero::async::promise::Promise<void, std::error_code> promise;
+    auto promise = new zero::async::promise::Promise<void, std::error_code>();
 
     bufferevent_setcb(
             bev,
@@ -446,20 +446,31 @@ asyncio::net::ssl::stream::connect(
                             make_error_code((Error) e) :
                             std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category())
                     );
+
+                    delete promise;
                     return;
                 }
 
                 promise->resolve();
+                delete promise;
             },
-            &promise
+            promise
     );
 
     if (bufferevent_socket_connect_hostname(bev, getEventLoop()->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
+        delete promise;
         bufferevent_free(bev);
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
-    auto result = co_await promise;
+    auto result = co_await zero::async::coroutine::Cancellable{
+            *promise,
+            [=]() -> tl::expected<void, std::error_code> {
+                promise->reject(make_error_code(std::errc::operation_canceled));
+                delete promise;
+                return {};
+            }
+    };
 
     if (!result) {
         bufferevent_free(bev);

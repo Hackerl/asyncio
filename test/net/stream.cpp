@@ -64,7 +64,7 @@ TEST_CASE("stream network connection", "[stream]") {
 #ifdef __unix__
     SECTION("UNIX domain") {
         asyncio::run([]() -> zero::async::coroutine::Task<void> {
-            auto listener = asyncio::net::stream::listen("/tmp/aio-test.sock");
+            auto listener = asyncio::net::stream::listen("/tmp/asyncio-test.sock");
             REQUIRE(listener);
 
             co_await zero::async::coroutine::allSettled(
@@ -75,7 +75,7 @@ TEST_CASE("stream network connection", "[stream]") {
                         auto &buffer = *result;
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
-                        REQUIRE(asyncio::net::stringify(*localAddress) == "/tmp/aio-test.sock");
+                        REQUIRE(asyncio::net::stringify(*localAddress) == "/tmp/asyncio-test.sock");
 
                         buffer->writeLine("hello world");
                         co_await buffer->drain();
@@ -88,13 +88,13 @@ TEST_CASE("stream network connection", "[stream]") {
                         buffer->close();
                     }(),
                     []() -> zero::async::coroutine::Task<void> {
-                        auto result = co_await asyncio::net::stream::connect("/tmp/aio-test.sock");
+                        auto result = co_await asyncio::net::stream::connect("/tmp/asyncio-test.sock");
                         REQUIRE(result);
 
                         auto &buffer = *result;
                         auto remoteAddress = buffer->remoteAddress();
                         REQUIRE(remoteAddress);
-                        REQUIRE(asyncio::net::stringify(*remoteAddress) == "/tmp/aio-test.sock");
+                        REQUIRE(asyncio::net::stringify(*remoteAddress) == "/tmp/asyncio-test.sock");
 
                         auto line = co_await buffer->readLine();
 
@@ -108,6 +108,7 @@ TEST_CASE("stream network connection", "[stream]") {
             );
 
             listener->close();
+            remove("/tmp/asyncio-test.sock");
         });
     }
 #endif

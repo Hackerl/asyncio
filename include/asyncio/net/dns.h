@@ -2,21 +2,10 @@
 #define ASYNCIO_DNS_H
 
 #include "net.h"
-#include <event2/dns.h>
 
 namespace asyncio::net::dns {
     enum Error {
-        FORMAT = DNS_ERR_FORMAT,
-        SERVER_FAILED = DNS_ERR_SERVERFAILED,
-        NOT_EXIST = DNS_ERR_NOTEXIST,
-        NOT_IMPL = DNS_ERR_NOTIMPL,
-        REFUSED = DNS_ERR_REFUSED,
-        TRUNCATED = DNS_ERR_TRUNCATED,
-        UNKNOWN = DNS_ERR_UNKNOWN,
-        TIMEOUT = DNS_ERR_TIMEOUT,
-        SHUTDOWN = DNS_ERR_SHUTDOWN,
-        CANCEL = DNS_ERR_CANCEL,
-        NODATA = DNS_ERR_NODATA
+
     };
 
     class Category : public std::error_category {

@@ -7,7 +7,7 @@ const char *asyncio::net::dns::Category::name() const noexcept {
 }
 
 std::string asyncio::net::dns::Category::message(int value) const {
-    return evdns_err_to_string(value);
+    return evutil_gai_strerror(value);
 }
 
 const std::error_category &asyncio::net::dns::category() {
@@ -27,7 +27,7 @@ asyncio::net::dns::getAddressInfo(
 ) {
     zero::async::promise::Promise<std::vector<Address>, int> promise;
 
-    evdns_getaddrinfo(
+    evdns_getaddrinfo_request *request = evdns_getaddrinfo(
             getEventLoop()->dnsBase(),
             node.c_str(),
             service ? service->c_str() : nullptr,
@@ -37,6 +37,7 @@ asyncio::net::dns::getAddressInfo(
 
                 if (result != 0) {
                     promise->reject(result);
+                    delete promise;
                     return;
                 }
 
@@ -53,11 +54,23 @@ asyncio::net::dns::getAddressInfo(
 
                 evutil_freeaddrinfo(res);
                 promise->resolve(std::move(addresses));
+                delete promise;
             },
-            &promise
+            new zero::async::promise::Promise<std::vector<Address>, int>(promise)
     );
 
-    co_return (co_await promise).transform_error([](int err) {
+    if (!request)
+        co_return (co_await promise).transform_error([](int err) {
+            return make_error_code((Error) err);
+        });
+
+    co_return (co_await zero::async::coroutine::Cancellable{
+            promise,
+            [=]() -> tl::expected<void, std::error_code> {
+                evdns_getaddrinfo_cancel(request);
+                return {};
+            }
+    }).transform_error([](int err) {
         return make_error_code((Error) err);
     });
 }

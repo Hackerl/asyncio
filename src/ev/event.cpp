@@ -18,21 +18,28 @@ asyncio::ev::Event::on(std::optional<std::chrono::milliseconds> timeout) {
     if (pending())
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-    co_return co_await zero::async::promise::chain<short, std::error_code>([&](const auto &promise) {
-        context() = promise;
+    co_return co_await zero::async::coroutine::Cancellable{
+            zero::async::promise::chain<short, std::error_code>([&](const auto &promise) {
+                context() = promise;
 
-        if (!timeout) {
-            event_add(mEvent.get(), nullptr);
-            return;
-        }
+                if (!timeout) {
+                    event_add(mEvent.get(), nullptr);
+                    return;
+                }
 
-        timeval tv = {
-                (decltype(timeval::tv_sec)) (timeout->count() / 1000),
-                (decltype(timeval::tv_usec)) ((timeout->count() % 1000) * 1000)
-        };
+                timeval tv = {
+                        (decltype(timeval::tv_sec)) (timeout->count() / 1000),
+                        (decltype(timeval::tv_usec)) ((timeout->count() % 1000) * 1000)
+                };
 
-        event_add(mEvent.get(), &tv);
-    });
+                event_add(mEvent.get(), &tv);
+            }),
+            [this]() -> tl::expected<void, std::error_code> {
+                event_del(mEvent.get());
+                std::exchange(context(), std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+                return {};
+            }
+    };
 }
 
 tl::expected<asyncio::ev::Event, std::error_code> asyncio::ev::makeEvent(evutil_socket_t fd, short events) {

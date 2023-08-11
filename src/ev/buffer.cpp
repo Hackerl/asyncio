@@ -83,14 +83,22 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::
             break;
         }
 
-        auto res = co_await zero::async::promise::chain<void, std::error_code>([this](const auto &promise) {
-            mPromises[READ_INDEX] = promise;
+        auto res = co_await zero::async::coroutine::Cancellable{
+                zero::async::promise::chain<void, std::error_code>([this](const auto &promise) {
+                    mPromises[READ_INDEX] = promise;
 
-            bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
-            bufferevent_enable(mBev.get(), EV_READ);
-        }).finally([this]() {
-            bufferevent_disable(mBev.get(), EV_READ);
-        });
+                    bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
+                    bufferevent_enable(mBev.get(), EV_READ);
+                }).finally([this]() {
+                    bufferevent_disable(mBev.get(), EV_READ);
+                }),
+                [this]() -> tl::expected<void, std::error_code> {
+                    std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
+                            make_error_code(std::errc::operation_canceled)
+                    );
+                    return {};
+                }
+        };
 
         if (!res) {
             result = tl::unexpected(res.error());
@@ -122,15 +130,23 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(st
     if (mClosed)
         co_return tl::unexpected(Error::IO_EOF);
 
-    auto result = co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromises[READ_INDEX] = promise;
+    auto result = co_await zero::async::coroutine::Cancellable{
+            zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
+                mPromises[READ_INDEX] = promise;
 
-        bufferevent_setwatermark(mBev.get(), EV_READ, data.size(), 0);
-        bufferevent_enable(mBev.get(), EV_READ);
-    }).finally([this]() {
-        bufferevent_disable(mBev.get(), EV_READ);
-        bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
-    });
+                bufferevent_setwatermark(mBev.get(), EV_READ, data.size(), 0);
+                bufferevent_enable(mBev.get(), EV_READ);
+            }).finally([this]() {
+                bufferevent_disable(mBev.get(), EV_READ);
+                bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
+            }),
+            [this]() -> tl::expected<void, std::error_code> {
+                std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
+                        make_error_code(std::errc::operation_canceled)
+                );
+                return {};
+            }
+    };
 
     if (!result)
         co_return tl::unexpected(result.error());
@@ -160,15 +176,23 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::readExa
     if (mClosed)
         co_return tl::unexpected(Error::IO_EOF);
 
-    auto result = co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromises[READ_INDEX] = promise;
+    auto result = co_await zero::async::coroutine::Cancellable{
+            zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
+                mPromises[READ_INDEX] = promise;
 
-        bufferevent_setwatermark(mBev.get(), EV_READ, data.size(), 0);
-        bufferevent_enable(mBev.get(), EV_READ);
-    }).finally([this]() {
-        bufferevent_disable(mBev.get(), EV_READ);
-        bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
-    });
+                bufferevent_setwatermark(mBev.get(), EV_READ, data.size(), 0);
+                bufferevent_enable(mBev.get(), EV_READ);
+            }).finally([this]() {
+                bufferevent_disable(mBev.get(), EV_READ);
+                bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
+            }),
+            [this]() -> tl::expected<void, std::error_code> {
+                std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
+                        make_error_code(std::errc::operation_canceled)
+                );
+                return {};
+            }
+    };
 
     if (!result)
         co_return tl::unexpected(result.error());
@@ -241,9 +265,17 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::drain()
     if (evbuffer_get_length(output) == 0)
         co_return tl::expected<void, std::error_code>{};
 
-    co_return co_await zero::async::promise::chain<void, std::error_code>([this](const auto &promise) {
-        mPromises[DRAIN_INDEX] = promise;
-    });
+    co_return co_await zero::async::coroutine::Cancellable{
+            zero::async::promise::chain<void, std::error_code>([this](const auto &promise) {
+                mPromises[DRAIN_INDEX] = promise;
+            }),
+            [this]() -> tl::expected<void, std::error_code> {
+                std::exchange(mPromises[DRAIN_INDEX], std::nullopt)->reject(
+                        make_error_code(std::errc::operation_canceled)
+                );
+                return {};
+            }
+    };
 }
 
 size_t asyncio::ev::Buffer::pending() {
@@ -266,14 +298,22 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::waitClo
     if (mClosed)
         co_return tl::unexpected(Error::IO_EOF);
 
-    co_return co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromises[WAIT_CLOSED_INDEX] = promise;
+    co_return co_await zero::async::coroutine::Cancellable{
+            zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
+                mPromises[WAIT_CLOSED_INDEX] = promise;
 
-        bufferevent_enable(mBev.get(), EV_READ);
-        bufferevent_set_timeouts(mBev.get(), nullptr, nullptr);
-    }).finally([this]() {
-        bufferevent_disable(mBev.get(), EV_READ);
-    });
+                bufferevent_enable(mBev.get(), EV_READ);
+                bufferevent_set_timeouts(mBev.get(), nullptr, nullptr);
+            }).finally([this]() {
+                bufferevent_disable(mBev.get(), EV_READ);
+            }),
+            [this]() -> tl::expected<void, std::error_code> {
+                std::exchange(mPromises[WAIT_CLOSED_INDEX], std::nullopt)->reject(
+                        make_error_code(std::errc::operation_canceled)
+                );
+                return {};
+            }
+    };
 }
 
 evutil_socket_t asyncio::ev::Buffer::fd() {
@@ -305,14 +345,22 @@ zero::async::coroutine::Task<size_t, std::error_code> asyncio::ev::Buffer::read(
     if (mClosed)
         co_return tl::unexpected(Error::IO_EOF);
 
-    auto result = co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        mPromises[READ_INDEX] = promise;
+    auto result = co_await zero::async::coroutine::Cancellable{
+            zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
+                mPromises[READ_INDEX] = promise;
 
-        bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
-        bufferevent_enable(mBev.get(), EV_READ);
-    }).finally([this]() {
-        bufferevent_disable(mBev.get(), EV_READ);
-    });
+                bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
+                bufferevent_enable(mBev.get(), EV_READ);
+            }).finally([this]() {
+                bufferevent_disable(mBev.get(), EV_READ);
+            }),
+            [this]() -> tl::expected<void, std::error_code> {
+                std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
+                        make_error_code(std::errc::operation_canceled)
+                );
+                return {};
+            }
+    };
 
     if (!result)
         co_return tl::unexpected(result.error());

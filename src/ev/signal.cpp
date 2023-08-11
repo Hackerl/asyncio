@@ -14,10 +14,17 @@ asyncio::ev::Signal::on() {
     if (pending())
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-    co_return co_await zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-        context() = promise;
-        evsignal_add(mEvent.get(), nullptr);
-    });
+    co_return co_await zero::async::coroutine::Cancellable{
+            zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
+                context() = promise;
+                evsignal_add(mEvent.get(), nullptr);
+            }),
+            [this]() -> tl::expected<void, std::error_code> {
+                evsignal_del(mEvent.get());
+                std::exchange(context(), std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+                return {};
+            }
+    };
 }
 
 tl::expected<asyncio::ev::Signal, std::error_code> asyncio::ev::makeSignal(int sig) {

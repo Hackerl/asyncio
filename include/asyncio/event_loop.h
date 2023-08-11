@@ -75,6 +75,23 @@ namespace asyncio {
     tl::expected<EventLoop, std::error_code> createEventLoop(size_t maxWorkers = 16);
     zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
+    template<typename T>
+    zero::async::coroutine::Task<T, std::error_code>
+    timeout(zero::async::coroutine::Task<T, std::error_code> &task, std::chrono::milliseconds ms) {
+        auto timer = sleep(ms);
+        co_await zero::async::coroutine::race(task, timer);
+
+        if (timer.result())
+            co_return tl::unexpected(make_error_code(std::errc::timed_out));
+
+        co_return task.result();
+    }
+
+    template<typename T>
+    auto timeout(zero::async::coroutine::Task<T, std::error_code> &&task, std::chrono::milliseconds ms) {
+        return timeout(task, ms);
+    }
+
     template<typename F>
     tl::expected<void, std::error_code> run(F &&f) {
         auto eventLoop = createEventLoop().transform([](EventLoop &&eventLoop) {

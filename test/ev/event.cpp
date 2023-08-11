@@ -17,8 +17,10 @@ TEST_CASE("async event notification", "[event]") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
             co_await zero::async::coroutine::allSettled(
                     [&]() -> zero::async::coroutine::Task<void> {
-                        auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::READ).value();
-                        auto result = co_await event.on();
+                        auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::READ);
+                        REQUIRE(event);
+
+                        auto result = co_await event->on();
 
                         REQUIRE(result);
                         REQUIRE(*result & asyncio::ev::What::READ);
@@ -27,7 +29,7 @@ TEST_CASE("async event notification", "[event]") {
                         REQUIRE(recv(fds[0], buffer, sizeof(buffer), 0) == 11);
                         REQUIRE(strcmp(buffer, "hello world") == 0);
 
-                        result = co_await event.on();
+                        result = co_await event->on();
 
                         REQUIRE(result);
                         REQUIRE(*result & asyncio::ev::What::READ);
@@ -36,8 +38,10 @@ TEST_CASE("async event notification", "[event]") {
                         evutil_closesocket(fds[0]);
                     }(),
                     [&]() -> zero::async::coroutine::Task<void> {
-                        auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::WRITE).value();
-                        auto result = co_await event.on();
+                        auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::WRITE);
+                        REQUIRE(event);
+
+                        auto result = co_await event->on();
 
                         REQUIRE(result);
                         REQUIRE(*result & asyncio::ev::What::WRITE);
@@ -51,11 +55,31 @@ TEST_CASE("async event notification", "[event]") {
 
     SECTION("wait timeout") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::READ).value();
-            auto result = co_await event.on(50ms);
+            auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::READ);
+            REQUIRE(event);
+
+            auto result = co_await event->on(50ms);
 
             REQUIRE(result);
             REQUIRE(*result & asyncio::ev::What::TIMEOUT);
+        });
+
+        evutil_closesocket(fds[0]);
+        evutil_closesocket(fds[1]);
+    }
+
+    SECTION("cancel") {
+        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+            auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::READ);
+            REQUIRE(event);
+
+            auto task = event->on();
+            auto result = co_await asyncio::timeout(task, 50ms);
+
+            REQUIRE(task.done());
+            REQUIRE(task.result().error() == std::errc::operation_canceled);
+            REQUIRE(!result);
+            REQUIRE(result.error() == std::errc::timed_out);
         });
 
         evutil_closesocket(fds[0]);

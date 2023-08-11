@@ -73,12 +73,18 @@ zero::async::coroutine::Task<evutil_socket_t, std::error_code> asyncio::net::str
     if (mPromise)
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-    co_return co_await zero::async::promise::chain<evutil_socket_t, std::error_code>([this](auto promise) {
-        mPromise = promise;
-        evconnlistener_enable(mListener.get());
-    }).finally([this]() {
-        evconnlistener_disable(mListener.get());
-    });
+    co_return co_await zero::async::coroutine::Cancellable{
+            zero::async::promise::chain<evutil_socket_t, std::error_code>([this](auto promise) {
+                mPromise = promise;
+                evconnlistener_enable(mListener.get());
+            }).finally([this]() {
+                evconnlistener_disable(mListener.get());
+            }),
+            [this]() -> tl::expected<void, std::error_code> {
+                std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+                return {};
+            }
+    };
 }
 
 tl::expected<void, std::error_code> asyncio::net::stream::Acceptor::close() {
@@ -221,7 +227,7 @@ asyncio::net::stream::connect(const std::string &host, unsigned short port) {
     if (!bev)
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    zero::async::promise::Promise<void, std::error_code> promise;
+    auto promise = new zero::async::promise::Promise<void, std::error_code>();
 
     bufferevent_setcb(
             bev,
@@ -232,20 +238,30 @@ asyncio::net::stream::connect(const std::string &host, unsigned short port) {
 
                 if ((what & BEV_EVENT_CONNECTED) == 0) {
                     promise->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+                    delete promise;
                     return;
                 }
 
                 promise->resolve();
+                delete promise;
             },
-            &promise
+            promise
     );
 
     if (bufferevent_socket_connect_hostname(bev, getEventLoop()->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
+        delete promise;
         bufferevent_free(bev);
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
-    auto result = co_await promise;
+    auto result = co_await zero::async::coroutine::Cancellable{
+            *promise,
+            [=]() -> tl::expected<void, std::error_code> {
+                promise->reject(make_error_code(std::errc::operation_canceled));
+                delete promise;
+                return {};
+            }
+    };
 
     if (!result) {
         bufferevent_free(bev);
@@ -290,7 +306,7 @@ asyncio::net::stream::connect(const std::string &path) {
     if (!bev)
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    zero::async::promise::Promise<void, std::error_code> promise;
+    auto promise = new zero::async::promise::Promise<void, std::error_code>();
 
     bufferevent_setcb(
             bev,
@@ -301,20 +317,30 @@ asyncio::net::stream::connect(const std::string &path) {
 
                 if ((what & BEV_EVENT_CONNECTED) == 0) {
                     promise->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+                    delete promise;
                     return;
                 }
 
                 promise->resolve();
+                delete promise;
             },
-            &promise
+            promise
     );
 
     if (bufferevent_socket_connect(bev, (const sockaddr *) &sa, sizeof(sa)) < 0) {
+        delete promise;
         bufferevent_free(bev);
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
-    auto result = co_await promise;
+    auto result = co_await zero::async::coroutine::Cancellable{
+            *promise,
+            [=]() -> tl::expected<void, std::error_code> {
+                promise->reject(make_error_code(std::errc::operation_canceled));
+                delete promise;
+                return {};
+            }
+    };
 
     if (!result) {
         bufferevent_free(bev);

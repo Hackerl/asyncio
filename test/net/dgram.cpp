@@ -133,4 +133,22 @@ TEST_CASE("datagram network connection", "[dgram]") {
             );
         });
     }
+
+    SECTION("cancel") {
+        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+            auto socket = asyncio::net::dgram::bind("127.0.0.1", 30000);
+            REQUIRE(socket);
+
+            std::byte data[1024];
+            auto task = socket->readFrom(data);
+            auto result = co_await asyncio::timeout(task, 50ms);
+
+            REQUIRE(task.done());
+            REQUIRE(task.result().error() == std::errc::operation_canceled);
+            REQUIRE(!result);
+            REQUIRE(result.error() == std::errc::timed_out);
+
+            socket->close();
+        });
+    }
 }
