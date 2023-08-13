@@ -2,6 +2,7 @@ find_package(Catch2 CONFIG REQUIRED)
 
 add_executable(
         asyncio_test
+        io.cpp
         event_loop.cpp
         thread.cpp
         channel.cpp

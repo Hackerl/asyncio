@@ -27,6 +27,9 @@ namespace asyncio {
         virtual void setTimeout(std::chrono::milliseconds timeout) = 0;
         virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
     };
+
+    zero::async::coroutine::Task<void, std::error_code> copy(IReader &reader, IWriter &writer);
+    zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll(IReader &reader);
 }
 
 #endif //ASYNCIO_IO_H
