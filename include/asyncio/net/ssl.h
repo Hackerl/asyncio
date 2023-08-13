@@ -59,6 +59,9 @@ namespace asyncio::net::ssl {
 
         public:
             tl::expected<void, std::error_code> close() override;
+
+        private:
+            std::error_code getError() override;
         };
 
         tl::expected<Buffer, std::error_code>

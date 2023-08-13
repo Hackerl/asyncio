@@ -123,6 +123,10 @@ install(
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
+if (NOT ASYNCIO_DISABLE_SAMPLES)
+    add_subdirectory(sample)
+endif ()
+
 if (NOT ASYNCIO_DISABLE_TESTS)
     add_subdirectory(test)
 endif ()

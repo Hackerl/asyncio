@@ -245,6 +245,15 @@ tl::expected<void, std::error_code> asyncio::net::ssl::stream::Buffer::close() {
     return net::stream::Buffer::close();
 }
 
+std::error_code asyncio::net::ssl::stream::Buffer::getError() {
+    unsigned long e = bufferevent_get_openssl_error(mBev.get());
+
+    if (!e)
+        return {EVUTIL_SOCKET_ERROR(), std::system_category()};
+
+    return make_error_code((Error) e);
+}
+
 tl::expected<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::makeBuffer(evutil_socket_t fd, const std::shared_ptr<Context> &context, State state, bool own) {
     bufferevent *bev = bufferevent_openssl_socket_new(
