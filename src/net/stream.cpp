@@ -151,10 +151,8 @@ asyncio::net::stream::listen(std::span<const Address> addresses) {
         if (result)
             return result;
 
-        if (it == addresses.end())
+        if (++it == addresses.end())
             return tl::unexpected(result.error());
-
-        it++;
     }
 }
 
@@ -213,10 +211,8 @@ asyncio::net::stream::connect(std::span<const Address> addresses) {
         if (result)
             co_return result;
 
-        if (it == addresses.end())
+        if (++it == addresses.end())
             co_return tl::unexpected(result.error());
-
-        it++;
     }
 }
 

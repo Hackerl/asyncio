@@ -323,10 +323,8 @@ asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, std::
         if (result)
             return result;
 
-        if (it == addresses.end())
+        if (++it == addresses.end())
             return tl::unexpected(result.error());
-
-        it++;
     }
 }
 
@@ -402,10 +400,8 @@ asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> &context, std:
         if (result)
             co_return result;
 
-        if (it == addresses.end())
+        if (++it == addresses.end())
             co_return tl::unexpected(result.error());
-
-        it++;
     }
 }
 
