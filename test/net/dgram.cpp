@@ -77,7 +77,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
                         auto client = co_await asyncio::net::dgram::connect("127.0.0.1", 30000);
                         REQUIRE(client);
 
-                        co_await client.value()->writeTo(message, *asyncio::net::IPv4Address::from("127.0.0.1", 30000));
+                        co_await client.value()->write(message);
 
                         std::byte data[1024];
                         auto result = co_await client.value()->readFrom(data);

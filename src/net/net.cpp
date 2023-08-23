@@ -8,9 +8,11 @@
 #elif __linux__
 #include <net/if.h>
 #include <netinet/in.h>
+#elif __APPLE__
+#include <net/if.h>
 #endif
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
 #include <sys/un.h>
 #endif
 
@@ -150,7 +152,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::addressFrom(c
             break;
         }
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
         case AF_UNIX: {
             result = UnixAddress{((const sockaddr_un *) addr)->sun_path};
             break;
@@ -165,48 +167,56 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::addressFrom(c
     return result;
 }
 
-tl::expected<sockaddr_storage, std::error_code> asyncio::net::socketAddressFrom(const Address &address) {
-    tl::expected<sockaddr_storage, std::error_code> result;
+tl::expected<std::vector<std::byte>, std::error_code> asyncio::net::socketAddressFrom(const Address &address) {
+    tl::expected<std::vector<std::byte>, std::error_code> result;
+    sockaddr_storage storage = {};
 
     switch (address.index()) {
         case 0: {
             auto ipv4 = std::get<IPv4Address>(address);
-            auto ptr = (sockaddr_in *) &*result;
+            auto ptr = (sockaddr_in *) &storage;
 
             ptr->sin_family = AF_INET;
             ptr->sin_port = htons(ipv4.port);
             memcpy(&ptr->sin_addr, ipv4.ip.data(), sizeof(in_addr));
 
+            result = {(const std::byte *) &storage, (const std::byte *) &storage + sizeof(sockaddr_in)};
             break;
         }
 
         case 1: {
             auto ipv6 = std::get<IPv6Address>(address);
-            auto ptr = (sockaddr_in6 *) &*result;
+            auto ptr = (sockaddr_in6 *) &storage;
 
             ptr->sin6_family = AF_INET6;
             ptr->sin6_port = htons(ipv6.port);
             memcpy(&ptr->sin6_addr, ipv6.ip.data(), sizeof(in6_addr));
 
-            if (!ipv6.zone)
+            if (!ipv6.zone) {
+                result = {(const std::byte *) &storage, (const std::byte *) &storage + sizeof(sockaddr_in6)};
                 break;
+            }
 
             unsigned int index = if_nametoindex(ipv6.zone->c_str());
 
-            if (!index)
+            if (!index) {
+                result = tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
                 break;
+            }
 
             ptr->sin6_scope_id = index;
+            result = {(const std::byte *) &storage, (const std::byte *) &storage + sizeof(sockaddr_in6)};
             break;
         }
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
         case 2: {
-            auto ptr = (sockaddr_un *) &*result;
+            auto ptr = (sockaddr_un *) &storage;
 
             ptr->sun_family = AF_UNIX;
             strncpy(ptr->sun_path, std::get<UnixAddress>(address).path.c_str(), sizeof(sockaddr_un::sun_path) - 1);
 
+            result = {(const std::byte *) &storage, (const std::byte *) &storage + sizeof(sockaddr_un)};
             break;
         }
 #endif

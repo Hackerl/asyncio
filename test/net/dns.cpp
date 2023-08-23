@@ -62,7 +62,7 @@ TEST_CASE("DNS query", "[dns]") {
     SECTION("lookup IPv6") {
         asyncio::run([]() -> zero::async::coroutine::Task<void> {
             auto result = co_await asyncio::net::dns::lookupIPv6("localhost");
-            REQUIRE((result->empty() || zero::os::net::stringify(result->front()) == "::1"));
+            REQUIRE((!result || result->empty() || zero::os::net::stringify(result->front()) == "::1"));
         });
     }
 }

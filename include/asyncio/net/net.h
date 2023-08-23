@@ -55,7 +55,7 @@ namespace asyncio::net {
     tl::expected<Address, std::error_code> addressFrom(evutil_socket_t fd, bool peer);
     tl::expected<Address, std::error_code> addressFrom(const sockaddr *addr);
 
-    tl::expected<sockaddr_storage, std::error_code> socketAddressFrom(const Address &address);
+    tl::expected<std::vector<std::byte>, std::error_code> socketAddressFrom(const Address &address);
 
     class IEndpoint : public virtual zero::Interface {
     public:

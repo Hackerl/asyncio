@@ -56,7 +56,7 @@ namespace asyncio::net::stream {
     zero::async::coroutine::Task<std::shared_ptr<IBuffer>, std::error_code>
     connect(const std::string &host, unsigned short port);
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
     tl::expected<Listener, std::error_code> listen(const std::string &path);
     zero::async::coroutine::Task<std::shared_ptr<IBuffer>, std::error_code> connect(const std::string &path);
 #endif

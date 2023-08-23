@@ -9,9 +9,11 @@
 #elif __linux__
 #include <net/if.h>
 #include <netinet/in.h>
+#elif __APPLE__
+#include <net/if.h>
 #endif
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
 #include <sys/un.h>
 #endif
 
@@ -36,7 +38,7 @@ TEST_CASE("network components", "[network]") {
         auto socketAddress = asyncio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);
 
-        auto addr = (const sockaddr_in *) &*socketAddress;
+        auto addr = (const sockaddr_in *) socketAddress->data();
 
         REQUIRE(addr->sin_family == AF_INET);
         REQUIRE(addr->sin_port == htons(80));
@@ -74,7 +76,7 @@ TEST_CASE("network components", "[network]") {
         auto socketAddress = asyncio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);
 
-        auto addr = (const sockaddr_in6 *) &*socketAddress;
+        auto addr = (const sockaddr_in6 *) socketAddress->data();
 
         REQUIRE(addr->sin6_family == AF_INET6);
         REQUIRE(addr->sin6_port == htons(80));
@@ -90,7 +92,7 @@ TEST_CASE("network components", "[network]") {
         );
     }
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
     SECTION("UNIX") {
         asyncio::net::Address address = asyncio::net::UnixAddress{"/tmp/test.sock"};
 
@@ -104,7 +106,7 @@ TEST_CASE("network components", "[network]") {
         auto socketAddress = asyncio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);
 
-        auto addr = (const sockaddr_un *) &*socketAddress;
+        auto addr = (const sockaddr_un *) socketAddress->data();
 
         REQUIRE(addr->sun_family == AF_UNIX);
         REQUIRE(strcmp(addr->sun_path, "/tmp/test.sock") == 0);

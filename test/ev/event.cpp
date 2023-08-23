@@ -13,6 +13,9 @@ TEST_CASE("async event notification", "[event]") {
     REQUIRE(evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
 #endif
 
+    REQUIRE(evutil_make_socket_nonblocking(fds[0]) != -1);
+    REQUIRE(evutil_make_socket_nonblocking(fds[1]) != -1);
+
     SECTION("normal") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
             co_await zero::async::coroutine::allSettled(

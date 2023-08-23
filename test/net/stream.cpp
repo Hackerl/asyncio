@@ -61,7 +61,7 @@ TEST_CASE("stream network connection", "[stream]") {
         });
     }
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
     SECTION("UNIX domain") {
         asyncio::run([]() -> zero::async::coroutine::Task<void> {
             auto listener = asyncio::net::stream::listen("/tmp/asyncio-test.sock");

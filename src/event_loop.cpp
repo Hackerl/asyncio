@@ -80,7 +80,7 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(size_
     if (!base)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-#if _WIN32 || __linux__ && !__ANDROID__
+#if _WIN32 || __APPLE__ || __linux__ && !__ANDROID__
     evdns_base *dnsBase = evdns_base_new(base, EVDNS_BASE_INITIALIZE_NAMESERVERS);
 #else
     evdns_base *dnsBase = evdns_base_new(base, 0);

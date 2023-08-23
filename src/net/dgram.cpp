@@ -245,8 +245,8 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
                 (const char *) data.data(),
                 (int) data.size(),
                 0,
-                (const sockaddr *) &*socketAddress,
-                sizeof(sockaddr_storage)
+                (const sockaddr *) socketAddress->data(),
+                (int) socketAddress->size()
         );
 
         if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
@@ -257,8 +257,8 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
                 data.data(),
                 data.size(),
                 0,
-                (const sockaddr *) &*socketAddress,
-                sizeof(sockaddr_storage)
+                (const sockaddr *) socketAddress->data(),
+                (socklen_t) socketAddress->size()
         );
 
         if (num == -1 && errno != EWOULDBLOCK) {
@@ -337,7 +337,7 @@ tl::expected<void, std::error_code> asyncio::net::dgram::Socket::bind(const asyn
     if (!socketAddress)
         return tl::unexpected(socketAddress.error());
 
-    if (::bind(mFD, (const sockaddr *) &*socketAddress, sizeof(sockaddr_storage)) != 0)
+    if (::bind(mFD, (const sockaddr *) socketAddress->data(), (socklen_t) socketAddress->size()) != 0)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
     return {};
@@ -349,7 +349,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket:
     if (!socketAddress)
         co_return tl::unexpected(socketAddress.error());
 
-    if (::connect(mFD, (const sockaddr *) &*socketAddress, sizeof(sockaddr_storage)) != 0)
+    if (::connect(mFD, (const sockaddr *) socketAddress->data(), (socklen_t) socketAddress->size()) != 0)
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
     co_return tl::expected<void, std::error_code>{};

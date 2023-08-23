@@ -300,8 +300,8 @@ asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const
             nullptr,
             LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
             -1,
-            (const sockaddr *) &*socketAddress,
-            (int) sizeof(sockaddr_storage)
+            (const sockaddr *) socketAddress->data(),
+            (int) socketAddress->size()
     );
 
     if (!listener)

@@ -4,7 +4,7 @@
 #include <zero/os/net.h>
 #include <cassert>
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
 #include <sys/un.h>
 #endif
 
@@ -128,8 +128,8 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
             nullptr,
             LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
             -1,
-            (const sockaddr *) &*socketAddress,
-            (int) sizeof(sockaddr_storage)
+            (const sockaddr *) socketAddress->data(),
+            (int) socketAddress->size()
     );
 
     if (!listener)
@@ -183,7 +183,7 @@ asyncio::net::stream::connect(const Address &address) {
             break;
         }
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
         case 2: {
             result = co_await connect(std::get<UnixAddress>(address).path);
             break;
@@ -267,7 +267,7 @@ asyncio::net::stream::connect(const std::string &host, unsigned short port) {
     co_return std::make_shared<Buffer>(bev);
 }
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
 tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const std::string &path) {
     sockaddr_un sa = {};
 
