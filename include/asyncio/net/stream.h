@@ -13,6 +13,7 @@ namespace asyncio::net::stream {
     class Buffer : public ev::Buffer, public IBuffer {
     public:
         explicit Buffer(bufferevent *bev);
+        explicit Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev);
 
     public:
         tl::expected<Address, std::error_code> localAddress() override;
@@ -43,22 +44,22 @@ namespace asyncio::net::stream {
         explicit Listener(evconnlistener *listener);
 
     public:
-        zero::async::coroutine::Task<std::shared_ptr<IBuffer>, std::error_code> accept();
+        zero::async::coroutine::Task<Buffer, std::error_code> accept();
     };
 
     tl::expected<Listener, std::error_code> listen(const Address &address);
     tl::expected<Listener, std::error_code> listen(std::span<const Address> addresses);
     tl::expected<Listener, std::error_code> listen(const std::string &ip, unsigned short port);
 
-    zero::async::coroutine::Task<std::shared_ptr<IBuffer>, std::error_code> connect(const Address &address);
-    zero::async::coroutine::Task<std::shared_ptr<IBuffer>, std::error_code> connect(std::span<const Address> addresses);
+    zero::async::coroutine::Task<Buffer, std::error_code> connect(const Address &address);
+    zero::async::coroutine::Task<Buffer, std::error_code> connect(std::span<const Address> addresses);
 
-    zero::async::coroutine::Task<std::shared_ptr<IBuffer>, std::error_code>
+    zero::async::coroutine::Task<Buffer, std::error_code>
     connect(const std::string &host, unsigned short port);
 
 #if __unix__ || __APPLE__
     tl::expected<Listener, std::error_code> listen(const std::string &path);
-    zero::async::coroutine::Task<std::shared_ptr<IBuffer>, std::error_code> connect(const std::string &path);
+    zero::async::coroutine::Task<Buffer, std::error_code> connect(const std::string &path);
 #endif
 }
 

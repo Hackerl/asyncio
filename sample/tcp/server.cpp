@@ -5,11 +5,11 @@
 #include <asyncio/event_loop.h>
 #include <csignal>
 
-zero::async::coroutine::Task<void> handle(std::shared_ptr<asyncio::net::stream::IBuffer> buffer) {
-    LOG_INFO("new connection[%s]", asyncio::net::stringify(*buffer->remoteAddress()).c_str());
+zero::async::coroutine::Task<void> handle(asyncio::net::stream::Buffer buffer) {
+    LOG_INFO("new connection[%s]", asyncio::net::stringify(*buffer.remoteAddress()).c_str());
 
     while (true) {
-        auto line = co_await buffer->readLine();
+        auto line = co_await buffer.readLine();
 
         if (!line) {
             LOG_ERROR("stream buffer read line failed[%s]", line.error().message().c_str());
@@ -18,8 +18,8 @@ zero::async::coroutine::Task<void> handle(std::shared_ptr<asyncio::net::stream::
 
         LOG_INFO("receive message[%s]", line->c_str());
 
-        buffer->writeLine(*line);
-        auto res = co_await buffer->drain();
+        buffer.writeLine(*line);
+        auto res = co_await buffer.drain();
 
         if (!res) {
             LOG_ERROR("stream buffer drain failed[%s]", res.error().message().c_str());
@@ -76,14 +76,14 @@ int main(int argc, char *argv[]) {
                 }(),
                 [&]() -> zero::async::coroutine::Task<void> {
                     while (true) {
-                        auto result = co_await listener->accept();
+                        auto buffer = std::move(co_await listener->accept());
 
-                        if (!result) {
-                            LOG_ERROR("accept failed[%s]", result.error().message().c_str());
+                        if (!buffer) {
+                            LOG_ERROR("accept failed[%s]", buffer.error().message().c_str());
                             break;
                         }
 
-                        handle(*result);
+                        handle(std::move(*buffer));
                     }
                 }()
         );

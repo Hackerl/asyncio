@@ -43,6 +43,7 @@ namespace asyncio::ev {
     class Buffer : public virtual IBuffer {
     public:
         explicit Buffer(bufferevent *bev);
+        explicit Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev);
         Buffer(Buffer &&rhs) noexcept;
         ~Buffer() override;
 
@@ -88,7 +89,7 @@ namespace asyncio::ev {
 
     protected:
         bool mClosed;
-        std::unique_ptr<bufferevent, decltype(bufferevent_free) *> mBev;
+        std::unique_ptr<bufferevent, void (*)(bufferevent *)> mBev;
 
     private:
         std::array<std::optional<zero::async::promise::Promise<void, std::error_code>>, 3> mPromises;

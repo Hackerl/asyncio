@@ -55,7 +55,7 @@ namespace asyncio::net::ssl {
 
         class Buffer : public net::stream::Buffer {
         public:
-            explicit Buffer(bufferevent *bev);
+            explicit Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev);
 
         public:
             tl::expected<void, std::error_code> close() override;
@@ -72,7 +72,7 @@ namespace asyncio::net::ssl {
             Listener(std::shared_ptr<Context> context, evconnlistener *listener);
 
         public:
-            zero::async::coroutine::Task<std::shared_ptr<net::stream::IBuffer>, std::error_code> accept();
+            zero::async::coroutine::Task<Buffer, std::error_code> accept();
 
         private:
             std::shared_ptr<Context> mContext;
@@ -86,22 +86,22 @@ namespace asyncio::net::ssl {
         tl::expected<Listener, std::error_code>
         listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port);
 
-        zero::async::coroutine::Task<std::shared_ptr<net::stream::IBuffer>, std::error_code>
+        zero::async::coroutine::Task<Buffer, std::error_code>
         connect(const Address &address);
 
-        zero::async::coroutine::Task<std::shared_ptr<net::stream::IBuffer>, std::error_code>
+        zero::async::coroutine::Task<Buffer, std::error_code>
         connect(std::span<const Address> addresses);
 
-        zero::async::coroutine::Task<std::shared_ptr<net::stream::IBuffer>, std::error_code>
+        zero::async::coroutine::Task<Buffer, std::error_code>
         connect(const std::string &host, unsigned short port);
 
-        zero::async::coroutine::Task<std::shared_ptr<net::stream::IBuffer>, std::error_code>
+        zero::async::coroutine::Task<Buffer, std::error_code>
         connect(const std::shared_ptr<Context> &context, const Address &address);
 
-        zero::async::coroutine::Task<std::shared_ptr<net::stream::IBuffer>, std::error_code>
+        zero::async::coroutine::Task<Buffer, std::error_code>
         connect(const std::shared_ptr<Context> &context, std::span<const Address> addresses);
 
-        zero::async::coroutine::Task<std::shared_ptr<net::stream::IBuffer>, std::error_code>
+        zero::async::coroutine::Task<Buffer, std::error_code>
         connect(const std::shared_ptr<Context> &context, const std::string &host, unsigned short port);
     }
 }

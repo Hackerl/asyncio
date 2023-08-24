@@ -36,14 +36,12 @@ int main(int argc, char *argv[]) {
 #endif
 
     asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-        auto result = co_await asyncio::net::stream::connect(host, port);
+        auto buffer = std::move(co_await asyncio::net::stream::connect(host, port));
 
-        if (!result) {
-            LOG_ERROR("stream buffer connect failed[%s]", result.error().message().c_str());
+        if (!buffer) {
+            LOG_ERROR("stream buffer connect failed[%s]", buffer.error().message().c_str());
             co_return;
         }
-
-        auto &buffer = *result;
 
         while (true) {
             buffer->writeLine("hello world");

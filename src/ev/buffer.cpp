@@ -8,7 +8,12 @@ constexpr auto READ_INDEX = 0;
 constexpr auto DRAIN_INDEX = 1;
 constexpr auto WAIT_CLOSED_INDEX = 2;
 
-asyncio::ev::Buffer::Buffer(bufferevent *bev) : mBev(bev, bufferevent_free), mClosed(false) {
+asyncio::ev::Buffer::Buffer(bufferevent *bev) : Buffer({bev, bufferevent_free}) {
+
+}
+
+asyncio::ev::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev)
+        : mBev(std::move(bev)), mClosed(false) {
     bufferevent_setcb(
             mBev.get(),
             [](bufferevent *bev, void *arg) {

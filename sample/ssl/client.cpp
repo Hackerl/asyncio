@@ -68,28 +68,26 @@ int main(int argc, char *argv[]) {
             co_return;
         }
 
-        auto result = co_await asyncio::net::ssl::stream::connect(*context, host, port);
+        auto buffer = std::move(co_await asyncio::net::ssl::stream::connect(*context, host, port));
 
-        if (!result) {
-            LOG_ERROR("ssl stream buffer connect failed[%s]", result.error().message().c_str());
+        if (!buffer) {
+            LOG_ERROR("stream buffer connect failed[%s]", buffer.error().message().c_str());
             co_return;
         }
-
-        auto &buffer = *result;
 
         while (true) {
             buffer->writeLine("hello world");
             auto res = co_await buffer->drain();
 
             if (!res) {
-                LOG_ERROR("ssl stream buffer drain failed[%s]", res.error().message().c_str());
+                LOG_ERROR("stream buffer drain failed[%s]", res.error().message().c_str());
                 break;
             }
 
             auto line = co_await buffer->readLine();
 
             if (!line) {
-                LOG_ERROR("ssl stream buffer read line failed[%s]", line.error().message().c_str());
+                LOG_ERROR("stream buffer read line failed[%s]", line.error().message().c_str());
                 break;
             }
 

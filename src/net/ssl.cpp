@@ -227,7 +227,8 @@ asyncio::net::ssl::newContext(const Config &config) {
     return ctx;
 }
 
-asyncio::net::ssl::stream::Buffer::Buffer(bufferevent *bev) : net::stream::Buffer(bev) {
+asyncio::net::ssl::stream::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev)
+        : net::stream::Buffer(std::move(bev)) {
 
 }
 
@@ -267,7 +268,17 @@ asyncio::net::ssl::stream::makeBuffer(evutil_socket_t fd, const std::shared_ptr<
     if (!bev)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    return Buffer{bev};
+    return Buffer{
+            {
+                    bev,
+                    [](bufferevent *bev) {
+                        SSL *ctx = bufferevent_openssl_get_ssl(bev);
+                        SSL_set_shutdown(ctx, SSL_RECEIVED_SHUTDOWN);
+                        SSL_shutdown(ctx);
+                        bufferevent_free(bev);
+                    }
+            }
+    };
 }
 
 asyncio::net::ssl::stream::Listener::Listener(std::shared_ptr<Context> context, evconnlistener *listener)
@@ -275,16 +286,14 @@ asyncio::net::ssl::stream::Listener::Listener(std::shared_ptr<Context> context, 
 
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::Listener::accept() {
     auto result = co_await fd();
 
     if (!result)
         co_return tl::unexpected(result.error());
 
-    co_return makeBuffer(*result, mContext, State::ACCEPTING, true).transform([](Buffer &&buffer) {
-        return std::make_shared<Buffer>(std::move(buffer));
-    });
+    co_return makeBuffer(*result, mContext, State::ACCEPTING, true);
 }
 
 tl::expected<asyncio::net::ssl::stream::Listener, std::error_code>
@@ -338,56 +347,46 @@ asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const
     return listen(context, *address);
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::connect(const asyncio::net::Address &address) {
     if (!defaultContext)
         co_return tl::unexpected(defaultContext.error());
 
-    co_return co_await connect(*defaultContext, address);
+    co_return std::move(co_await connect(*defaultContext, address));
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::connect(std::span<const Address> addresses) {
     if (!defaultContext)
         co_return tl::unexpected(defaultContext.error());
 
-    co_return co_await connect(*defaultContext, addresses);
+    co_return std::move(co_await connect(*defaultContext, addresses));
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::connect(const std::string &host, unsigned short port) {
     if (!defaultContext)
         co_return tl::unexpected(defaultContext.error());
 
-    co_return co_await connect(*defaultContext, host, port);
+    co_return std::move(co_await connect(*defaultContext, host, port));
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> &context, const asyncio::net::Address &address) {
-    tl::expected<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code> result;
+    size_t index = address.index();
 
-    switch (address.index()) {
-        case 0: {
-            IPv4Address ipv4 = std::get<IPv4Address>(address);
-            result = co_await connect(context, zero::os::net::stringify(ipv4.ip), ipv4.port);
-            break;
-        }
-
-        case 1: {
-            IPv6Address ipv6 = std::get<IPv6Address>(address);
-            result = co_await connect(context, zero::os::net::stringify(ipv6.ip), ipv6.port);
-            break;
-        }
-
-        default:
-            result = tl::unexpected(make_error_code(std::errc::address_family_not_supported));
-            break;
+    if (index == 0) {
+        IPv4Address ipv4 = std::get<IPv4Address>(address);
+        co_return std::move(co_await connect(context, zero::os::net::stringify(ipv4.ip), ipv4.port));
+    } else if (index == 1) {
+        IPv6Address ipv6 = std::get<IPv6Address>(address);
+        co_return std::move(co_await connect(context, zero::os::net::stringify(ipv6.ip), ipv6.port));
     }
 
-    co_return result;
+    co_return tl::unexpected(make_error_code(std::errc::address_family_not_supported));
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> &context, std::span<const Address> addresses) {
     if (addresses.empty())
         co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
@@ -395,17 +394,17 @@ asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> &context, std:
     auto it = addresses.begin();
 
     while (true) {
-        auto result = co_await connect(context, *it);
+        auto result = std::move(co_await connect(context, *it));
 
         if (result)
-            co_return result;
+            co_return std::move(result);
 
         if (++it == addresses.end())
             co_return tl::unexpected(result.error());
     }
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::connect(
         const std::shared_ptr<Context> &context,
         const std::string &host,
@@ -482,5 +481,15 @@ asyncio::net::ssl::stream::connect(
         co_return tl::unexpected(result.error());
     }
 
-    co_return std::make_shared<Buffer>(bev);
+    co_return Buffer{
+            {
+                    bev,
+                    [](bufferevent *bev) {
+                        SSL *ctx = bufferevent_openssl_get_ssl(bev);
+                        SSL_set_shutdown(ctx, SSL_RECEIVED_SHUTDOWN);
+                        SSL_shutdown(ctx);
+                        bufferevent_free(bev);
+                    }
+            }
+    };
 }

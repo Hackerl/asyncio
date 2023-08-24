@@ -10,10 +10,8 @@ TEST_CASE("stream network connection", "[stream]") {
 
             co_await zero::async::coroutine::allSettled(
                     [&]() -> zero::async::coroutine::Task<void> {
-                        auto result = co_await listener->accept();
-                        REQUIRE(result);
-
-                        auto &buffer = *result;
+                        auto buffer = std::move(co_await listener->accept());
+                        REQUIRE(buffer);
 
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
@@ -34,10 +32,9 @@ TEST_CASE("stream network connection", "[stream]") {
                         buffer->close();
                     }(),
                     []() -> zero::async::coroutine::Task<void> {
-                        auto result = co_await asyncio::net::stream::connect("127.0.0.1", 30000);
-                        REQUIRE(result);
+                        auto buffer = std::move(co_await asyncio::net::stream::connect("127.0.0.1", 30000));
+                        REQUIRE(buffer);
 
-                        auto &buffer = *result;
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
                         REQUIRE(asyncio::net::stringify(*localAddress).starts_with("127.0.0.1"));
@@ -69,10 +66,9 @@ TEST_CASE("stream network connection", "[stream]") {
 
             co_await zero::async::coroutine::allSettled(
                     [&]() -> zero::async::coroutine::Task<void> {
-                        auto result = co_await listener->accept();
-                        REQUIRE(result);
+                        auto buffer = std::move(co_await listener->accept());
+                        REQUIRE(buffer);
 
-                        auto &buffer = *result;
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
                         REQUIRE(asyncio::net::stringify(*localAddress) == "/tmp/asyncio-test.sock");
@@ -88,10 +84,9 @@ TEST_CASE("stream network connection", "[stream]") {
                         buffer->close();
                     }(),
                     []() -> zero::async::coroutine::Task<void> {
-                        auto result = co_await asyncio::net::stream::connect("/tmp/asyncio-test.sock");
-                        REQUIRE(result);
+                        auto buffer = std::move(co_await asyncio::net::stream::connect("/tmp/asyncio-test.sock"));
+                        REQUIRE(buffer);
 
-                        auto &buffer = *result;
                         auto remoteAddress = buffer->remoteAddress();
                         REQUIRE(remoteAddress);
                         REQUIRE(asyncio::net::stringify(*remoteAddress) == "/tmp/asyncio-test.sock");

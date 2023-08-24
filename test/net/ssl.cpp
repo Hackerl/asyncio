@@ -142,10 +142,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
             co_await zero::async::coroutine::allSettled(
                     [&]() -> zero::async::coroutine::Task<void> {
-                        auto result = co_await listener->accept();
-                        REQUIRE(result);
-
-                        auto &buffer = *result;
+                        auto buffer = std::move(co_await listener->accept());
+                        REQUIRE(buffer);
 
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
@@ -175,10 +173,13 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         );
                         REQUIRE(context);
 
-                        auto result = co_await asyncio::net::ssl::stream::connect(*context, "localhost", 30000);
-                        REQUIRE(result);
+                        auto buffer = std::move(co_await asyncio::net::ssl::stream::connect(
+                                *context,
+                                "localhost",
+                                30000)
+                        );
+                        REQUIRE(buffer);
 
-                        auto &buffer = *result;
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
                         REQUIRE(asyncio::net::stringify(*localAddress).starts_with("127.0.0.1"));
@@ -220,10 +221,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
             co_await zero::async::coroutine::allSettled(
                     [&]() -> zero::async::coroutine::Task<void> {
-                        auto result = co_await listener->accept();
-                        REQUIRE(result);
-
-                        auto &buffer = *result;
+                        auto buffer = std::move(co_await listener->accept());
+                        REQUIRE(buffer);
 
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
@@ -252,10 +251,13 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         );
                         REQUIRE(context);
 
-                        auto result = co_await asyncio::net::ssl::stream::connect(*context, "localhost", 30000);
-                        REQUIRE(result);
+                        auto buffer = std::move(co_await asyncio::net::ssl::stream::connect(
+                                *context,
+                                "localhost",
+                                30000
+                        ));
+                        REQUIRE(buffer);
 
-                        auto &buffer = *result;
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
                         REQUIRE(asyncio::net::stringify(*localAddress).starts_with("127.0.0.1"));

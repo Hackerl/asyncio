@@ -12,6 +12,11 @@ asyncio::net::stream::Buffer::Buffer(bufferevent *bev) : ev::Buffer(bev) {
 
 }
 
+asyncio::net::stream::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev)
+        : ev::Buffer(std::move(bev)) {
+
+}
+
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::localAddress() {
     evutil_socket_t fd = this->fd();
 
@@ -104,16 +109,14 @@ asyncio::net::stream::Listener::Listener(evconnlistener *listener) : Acceptor(li
 
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::Listener::accept() {
     auto result = co_await fd();
 
     if (!result)
         co_return tl::unexpected(result.error());
 
-    co_return makeBuffer(*result, true).transform([](Buffer &&buffer) {
-        return std::make_shared<Buffer>(std::move(buffer));
-    });
+    co_return makeBuffer(*result, true);
 }
 
 tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const Address &address) {
@@ -166,39 +169,26 @@ asyncio::net::stream::listen(const std::string &ip, unsigned short port) {
     return listen(*address);
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(const Address &address) {
-    tl::expected<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code> result;
+    size_t index = address.index();
 
-    switch (address.index()) {
-        case 0: {
-            IPv4Address ipv4 = std::get<IPv4Address>(address);
-            result = co_await connect(zero::os::net::stringify(ipv4.ip), ipv4.port);
-            break;
-        }
-
-        case 1: {
-            IPv6Address ipv6 = std::get<IPv6Address>(address);
-            result = co_await connect(zero::os::net::stringify(ipv6.ip), ipv6.port);
-            break;
-        }
-
+    if (index == 0) {
+        IPv4Address ipv4 = std::get<IPv4Address>(address);
+        co_return std::move(co_await connect(zero::os::net::stringify(ipv4.ip), ipv4.port));
+    } else if (index == 1) {
+        IPv6Address ipv6 = std::get<IPv6Address>(address);
+        co_return std::move(co_await connect(zero::os::net::stringify(ipv6.ip), ipv6.port));
+    } else if (index == 2) {
 #if __unix__ || __APPLE__
-        case 2: {
-            result = co_await connect(std::get<UnixAddress>(address).path);
-            break;
-        }
+        co_return std::move(co_await connect(std::get<UnixAddress>(address).path));
 #endif
-
-        default:
-            result = tl::unexpected(make_error_code(std::errc::address_family_not_supported));
-            break;
     }
 
-    co_return result;
+    co_return tl::unexpected(make_error_code(std::errc::address_family_not_supported));
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(std::span<const Address> addresses) {
     if (addresses.empty())
         co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
@@ -206,17 +196,17 @@ asyncio::net::stream::connect(std::span<const Address> addresses) {
     auto it = addresses.begin();
 
     while (true) {
-        auto result = co_await connect(*it);
+        auto result = std::move(co_await connect(*it));
 
         if (result)
-            co_return result;
+            co_return std::move(result);
 
         if (++it == addresses.end())
             co_return tl::unexpected(result.error());
     }
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(const std::string &host, unsigned short port) {
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
@@ -264,7 +254,7 @@ asyncio::net::stream::connect(const std::string &host, unsigned short port) {
         co_return tl::unexpected(result.error());
     }
 
-    co_return std::make_shared<Buffer>(bev);
+    co_return Buffer{bev};
 }
 
 #if __unix__ || __APPLE__
@@ -290,7 +280,7 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
     return Listener{listener};
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::stream::IBuffer>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(const std::string &path) {
     sockaddr_un sa = {};
 
@@ -343,6 +333,6 @@ asyncio::net::stream::connect(const std::string &path) {
         co_return tl::unexpected(result.error());
     }
 
-    co_return std::make_shared<Buffer>(bev);
+    co_return Buffer{bev};
 }
 #endif
