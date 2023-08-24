@@ -29,7 +29,14 @@ namespace asyncio {
     };
 
     zero::async::coroutine::Task<void, std::error_code> copy(IReader &reader, IWriter &writer);
+
+    zero::async::coroutine::Task<void, std::error_code>
+    copy(std::shared_ptr<IReader> reader, std::shared_ptr<IWriter> writer);
+
     zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll(IReader &reader);
+
+    zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
+    readAll(std::shared_ptr<IReader> reader);
 }
 
 #endif //ASYNCIO_IO_H

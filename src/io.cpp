@@ -27,6 +27,11 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reade
     co_return result;
 }
 
+zero::async::coroutine::Task<void, std::error_code>
+asyncio::copy(std::shared_ptr<IReader> reader, std::shared_ptr<IWriter> writer) {
+    co_return co_await copy(*reader, *writer);
+}
+
 zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::readAll(IReader &reader) {
     tl::expected<std::vector<std::byte>, std::error_code> result;
 
@@ -46,4 +51,9 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::r
     }
 
     co_return result;
+}
+
+zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
+asyncio::readAll(std::shared_ptr<IReader> reader) {
+    co_return co_await readAll(*reader);
 }
