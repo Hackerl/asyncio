@@ -60,13 +60,15 @@ TEST_CASE("async channel buffer", "[channel]") {
             asyncio::run([&]() -> zero::async::coroutine::Task<void> {
                 asyncio::Channel<int> channel(100);
 
-                auto produce = [&]() {
+                auto produce = [&]() -> tl::expected<void, std::error_code> {
                     while (true) {
                         if (counters[0] >= 10000)
                             break;
 
                         channel.sendSync(counters[0]++);
                     }
+
+                    return {};
                 };
 
                 auto consume = [&]() -> zero::async::coroutine::Task<void, std::error_code> {
@@ -111,7 +113,7 @@ TEST_CASE("async channel buffer", "[channel]") {
             asyncio::run([]() -> zero::async::coroutine::Task<void> {
                 asyncio::Channel<int> channel(2);
 
-                co_await asyncio::toThread([&]() {
+                co_await asyncio::toThread([&]() -> tl::expected<void, std::error_code> {
                     auto result = channel.sendSync(0, 50ms);
                     REQUIRE(result);
 
@@ -119,6 +121,8 @@ TEST_CASE("async channel buffer", "[channel]") {
 
                     REQUIRE(!result);
                     REQUIRE(result.error() == std::errc::timed_out);
+
+                    return {};
                 });
             });
         }
@@ -205,11 +209,13 @@ TEST_CASE("async channel buffer", "[channel]") {
             asyncio::run([]() -> zero::async::coroutine::Task<void> {
                 asyncio::Channel<int> channel(2);
 
-                co_await asyncio::toThread([&]() {
+                co_await asyncio::toThread([&]() -> tl::expected<void, std::error_code> {
                     auto result = channel.receiveSync(50ms);
 
                     REQUIRE(!result);
                     REQUIRE(result.error() == std::errc::timed_out);
+
+                    return {};
                 });
             });
         }

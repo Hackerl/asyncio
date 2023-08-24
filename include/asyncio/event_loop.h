@@ -5,7 +5,6 @@
 #include <queue>
 #include <event.h>
 #include <event2/dns.h>
-#include <zero/async/coroutine.h>
 
 namespace asyncio {
     class EventLoop {
@@ -61,12 +60,16 @@ namespace asyncio {
         template<typename F>
         friend zero::async::coroutine::Task<
                 zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
-                std::conditional_t<
-                        zero::detail::is_specialization<std::invoke_result_t<F>, tl::expected>,
-                        zero::async::promise::promise_reason_t<std::invoke_result_t<F>>,
-                        std::exception_ptr
-                >
-        > toThread(F &&f);
+                std::error_code
+        >
+        toThread(F &&f);
+
+        template<typename F, typename C>
+        friend zero::async::coroutine::Task<
+                zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
+                std::error_code
+        >
+        toThread(F &&f, C &&cancel);
     };
 
     std::shared_ptr<EventLoop> getEventLoop();

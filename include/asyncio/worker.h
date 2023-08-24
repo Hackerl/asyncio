@@ -6,6 +6,7 @@
 #include <functional>
 #include <condition_variable>
 #include <zero/atomic/event.h>
+#include <zero/async/coroutine.h>
 
 namespace asyncio {
     class Worker {
@@ -31,6 +32,13 @@ namespace asyncio {
         std::function<void()> mTask;
         std::condition_variable mCond;
         std::thread mThread;
+
+        template<typename F, typename C>
+        friend zero::async::coroutine::Task<
+                zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
+                std::error_code
+        >
+        toThread(F &&f, C &&cancel);
     };
 }
 

@@ -6,21 +6,12 @@
 
 namespace asyncio {
     template<typename F>
-    zero::async::coroutine::Task<
-            zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
-            std::conditional_t<
-                    zero::detail::is_specialization<std::invoke_result_t<F>, tl::expected>,
-                    zero::async::promise::promise_reason_t<std::invoke_result_t<F>>,
-                    std::exception_ptr
-            >
-    > toThread(F &&f) {
+    zero::async::coroutine::Task<zero::async::promise::promise_result_t<std::invoke_result_t<F>>, std::error_code>
+    toThread(F &&f) {
         using T = std::invoke_result_t<F>;
 
         auto eventLoop = getEventLoop();
-        auto event = ev::makeEvent(-1, ev::What::READ);
-
-        if (!event)
-            throw std::system_error(event.error());
+        zero::async::promise::Promise<void, std::error_code> promise;
 
         std::unique_ptr<Worker> worker;
 
@@ -31,36 +22,60 @@ namespace asyncio {
             eventLoop->mWorkers.pop();
         }
 
-        if constexpr (std::is_void_v<T>) {
-            auto task = event->on();
+        T result;
 
-            worker->execute([&, f = std::forward<F>(f)]() {
-                f();
-                event->trigger(ev::What::READ);
+        worker->execute([=, &result, f = std::forward<F>(f)]() {
+            result = f();
+            eventLoop->post([=]() mutable {
+                promise.resolve();
             });
+        });
 
-            co_await task;
+        co_await promise;
 
-            if (eventLoop->mWorkers.size() < eventLoop->mMaxWorkers)
-                eventLoop->mWorkers.push(std::move(worker));
+        if (eventLoop->mWorkers.size() < eventLoop->mMaxWorkers)
+            eventLoop->mWorkers.push(std::move(worker));
 
-            co_return;
+        co_return result;
+    }
+
+    template<typename F, typename C>
+    zero::async::coroutine::Task<zero::async::promise::promise_result_t<std::invoke_result_t<F>>, std::error_code>
+    toThread(F &&f, C && cancel) {
+        using T = std::invoke_result_t<F>;
+
+        auto eventLoop = getEventLoop();
+        zero::async::promise::Promise<void, std::error_code> promise;
+
+        std::unique_ptr<Worker> worker;
+
+        if (eventLoop->mWorkers.empty()) {
+            worker = std::make_unique<Worker>();
         } else {
-            T result;
-            auto task = event->on();
-
-            worker->execute([&, f = std::forward<F>(f)]() {
-                result = f();
-                event->trigger(ev::What::READ);
-            });
-
-            co_await task;
-
-            if (eventLoop->mWorkers.size() < eventLoop->mMaxWorkers)
-                eventLoop->mWorkers.push(std::move(worker));
-
-            co_return result;
+            worker = std::move(eventLoop->mWorkers.front());
+            eventLoop->mWorkers.pop();
         }
+
+        T result;
+
+        worker->execute([=, &result, f = std::forward<F>(f)]() {
+            result = f();
+            eventLoop->post([=]() mutable {
+                promise.resolve();
+            });
+        });
+
+        co_await zero::async::coroutine::Cancellable{
+                promise,
+                [handle = worker->mThread.native_handle(), cancel = std::forward<C>(cancel)]() {
+                    return cancel(handle);
+                }
+        };
+
+        if (eventLoop->mWorkers.size() < eventLoop->mMaxWorkers)
+            eventLoop->mWorkers.push(std::move(worker));
+
+        co_return result;
     }
 }
 
