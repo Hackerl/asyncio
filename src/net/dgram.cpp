@@ -222,7 +222,7 @@ asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
 }
 
 zero::async::coroutine::Task<void, std::error_code>
-asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Address &address) {
+asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, Address address) {
     if (mFD == EVUTIL_INVALID_SOCKET)
         co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
@@ -331,7 +331,7 @@ evutil_socket_t asyncio::net::dgram::Socket::fd() {
     return mFD;
 }
 
-tl::expected<void, std::error_code> asyncio::net::dgram::Socket::bind(const asyncio::net::Address &address) {
+tl::expected<void, std::error_code> asyncio::net::dgram::Socket::bind(const Address &address) {
     auto socketAddress = socketAddressFrom(address);
 
     if (!socketAddress)
@@ -343,7 +343,7 @@ tl::expected<void, std::error_code> asyncio::net::dgram::Socket::bind(const asyn
     return {};
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket::connect(const Address &address) {
+zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket::connect(Address address) {
     auto socketAddress = socketAddressFrom(address);
 
     if (!socketAddress)
@@ -397,8 +397,8 @@ asyncio::net::dgram::bind(const std::string &ip, unsigned short port) {
     return dgram::bind(*address);
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::dgram::Socket>, std::error_code>
-asyncio::net::dgram::connect(const asyncio::net::Address &address) {
+zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
+asyncio::net::dgram::connect(Address address) {
     auto socket = makeSocket(address.index() == 0 ? AF_INET : AF_INET6);
 
     if (!socket)
@@ -409,10 +409,10 @@ asyncio::net::dgram::connect(const asyncio::net::Address &address) {
     if (!result)
         co_return tl::unexpected(result.error());
 
-    co_return std::make_shared<Socket>(std::move(*socket));
+    co_return std::move(*socket);
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::dgram::Socket>, std::error_code>
+zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
 asyncio::net::dgram::connect(std::span<const Address> addresses) {
     if (addresses.empty())
         co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
@@ -420,18 +420,18 @@ asyncio::net::dgram::connect(std::span<const Address> addresses) {
     auto it = addresses.begin();
 
     while (true) {
-        auto result = co_await connect(*it);
+        auto result = std::move(co_await connect(*it));
 
         if (result)
-            co_return result;
+            co_return std::move(*result);
 
         if (++it == addresses.end())
             co_return tl::unexpected(result.error());
     }
 }
 
-zero::async::coroutine::Task<std::shared_ptr<asyncio::net::dgram::Socket>, std::error_code>
-asyncio::net::dgram::connect(const std::string &host, unsigned short port) {
+zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
+asyncio::net::dgram::connect(std::string host, unsigned short port) {
     evutil_addrinfo hints = {};
 
     hints.ai_family = AF_UNSPEC;
@@ -442,7 +442,7 @@ asyncio::net::dgram::connect(const std::string &host, unsigned short port) {
     if (!result)
         co_return tl::unexpected(result.error());
 
-    co_return co_await connect(*result);
+    co_return std::move(co_await connect(*result));
 }
 
 tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::makeSocket(int family) {

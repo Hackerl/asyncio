@@ -7,7 +7,7 @@
 namespace asyncio {
     template<typename F>
     zero::async::coroutine::Task<zero::async::promise::promise_result_t<std::invoke_result_t<F>>, std::error_code>
-    toThread(F &&f) {
+    toThread(F f) {
         using T = std::invoke_result_t<F>;
 
         auto eventLoop = getEventLoop();
@@ -24,7 +24,7 @@ namespace asyncio {
 
         T result;
 
-        worker->execute([=, &result, f = std::forward<F>(f)]() {
+        worker->execute([=, &result, f = std::move(f)]() {
             result = f();
             eventLoop->post([=]() mutable {
                 promise.resolve();
@@ -41,7 +41,7 @@ namespace asyncio {
 
     template<typename F, typename C>
     zero::async::coroutine::Task<zero::async::promise::promise_result_t<std::invoke_result_t<F>>, std::error_code>
-    toThread(F &&f, C && cancel) {
+    toThread(F f, C cancel) {
         using T = std::invoke_result_t<F>;
 
         auto eventLoop = getEventLoop();
@@ -58,7 +58,7 @@ namespace asyncio {
 
         T result;
 
-        worker->execute([=, &result, f = std::forward<F>(f)]() {
+        worker->execute([=, &result, f = std::move(f)]() {
             result = f();
             eventLoop->post([=]() mutable {
                 promise.resolve();
@@ -67,7 +67,7 @@ namespace asyncio {
 
         co_await zero::async::coroutine::Cancellable{
                 promise,
-                [handle = worker->mThread.native_handle(), cancel = std::forward<C>(cancel)]() {
+                [handle = worker->mThread.native_handle(), cancel = std::move(cancel)]() {
                     return cancel(handle);
                 }
         };

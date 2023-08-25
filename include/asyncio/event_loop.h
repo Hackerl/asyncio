@@ -62,14 +62,14 @@ namespace asyncio {
                 zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
                 std::error_code
         >
-        toThread(F &&f);
+        toThread(F f);
 
         template<typename F, typename C>
         friend zero::async::coroutine::Task<
                 zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
                 std::error_code
         >
-        toThread(F &&f, C &&cancel);
+        toThread(F f, C cancel);
     };
 
     std::shared_ptr<EventLoop> getEventLoop();
@@ -80,7 +80,7 @@ namespace asyncio {
 
     template<typename T>
     zero::async::coroutine::Task<T, std::error_code>
-    timeout(zero::async::coroutine::Task<T, std::error_code> &task, std::chrono::milliseconds ms) {
+    timeout(zero::async::coroutine::Task<T, std::error_code> task, std::chrono::milliseconds ms) {
         auto timer = sleep(ms);
         co_await zero::async::coroutine::race(task, timer);
 
@@ -88,11 +88,6 @@ namespace asyncio {
             co_return tl::unexpected(make_error_code(std::errc::timed_out));
 
         co_return task.result();
-    }
-
-    template<typename T>
-    auto timeout(zero::async::coroutine::Task<T, std::error_code> &&task, std::chrono::milliseconds ms) {
-        return timeout(task, ms);
     }
 
     template<typename F>

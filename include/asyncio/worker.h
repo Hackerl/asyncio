@@ -38,7 +38,7 @@ namespace asyncio {
                 zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
                 std::error_code
         >
-        toThread(F &&f, C &&cancel);
+        toThread(F f, C cancel);
     };
 }
 

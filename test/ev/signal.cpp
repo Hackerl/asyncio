@@ -15,22 +15,19 @@ TEST_CASE("signal handler", "[signal]") {
             auto signal = asyncio::ev::makeSignal(SIGINT);
             REQUIRE(signal);
 
-            auto task = signal->on();
-
-            co_await zero::async::coroutine::allSettled(
-                    []() -> zero::async::coroutine::Task<void> {
-                        co_await asyncio::sleep(20ms);
+            std::thread thread([]() {
+                std::this_thread::sleep_for(50ms);
 #ifdef _WIN32
-                        raise(SIGINT);
+                raise(SIGINT);
 #else
-                        kill(getpid(), SIGINT);
+                kill(getpid(), SIGINT);
 #endif
-                    }(),
-                    [&]() -> zero::async::coroutine::Task<void> {
-                        auto result = co_await task;
-                        REQUIRE(result);
-                    }()
-            );
+            });
+
+            auto result = co_await signal->on();
+            REQUIRE(result);
+
+            thread.join();
         });
     }
 

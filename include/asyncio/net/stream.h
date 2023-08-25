@@ -51,15 +51,15 @@ namespace asyncio::net::stream {
     tl::expected<Listener, std::error_code> listen(std::span<const Address> addresses);
     tl::expected<Listener, std::error_code> listen(const std::string &ip, unsigned short port);
 
-    zero::async::coroutine::Task<Buffer, std::error_code> connect(const Address &address);
+    zero::async::coroutine::Task<Buffer, std::error_code> connect(Address address);
     zero::async::coroutine::Task<Buffer, std::error_code> connect(std::span<const Address> addresses);
 
     zero::async::coroutine::Task<Buffer, std::error_code>
-    connect(const std::string &host, unsigned short port);
+    connect(std::string host, unsigned short port);
 
 #if __unix__ || __APPLE__
     tl::expected<Listener, std::error_code> listen(const std::string &path);
-    zero::async::coroutine::Task<Buffer, std::error_code> connect(const std::string &path);
+    zero::async::coroutine::Task<Buffer, std::error_code> connect(std::string path);
 #endif
 }
 

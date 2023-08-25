@@ -18,20 +18,16 @@ namespace asyncio::net::dns {
     std::error_code make_error_code(Error e);
 
     zero::async::coroutine::Task<std::vector<Address>, std::error_code>
-    getAddressInfo(
-            const std::string &node,
-            const std::optional<std::string> &service,
-            const std::optional<evutil_addrinfo> &hints
-    );
+    getAddressInfo(std::string node, std::optional<std::string> service, std::optional<evutil_addrinfo> hints);
 
     zero::async::coroutine::Task<std::vector<std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>>>, std::error_code>
-    lookupIP(const std::string &host);
+    lookupIP(std::string host);
 
     zero::async::coroutine::Task<std::vector<std::array<std::byte, 4>>, std::error_code>
-    lookupIPv4(const std::string &host);
+    lookupIPv4(std::string host);
 
     zero::async::coroutine::Task<std::vector<std::array<std::byte, 16>>, std::error_code>
-    lookupIPv6(const std::string &host);
+    lookupIPv6(std::string host);
 }
 
 namespace std {

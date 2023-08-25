@@ -141,8 +141,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
             REQUIRE(listener);
 
             co_await zero::async::coroutine::allSettled(
-                    [&]() -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await listener->accept());
+                    [](auto listener) -> zero::async::coroutine::Task<void> {
+                        auto buffer = std::move(co_await listener.accept());
                         REQUIRE(buffer);
 
                         auto localAddress = buffer->localAddress();
@@ -162,7 +162,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         REQUIRE(*line == "world hello");
 
                         buffer->close();
-                    }(),
+                        listener.close();
+                    }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto context = asyncio::net::ssl::newContext(
                                 {
@@ -198,8 +199,6 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         co_await buffer->waitClosed();
                     }()
             );
-
-            listener->close();
         });
     }
 
@@ -220,8 +219,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
             REQUIRE(listener);
 
             co_await zero::async::coroutine::allSettled(
-                    [&]() -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await listener->accept());
+                    [](auto listener) -> zero::async::coroutine::Task<void> {
+                        auto buffer = std::move(co_await listener.accept());
                         REQUIRE(buffer);
 
                         auto localAddress = buffer->localAddress();
@@ -241,8 +240,8 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         REQUIRE(*line == "world hello");
 
                         buffer->close();
-                        listener->close();
-                    }(),
+                        listener.close();
+                    }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto context = asyncio::net::ssl::newContext(
                                 {
@@ -276,8 +275,6 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         co_await buffer->waitClosed();
                     }()
             );
-
-            listener->close();
         });
     }
 }

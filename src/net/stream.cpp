@@ -170,7 +170,7 @@ asyncio::net::stream::listen(const std::string &ip, unsigned short port) {
 }
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(const Address &address) {
+asyncio::net::stream::connect(Address address) {
     size_t index = address.index();
 
     if (index == 0) {
@@ -199,7 +199,7 @@ asyncio::net::stream::connect(std::span<const Address> addresses) {
         auto result = std::move(co_await connect(*it));
 
         if (result)
-            co_return std::move(result);
+            co_return std::move(*result);
 
         if (++it == addresses.end())
             co_return tl::unexpected(result.error());
@@ -207,7 +207,7 @@ asyncio::net::stream::connect(std::span<const Address> addresses) {
 }
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(const std::string &host, unsigned short port) {
+asyncio::net::stream::connect(std::string host, unsigned short port) {
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
@@ -281,7 +281,7 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
 }
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(const std::string &path) {
+asyncio::net::stream::connect(std::string path) {
     sockaddr_un sa = {};
 
     sa.sun_family = AF_UNIX;

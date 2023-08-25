@@ -19,8 +19,8 @@ TEST_CASE("async event notification", "[event]") {
     SECTION("normal") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
             co_await zero::async::coroutine::allSettled(
-                    [&]() -> zero::async::coroutine::Task<void> {
-                        auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::READ);
+                    [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
+                        auto event = asyncio::ev::makeEvent(fd, asyncio::ev::What::READ);
                         REQUIRE(event);
 
                         auto result = co_await event->on();
@@ -29,29 +29,29 @@ TEST_CASE("async event notification", "[event]") {
                         REQUIRE(*result & asyncio::ev::What::READ);
 
                         char buffer[1024] = {};
-                        REQUIRE(recv(fds[0], buffer, sizeof(buffer), 0) == 11);
+                        REQUIRE(recv(fd, buffer, sizeof(buffer), 0) == 11);
                         REQUIRE(strcmp(buffer, "hello world") == 0);
 
                         result = co_await event->on();
 
                         REQUIRE(result);
                         REQUIRE(*result & asyncio::ev::What::READ);
-                        REQUIRE(recv(fds[0], buffer, sizeof(buffer), 0) == 0);
+                        REQUIRE(recv(fd, buffer, sizeof(buffer), 0) == 0);
 
-                        evutil_closesocket(fds[0]);
-                    }(),
-                    [&]() -> zero::async::coroutine::Task<void> {
-                        auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::WRITE);
+                        evutil_closesocket(fd);
+                    }(fds[0]),
+                    [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
+                        auto event = asyncio::ev::makeEvent(fd, asyncio::ev::What::WRITE);
                         REQUIRE(event);
 
                         auto result = co_await event->on();
 
                         REQUIRE(result);
                         REQUIRE(*result & asyncio::ev::What::WRITE);
-                        REQUIRE(send(fds[1], "hello world", 11, 0) == 11);
+                        REQUIRE(send(fd, "hello world", 11, 0) == 11);
 
-                        evutil_closesocket(fds[1]);
-                    }()
+                        evutil_closesocket(fd);
+                    }(fds[1])
             );
         });
     }

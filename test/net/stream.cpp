@@ -9,8 +9,8 @@ TEST_CASE("stream network connection", "[stream]") {
             REQUIRE(listener);
 
             co_await zero::async::coroutine::allSettled(
-                    [&]() -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await listener->accept());
+                    [](auto listener) -> zero::async::coroutine::Task<void> {
+                        auto buffer = std::move(co_await listener.accept());
                         REQUIRE(buffer);
 
                         auto localAddress = buffer->localAddress();
@@ -30,7 +30,8 @@ TEST_CASE("stream network connection", "[stream]") {
                         REQUIRE(*line == "world hello");
 
                         buffer->close();
-                    }(),
+                        listener.close();
+                    }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto buffer = std::move(co_await asyncio::net::stream::connect("127.0.0.1", 30000));
                         REQUIRE(buffer);
@@ -53,8 +54,6 @@ TEST_CASE("stream network connection", "[stream]") {
                         co_await buffer->waitClosed();
                     }()
             );
-
-            listener->close();
         });
     }
 
@@ -65,8 +64,8 @@ TEST_CASE("stream network connection", "[stream]") {
             REQUIRE(listener);
 
             co_await zero::async::coroutine::allSettled(
-                    [&]() -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await listener->accept());
+                    [](auto listener) -> zero::async::coroutine::Task<void> {
+                        auto buffer = std::move(co_await listener.accept());
                         REQUIRE(buffer);
 
                         auto localAddress = buffer->localAddress();
@@ -82,7 +81,10 @@ TEST_CASE("stream network connection", "[stream]") {
                         REQUIRE(*line == "world hello");
 
                         buffer->close();
-                    }(),
+                        listener.close();
+
+                        remove("/tmp/asyncio-test.sock");
+                    }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto buffer = std::move(co_await asyncio::net::stream::connect("/tmp/asyncio-test.sock"));
                         REQUIRE(buffer);
@@ -101,9 +103,6 @@ TEST_CASE("stream network connection", "[stream]") {
                         co_await buffer->waitClosed();
                     }()
             );
-
-            listener->close();
-            remove("/tmp/asyncio-test.sock");
         });
     }
 #endif

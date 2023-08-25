@@ -19,8 +19,8 @@ TEST_CASE("async stream buffer", "[buffer]") {
     SECTION("normal") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
             co_await zero::async::coroutine::allSettled(
-                    [&]() -> zero::async::coroutine::Task<void> {
-                        auto buffer = asyncio::ev::makeBuffer(fds[0]);
+                    [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
+                        auto buffer = asyncio::ev::makeBuffer(fd);
 
                         REQUIRE(buffer);
                         REQUIRE(buffer->fd() > 0);
@@ -34,9 +34,9 @@ TEST_CASE("async stream buffer", "[buffer]") {
                         REQUIRE(*result == "world hello");
 
                         buffer->close();
-                    }(),
-                    [&]() -> zero::async::coroutine::Task<void> {
-                        auto buffer = asyncio::ev::makeBuffer(fds[1]);
+                    }(fds[0]),
+                    [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
+                        auto buffer = asyncio::ev::makeBuffer(fd);
 
                         REQUIRE(buffer);
                         REQUIRE(buffer->fd() > 0);
@@ -50,7 +50,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
 
                         co_await buffer->drain();
                         co_await buffer->waitClosed();
-                    }()
+                    }(fds[1])
             );
         });
     }

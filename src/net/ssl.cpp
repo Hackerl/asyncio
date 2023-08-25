@@ -348,11 +348,11 @@ asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const
 }
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
-asyncio::net::ssl::stream::connect(const asyncio::net::Address &address) {
+asyncio::net::ssl::stream::connect(Address address) {
     if (!defaultContext)
         co_return tl::unexpected(defaultContext.error());
 
-    co_return std::move(co_await connect(*defaultContext, address));
+    co_return std::move(co_await connect(*defaultContext, std::move(address)));
 }
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
@@ -364,30 +364,30 @@ asyncio::net::ssl::stream::connect(std::span<const Address> addresses) {
 }
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
-asyncio::net::ssl::stream::connect(const std::string &host, unsigned short port) {
+asyncio::net::ssl::stream::connect(std::string host, unsigned short port) {
     if (!defaultContext)
         co_return tl::unexpected(defaultContext.error());
 
-    co_return std::move(co_await connect(*defaultContext, host, port));
+    co_return std::move(co_await connect(*defaultContext, std::move(host), port));
 }
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
-asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> &context, const asyncio::net::Address &address) {
+asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, Address address) {
     size_t index = address.index();
 
     if (index == 0) {
         IPv4Address ipv4 = std::get<IPv4Address>(address);
-        co_return std::move(co_await connect(context, zero::os::net::stringify(ipv4.ip), ipv4.port));
+        co_return std::move(co_await connect(std::move(context), zero::os::net::stringify(ipv4.ip), ipv4.port));
     } else if (index == 1) {
         IPv6Address ipv6 = std::get<IPv6Address>(address);
-        co_return std::move(co_await connect(context, zero::os::net::stringify(ipv6.ip), ipv6.port));
+        co_return std::move(co_await connect(std::move(context), zero::os::net::stringify(ipv6.ip), ipv6.port));
     }
 
     co_return tl::unexpected(make_error_code(std::errc::address_family_not_supported));
 }
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
-asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> &context, std::span<const Address> addresses) {
+asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, std::span<const Address> addresses) {
     if (addresses.empty())
         co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
 
@@ -397,7 +397,7 @@ asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> &context, std:
         auto result = std::move(co_await connect(context, *it));
 
         if (result)
-            co_return std::move(result);
+            co_return std::move(*result);
 
         if (++it == addresses.end())
             co_return tl::unexpected(result.error());
@@ -405,11 +405,7 @@ asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> &context, std:
 }
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
-asyncio::net::ssl::stream::connect(
-        const std::shared_ptr<Context> &context,
-        const std::string &host,
-        unsigned short port
-) {
+asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, std::string host, unsigned short port) {
     SSL *ssl = SSL_new(context.get());
 
     if (!ssl)

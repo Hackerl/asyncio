@@ -87,22 +87,22 @@ namespace asyncio::net::ssl {
         listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port);
 
         zero::async::coroutine::Task<Buffer, std::error_code>
-        connect(const Address &address);
+        connect(Address address);
 
         zero::async::coroutine::Task<Buffer, std::error_code>
         connect(std::span<const Address> addresses);
 
         zero::async::coroutine::Task<Buffer, std::error_code>
-        connect(const std::string &host, unsigned short port);
+        connect(std::string host, unsigned short port);
 
         zero::async::coroutine::Task<Buffer, std::error_code>
-        connect(const std::shared_ptr<Context> &context, const Address &address);
+        connect(std::shared_ptr<Context> context, Address address);
 
         zero::async::coroutine::Task<Buffer, std::error_code>
-        connect(const std::shared_ptr<Context> &context, std::span<const Address> addresses);
+        connect(std::shared_ptr<Context> context, std::span<const Address> addresses);
 
         zero::async::coroutine::Task<Buffer, std::error_code>
-        connect(const std::shared_ptr<Context> &context, const std::string &host, unsigned short port);
+        connect(std::shared_ptr<Context> context, std::string host, unsigned short port);
     }
 }
 

@@ -28,6 +28,23 @@ zero::async::coroutine::Task<void> handle(asyncio::net::stream::Buffer buffer) {
     }
 }
 
+zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::stream::Listener listener) {
+    tl::expected<void, std::error_code> result;
+
+    while (true) {
+        auto buffer = std::move(co_await listener.accept());
+
+        if (!buffer) {
+            result = tl::unexpected(buffer.error());
+            break;
+        }
+
+        handle(std::move(*buffer));
+    }
+
+    co_return result;
+}
+
 int main(int argc, char *argv[]) {
     INIT_CONSOLE_LOG(zero::INFO_LEVEL);
 
@@ -69,24 +86,7 @@ int main(int argc, char *argv[]) {
             co_return;
         }
 
-        co_await zero::async::coroutine::allSettled(
-                [&]() -> zero::async::coroutine::Task<void> {
-                    co_await signal->on();
-                    listener->close();
-                }(),
-                [&]() -> zero::async::coroutine::Task<void> {
-                    while (true) {
-                        auto buffer = std::move(co_await listener->accept());
-
-                        if (!buffer) {
-                            LOG_ERROR("accept failed[%s]", buffer.error().message().c_str());
-                            break;
-                        }
-
-                        handle(std::move(*buffer));
-                    }
-                }()
-        );
+        co_await zero::async::coroutine::race(signal->on(), serve(std::move(*listener)));
     });
 
 #ifdef _WIN32
