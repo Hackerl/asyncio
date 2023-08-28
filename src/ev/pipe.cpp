@@ -1,5 +1,6 @@
 #include <asyncio/ev/pipe.h>
 #include <asyncio/event_loop.h>
+#include <asyncio/error.h>
 
 asyncio::ev::PairedBuffer::PairedBuffer(bufferevent *bev, std::shared_ptr<std::error_code> ec)
         : Buffer(bev), mErrorCode(std::move(ec)) {
@@ -7,7 +8,7 @@ asyncio::ev::PairedBuffer::PairedBuffer(bufferevent *bev, std::shared_ptr<std::e
 }
 
 asyncio::ev::PairedBuffer::~PairedBuffer() {
-    if (!mBev)
+    if (!mBev || mClosed)
         return;
 
     bufferevent_flush(mBev.get(), EV_WRITE, BEV_FINISHED);
@@ -18,13 +19,22 @@ tl::expected<void, std::error_code> asyncio::ev::PairedBuffer::close() {
     return Buffer::close();
 }
 
-void asyncio::ev::PairedBuffer::throws(const std::error_code &ec) {
+tl::expected<void, std::error_code> asyncio::ev::PairedBuffer::throws(const std::error_code &ec) {
+    if (!mBev)
+        return tl::unexpected(Error::RESOURCE_DESTROYED);
+
+    if (mClosed)
+        return tl::unexpected(Error::IO_EOF);
+
     *mErrorCode = ec;
 
     if (bufferevent *buffer = bufferevent_pair_get_partner(mBev.get()))
         bufferevent_trigger_event(buffer, BEV_EVENT_ERROR, BEV_OPT_DEFER_CALLBACKS);
 
-    bufferevent_trigger_event(mBev.get(), BEV_EVENT_ERROR, 0);
+    bufferevent_trigger_event(mBev.get(), BEV_EVENT_ERROR, BEV_OPT_DEFER_CALLBACKS);
+    mClosed = true;
+
+    return {};
 }
 
 std::error_code asyncio::ev::PairedBuffer::getError() {

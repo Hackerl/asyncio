@@ -7,7 +7,7 @@
 namespace asyncio::ev {
     class IPairedBuffer : public virtual IBuffer {
     public:
-        virtual void throws(const std::error_code &ec) = 0;
+        virtual tl::expected<void, std::error_code> throws(const std::error_code &ec) = 0;
     };
 
     class PairedBuffer : public Buffer, public IPairedBuffer {
@@ -18,7 +18,7 @@ namespace asyncio::ev {
 
     public:
         tl::expected<void, std::error_code> close() override;
-        void throws(const std::error_code &ec) override;
+        tl::expected<void, std::error_code> throws(const std::error_code &ec) override;
 
     private:
         std::error_code getError() override;
