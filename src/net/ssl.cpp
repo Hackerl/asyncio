@@ -1,6 +1,7 @@
 #include <asyncio/net/ssl.h>
-#include <asyncio/error.h>
+#include <asyncio/net/dns.h>
 #include <asyncio/event_loop.h>
+#include <asyncio/error.h>
 #include <zero/os/net.h>
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
@@ -441,13 +442,19 @@ asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, std::string
                 auto promise = static_cast<zero::async::promise::Promise<void, std::error_code> *>(arg);
 
                 if ((what & BEV_EVENT_CONNECTED) == 0) {
-                    unsigned long e = bufferevent_get_openssl_error(bev);
-                    promise->reject(
-                            e ?
-                            make_error_code((Error) e) :
-                            std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category())
-                    );
+                    if (int e = bufferevent_socket_get_dns_error(bev); e) {
+                        promise->reject(make_error_code((dns::Error) e));
+                        delete promise;
+                        return;
+                    }
 
+                    if (unsigned long e = bufferevent_get_openssl_error(bev); e) {
+                        promise->reject(make_error_code((Error) e));
+                        delete promise;
+                        return;
+                    }
+
+                    promise->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
                     delete promise;
                     return;
                 }
@@ -461,7 +468,7 @@ asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, std::string
     if (bufferevent_socket_connect_hostname(bev, getEventLoop()->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
         delete ctx;
         bufferevent_free(bev);
-        co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
     }
 
     auto result = co_await zero::async::coroutine::Cancellable{
