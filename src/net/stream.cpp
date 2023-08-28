@@ -213,7 +213,8 @@ asyncio::net::stream::connect(std::string host, unsigned short port) {
     if (!bev)
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    auto promise = new zero::async::promise::Promise<void, std::error_code>();
+    zero::async::promise::Promise<void, std::error_code> promise;
+    auto ctx = new zero::async::promise::Promise<void, std::error_code>(promise);
 
     bufferevent_setcb(
             bev,
@@ -231,20 +232,21 @@ asyncio::net::stream::connect(std::string host, unsigned short port) {
                 promise->resolve();
                 delete promise;
             },
-            promise
+            ctx
     );
 
     if (bufferevent_socket_connect_hostname(bev, getEventLoop()->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
-        delete promise;
+        delete ctx;
         bufferevent_free(bev);
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
     auto result = co_await zero::async::coroutine::Cancellable{
-            *promise,
-            [=]() -> tl::expected<void, std::error_code> {
-                promise->reject(make_error_code(std::errc::operation_canceled));
-                delete promise;
+            promise,
+            [=]() mutable -> tl::expected<void, std::error_code> {
+                bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
+                promise.reject(make_error_code(std::errc::operation_canceled));
+                delete ctx;
                 return {};
             }
     };
