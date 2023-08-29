@@ -4,17 +4,13 @@ project(asyncio)
 set(CMAKE_CXX_STANDARD 20)
 
 option(ASYNCIO_DISABLE_SSL "disable ssl support" OFF)
-option(ASYNCIO_DISABLE_TESTS "disable asyncio unit test" OFF)
 option(ASYNCIO_DISABLE_SAMPLES "disable asyncio samples" OFF)
 option(ASYNCIO_EMBED_CA_CERT "use embedded CA certificates" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/lib)
-
 set(ASYNCIO_VERSION 1.0.0)
 
+include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
@@ -127,6 +123,6 @@ if (NOT ASYNCIO_DISABLE_SAMPLES)
     add_subdirectory(sample)
 endif ()
 
-if (NOT ASYNCIO_DISABLE_TESTS)
+if (BUILD_TESTING)
     add_subdirectory(test)
 endif ()
