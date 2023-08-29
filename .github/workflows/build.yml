@@ -1,0 +1,45 @@
+name: asyncio
+on: [ push ]
+jobs:
+  linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: |
+          mkdir -p build
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          cmake --build build -j$(nproc)
+
+  windows-amd64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Build
+        run: |
+          mkdir -p build
+          cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          cmake --build build -j $env:NUMBER_OF_PROCESSORS
+
+  macos-amd64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install LLVM-16
+        run: |
+          brew install llvm@16
+          echo "LLVM16=$(brew --prefix llvm@16)" >> $GITHUB_ENV
+      - name: Build
+        run: |
+          mkdir -p build
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          cmake --build build -j$(nproc)
+        env:
+          CC: ${{ env.LLVM16 }}/bin/clang
+          CXX: ${{ env.LLVM16 }}/bin/clang++
+          CPPFLAGS: -I${{ env.LLVM16 }}/include
+          LDFLAGS: -L${{ env.LLVM16 }}/lib -L${{ env.LLVM16 }}/lib/c++ -Wl,-rpath,${{ env.LLVM16 }}/lib/c++
+      - name: Test
+        run: ctest --output-on-failure --test-dir build

@@ -24,7 +24,7 @@ namespace asyncio {
 
         T result;
 
-        worker->execute([=, &result, f = std::move(f)]() {
+        worker->execute([=, &result, f = std::move(f)]() mutable {
             result = f();
             eventLoop->post([=]() mutable {
                 promise.resolve();
@@ -58,7 +58,7 @@ namespace asyncio {
 
         T result;
 
-        worker->execute([=, &result, f = std::move(f)]() {
+        worker->execute([=, &result, f = std::move(f)]() mutable {
             result = f();
             eventLoop->post([=]() mutable {
                 promise.resolve();
