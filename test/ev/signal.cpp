@@ -15,19 +15,23 @@ TEST_CASE("signal handler", "[signal]") {
             auto signal = asyncio::ev::makeSignal(SIGINT);
             REQUIRE(signal);
 
+#ifdef __APPLE__
             std::thread thread([]() {
                 std::this_thread::sleep_for(50ms);
-#ifdef _WIN32
-                raise(SIGINT);
-#else
                 kill(getpid(), SIGINT);
-#endif
             });
 
             auto result = co_await signal->on();
             REQUIRE(result);
 
             thread.join();
+#else
+            auto task = signal->on();
+            raise(SIGINT);
+
+            auto result = co_await task;
+            REQUIRE(result);
+#endif
         });
     }
 
