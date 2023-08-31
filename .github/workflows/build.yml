@@ -47,7 +47,7 @@ jobs:
         run: |
           mkdir -p build
           cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
-          cmake --build build -j$(nproc)
+          cmake --build build -j$(sysctl -n hw.physicalcpu)
         env:
           CC: ${{ env.LLVM16 }}/bin/clang
           CXX: ${{ env.LLVM16 }}/bin/clang++
