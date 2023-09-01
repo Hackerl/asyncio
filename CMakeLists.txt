@@ -15,6 +15,7 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 find_package(zero CONFIG REQUIRED)
+find_package(CURL CONFIG REQUIRED)
 find_package(Libevent CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
@@ -34,6 +35,7 @@ add_library(
         src/net/dns.cpp
         src/net/dgram.cpp
         src/net/stream.cpp
+        src/http/url.cpp
         $<$<NOT:$<BOOL:${ASYNCIO_DISABLE_SSL}>>:src/net/ssl.cpp>
 )
 
@@ -66,6 +68,7 @@ target_link_libraries(
         asyncio
         PUBLIC
         zero::zero
+        CURL::libcurl
         libevent::core
         libevent::extra
         nlohmann_json::nlohmann_json

@@ -28,7 +28,7 @@ const std::error_category &asyncio::net::ssl::category() {
     return instance;
 }
 
-std::error_code asyncio::net::ssl::make_error_code(asyncio::net::ssl::Error e) {
+std::error_code asyncio::net::ssl::make_error_code(Error e) {
     return {static_cast<int>(e), category()};
 }
 
@@ -37,13 +37,13 @@ tl::expected<void, std::error_code> asyncio::net::ssl::loadEmbeddedCA(Context *c
     BIO *bio = BIO_new_mem_buf(CA_CERT, (int) sizeof(CA_CERT));
 
     if (!bio)
-        return tl::unexpected(make_error_code((Error) ERR_get_error()));
+        return tl::unexpected((Error) ERR_get_error());
 
     STACK_OF(X509_INFO) *info = PEM_X509_INFO_read_bio(bio, nullptr, nullptr, nullptr);
 
     if (!info) {
         BIO_free(bio);
-        return tl::unexpected(make_error_code((Error) ERR_get_error()));
+        return tl::unexpected((Error) ERR_get_error());
     }
 
     X509_STORE *store = SSL_CTX_get_cert_store(ctx);
@@ -51,7 +51,7 @@ tl::expected<void, std::error_code> asyncio::net::ssl::loadEmbeddedCA(Context *c
     if (!store) {
         sk_X509_INFO_pop_free(info, X509_INFO_free);
         BIO_free(bio);
-        return tl::unexpected(make_error_code((Error) ERR_get_error()));
+        return tl::unexpected((Error) ERR_get_error());
     }
 
     for (int i = 0; i < sk_X509_INFO_num(info); i++) {
@@ -115,35 +115,35 @@ asyncio::net::ssl::newContext(const Config &config) {
     );
 
     if (!ctx)
-        return tl::unexpected(make_error_code((Error) ERR_get_error()));
+        return tl::unexpected((Error) ERR_get_error());
 
     if (!SSL_CTX_set_min_proto_version(ctx.get(), config.minVersion.value_or(TLS_VERSION_1_2)))
-        return tl::unexpected(make_error_code((Error) ERR_get_error()));
+        return tl::unexpected((Error) ERR_get_error());
 
     if (!SSL_CTX_set_max_proto_version(ctx.get(), config.minVersion.value_or(TLS_VERSION_1_3)))
-        return tl::unexpected(make_error_code((Error) ERR_get_error()));
+        return tl::unexpected((Error) ERR_get_error());
 
     switch (config.ca.index()) {
         case 1: {
             std::shared_ptr<X509> cert = readCertificate(std::get<1>(config.ca));
 
             if (!cert)
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             X509_STORE *store = SSL_CTX_get_cert_store(ctx.get());
 
             if (!store)
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             if (!X509_STORE_add_cert(store, cert.get()))
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             break;
         }
 
         case 2:
             if (!SSL_CTX_load_verify_locations(ctx.get(), std::get<2>(config.ca).string().c_str(), nullptr))
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             break;
 
@@ -156,17 +156,17 @@ asyncio::net::ssl::newContext(const Config &config) {
             std::shared_ptr<X509> cert = readCertificate(std::get<1>(config.cert));
 
             if (!cert)
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             if (!SSL_CTX_use_certificate(ctx.get(), cert.get()))
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             break;
         }
 
         case 2:
             if (!SSL_CTX_use_certificate_file(ctx.get(), std::get<2>(config.cert).string().c_str(), SSL_FILETYPE_PEM))
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             break;
 
@@ -179,13 +179,13 @@ asyncio::net::ssl::newContext(const Config &config) {
             std::shared_ptr<EVP_PKEY> key = readPrivateKey(std::get<1>(config.privateKey));
 
             if (!key)
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             if (!SSL_CTX_use_PrivateKey(ctx.get(), key.get()))
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             if (!SSL_CTX_check_private_key(ctx.get()))
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             break;
         }
@@ -196,10 +196,10 @@ asyncio::net::ssl::newContext(const Config &config) {
                     std::get<2>(config.privateKey).string().c_str(),
                     SSL_FILETYPE_PEM
             ))
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             if (!SSL_CTX_check_private_key(ctx.get()))
-                return tl::unexpected(make_error_code((Error) ERR_get_error()));
+                return tl::unexpected((Error) ERR_get_error());
 
             break;
 
@@ -215,7 +215,7 @@ asyncio::net::ssl::newContext(const Config &config) {
             return tl::unexpected(result.error());
 #else
         if (!SSL_CTX_set_default_verify_paths(ctx.get()))
-            return tl::unexpected(make_error_code((Error) ERR_get_error()));
+            return tl::unexpected((Error) ERR_get_error());
 #endif
     }
 
@@ -253,7 +253,7 @@ std::error_code asyncio::net::ssl::stream::Buffer::getError() {
     if (!e)
         return {EVUTIL_SOCKET_ERROR(), std::system_category()};
 
-    return make_error_code((Error) e);
+    return (Error) e;
 }
 
 tl::expected<asyncio::net::ssl::stream::Buffer, std::error_code>
@@ -410,14 +410,14 @@ asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, std::string
     SSL *ssl = SSL_new(context.get());
 
     if (!ssl)
-        co_return tl::unexpected(make_error_code((Error) ERR_get_error()));
+        co_return tl::unexpected((Error) ERR_get_error());
 
     SSL_set_tlsext_host_name(ssl, host.c_str());
     SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
     if (!SSL_set1_host(ssl, host.c_str())) {
         SSL_free(ssl);
-        co_return tl::unexpected(make_error_code((Error) ERR_get_error()));
+        co_return tl::unexpected((Error) ERR_get_error());
     }
 
     bufferevent *bev = bufferevent_openssl_socket_new(
@@ -443,13 +443,13 @@ asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, std::string
 
                 if ((what & BEV_EVENT_CONNECTED) == 0) {
                     if (int e = bufferevent_socket_get_dns_error(bev); e) {
-                        promise->reject(make_error_code((dns::Error) e));
+                        promise->reject((dns::Error) e);
                         delete promise;
                         return;
                     }
 
                     if (unsigned long e = bufferevent_get_openssl_error(bev); e) {
-                        promise->reject(make_error_code((Error) e));
+                        promise->reject((Error) e);
                         delete promise;
                         return;
                     }

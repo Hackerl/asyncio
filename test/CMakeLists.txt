@@ -15,6 +15,7 @@ add_executable(
         net/dns.cpp
         net/dgram.cpp
         net/stream.cpp
+        http/url.cpp
         $<$<NOT:$<BOOL:${ASYNCIO_DISABLE_SSL}>>:net/ssl.cpp>
         $<$<PLATFORM_ID:Windows>:main.cpp>
 )

@@ -100,7 +100,7 @@ tl::expected<void, std::error_code> asyncio::net::stream::Acceptor::close() {
     auto promise = std::exchange(mPromise, std::nullopt);
 
     if (promise)
-        promise->reject(make_error_code(Error::RESOURCE_DESTROYED));
+        promise->reject(Error::RESOURCE_DESTROYED);
 
     mListener.reset();
     return {};
@@ -226,7 +226,7 @@ asyncio::net::stream::connect(std::string host, unsigned short port) {
 
                 if ((what & BEV_EVENT_CONNECTED) == 0) {
                     if (int e = bufferevent_socket_get_dns_error(bev); e) {
-                        promise->reject(make_error_code((dns::Error) e));
+                        promise->reject((dns::Error) e);
                         delete promise;
                         return;
                     }
