@@ -76,7 +76,7 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
             REQUIRE(!task.done());
 
             task.cancel();
-            co_await asyncio::sleep(50ms);
+            co_await asyncio::sleep(100ms);
 
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);

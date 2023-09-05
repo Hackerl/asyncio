@@ -36,6 +36,7 @@ add_library(
         src/net/dgram.cpp
         src/net/stream.cpp
         src/http/url.cpp
+        src/http/request.cpp
         $<$<NOT:$<BOOL:${ASYNCIO_DISABLE_SSL}>>:src/net/ssl.cpp>
 )
 
