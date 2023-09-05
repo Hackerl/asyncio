@@ -37,6 +37,11 @@ namespace asyncio {
 
     zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
     readAll(std::shared_ptr<IReader> reader);
+
+    zero::async::coroutine::Task<void, std::error_code> readExactly(IReader &reader, std::span<std::byte> data);
+
+    zero::async::coroutine::Task<void, std::error_code>
+    readExactly(std::shared_ptr<IReader> reader, std::span<std::byte> data);
 }
 
 #endif //ASYNCIO_IO_H

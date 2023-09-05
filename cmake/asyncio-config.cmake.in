@@ -3,6 +3,7 @@
 include(CMakeFindDependencyMacro)
 
 find_dependency(zero)
+find_dependency(CURL)
 find_dependency(Libevent)
 find_dependency(nlohmann_json)
 

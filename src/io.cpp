@@ -57,3 +57,27 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
 asyncio::readAll(std::shared_ptr<IReader> reader) {
     co_return co_await readAll(*reader);
 }
+
+zero::async::coroutine::Task<void, std::error_code> asyncio::readExactly(IReader &reader, std::span<std::byte> data) {
+    tl::expected<void, std::error_code> result;
+
+    size_t offset = 0;
+
+    while (offset < data.size()) {
+        auto n = co_await reader.read(data.subspan(offset));
+
+        if (!n) {
+            result = tl::unexpected(n.error());
+            break;
+        }
+
+        offset += *n;
+    }
+
+    co_return result;
+}
+
+zero::async::coroutine::Task<void, std::error_code>
+asyncio::readExactly(std::shared_ptr<IReader> reader, std::span<std::byte> data) {
+    co_return co_await readExactly(*reader, data);
+}
