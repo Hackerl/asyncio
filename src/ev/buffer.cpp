@@ -33,7 +33,7 @@ asyncio::ev::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)
 }
 
 asyncio::ev::Buffer::Buffer(asyncio::ev::Buffer &&rhs) noexcept
-        : mBev(std::move(rhs.mBev)), mClosed(rhs.mClosed) {
+        : mBev(std::move(rhs.mBev)), mClosed(rhs.mClosed), mLastError(rhs.mLastError) {
     assert(!mPromises[READ_INDEX]);
     assert(!mPromises[DRAIN_INDEX]);
     assert(!mPromises[WAIT_CLOSED_INDEX]);
@@ -84,7 +84,7 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::
         }
 
         if (mClosed) {
-            result = tl::unexpected<std::error_code>(Error::IO_EOF);
+            result = tl::unexpected<std::error_code>(mLastError);
             break;
         }
 
@@ -133,7 +133,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(st
     }
 
     if (mClosed)
-        co_return tl::unexpected(Error::IO_EOF);
+        co_return tl::unexpected(mLastError);
 
     auto result = co_await zero::async::coroutine::Cancellable{
             zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
@@ -179,7 +179,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::readExa
     }
 
     if (mClosed)
-        co_return tl::unexpected(Error::IO_EOF);
+        co_return tl::unexpected(mLastError);
 
     auto result = co_await zero::async::coroutine::Cancellable{
             zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
@@ -249,7 +249,7 @@ tl::expected<void, std::error_code> asyncio::ev::Buffer::submit(std::span<const 
         return tl::unexpected(Error::RESOURCE_DESTROYED);
 
     if (mClosed)
-        return tl::unexpected(Error::IO_EOF);
+        return tl::unexpected(mLastError);
 
     bufferevent_write(mBev.get(), data.data(), data.size());
     return {};
@@ -263,7 +263,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::drain()
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
     if (mClosed)
-        co_return tl::unexpected(Error::IO_EOF);
+        co_return tl::unexpected(mLastError);
 
     evbuffer *output = bufferevent_get_output(mBev.get());
 
@@ -301,7 +301,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::waitClo
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
     if (mClosed)
-        co_return tl::unexpected(Error::IO_EOF);
+        co_return tl::unexpected(mLastError);
 
     co_return co_await zero::async::coroutine::Cancellable{
             zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
@@ -348,7 +348,7 @@ zero::async::coroutine::Task<size_t, std::error_code> asyncio::ev::Buffer::read(
     }
 
     if (mClosed)
-        co_return tl::unexpected(Error::IO_EOF);
+        co_return tl::unexpected(mLastError);
 
     auto result = co_await zero::async::coroutine::Cancellable{
             zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
@@ -390,8 +390,10 @@ tl::expected<void, std::error_code> asyncio::ev::Buffer::close() {
     if (!mBev)
         return tl::unexpected(Error::RESOURCE_DESTROYED);
 
-    if (mClosed)
-        return tl::unexpected(Error::IO_EOF);
+    if (mClosed) {
+        mBev.reset();
+        return tl::unexpected(mLastError);
+    }
 
     onClose(Error::IO_EOF);
     mBev.reset();
@@ -430,6 +432,7 @@ void asyncio::ev::Buffer::setTimeout(std::chrono::milliseconds readTimeout, std:
 
 void asyncio::ev::Buffer::onClose(const std::error_code &ec) {
     mClosed = true;
+    mLastError = ec;
 
     auto [read, drain, waitClosed] = std::exchange(mPromises, {});
 

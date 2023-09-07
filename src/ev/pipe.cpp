@@ -24,7 +24,7 @@ tl::expected<void, std::error_code> asyncio::ev::PairedBuffer::throws(const std:
         return tl::unexpected(Error::RESOURCE_DESTROYED);
 
     if (mClosed)
-        return tl::unexpected(Error::IO_EOF);
+        return tl::unexpected(mLastError);
 
     *mErrorCode = ec;
 

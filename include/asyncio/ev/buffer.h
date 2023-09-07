@@ -89,6 +89,7 @@ namespace asyncio::ev {
 
     protected:
         bool mClosed;
+        std::error_code mLastError;
         std::unique_ptr<bufferevent, void (*)(bufferevent *)> mBev;
 
     private:

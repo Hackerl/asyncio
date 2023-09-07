@@ -143,6 +143,8 @@ tl::expected<void, std::error_code> asyncio::net::dgram::Socket::close() {
     if (mClosed)
         return tl::unexpected(Error::IO_EOF);
 
+    mClosed = true;
+
     for (auto &event: mEvents) {
         if (!event.pending())
             continue;

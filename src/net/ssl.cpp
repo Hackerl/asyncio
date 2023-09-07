@@ -238,7 +238,7 @@ tl::expected<void, std::error_code> asyncio::net::ssl::stream::Buffer::close() {
         return tl::unexpected(asyncio::Error::RESOURCE_DESTROYED);
 
     if (mClosed)
-        return tl::unexpected(asyncio::Error::IO_EOF);
+        return tl::unexpected(mLastError);
 
     SSL *ctx = bufferevent_openssl_get_ssl(mBev.get());
     SSL_set_shutdown(ctx, SSL_RECEIVED_SHUTDOWN);

@@ -20,7 +20,7 @@ size_t onWrite(char *buffer, size_t size, size_t n, void *userdata) {
     }
 
     if (connection->buffers[0].pending() >= 1024 * 1024) {
-        connection->buffers[0].drain().promise().finally([=]() {
+        connection->buffers[0].drain().promise().then([=]() {
             curl_easy_pause(connection->easy.get(), CURLPAUSE_CONT);
         });
 
