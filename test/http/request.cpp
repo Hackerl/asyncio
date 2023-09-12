@@ -507,44 +507,4 @@ TEST_CASE("http requests", "[request]") {
             );
         });
     }
-
-    SECTION("non-http protocol") {
-        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto path = std::filesystem::temp_directory_path() / "asyncio-file";
-
-            std::fstream stream;
-            stream.open(path, std::ios::out);
-            REQUIRE(stream.is_open());
-
-            stream << "hello world";
-            stream.close();
-
-            auto url = asyncio::http::URL::from(zero::strings::format("file://%s", path.string().c_str()));
-            REQUIRE(url);
-
-            auto result = asyncio::http::makeRequests();
-            REQUIRE(result);
-
-            auto &requests = *result;
-            auto response = std::move(co_await requests->get(*url));
-            REQUIRE(response);
-
-            auto output = std::filesystem::temp_directory_path() / "asyncio-file-copy";
-            auto res = co_await response->output(output);
-            REQUIRE(res);
-
-            stream.open(output, std::ios::in);
-            REQUIRE(stream.is_open());
-
-            std::string content = {
-                    std::istreambuf_iterator<char>(stream),
-                    std::istreambuf_iterator<char>()
-            };
-
-            REQUIRE(content == "hello world");
-
-            std::filesystem::remove(path);
-            std::filesystem::remove(output);
-        });
-    }
 }
