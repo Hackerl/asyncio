@@ -34,10 +34,7 @@ namespace asyncio {
         std::thread mThread;
 
         template<typename F, typename C>
-        friend zero::async::coroutine::Task<
-                zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
-                std::error_code
-        >
+        friend zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>
         toThread(F f, C cancel);
     };
 }

@@ -1,6 +1,7 @@
 #include <asyncio/net/dgram.h>
 #include <asyncio/net/dns.h>
 #include <asyncio/error.h>
+#include <zero/try.h>
 #include <cassert>
 
 constexpr auto READ_INDEX = 0;
@@ -234,10 +235,7 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, Address ad
     if (mEvents[WRITE_INDEX].pending())
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-    auto socketAddress = socketAddressFrom(address);
-
-    if (!socketAddress)
-        co_return tl::unexpected(socketAddress.error());
+    auto socketAddress = CO_TRY(socketAddressFrom(address));
 
     tl::expected<void, std::error_code> result;
 
@@ -334,10 +332,7 @@ evutil_socket_t asyncio::net::dgram::Socket::fd() {
 }
 
 tl::expected<void, std::error_code> asyncio::net::dgram::Socket::bind(const Address &address) {
-    auto socketAddress = socketAddressFrom(address);
-
-    if (!socketAddress)
-        return tl::unexpected(socketAddress.error());
+    auto socketAddress = TRY(socketAddressFrom(address));
 
     if (::bind(mFD, (const sockaddr *) socketAddress->data(), (socklen_t) socketAddress->size()) != 0)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
@@ -346,10 +341,7 @@ tl::expected<void, std::error_code> asyncio::net::dgram::Socket::bind(const Addr
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket::connect(Address address) {
-    auto socketAddress = socketAddressFrom(address);
-
-    if (!socketAddress)
-        co_return tl::unexpected(socketAddress.error());
+    auto socketAddress = CO_TRY(socketAddressFrom(address));
 
     if (::connect(mFD, (const sockaddr *) socketAddress->data(), (socklen_t) socketAddress->size()) != 0)
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
@@ -358,16 +350,8 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket:
 }
 
 tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::bind(const Address &address) {
-    auto socket = makeSocket(address.index() == 0 ? AF_INET : AF_INET6);
-
-    if (!socket)
-        return tl::unexpected(socket.error());
-
-    auto result = socket->bind(address);
-
-    if (!result)
-        return tl::unexpected(result.error());
-
+    auto socket = TRY(makeSocket(address.index() == 0 ? AF_INET : AF_INET6));
+    TRY(socket->bind(address));
     return socket;
 }
 
@@ -391,26 +375,14 @@ asyncio::net::dgram::bind(std::span<const Address> addresses) {
 
 tl::expected<asyncio::net::dgram::Socket, std::error_code>
 asyncio::net::dgram::bind(const std::string &ip, unsigned short port) {
-    auto address = addressFrom(ip, port);
-
-    if (!address)
-        return tl::unexpected(address.error());
-
+    auto address = TRY(addressFrom(ip, port));
     return dgram::bind(*address);
 }
 
 zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
 asyncio::net::dgram::connect(Address address) {
-    auto socket = makeSocket(address.index() == 0 ? AF_INET : AF_INET6);
-
-    if (!socket)
-        co_return tl::unexpected(socket.error());
-
-    auto result = co_await socket->connect(address);
-
-    if (!result)
-        co_return tl::unexpected(result.error());
-
+    auto socket = CO_TRY(makeSocket(address.index() == 0 ? AF_INET : AF_INET6));
+    CO_TRY(co_await socket->connect(address));
     co_return std::move(*socket);
 }
 
@@ -439,11 +411,7 @@ asyncio::net::dgram::connect(std::string host, unsigned short port) {
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
 
-    auto result = co_await dns::getAddressInfo(host, std::to_string(port), hints);
-
-    if (!result)
-        co_return tl::unexpected(result.error());
-
+    auto result = CO_TRY(co_await dns::getAddressInfo(host, std::to_string(port), hints));
     co_return std::move(co_await connect(*result));
 }
 

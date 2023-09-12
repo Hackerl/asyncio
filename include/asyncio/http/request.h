@@ -4,6 +4,7 @@
 #include "url.h"
 #include <map>
 #include <variant>
+#include <zero/try.h>
 #include <asyncio/ev/pipe.h>
 #include <asyncio/ev/timer.h>
 #include <nlohmann/json.hpp>
@@ -70,10 +71,7 @@ namespace asyncio::http {
 
         template<typename T>
         zero::async::coroutine::Task<T, std::error_code> json() {
-            tl::expected<nlohmann::json, std::error_code> j = co_await json();
-
-            if (!j)
-                co_return tl::unexpected(j.error());
+            tl::expected<nlohmann::json, std::error_code> j = CO_TRY(co_await json());
 
             try {
                 co_return j->get<T>();
@@ -167,10 +165,7 @@ namespace asyncio::http {
             Options opt = options.value_or(mOptions);
             opt.headers["Content-Type"] = "application/json";
 
-            auto connection = prepare(std::move(method), std::move(url), std::move(opt));
-
-            if (!connection)
-                co_return tl::unexpected(connection.error());
+            auto connection = CO_TRY(prepare(std::move(method), std::move(url), std::move(opt)));
 
             curl_easy_setopt(
                     connection->get()->easy.get(),

@@ -209,10 +209,7 @@ asyncio::net::ssl::newContext(const Config &config) {
 
     if (!config.insecure && config.ca.index() == 0 && !config.server) {
 #ifdef ASYNCIO_EMBED_CA_CERT
-        auto result = loadEmbeddedCA(ctx.get());
-
-        if (!result)
-            return tl::unexpected(result.error());
+        TRY(loadEmbeddedCA(ctx.get()));
 #else
         if (!SSL_CTX_set_default_verify_paths(ctx.get()))
             return tl::unexpected((Error) ERR_get_error());
@@ -289,20 +286,13 @@ asyncio::net::ssl::stream::Listener::Listener(std::shared_ptr<Context> context, 
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::Listener::accept() {
-    auto result = co_await fd();
-
-    if (!result)
-        co_return tl::unexpected(result.error());
-
+    auto result = CO_TRY(co_await fd());
     co_return makeBuffer(*result, mContext, State::ACCEPTING, true);
 }
 
 tl::expected<asyncio::net::ssl::stream::Listener, std::error_code>
 asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const Address &address) {
-    auto socketAddress = socketAddressFrom(address);
-
-    if (!socketAddress)
-        return tl::unexpected(socketAddress.error());
+    auto socketAddress = TRY(socketAddressFrom(address));
 
     evconnlistener *listener = evconnlistener_new_bind(
             getEventLoop()->base(),
@@ -340,11 +330,7 @@ asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, std::
 
 tl::expected<asyncio::net::ssl::stream::Listener, std::error_code>
 asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port) {
-    auto address = addressFrom(ip, port);
-
-    if (!address)
-        return tl::unexpected(address.error());
-
+    auto address = TRY(addressFrom(ip, port));
     return listen(context, *address);
 }
 

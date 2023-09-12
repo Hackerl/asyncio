@@ -5,6 +5,7 @@
 #include <queue>
 #include <event.h>
 #include <event2/dns.h>
+#include <zero/try.h>
 
 namespace asyncio {
     class EventLoop {
@@ -58,17 +59,11 @@ namespace asyncio {
         std::unique_ptr<evdns_base, void (*)(evdns_base *)> mDnsBase;
 
         template<typename F>
-        friend zero::async::coroutine::Task<
-                zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
-                std::error_code
-        >
+        friend zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>
         toThread(F f);
 
         template<typename F, typename C>
-        friend zero::async::coroutine::Task<
-                zero::async::promise::promise_result_t<std::invoke_result_t<F>>,
-                std::error_code
-        >
+        friend zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>
         toThread(F f, C cancel);
     };
 
@@ -92,12 +87,9 @@ namespace asyncio {
 
     template<typename F>
     tl::expected<void, std::error_code> run(F &&f) {
-        auto eventLoop = createEventLoop().transform([](EventLoop &&eventLoop) {
+        auto eventLoop = TRY(createEventLoop().transform([](EventLoop &&eventLoop) {
             return std::make_shared<EventLoop>(std::move(eventLoop));
-        });
-
-        if (!eventLoop)
-            return tl::unexpected(eventLoop.error());
+        }));
 
         setEventLoop(*eventLoop);
 

@@ -112,19 +112,12 @@ asyncio::net::stream::Listener::Listener(evconnlistener *listener) : Acceptor(li
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::Listener::accept() {
-    auto result = co_await fd();
-
-    if (!result)
-        co_return tl::unexpected(result.error());
-
+    auto result = CO_TRY(co_await fd());
     co_return makeBuffer(*result, true);
 }
 
 tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const Address &address) {
-    auto socketAddress = socketAddressFrom(address);
-
-    if (!socketAddress)
-        return tl::unexpected(socketAddress.error());
+    auto socketAddress = TRY(socketAddressFrom(address));
 
     evconnlistener *listener = evconnlistener_new_bind(
             getEventLoop()->base(),
@@ -162,11 +155,7 @@ asyncio::net::stream::listen(std::span<const Address> addresses) {
 
 tl::expected<asyncio::net::stream::Listener, std::error_code>
 asyncio::net::stream::listen(const std::string &ip, unsigned short port) {
-    auto address = addressFrom(ip, port);
-
-    if (!address)
-        return tl::unexpected(address.error());
-
+    auto address = TRY(addressFrom(ip, port));
     return listen(*address);
 }
 

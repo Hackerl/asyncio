@@ -378,11 +378,7 @@ zero::async::coroutine::Task<size_t, std::error_code> asyncio::ev::Buffer::read(
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::write(std::span<const std::byte> data) {
-    tl::expected<void, std::error_code> result = submit(data);
-
-    if (!result)
-        co_return tl::unexpected(result.error());
-
+    CO_TRY(submit(data));
     co_return co_await drain();
 }
 

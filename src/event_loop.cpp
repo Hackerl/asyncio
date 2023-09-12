@@ -105,10 +105,6 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(size_
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(std::chrono::milliseconds ms) {
-    auto timer = ev::makeTimer();
-
-    if (!timer)
-        co_return tl::unexpected(timer.error());
-
+    auto timer = CO_TRY(ev::makeTimer());
     co_return co_await timer->after(ms);
 }

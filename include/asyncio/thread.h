@@ -6,7 +6,7 @@
 
 namespace asyncio {
     template<typename F>
-    zero::async::coroutine::Task<zero::async::promise::promise_result_t<std::invoke_result_t<F>>, std::error_code>
+    zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>
     toThread(F f) {
         using T = std::invoke_result_t<F>;
 
@@ -40,7 +40,7 @@ namespace asyncio {
     }
 
     template<typename F, typename C>
-    zero::async::coroutine::Task<zero::async::promise::promise_result_t<std::invoke_result_t<F>>, std::error_code>
+    zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>
     toThread(F f, C cancel) {
         using T = std::invoke_result_t<F>;
 

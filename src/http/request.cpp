@@ -129,11 +129,7 @@ std::optional<std::string> asyncio::http::Response::header(const std::string &na
 }
 
 zero::async::coroutine::Task<std::string, std::error_code> asyncio::http::Response::string() {
-    auto data = co_await readAll(operator*());
-
-    if (!data)
-        co_return tl::unexpected(data.error());
-
+    auto data = CO_TRY(co_await readAll(operator*()));
     co_return std::string{(const char *) data->data(), data->size()};
 }
 
@@ -322,21 +318,13 @@ asyncio::http::Options &asyncio::http::Requests::options() {
 
 tl::expected<std::unique_ptr<asyncio::http::Connection>, std::error_code>
 asyncio::http::Requests::prepare(std::string method, const URL &url, const std::optional<Options> &options) {
-    auto u = url.string();
-
-    if (!u)
-        return tl::unexpected(u.error());
-
+    auto u = TRY(url.string());
     std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy = {curl_easy_init(), curl_easy_cleanup};
 
     if (!easy)
         return tl::unexpected(make_error_code(std::errc::not_enough_memory));
 
-    auto buffers = ev::pipe();
-
-    if (!buffers)
-        return tl::unexpected(buffers.error());
-
+    auto buffers = TRY(ev::pipe());
     Options opt = options.value_or(mOptions);
     zero::async::promise::Promise<void, std::error_code> promise;
 
@@ -450,11 +438,7 @@ asyncio::http::Requests::perform(std::unique_ptr<Connection> connection) {
 
 zero::async::coroutine::Task<asyncio::http::Response, std::error_code>
 asyncio::http::Requests::request(std::string method, asyncio::http::URL url, std::optional<Options> options) {
-    auto connection = prepare(std::move(method), std::move(url), std::move(options));
-
-    if (!connection)
-        co_return tl::unexpected(connection.error());
-
+    auto connection = CO_TRY(prepare(std::move(method), url, options));
     co_return std::move(co_await perform(std::move(*connection)));
 }
 
@@ -464,10 +448,7 @@ zero::async::coroutine::Task<asyncio::http::Response, std::error_code> asyncio::
         std::optional<Options> options,
         std::string payload
 ) {
-    auto connection = prepare(std::move(method), std::move(url), std::move(options));
-
-    if (!connection)
-        co_return tl::unexpected(connection.error());
+    auto connection = CO_TRY(prepare(std::move(method), url, options));
 
     curl_easy_setopt(connection->get()->easy.get(), CURLOPT_POSTFIELDSIZE, (long) payload.length());
     curl_easy_setopt(connection->get()->easy.get(), CURLOPT_COPYPOSTFIELDS, payload.c_str());
@@ -481,10 +462,7 @@ zero::async::coroutine::Task<asyncio::http::Response, std::error_code> asyncio::
         std::optional<Options> options,
         std::map<std::string, std::string> payload
 ) {
-    auto connection = prepare(std::move(method), std::move(url), std::move(options));
-
-    if (!connection)
-        co_return tl::unexpected(connection.error());
+    auto connection = CO_TRY(prepare(std::move(method), url, options));
 
     std::list<std::string> items;
 
@@ -508,11 +486,7 @@ zero::async::coroutine::Task<asyncio::http::Response, std::error_code> asyncio::
         std::optional<Options> options,
         std::map<std::string, std::filesystem::path> payload
 ) {
-    auto connection = prepare(std::move(method), std::move(url), std::move(options));
-
-    if (!connection)
-        co_return tl::unexpected(connection.error());
-
+    auto connection = CO_TRY(prepare(std::move(method), url, options));
     curl_mime *form = curl_mime_init(connection->get()->easy.get());
 
     for (const auto &[key, value]: payload) {
@@ -542,11 +516,7 @@ zero::async::coroutine::Task<asyncio::http::Response, std::error_code> asyncio::
         std::optional<Options> options,
         std::map<std::string, std::variant<std::string, std::filesystem::path>> payload
 ) {
-    auto connection = prepare(std::move(method), std::move(url), std::move(options));
-
-    if (!connection)
-        co_return tl::unexpected(connection.error());
-
+    auto connection = CO_TRY(prepare(std::move(method), url, options));
     curl_mime *form = curl_mime_init(connection->get()->easy.get());
 
     for (const auto &[k, v]: payload) {
@@ -584,10 +554,7 @@ zero::async::coroutine::Task<asyncio::http::Response, std::error_code> asyncio::
     Options opt = options.value_or(mOptions);
     opt.headers["Content-Type"] = "application/json";
 
-    auto connection = prepare(std::move(method), std::move(url), std::move(opt));
-
-    if (!connection)
-        co_return tl::unexpected(connection.error());
+    auto connection = CO_TRY(prepare(std::move(method), url, opt));
 
     curl_easy_setopt(
             connection->get()->easy.get(),
