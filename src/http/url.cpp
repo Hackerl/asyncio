@@ -61,8 +61,10 @@ tl::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(const
 
     CURLUcode code = curl_url_set(url, CURLUPART_URL, str.c_str(), CURLU_NON_SUPPORT_SCHEME);
 
-    if (code != CURLUE_OK)
+    if (code != CURLUE_OK) {
+        curl_url_cleanup(url);
         return tl::unexpected((URLError) code);
+    }
 
     return URL{url};
 }
