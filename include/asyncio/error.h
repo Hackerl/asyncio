@@ -5,7 +5,7 @@
 
 namespace asyncio {
     enum Error {
-        IO_EOF,
+        IO_EOF = 1,
         RESOURCE_DESTROYED
     };
 
