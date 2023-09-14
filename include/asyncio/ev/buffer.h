@@ -14,7 +14,7 @@ namespace asyncio::ev {
         NUL = EVBUFFER_EOL_NUL
     };
 
-    class IBufferReader : public virtual IReader {
+    class IBufferReader : public virtual ICloseableReader, public virtual IFileDescriptor {
     public:
         virtual size_t available() = 0;
         virtual zero::async::coroutine::Task<std::string, std::error_code> readLine() = 0;
@@ -23,7 +23,7 @@ namespace asyncio::ev {
         virtual zero::async::coroutine::Task<void, std::error_code> readExactly(std::span<std::byte> data) = 0;
     };
 
-    class IBufferWriter : public virtual IWriter {
+    class IBufferWriter : public virtual ICloseableWriter, public virtual IFileDescriptor {
     public:
         virtual tl::expected<void, std::error_code> writeLine(std::string_view line) = 0;
         virtual tl::expected<void, std::error_code> writeLine(std::string_view line, EOL eol) = 0;
@@ -36,8 +36,7 @@ namespace asyncio::ev {
     };
 
     class IBuffer : public virtual IStreamIO, public IDeadline, public IBufferReader, public IBufferWriter {
-    public:
-        virtual evutil_socket_t fd() = 0;
+
     };
 
     class Buffer : public virtual IBuffer {

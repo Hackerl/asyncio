@@ -63,9 +63,8 @@ namespace asyncio::net {
         virtual tl::expected<Address, std::error_code> remoteAddress() = 0;
     };
 
-    class ISocket : public virtual IStreamIO, public virtual IEndpoint, public IDeadline {
+    class ISocket : public virtual IStreamIO, public IFileDescriptor, public virtual IEndpoint, public IDeadline {
     public:
-        virtual evutil_socket_t fd() = 0;
         virtual tl::expected<void, std::error_code> bind(const Address &address) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> connect(Address address) = 0;
 

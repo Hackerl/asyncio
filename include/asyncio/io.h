@@ -3,6 +3,7 @@
 
 #include <span>
 #include <chrono>
+#include <event2/util.h>
 #include <zero/interface.h>
 #include <zero/async/coroutine.h>
 
@@ -17,9 +18,26 @@ namespace asyncio {
         virtual zero::async::coroutine::Task<void, std::error_code> write(std::span<const std::byte> data) = 0;
     };
 
-    class IStreamIO : public virtual IReader, public virtual IWriter {
+    class ICloseable : public virtual zero::Interface {
     public:
         virtual tl::expected<void, std::error_code> close() = 0;
+    };
+
+    class ICloseableReader : public virtual IReader, public virtual ICloseable {
+
+    };
+
+    class ICloseableWriter : public virtual IWriter, public virtual ICloseable {
+
+    };
+
+    class IStreamIO : public virtual ICloseableReader, public virtual ICloseableWriter {
+
+    };
+
+    class IFileDescriptor : public virtual zero::Interface {
+    public:
+        virtual evutil_socket_t fd() = 0;
     };
 
     class IDeadline : public virtual zero::Interface {
