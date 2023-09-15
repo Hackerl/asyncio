@@ -1,6 +1,5 @@
 #include <asyncio/ev/buffer.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <optional>
 #include <cassert>
 

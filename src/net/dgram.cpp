@@ -1,6 +1,5 @@
 #include <asyncio/net/dgram.h>
 #include <asyncio/net/dns.h>
-#include <asyncio/error.h>
 #include <zero/try.h>
 #include <cassert>
 

@@ -1,7 +1,6 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/dns.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <zero/os/net.h>
 #include <cassert>
 

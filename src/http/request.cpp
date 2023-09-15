@@ -1,5 +1,4 @@
 #include <asyncio/http/request.h>
-#include <asyncio/error.h>
 #include <asyncio/thread.h>
 #include <asyncio/event_loop.h>
 #include <zero/strings/strings.h>
@@ -129,7 +128,7 @@ std::optional<std::string> asyncio::http::Response::header(const std::string &na
 }
 
 zero::async::coroutine::Task<std::string, std::error_code> asyncio::http::Response::string() {
-    auto data = CO_TRY(co_await readAll(operator*()));
+    auto data = CO_TRY(co_await readAll(std::move(mConnection->buffers[1])));
     co_return std::string{(const char *) data->data(), data->size()};
 }
 

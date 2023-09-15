@@ -1,6 +1,5 @@
 #include <asyncio/ev/pipe.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("buffer pipe", "[pipe]") {

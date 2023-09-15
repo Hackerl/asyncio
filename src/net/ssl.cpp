@@ -1,7 +1,6 @@
 #include <asyncio/net/ssl.h>
 #include <asyncio/net/dns.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <zero/os/net.h>
 #include <openssl/err.h>
 #include <openssl/x509v3.h>

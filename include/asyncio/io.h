@@ -4,6 +4,7 @@
 #include <span>
 #include <chrono>
 #include <event2/util.h>
+#include <asyncio/error.h>
 #include <zero/interface.h>
 #include <zero/async/coroutine.h>
 
@@ -46,17 +47,83 @@ namespace asyncio {
         virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
     };
 
-    zero::async::coroutine::Task<void, std::error_code> copy(IReader &reader, IWriter &writer);
+    template<typename R, typename W>
+    requires (std::derived_from<R, IReader> && std::derived_from<W, IWriter>)
+    zero::async::coroutine::Task<void, std::error_code> copy(R reader, W writer) {
+        tl::expected<void, std::error_code> result;
+
+        while (true) {
+            std::byte data[10240];
+            auto n = co_await reader.read(data);
+
+            if (!n) {
+                if (n.error() == Error::IO_EOF)
+                    break;
+
+                result = tl::unexpected(n.error());
+                break;
+            }
+
+            auto res = co_await writer.write({data, *n});
+
+            if (!res) {
+                result = tl::unexpected(res.error());
+                break;
+            }
+        }
+
+        co_return result;
+    }
+
+    template<typename T>
+    requires std::derived_from<T, IReader>
+    zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll(T reader) {
+        tl::expected<std::vector<std::byte>, std::error_code> result;
+
+        while (true) {
+            std::byte data[10240];
+            auto n = co_await reader.read(data);
+
+            if (!n) {
+                if (n.error() == Error::IO_EOF)
+                    break;
+
+                result = tl::unexpected(n.error());
+                break;
+            }
+
+            result->insert(result->end(), data, data + *n);
+        }
+
+        co_return result;
+    }
+
+    template<typename T>
+    requires std::derived_from<T, IReader>
+    zero::async::coroutine::Task<void, std::error_code> readExactly(T reader, std::span<std::byte> data) {
+        tl::expected<void, std::error_code> result;
+
+        size_t offset = 0;
+
+        while (offset < data.size()) {
+            auto n = co_await reader.read(data.subspan(offset));
+
+            if (!n) {
+                result = tl::unexpected(n.error());
+                break;
+            }
+
+            offset += *n;
+        }
+
+        co_return result;
+    }
 
     zero::async::coroutine::Task<void, std::error_code>
     copy(std::shared_ptr<IReader> reader, std::shared_ptr<IWriter> writer);
 
-    zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll(IReader &reader);
-
     zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
     readAll(std::shared_ptr<IReader> reader);
-
-    zero::async::coroutine::Task<void, std::error_code> readExactly(IReader &reader, std::span<std::byte> data);
 
     zero::async::coroutine::Task<void, std::error_code>
     readExactly(std::shared_ptr<IReader> reader, std::span<std::byte> data);

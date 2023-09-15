@@ -1,12 +1,12 @@
 #include <asyncio/io.h>
-#include <asyncio/error.h>
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reader, IWriter &writer) {
+zero::async::coroutine::Task<void, std::error_code>
+asyncio::copy(std::shared_ptr<IReader> reader, std::shared_ptr<IWriter> writer)  {
     tl::expected<void, std::error_code> result;
 
     while (true) {
         std::byte data[10240];
-        auto n = co_await reader.read(data);
+        auto n = co_await reader->read(data);
 
         if (!n) {
             if (n.error() == Error::IO_EOF)
@@ -16,7 +16,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reade
             break;
         }
 
-        auto res = co_await writer.write({data, *n});
+        auto res = co_await writer->write({data, *n});
 
         if (!res) {
             result = tl::unexpected(res.error());
@@ -27,17 +27,13 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reade
     co_return result;
 }
 
-zero::async::coroutine::Task<void, std::error_code>
-asyncio::copy(std::shared_ptr<IReader> reader, std::shared_ptr<IWriter> writer) {
-    co_return co_await copy(*reader, *writer);
-}
-
-zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::readAll(IReader &reader) {
+zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
+asyncio::readAll(std::shared_ptr<IReader> reader) {
     tl::expected<std::vector<std::byte>, std::error_code> result;
 
     while (true) {
         std::byte data[10240];
-        auto n = co_await reader.read(data);
+        auto n = co_await reader->read(data);
 
         if (!n) {
             if (n.error() == Error::IO_EOF)
@@ -53,18 +49,14 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::r
     co_return result;
 }
 
-zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
-asyncio::readAll(std::shared_ptr<IReader> reader) {
-    co_return co_await readAll(*reader);
-}
-
-zero::async::coroutine::Task<void, std::error_code> asyncio::readExactly(IReader &reader, std::span<std::byte> data) {
+zero::async::coroutine::Task<void, std::error_code>
+asyncio::readExactly(std::shared_ptr<IReader> reader, std::span<std::byte> data) {
     tl::expected<void, std::error_code> result;
 
     size_t offset = 0;
 
     while (offset < data.size()) {
-        auto n = co_await reader.read(data.subspan(offset));
+        auto n = co_await reader->read(data.subspan(offset));
 
         if (!n) {
             result = tl::unexpected(n.error());
@@ -75,9 +67,4 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::readExactly(IReader
     }
 
     co_return result;
-}
-
-zero::async::coroutine::Task<void, std::error_code>
-asyncio::readExactly(std::shared_ptr<IReader> reader, std::span<std::byte> data) {
-    co_return co_await readExactly(*reader, data);
 }

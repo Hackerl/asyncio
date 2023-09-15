@@ -1,6 +1,5 @@
 #include <asyncio/ev/pipe.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 
 asyncio::ev::PairedBuffer::PairedBuffer(bufferevent *bev, std::shared_ptr<std::error_code> ec)
         : Buffer(bev), mErrorCode(std::move(ec)) {

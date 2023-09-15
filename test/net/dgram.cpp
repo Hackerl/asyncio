@@ -1,5 +1,4 @@
 #include <asyncio/net/dgram.h>
-#include <asyncio/error.h>
 #include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
 
