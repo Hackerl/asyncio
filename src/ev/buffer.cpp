@@ -33,9 +33,9 @@ asyncio::ev::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)
 
 asyncio::ev::Buffer::Buffer(asyncio::ev::Buffer &&rhs) noexcept
         : mBev(std::move(rhs.mBev)), mClosed(rhs.mClosed), mLastError(rhs.mLastError) {
-    assert(!mPromises[READ_INDEX]);
-    assert(!mPromises[DRAIN_INDEX]);
-    assert(!mPromises[WAIT_CLOSED_INDEX]);
+    assert(!rhs.mPromises[READ_INDEX]);
+    assert(!rhs.mPromises[DRAIN_INDEX]);
+    assert(!rhs.mPromises[WAIT_CLOSED_INDEX]);
 
     bufferevent_data_cb rcb, wcb;
     bufferevent_event_cb ecb;
@@ -274,6 +274,9 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::drain()
                 mPromises[DRAIN_INDEX] = promise;
             }),
             [this]() -> tl::expected<void, std::error_code> {
+                if (!mPromises[DRAIN_INDEX])
+                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
                 std::exchange(mPromises[DRAIN_INDEX], std::nullopt)->reject(
                         make_error_code(std::errc::operation_canceled)
                 );
@@ -312,6 +315,9 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::waitClo
                 bufferevent_disable(mBev.get(), EV_READ);
             }),
             [this]() -> tl::expected<void, std::error_code> {
+                if (!mPromises[WAIT_CLOSED_INDEX])
+                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
                 std::exchange(mPromises[WAIT_CLOSED_INDEX], std::nullopt)->reject(
                         make_error_code(std::errc::operation_canceled)
                 );
