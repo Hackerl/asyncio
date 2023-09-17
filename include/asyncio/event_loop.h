@@ -79,7 +79,7 @@ namespace asyncio {
         auto timer = sleep(ms);
         co_await zero::async::coroutine::race(task, timer);
 
-        if (timer.result())
+        if (timer.done() && timer.result())
             co_return tl::unexpected(make_error_code(std::errc::timed_out));
 
         co_return task.result();
