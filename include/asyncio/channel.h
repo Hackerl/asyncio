@@ -51,12 +51,7 @@ namespace asyncio {
     };
 
     template<typename T>
-    class IChannel : public ISender<T>, public IReceiver<T> {
-
-    };
-
-    template<typename T>
-    class Channel : public IChannel<T> {
+    class Channel : public ISender<T>, public IReceiver<T> {
     private:
         static constexpr auto SENDER = 0;
         static constexpr auto RECEIVER = 1;
@@ -111,12 +106,14 @@ namespace asyncio {
 
     public:
         void close() override {
-            std::lock_guard<std::mutex> guard(mMutex);
+            {
+                std::lock_guard<std::mutex> guard(mMutex);
 
-            if (mClosed)
-                return;
+                if (mClosed)
+                    return;
 
-            mClosed = true;
+                mClosed = true;
+            }
 
             trigger<SENDER>(Error::IO_EOF);
             trigger<RECEIVER>(Error::IO_EOF);
@@ -140,7 +137,7 @@ namespace asyncio {
         }
 
         tl::expected<T, std::error_code> tryReceive() override {
-            std::optional<size_t> index = mBuffer.acquire();
+            auto index = mBuffer.acquire();
 
             if (!index)
                 return tl::unexpected(
@@ -152,8 +149,6 @@ namespace asyncio {
             T element = std::move(mBuffer[*index]);
             mBuffer.release(*index);
 
-            std::lock_guard<std::mutex> guard(mMutex);
-
             trigger<SENDER>();
             return element;
         }
@@ -164,15 +159,13 @@ namespace asyncio {
             if (mClosed)
                 return tl::unexpected(Error::IO_EOF);
 
-            std::optional<size_t> index = mBuffer.reserve();
+            auto index = mBuffer.reserve();
 
             if (!index)
                 return tl::unexpected(make_error_code(std::errc::operation_would_block));
 
             mBuffer[*index] = std::forward<U>(element);
             mBuffer.commit(*index);
-
-            std::lock_guard<std::mutex> guard(mMutex);
 
             trigger<RECEIVER>();
             return {};
@@ -187,7 +180,7 @@ namespace asyncio {
             tl::expected<void, std::error_code> result;
 
             while (true) {
-                std::optional<size_t> index = mBuffer.reserve();
+                auto index = mBuffer.reserve();
 
                 if (!index) {
                     mMutex.lock();
@@ -203,7 +196,7 @@ namespace asyncio {
                         continue;
                     }
 
-                    std::shared_ptr<zero::atomic::Event> event = std::make_shared<zero::atomic::Event>();
+                    auto event = std::make_shared<zero::atomic::Event>();
                     zero::async::promise::Promise<void, std::error_code> promise;
 
                     promise.finally([=]() {
@@ -216,6 +209,8 @@ namespace asyncio {
                     auto res = event->wait(timeout);
 
                     if (!res) {
+                        std::lock_guard<std::mutex> guard(mMutex);
+                        mPending[SENDER].remove(promise);
                         result = tl::unexpected(res.error());
                         break;
                     }
@@ -225,8 +220,6 @@ namespace asyncio {
 
                 mBuffer[*index] = std::forward<U>(element);
                 mBuffer.commit(*index);
-
-                std::lock_guard<std::mutex> guard(mMutex);
 
                 trigger<RECEIVER>();
                 break;
@@ -243,7 +236,7 @@ namespace asyncio {
             tl::expected<void, std::error_code> result;
 
             while (true) {
-                std::optional<size_t> index = mBuffer.reserve();
+                auto index = mBuffer.reserve();
 
                 if (!index) {
                     mMutex.lock();
@@ -261,7 +254,7 @@ namespace asyncio {
 
                     zero::async::promise::Promise<void, std::error_code> promise;
 
-                    mPending[SENDER].emplace_back(promise);
+                    mPending[SENDER].push_back(promise);
                     mMutex.unlock();
 
                     auto task = [](auto promise) -> zero::async::coroutine::Task<void, std::error_code> {
@@ -277,6 +270,8 @@ namespace asyncio {
                     auto res = timeout ? (co_await asyncio::timeout(task, *timeout)) : (co_await task);
 
                     if (!res) {
+                        std::lock_guard<std::mutex> guard(mMutex);
+                        mPending[SENDER].remove(promise);
                         result = tl::unexpected(res.error());
                         break;
                     }
@@ -286,8 +281,6 @@ namespace asyncio {
 
                 mBuffer[*index] = std::move(element);
                 mBuffer.commit(*index);
-
-                std::lock_guard<std::mutex> guard(mMutex);
 
                 trigger<RECEIVER>();
                 break;
@@ -301,7 +294,7 @@ namespace asyncio {
             tl::expected<T, std::error_code> result;
 
             while (true) {
-                std::optional<size_t> index = mBuffer.acquire();
+                auto index = mBuffer.acquire();
 
                 if (!index) {
                     mMutex.lock();
@@ -317,19 +310,21 @@ namespace asyncio {
                         continue;
                     }
 
-                    std::shared_ptr<zero::atomic::Event> event = std::make_shared<zero::atomic::Event>();
+                    auto event = std::make_shared<zero::atomic::Event>();
                     zero::async::promise::Promise<void, std::error_code> promise;
 
                     promise.finally([=]() {
                         event->notify();
                     });
 
-                    mPending[RECEIVER].push_back(std::move(promise));
+                    mPending[RECEIVER].push_back(promise);
                     mMutex.unlock();
 
                     auto res = event->wait(timeout);
 
                     if (!res) {
+                        std::lock_guard<std::mutex> guard(mMutex);
+                        mPending[RECEIVER].remove(promise);
                         result = tl::unexpected(res.error());
                         break;
                     }
@@ -339,8 +334,6 @@ namespace asyncio {
 
                 result = std::move(mBuffer[*index]);
                 mBuffer.release(*index);
-
-                std::lock_guard<std::mutex> guard(mMutex);
 
                 trigger<SENDER>();
                 break;
@@ -353,7 +346,7 @@ namespace asyncio {
             tl::expected<T, std::error_code> result;
 
             while (true) {
-                std::optional<size_t> index = mBuffer.acquire();
+                auto index = mBuffer.acquire();
 
                 if (!index) {
                     mMutex.lock();
@@ -387,6 +380,8 @@ namespace asyncio {
                     auto res = timeout ? (co_await asyncio::timeout(task, *timeout)) : (co_await task);
 
                     if (!res) {
+                        std::lock_guard<std::mutex> guard(mMutex);
+                        mPending[RECEIVER].remove(promise);
                         result = tl::unexpected(res.error());
                         break;
                     }
@@ -396,8 +391,6 @@ namespace asyncio {
 
                 T element = std::move(mBuffer[*index]);
                 mBuffer.release(*index);
-
-                std::lock_guard<std::mutex> guard(mMutex);
 
                 trigger<SENDER>();
                 result = std::move(element);
@@ -411,6 +404,8 @@ namespace asyncio {
     private:
         template<int Index>
         void trigger() {
+            std::lock_guard<std::mutex> guard(mMutex);
+
             if (mPending[Index].empty())
                 return;
 
@@ -422,6 +417,8 @@ namespace asyncio {
 
         template<int Index>
         void trigger(const std::error_code &ec) {
+            std::lock_guard<std::mutex> guard(mMutex);
+
             if (mPending[Index].empty())
                 return;
 
