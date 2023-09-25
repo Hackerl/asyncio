@@ -7,6 +7,7 @@
 #include <system_error>
 #include <tl/expected.hpp>
 #include <curl/curl.h>
+#include <zero/cmdline.h>
 
 namespace asyncio::http {
     enum URLError {
@@ -85,6 +86,9 @@ namespace asyncio::http {
         std::unique_ptr<CURLU, decltype(curl_url_cleanup) *> mURL;
     };
 }
+
+template<>
+tl::expected<asyncio::http::URL, std::error_code> zero::fromCommandLine(const std::string &str);
 
 namespace std {
     template<>

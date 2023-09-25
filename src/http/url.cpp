@@ -243,3 +243,8 @@ asyncio::http::URL &asyncio::http::URL::append(const std::string &subPath) {
 
     return *this;
 }
+
+template<>
+tl::expected<asyncio::http::URL, std::error_code> zero::fromCommandLine(const std::string &str) {
+    return asyncio::http::URL::from(str);
+}

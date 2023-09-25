@@ -128,7 +128,8 @@ namespace asyncio::http {
         request(std::string method, URL url, std::optional<Options> options, std::string payload);
 
         zero::async::coroutine::Task<Response, std::error_code> request(
-                std::string method, URL url,
+                std::string method,
+                URL url,
                 std::optional<Options> options,
                 std::map<std::string, std::string> payload
         );

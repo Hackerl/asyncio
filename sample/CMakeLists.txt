@@ -11,3 +11,6 @@ if (NOT ASYNCIO_DISABLE_SSL)
     add_executable(asyncio_ssl_server ssl/server.cpp)
     target_link_libraries(asyncio_ssl_server PRIVATE asyncio)
 endif ()
+
+add_executable(asyncio_http http/main.cpp)
+target_link_libraries(asyncio_http PRIVATE asyncio)

@@ -149,8 +149,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
       {
         "kind": "git",
         "repository": "https://github.com/Hackerl/vcpkg-registry",
-        "baseline": "271a4a904611cfbcf66316242673732e1a146797",
-        "reference": "dev",
+        "baseline": "92418a6fb93305df4ce936291b3d5122a3e94fd2",
         "packages": [
           "asyncio",
           "zero"

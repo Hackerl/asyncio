@@ -237,7 +237,7 @@ void asyncio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what,
     struct Context {
         event e;
         curl_socket_t s;
-        Requests *requests;
+        std::shared_ptr<Requests> requests;
     };
 
     auto context = static_cast<Context *>(data);
@@ -252,7 +252,7 @@ void asyncio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what,
     }
 
     if (!context) {
-        context = new Context{.s = s, .requests = this};
+        context = new Context{.s = s, .requests = shared_from_this()};
         curl_multi_assign(mMulti.get(), s, context);
     } else {
         event_del(&context->e);
@@ -566,6 +566,15 @@ zero::async::coroutine::Task<asyncio::http::Response, std::error_code> asyncio::
 
 tl::expected<std::shared_ptr<asyncio::http::Requests>, std::error_code>
 asyncio::http::makeRequests(const asyncio::http::Options &options) {
+    static std::once_flag flag;
+
+    std::call_once(flag, []() {
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+        std::atexit([]() {
+            curl_global_cleanup();
+        });
+    });
+
     CURLM *multi = curl_multi_init();
 
     if (!multi)

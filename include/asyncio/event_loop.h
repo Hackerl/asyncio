@@ -1,11 +1,11 @@
 #ifndef ASYNCIO_EVENT_LOOP_H
 #define ASYNCIO_EVENT_LOOP_H
 
-#include "worker.h"
 #include <queue>
 #include <event.h>
 #include <event2/dns.h>
 #include <zero/try.h>
+#include "worker.h"
 
 namespace asyncio {
     class EventLoop {

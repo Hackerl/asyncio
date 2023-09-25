@@ -16,6 +16,18 @@
     "tests"
   ],
   "features": {
+    "legacy": {
+      "description": "Compatible with older Windows",
+      "supports": "windows",
+      "dependencies": [
+        {
+          "name": "zero",
+          "features": [
+            "legacy"
+          ]
+        }
+      ]
+    },
     "openssl": {
       "description": "Support for openssl",
       "dependencies": [
