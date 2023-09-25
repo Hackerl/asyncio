@@ -257,15 +257,13 @@ namespace asyncio {
                     mPending[SENDER].push_back(promise);
                     mMutex.unlock();
 
-                    auto task = [](auto promise) -> zero::async::coroutine::Task<void, std::error_code> {
-                        co_return co_await zero::async::coroutine::Cancellable{
-                                promise,
-                                [=]() mutable -> tl::expected<void, std::error_code> {
-                                    promise.reject(make_error_code(std::errc::operation_canceled));
-                                    return {};
-                                }
-                        };
-                    }(promise);
+                    auto task = zero::async::coroutine::from(zero::async::coroutine::Cancellable{
+                            promise,
+                            [=]() mutable -> tl::expected<void, std::error_code> {
+                                promise.reject(make_error_code(std::errc::operation_canceled));
+                                return {};
+                            }
+                    });
 
                     auto res = timeout ? (co_await asyncio::timeout(task, *timeout)) : (co_await task);
 
@@ -367,15 +365,13 @@ namespace asyncio {
                     mPending[RECEIVER].push_back(promise);
                     mMutex.unlock();
 
-                    auto task = [](auto promise) -> zero::async::coroutine::Task<void, std::error_code> {
-                        co_return co_await zero::async::coroutine::Cancellable{
-                                promise,
-                                [=]() mutable -> tl::expected<void, std::error_code> {
-                                    promise.reject(make_error_code(std::errc::operation_canceled));
-                                    return {};
-                                }
-                        };
-                    }(promise);
+                    auto task = zero::async::coroutine::from(zero::async::coroutine::Cancellable{
+                            promise,
+                            [=]() mutable -> tl::expected<void, std::error_code> {
+                                promise.reject(make_error_code(std::errc::operation_canceled));
+                                return {};
+                            }
+                    });
 
                     auto res = timeout ? (co_await asyncio::timeout(task, *timeout)) : (co_await task);
 

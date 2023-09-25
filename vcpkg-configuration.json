@@ -4,7 +4,6 @@
       "kind": "git",
       "repository": "https://github.com/Hackerl/vcpkg-registry",
       "baseline": "891208f06ff08441853ffed299cb298f1df3c25e",
-      "reference": "dev",
       "packages": [
         "zero"
       ]

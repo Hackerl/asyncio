@@ -77,12 +77,11 @@ TEST_CASE("async channel buffer", "[channel]") {
 
             co_await zero::async::coroutine::allSettled(
                     [](auto channel, auto counter) -> zero::async::coroutine::Task<void> {
-                        auto result = co_await zero::async::coroutine::allSettled(
+                        co_await zero::async::coroutine::allSettled(
                                 produce(channel, counter),
                                 produce(channel, counter)
                         );
 
-                        REQUIRE(result);
                         channel->close();
                     }(channel, counters[0]),
                     [](auto channel, auto counter) -> zero::async::coroutine::Task<void> {
@@ -91,8 +90,8 @@ TEST_CASE("async channel buffer", "[channel]") {
                                 consume(channel, counter)
                         );
 
-                        REQUIRE(std::get<0>(*result).error() == asyncio::Error::IO_EOF);
-                        REQUIRE(std::get<1>(*result).error() == asyncio::Error::IO_EOF);
+                        REQUIRE(std::get<0>(result).error() == asyncio::Error::IO_EOF);
+                        REQUIRE(std::get<1>(result).error() == asyncio::Error::IO_EOF);
                     }(channel, counters[1])
             );
 
@@ -107,12 +106,11 @@ TEST_CASE("async channel buffer", "[channel]") {
 
                 co_await zero::async::coroutine::allSettled(
                         [](auto channel, auto counter) -> zero::async::coroutine::Task<void> {
-                            auto result = co_await zero::async::coroutine::allSettled(
+                            co_await zero::async::coroutine::allSettled(
                                     asyncio::toThread([=] { return produceSync(channel, counter); }),
                                     asyncio::toThread([=] { return produceSync(channel, counter); })
                             );
 
-                            REQUIRE(result);
                             channel->close();
                         }(channel, counters[0]),
                         [](auto channel, auto counter) -> zero::async::coroutine::Task<void> {
@@ -121,8 +119,8 @@ TEST_CASE("async channel buffer", "[channel]") {
                                     consume(channel, counter)
                             );
 
-                            REQUIRE(std::get<0>(*result).error() == asyncio::Error::IO_EOF);
-                            REQUIRE(std::get<1>(*result).error() == asyncio::Error::IO_EOF);
+                            REQUIRE(std::get<0>(result).error() == asyncio::Error::IO_EOF);
+                            REQUIRE(std::get<1>(result).error() == asyncio::Error::IO_EOF);
                         }(channel, counters[1])
                 );
 
@@ -166,12 +164,11 @@ TEST_CASE("async channel buffer", "[channel]") {
 
                 co_await zero::async::coroutine::allSettled(
                         [](auto channel, auto counter) -> zero::async::coroutine::Task<void> {
-                            auto result = co_await zero::async::coroutine::allSettled(
+                            co_await zero::async::coroutine::allSettled(
                                     produce(channel, counter),
                                     produce(channel, counter)
                             );
 
-                            REQUIRE(result);
                             channel->close();
                         }(channel, counters[0]),
                         [](auto channel, auto counter) -> zero::async::coroutine::Task<void> {
@@ -180,8 +177,8 @@ TEST_CASE("async channel buffer", "[channel]") {
                                     asyncio::toThread([=] { return consumeSync(channel, counter); })
                             );
 
-                            REQUIRE(std::get<0>(*result).error() == asyncio::Error::IO_EOF);
-                            REQUIRE(std::get<1>(*result).error() == asyncio::Error::IO_EOF);
+                            REQUIRE(std::get<0>(result).error() == asyncio::Error::IO_EOF);
+                            REQUIRE(std::get<1>(result).error() == asyncio::Error::IO_EOF);
                         }(channel, counters[1])
                 );
 
