@@ -265,12 +265,21 @@ namespace asyncio {
                             }
                     });
 
-                    auto res = timeout ? (co_await asyncio::timeout(task, *timeout)) : (co_await task);
+                    auto res = co_await asyncio::timeout(task, timeout.value_or(std::chrono::milliseconds{0}));
 
                     if (!res) {
                         std::lock_guard<std::mutex> guard(mMutex);
                         mPending[SENDER].remove(promise);
                         result = tl::unexpected(res.error());
+                        break;
+                    }
+
+                    auto r = *res;
+
+                    if (!r) {
+                        std::lock_guard<std::mutex> guard(mMutex);
+                        mPending[SENDER].remove(promise);
+                        result = tl::unexpected(r.error());
                         break;
                     }
 
@@ -373,12 +382,21 @@ namespace asyncio {
                             }
                     });
 
-                    auto res = timeout ? (co_await asyncio::timeout(task, *timeout)) : (co_await task);
+                    auto res = co_await asyncio::timeout(task, timeout.value_or(std::chrono::milliseconds{0}));
 
                     if (!res) {
                         std::lock_guard<std::mutex> guard(mMutex);
                         mPending[RECEIVER].remove(promise);
                         result = tl::unexpected(res.error());
+                        break;
+                    }
+
+                    auto r = *res;
+
+                    if (!r) {
+                        std::lock_guard<std::mutex> guard(mMutex);
+                        mPending[RECEIVER].remove(promise);
+                        result = tl::unexpected(r.error());
                         break;
                     }
 

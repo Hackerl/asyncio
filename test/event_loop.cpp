@@ -20,11 +20,31 @@ TEST_CASE("asyncio event loop", "[event loop]") {
             });
         }
 
-        SECTION("failure") {
+        SECTION("timeout") {
             asyncio::run([]() -> zero::async::coroutine::Task<void> {
                 auto result = co_await asyncio::timeout(asyncio::sleep(50ms), 10ms);
                 REQUIRE(!result);
                 REQUIRE(result.error() == std::errc::timed_out);
+            });
+        }
+
+        SECTION("failure") {
+            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+                auto task = asyncio::sleep(50ms);
+                task.cancel();
+                auto result = co_await asyncio::timeout(task, 50ms);
+                REQUIRE(result);
+                REQUIRE(result.value().error() == std::errc::operation_canceled);
+            });
+        }
+
+        SECTION("cancel") {
+            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+                auto task = asyncio::timeout(asyncio::sleep(50ms), 50ms);
+                task.cancel();
+                auto result = co_await task;
+                REQUIRE(!result);
+                REQUIRE(result.error() == std::errc::operation_canceled);
             });
         }
     }

@@ -73,16 +73,43 @@ namespace asyncio {
     tl::expected<EventLoop, std::error_code> createEventLoop(size_t maxWorkers = 16);
     zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
-    template<typename T>
-    zero::async::coroutine::Task<T, std::error_code>
-    timeout(zero::async::coroutine::Task<T, std::error_code> task, std::chrono::milliseconds ms) {
+    template<typename T, typename E>
+    zero::async::coroutine::Task<tl::expected<T, E>, std::error_code>
+    timeout(zero::async::coroutine::Task<T, E> task, std::chrono::milliseconds ms) {
+        if (ms == std::chrono::milliseconds::zero()) {
+            co_await task;
+            co_return tl::expected<tl::expected<T, E>, std::error_code>{tl::in_place, std::move(task.result())};
+        }
+
         auto timer = sleep(ms);
-        co_await zero::async::coroutine::race(task, timer);
 
-        if (timer.done() && timer.result())
+        if constexpr (std::is_void_v<T>) {
+            task.promise().then([=]() mutable {
+                timer.cancel();
+            }, [=](const E &reason) mutable {
+                timer.cancel();
+            });
+        } else {
+            task.promise().then([=](const T &) mutable {
+                timer.cancel();
+            }, [=](const E &reason) mutable {
+                timer.cancel();
+            });
+        }
+
+        auto result = co_await timer;
+
+        if (result) {
+            task.cancel();
             co_return tl::unexpected(make_error_code(std::errc::timed_out));
+        }
 
-        co_return task.result();
+        if (!task.done()) {
+            task.cancel();
+            co_return tl::unexpected(result.error());
+        }
+
+        co_return tl::expected<tl::expected<T, E>, std::error_code>{tl::in_place, std::move(task.result())};
     }
 
     template<typename F>
