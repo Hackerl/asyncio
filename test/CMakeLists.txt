@@ -4,6 +4,7 @@ add_executable(
         asyncio_test
         io.cpp
         binary.cpp
+        future.cpp
         event_loop.cpp
         thread.cpp
         channel.cpp
