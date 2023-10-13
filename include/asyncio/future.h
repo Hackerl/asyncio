@@ -2,6 +2,7 @@
 #define ASYNCIO_FUTURE_H
 
 #include "event_loop.h"
+#include <cassert>
 
 namespace asyncio {
     template<typename T>

@@ -2,7 +2,7 @@
 #define ASYNCIO_CHANNEL_H
 
 #include "error.h"
-#include "event_loop.h"
+#include "future.h"
 #include <chrono>
 #include <zero/interface.h>
 #include <zero/async/coroutine.h>
@@ -196,21 +196,21 @@ namespace asyncio {
                         continue;
                     }
 
+                    Future<void> future(mEventLoop);
                     auto event = std::make_shared<zero::atomic::Event>();
-                    zero::async::promise::Promise<void, std::error_code> promise;
 
-                    promise.finally([=]() {
+                    future.get().promise().finally([=]() {
                         event->notify();
                     });
 
-                    mPending[SENDER].push_back(promise);
+                    mPending[SENDER].push_back(future);
                     mMutex.unlock();
 
                     auto res = event->wait(timeout);
 
                     if (!res) {
                         std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[SENDER].remove(promise);
+                        mPending[SENDER].remove(future);
                         result = tl::unexpected(res.error());
                         break;
                     }
@@ -252,34 +252,17 @@ namespace asyncio {
                         continue;
                     }
 
-                    zero::async::promise::Promise<void, std::error_code> promise;
+                    Future<void> future(mEventLoop);
 
-                    mPending[SENDER].push_back(promise);
+                    mPending[SENDER].push_back(future);
                     mMutex.unlock();
 
-                    auto task = zero::async::coroutine::from(zero::async::coroutine::Cancellable{
-                            promise,
-                            [=]() mutable -> tl::expected<void, std::error_code> {
-                                promise.reject(make_error_code(std::errc::operation_canceled));
-                                return {};
-                            }
-                    });
-
-                    auto res = co_await asyncio::timeout(task, timeout.value_or(std::chrono::milliseconds{0}));
+                    auto res = co_await future.get(timeout);
 
                     if (!res) {
                         std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[SENDER].remove(promise);
+                        mPending[SENDER].remove(future);
                         result = tl::unexpected(res.error());
-                        break;
-                    }
-
-                    auto r = *res;
-
-                    if (!r) {
-                        std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[SENDER].remove(promise);
-                        result = tl::unexpected(r.error());
                         break;
                     }
 
@@ -317,21 +300,21 @@ namespace asyncio {
                         continue;
                     }
 
+                    Future<void> future(mEventLoop);
                     auto event = std::make_shared<zero::atomic::Event>();
-                    zero::async::promise::Promise<void, std::error_code> promise;
 
-                    promise.finally([=]() {
+                    future.get().promise().finally([=]() {
                         event->notify();
                     });
 
-                    mPending[RECEIVER].push_back(promise);
+                    mPending[RECEIVER].push_back(future);
                     mMutex.unlock();
 
                     auto res = event->wait(timeout);
 
                     if (!res) {
                         std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[RECEIVER].remove(promise);
+                        mPending[RECEIVER].remove(future);
                         result = tl::unexpected(res.error());
                         break;
                     }
@@ -369,34 +352,17 @@ namespace asyncio {
                         continue;
                     }
 
-                    zero::async::promise::Promise<void, std::error_code> promise;
+                    Future<void> future(mEventLoop);
 
-                    mPending[RECEIVER].push_back(promise);
+                    mPending[RECEIVER].push_back(future);
                     mMutex.unlock();
 
-                    auto task = zero::async::coroutine::from(zero::async::coroutine::Cancellable{
-                            promise,
-                            [=]() mutable -> tl::expected<void, std::error_code> {
-                                promise.reject(make_error_code(std::errc::operation_canceled));
-                                return {};
-                            }
-                    });
-
-                    auto res = co_await asyncio::timeout(task, timeout.value_or(std::chrono::milliseconds{0}));
+                    auto res = co_await future.get(timeout);
 
                     if (!res) {
                         std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[RECEIVER].remove(promise);
+                        mPending[RECEIVER].remove(future);
                         result = tl::unexpected(res.error());
-                        break;
-                    }
-
-                    auto r = *res;
-
-                    if (!r) {
-                        std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[RECEIVER].remove(promise);
-                        result = tl::unexpected(r.error());
                         break;
                     }
 
@@ -424,8 +390,8 @@ namespace asyncio {
                 return;
 
             mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
-                for (auto &promise: pending)
-                    promise.resolve();
+                for (auto &future: pending)
+                    future.set();
             });
         }
 
@@ -437,8 +403,8 @@ namespace asyncio {
                 return;
 
             mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
-                for (auto &promise: pending)
-                    promise.reject(ec);
+                for (auto &future: pending)
+                    future.setError(ec);
             });
         }
 
@@ -447,7 +413,7 @@ namespace asyncio {
         std::atomic<bool> mClosed;
         std::shared_ptr<EventLoop> mEventLoop;
         zero::atomic::CircularBuffer<T> mBuffer;
-        std::array<std::list<zero::async::promise::Promise<void, std::error_code>>, 2> mPending;
+        std::array<std::list<Future<void>>, 2> mPending;
     };
 }
 
