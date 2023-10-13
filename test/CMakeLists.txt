@@ -8,6 +8,7 @@ add_executable(
         event_loop.cpp
         thread.cpp
         channel.cpp
+        sync/mutex.cpp
         ev/pipe.cpp
         ev/event.cpp
         ev/buffer.cpp
