@@ -69,10 +69,10 @@ namespace asyncio {
 
         zero::async::coroutine::Task<T, std::error_code> get(std::optional<std::chrono::milliseconds> ms) {
             if (!ms)
-                co_return co_await get();
+                co_return std::move(co_await get());
 
-            auto result = CO_TRY(co_await timeout(get(), *ms));
-            co_return *result;
+            auto result = CO_TRY(std::move(co_await timeout(get(), *ms)));
+            co_return std::move(*result);
         }
 
     public:

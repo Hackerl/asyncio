@@ -2,6 +2,7 @@
 #include <asyncio/net/dns.h>
 #include <asyncio/event_loop.h>
 #include <zero/os/net.h>
+#include <cstring>
 #include <cassert>
 
 #if __unix__ || __APPLE__
