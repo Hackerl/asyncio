@@ -12,7 +12,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Mutex::lock()
     auto result = co_await future.get();
 
     if (!result) {
-        if (mPending.remove(future) == 0) {
+        if (mPending.remove(future) == 0 && !mPending.empty()) {
             mPending.front().set();
             mPending.pop_front();
         }
