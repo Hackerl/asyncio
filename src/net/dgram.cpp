@@ -193,7 +193,7 @@ asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
         }
 
         if (num > 0) {
-            auto address = addressFrom((const sockaddr *) &storage);
+            auto address = addressFrom((const sockaddr *) &storage, length);
 
             if (!address) {
                 result = tl::unexpected(address.error());

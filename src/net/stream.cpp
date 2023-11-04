@@ -257,10 +257,19 @@ asyncio::net::stream::connect(std::string host, unsigned short port) {
 
 #if __unix__ || __APPLE__
 tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const std::string &path) {
+    if (path.empty())
+        return tl::unexpected(make_error_code(std::errc::invalid_argument));
+
     sockaddr_un sa = {};
+    socklen_t length = sizeof(sa_family_t) + path.length() + 1;
 
     sa.sun_family = AF_UNIX;
     strncpy(sa.sun_path, path.c_str(), sizeof(sa.sun_path) - 1);
+
+    if (path.front() == '@') {
+        length--;
+        sa.sun_path[0] = '\0';
+    }
 
     evconnlistener *listener = evconnlistener_new_bind(
             getEventLoop()->base(),
@@ -269,7 +278,7 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
             LEV_OPT_CLOSE_ON_FREE | LEV_OPT_DISABLED,
             -1,
             (const sockaddr *) &sa,
-            sizeof(sa)
+            (int) length
     );
 
     if (!listener)
@@ -280,10 +289,19 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(std::string path) {
+    if (path.empty())
+        co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+
     sockaddr_un sa = {};
+    socklen_t length = sizeof(sa_family_t) + path.length() + 1;
 
     sa.sun_family = AF_UNIX;
     strncpy(sa.sun_path, path.c_str(), sizeof(sa.sun_path) - 1);
+
+    if (path.front() == '@') {
+        length--;
+        sa.sun_path[0] = '\0';
+    }
 
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
@@ -312,7 +330,7 @@ asyncio::net::stream::connect(std::string path) {
             ctx
     );
 
-    if (bufferevent_socket_connect(bev, (const sockaddr *) &sa, sizeof(sa)) < 0) {
+    if (bufferevent_socket_connect(bev, (const sockaddr *) &sa, (int) length) < 0) {
         delete ctx;
         bufferevent_free(bev);
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));

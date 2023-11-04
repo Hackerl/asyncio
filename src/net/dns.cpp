@@ -40,7 +40,7 @@ asyncio::net::dns::getAddressInfo(std::string node, std::optional<std::string> s
                 std::vector<Address> addresses;
 
                 for (auto i = res; i; i = i->ai_next) {
-                    auto address = addressFrom(i->ai_addr);
+                    auto address = addressFrom(i->ai_addr, i->ai_addrlen);
 
                     if (!address)
                         continue;

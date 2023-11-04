@@ -109,10 +109,10 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::addressFrom(e
     if ((peer ? getpeername : getsockname)(fd, (sockaddr *) &storage, &length) < 0)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    return addressFrom((const sockaddr *) &storage);
+    return addressFrom((const sockaddr *) &storage, length);
 }
 
-tl::expected<asyncio::net::Address, std::error_code> asyncio::net::addressFrom(const sockaddr *addr) {
+tl::expected<asyncio::net::Address, std::error_code> asyncio::net::addressFrom(const sockaddr *addr, socklen_t length) {
     tl::expected<Address, std::error_code> result;
 
     switch (addr->sa_family) {
@@ -154,7 +154,25 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::addressFrom(c
 
 #if __unix__ || __APPLE__
         case AF_UNIX: {
-            result = UnixAddress{((const sockaddr_un *) addr)->sun_path};
+            if (length == sizeof(sa_family_t)) {
+                result = UnixAddress{};
+                break;
+            }
+
+            auto address = (const sockaddr_un *) addr;
+
+            if (address->sun_path[0] == '\0') {
+                result = UnixAddress{
+                        zero::strings::format(
+                                "@%.*s",
+                                (int) (length - sizeof(sa_family_t) - 1),
+                                address->sun_path + 1
+                        )
+                };
+                break;
+            }
+
+            result = UnixAddress{address->sun_path};
             break;
         }
 #endif
