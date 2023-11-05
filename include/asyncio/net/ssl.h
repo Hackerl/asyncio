@@ -65,7 +65,7 @@ namespace asyncio::net::ssl {
         };
 
         tl::expected<Buffer, std::error_code>
-        makeBuffer(evutil_socket_t fd, const std::shared_ptr<Context> &context, State state, bool own = true);
+        makeBuffer(FileDescriptor fd, const std::shared_ptr<Context> &context, State state, bool own = true);
 
         class Listener : public net::stream::Acceptor {
         public:

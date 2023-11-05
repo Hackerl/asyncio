@@ -253,7 +253,12 @@ std::error_code asyncio::net::ssl::stream::Buffer::getError() {
 }
 
 tl::expected<asyncio::net::ssl::stream::Buffer, std::error_code>
-asyncio::net::ssl::stream::makeBuffer(evutil_socket_t fd, const std::shared_ptr<Context> &context, State state, bool own) {
+asyncio::net::ssl::stream::makeBuffer(
+        FileDescriptor fd,
+        const std::shared_ptr<Context> &context,
+        State state,
+        bool own
+) {
     bufferevent *bev = bufferevent_openssl_socket_new(
             getEventLoop()->base(),
             fd,

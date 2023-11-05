@@ -20,7 +20,7 @@ namespace asyncio::net::stream {
         tl::expected<Address, std::error_code> remoteAddress() override;
     };
 
-    tl::expected<Buffer, std::error_code> makeBuffer(evutil_socket_t fd, bool own = true);
+    tl::expected<Buffer, std::error_code> makeBuffer(FileDescriptor fd, bool own = true);
 
     class Acceptor {
     public:
@@ -29,14 +29,14 @@ namespace asyncio::net::stream {
         ~Acceptor();
 
     protected:
-        zero::async::coroutine::Task<evutil_socket_t, std::error_code> fd();
+        zero::async::coroutine::Task<FileDescriptor, std::error_code> fd();
 
     public:
         tl::expected<void, std::error_code> close();
 
     protected:
         std::unique_ptr<evconnlistener, decltype(evconnlistener_free) *> mListener;
-        std::optional<zero::async::promise::Promise<evutil_socket_t, std::error_code>> mPromise;
+        std::optional<zero::async::promise::Promise<FileDescriptor, std::error_code>> mPromise;
     };
 
     class Listener : public Acceptor {

@@ -6,27 +6,27 @@
 constexpr auto READ_INDEX = 0;
 constexpr auto WRITE_INDEX = 1;
 
-asyncio::net::dgram::Socket::Socket(evutil_socket_t fd, std::array<ev::Event, 2> events)
+asyncio::net::dgram::Socket::Socket(FileDescriptor fd, std::array<ev::Event, 2> events)
         : mFD(fd), mClosed(false), mEvents(std::move(events)) {
 
 }
 
 asyncio::net::dgram::Socket::Socket(asyncio::net::dgram::Socket &&rhs) noexcept
-        : mFD(std::exchange(rhs.mFD, EVUTIL_INVALID_SOCKET)), mClosed(rhs.mClosed),
+        : mFD(std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR)), mClosed(rhs.mClosed),
           mEvents(std::move(rhs.mEvents)), mTimeouts(rhs.mTimeouts) {
     assert(!mEvents[READ_INDEX].pending());
     assert(!mEvents[WRITE_INDEX].pending());
 }
 
 asyncio::net::dgram::Socket::~Socket() {
-    if (mFD == EVUTIL_INVALID_SOCKET)
+    if (mFD == INVALID_FILE_DESCRIPTOR)
         return;
 
     evutil_closesocket(mFD);
 }
 
 zero::async::coroutine::Task<size_t, std::error_code> asyncio::net::dgram::Socket::read(std::span<std::byte> data) {
-    if (mFD == EVUTIL_INVALID_SOCKET)
+    if (mFD == INVALID_FILE_DESCRIPTOR)
         co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mClosed)
@@ -83,7 +83,7 @@ zero::async::coroutine::Task<size_t, std::error_code> asyncio::net::dgram::Socke
 
 zero::async::coroutine::Task<void, std::error_code>
 asyncio::net::dgram::Socket::write(std::span<const std::byte> data) {
-    if (mFD == EVUTIL_INVALID_SOCKET)
+    if (mFD == INVALID_FILE_DESCRIPTOR)
         co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mClosed)
@@ -137,7 +137,7 @@ asyncio::net::dgram::Socket::write(std::span<const std::byte> data) {
 }
 
 tl::expected<void, std::error_code> asyncio::net::dgram::Socket::close() {
-    if (mFD == EVUTIL_INVALID_SOCKET)
+    if (mFD == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mClosed)
@@ -152,13 +152,13 @@ tl::expected<void, std::error_code> asyncio::net::dgram::Socket::close() {
         event.trigger(ev::What::CLOSED);
     }
 
-    evutil_closesocket(std::exchange(mFD, EVUTIL_INVALID_SOCKET));
+    evutil_closesocket(std::exchange(mFD, INVALID_FILE_DESCRIPTOR));
     return {};
 }
 
 zero::async::coroutine::Task<std::pair<size_t, asyncio::net::Address>, std::error_code>
 asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
-    if (mFD == EVUTIL_INVALID_SOCKET)
+    if (mFD == INVALID_FILE_DESCRIPTOR)
         co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mClosed)
@@ -225,7 +225,7 @@ asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
 
 zero::async::coroutine::Task<void, std::error_code>
 asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, Address address) {
-    if (mFD == EVUTIL_INVALID_SOCKET)
+    if (mFD == INVALID_FILE_DESCRIPTOR)
         co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mClosed)
@@ -313,20 +313,20 @@ void asyncio::net::dgram::Socket::setTimeout(
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::localAddress() {
-    if (mFD == EVUTIL_INVALID_SOCKET)
+    if (mFD == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     return addressFrom(mFD, false);
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::remoteAddress() {
-    if (mFD == EVUTIL_INVALID_SOCKET)
+    if (mFD == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     return addressFrom(mFD, true);
 }
 
-evutil_socket_t asyncio::net::dgram::Socket::fd() {
+asyncio::FileDescriptor asyncio::net::dgram::Socket::fd() {
     return mFD;
 }
 
@@ -405,7 +405,7 @@ asyncio::net::dgram::connect(std::span<const Address> addresses) {
 
 zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
 asyncio::net::dgram::connect(std::string host, unsigned short port) {
-    evutil_addrinfo hints = {};
+    dns::AddressInfo hints = {};
 
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
@@ -415,9 +415,9 @@ asyncio::net::dgram::connect(std::string host, unsigned short port) {
 }
 
 tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::makeSocket(int family) {
-    auto fd = (evutil_socket_t) socket(family, SOCK_DGRAM, 0);
+    auto fd = (FileDescriptor) socket(family, SOCK_DGRAM, 0);
 
-    if (fd == EVUTIL_INVALID_SOCKET)
+    if (fd == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
     if (evutil_make_socket_nonblocking(fd) == -1) {

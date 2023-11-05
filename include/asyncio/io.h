@@ -9,6 +9,9 @@
 #include <zero/async/coroutine.h>
 
 namespace asyncio {
+    constexpr auto INVALID_FILE_DESCRIPTOR = -1;
+    using FileDescriptor = evutil_socket_t;
+
     class IReader : public virtual zero::Interface {
     public:
         virtual zero::async::coroutine::Task<size_t, std::error_code> read(std::span<std::byte> data) = 0;
@@ -38,7 +41,7 @@ namespace asyncio {
 
     class IFileDescriptor : public virtual zero::Interface {
     public:
-        virtual evutil_socket_t fd() = 0;
+        virtual FileDescriptor fd() = 0;
     };
 
     class IDeadline : public virtual zero::Interface {

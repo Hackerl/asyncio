@@ -326,9 +326,9 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::waitClo
     };
 }
 
-evutil_socket_t asyncio::ev::Buffer::fd() {
+asyncio::FileDescriptor asyncio::ev::Buffer::fd() {
     if (!mBev)
-        return EVUTIL_INVALID_SOCKET;
+        return INVALID_FILE_DESCRIPTOR;
 
     return bufferevent_getfd(mBev.get());
 }
@@ -508,7 +508,7 @@ std::error_code asyncio::ev::Buffer::getError() {
     return {EVUTIL_SOCKET_ERROR(), std::system_category()};
 }
 
-tl::expected<asyncio::ev::Buffer, std::error_code> asyncio::ev::makeBuffer(evutil_socket_t fd, bool own) {
+tl::expected<asyncio::ev::Buffer, std::error_code> asyncio::ev::makeBuffer(FileDescriptor fd, bool own) {
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), fd, own ? BEV_OPT_CLOSE_ON_FREE : 0);
 
     if (!bev)

@@ -102,7 +102,7 @@ asyncio::net::addressFrom(const std::string &ip, unsigned short port) {
     return IPv4Address::from(ip, port);
 }
 
-tl::expected<asyncio::net::Address, std::error_code> asyncio::net::addressFrom(evutil_socket_t fd, bool peer) {
+tl::expected<asyncio::net::Address, std::error_code> asyncio::net::addressFrom(FileDescriptor fd, bool peer) {
     sockaddr_storage storage = {};
     socklen_t length = sizeof(sockaddr_storage);
 

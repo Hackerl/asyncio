@@ -6,7 +6,7 @@
 TEST_CASE("DNS query", "[dns]") {
     SECTION("get address info") {
         asyncio::run([]() -> zero::async::coroutine::Task<void> {
-            evutil_addrinfo hints = {};
+            asyncio::net::dns::AddressInfo hints = {};
 
             hints.ai_family = AF_UNSPEC;
             hints.ai_socktype = SOCK_STREAM;

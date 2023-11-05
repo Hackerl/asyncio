@@ -4,6 +4,8 @@
 #include "net.h"
 
 namespace asyncio::net::dns {
+    using AddressInfo = evutil_addrinfo;
+
     enum Error {
 
     };
@@ -18,7 +20,7 @@ namespace asyncio::net::dns {
     std::error_code make_error_code(Error e);
 
     zero::async::coroutine::Task<std::vector<Address>, std::error_code>
-    getAddressInfo(std::string node, std::optional<std::string> service, std::optional<evutil_addrinfo> hints);
+    getAddressInfo(std::string node, std::optional<std::string> service, std::optional<AddressInfo> hints);
 
     zero::async::coroutine::Task<std::vector<std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>>>, std::error_code>
     lookupIP(std::string host);

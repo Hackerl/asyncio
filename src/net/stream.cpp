@@ -19,25 +19,25 @@ asyncio::net::stream::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(buffe
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::localAddress() {
-    evutil_socket_t fd = this->fd();
+    FileDescriptor fd = this->fd();
 
-    if (fd == EVUTIL_INVALID_SOCKET)
+    if (fd == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     return addressFrom(fd, false);
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::remoteAddress() {
-    evutil_socket_t fd = this->fd();
+    FileDescriptor fd = this->fd();
 
-    if (fd == EVUTIL_INVALID_SOCKET)
+    if (fd == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     return addressFrom(fd, true);
 }
 
 tl::expected<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::makeBuffer(evutil_socket_t fd, bool own) {
+asyncio::net::stream::makeBuffer(FileDescriptor fd, bool own) {
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), fd, own ? BEV_OPT_CLOSE_ON_FREE : 0);
 
     if (!bev)
@@ -72,7 +72,7 @@ asyncio::net::stream::Acceptor::~Acceptor() {
     assert(!mPromise);
 }
 
-zero::async::coroutine::Task<evutil_socket_t, std::error_code> asyncio::net::stream::Acceptor::fd() {
+zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::net::stream::Acceptor::fd() {
     if (!mListener)
         co_return tl::unexpected(Error::RESOURCE_DESTROYED);
 
@@ -80,7 +80,7 @@ zero::async::coroutine::Task<evutil_socket_t, std::error_code> asyncio::net::str
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
     co_return co_await zero::async::coroutine::Cancellable{
-            zero::async::promise::chain<evutil_socket_t, std::error_code>([this](auto promise) {
+            zero::async::promise::chain<FileDescriptor, std::error_code>([this](auto promise) {
                 mPromise = promise;
                 evconnlistener_enable(mListener.get());
             }).finally([this]() {

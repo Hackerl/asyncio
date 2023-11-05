@@ -7,7 +7,7 @@
 namespace asyncio::net::dgram {
     class Socket : public ISocket {
     public:
-        Socket(evutil_socket_t fd, std::array<ev::Event, 2> events);
+        Socket(FileDescriptor fd, std::array<ev::Event, 2> events);
         Socket(Socket &&rhs) noexcept;
         ~Socket() override;
 
@@ -32,13 +32,13 @@ namespace asyncio::net::dgram {
         tl::expected<Address, std::error_code> remoteAddress() override;
 
     public:
-        evutil_socket_t fd() override;
+        FileDescriptor fd() override;
         tl::expected<void, std::error_code> bind(const Address &address) override;
         zero::async::coroutine::Task<void, std::error_code> connect(Address address) override;
 
     private:
         bool mClosed;
-        evutil_socket_t mFD;
+        FileDescriptor mFD;
         std::array<ev::Event, 2> mEvents;
         std::array<std::optional<std::chrono::milliseconds>, 2> mTimeouts;
     };

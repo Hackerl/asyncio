@@ -20,7 +20,11 @@ std::error_code asyncio::net::dns::make_error_code(Error e) {
 }
 
 zero::async::coroutine::Task<std::vector<asyncio::net::Address>, std::error_code>
-asyncio::net::dns::getAddressInfo(std::string node, std::optional<std::string> service, std::optional<addrinfo> hints) {
+asyncio::net::dns::getAddressInfo(
+        std::string node,
+        std::optional<std::string> service,
+        std::optional<AddressInfo> hints
+) {
     zero::async::promise::Promise<std::vector<Address>, Error> promise;
 
     evdns_getaddrinfo_request *request = evdns_getaddrinfo(
@@ -71,7 +75,7 @@ zero::async::coroutine::Task<std::vector<std::variant<std::array<std::byte, 4>, 
 asyncio::net::dns::lookupIP(std::string host) {
     using IPAddress = std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>>;
 
-    evutil_addrinfo hints = {};
+    AddressInfo hints = {};
 
     hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
     hints.ai_family = AF_UNSPEC;
@@ -95,7 +99,7 @@ asyncio::net::dns::lookupIP(std::string host) {
 
 zero::async::coroutine::Task<std::vector<std::array<std::byte, 4>>, std::error_code>
 asyncio::net::dns::lookupIPv4(std::string host) {
-    evutil_addrinfo hints = {};
+    AddressInfo hints = {};
 
     hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
     hints.ai_family = AF_INET;
@@ -116,7 +120,7 @@ asyncio::net::dns::lookupIPv4(std::string host) {
 
 zero::async::coroutine::Task<std::vector<std::array<std::byte, 16>>, std::error_code>
 asyncio::net::dns::lookupIPv6(std::string host) {
-    evutil_addrinfo hints = {};
+    AddressInfo hints = {};
 
     hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
     hints.ai_family = AF_INET6;

@@ -5,7 +5,7 @@ asyncio::ev::Event::Event(event *e) : Notifier(e) {
 
 }
 
-evutil_socket_t asyncio::ev::Event::fd() {
+asyncio::FileDescriptor asyncio::ev::Event::fd() {
     return event_get_fd(mEvent.get());
 }
 
@@ -42,7 +42,7 @@ asyncio::ev::Event::on(std::optional<std::chrono::milliseconds> timeout) {
     };
 }
 
-tl::expected<asyncio::ev::Event, std::error_code> asyncio::ev::makeEvent(evutil_socket_t fd, short events) {
+tl::expected<asyncio::ev::Event, std::error_code> asyncio::ev::makeEvent(FileDescriptor fd, short events) {
     auto context = new Event::Context();
 
     event *e = event_new(

@@ -52,7 +52,7 @@ namespace asyncio::net {
     std::string stringify(const Address &address);
 
     tl::expected<Address, std::error_code> addressFrom(const std::string &ip, unsigned short port);
-    tl::expected<Address, std::error_code> addressFrom(evutil_socket_t fd, bool peer);
+    tl::expected<Address, std::error_code> addressFrom(FileDescriptor fd, bool peer);
     tl::expected<Address, std::error_code> addressFrom(const sockaddr *addr, socklen_t length);
 
     tl::expected<std::vector<std::byte>, std::error_code> socketAddressFrom(const Address &address);

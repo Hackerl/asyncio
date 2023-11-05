@@ -5,6 +5,7 @@
 #include <optional>
 #include <event.h>
 #include <cassert>
+#include <asyncio/io.h>
 #include <zero/async/coroutine.h>
 
 namespace asyncio::ev {
@@ -66,7 +67,7 @@ namespace asyncio::ev {
         explicit Event(event *e);
 
     public:
-        evutil_socket_t fd();
+        FileDescriptor fd();
 
     public:
         void trigger(short events);
@@ -76,7 +77,7 @@ namespace asyncio::ev {
         on(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
     };
 
-    tl::expected<Event, std::error_code> makeEvent(evutil_socket_t fd, short events);
+    tl::expected<Event, std::error_code> makeEvent(FileDescriptor fd, short events);
 }
 
 #endif //ASYNCIO_EVENT_H

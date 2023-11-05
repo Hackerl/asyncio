@@ -64,7 +64,7 @@ namespace asyncio::ev {
         zero::async::coroutine::Task<void, std::error_code> waitClosed() override;
 
     public:
-        evutil_socket_t fd() override;
+        FileDescriptor fd() override;
 
     public:
         zero::async::coroutine::Task<size_t, std::error_code> read(std::span<std::byte> data) override;
@@ -95,7 +95,7 @@ namespace asyncio::ev {
         std::array<std::optional<zero::async::promise::Promise<void, std::error_code>>, 3> mPromises;
     };
 
-    tl::expected<Buffer, std::error_code> makeBuffer(evutil_socket_t fd, bool own = true);
+    tl::expected<Buffer, std::error_code> makeBuffer(FileDescriptor fd, bool own = true);
 }
 
 #endif //ASYNCIO_BUFFER_H
