@@ -34,6 +34,8 @@ jobs:
           mkdir -p build
           cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           cmake --build build -j $env:NUMBER_OF_PROCESSORS
+      - name: Test
+        run: ctest --output-on-failure --test-dir build
 
   windows-legacy-amd64:
     runs-on: windows-latest
@@ -46,6 +48,8 @@ jobs:
           mkdir -p build
           cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_MANIFEST_FEATURES="test;openssl;legacy"
           cmake --build build -j $env:NUMBER_OF_PROCESSORS
+      - name: Test
+        run: ctest --output-on-failure --test-dir build
 
   macos-amd64:
     runs-on: macos-latest
