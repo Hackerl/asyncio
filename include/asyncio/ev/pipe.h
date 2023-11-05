@@ -13,7 +13,7 @@ namespace asyncio::ev {
     class PairedBuffer : public Buffer, public IPairedBuffer {
     public:
         PairedBuffer(bufferevent *bev, std::shared_ptr<std::error_code> ec);
-        PairedBuffer(PairedBuffer &&rhs) = default;
+        PairedBuffer(PairedBuffer &&) = default;
         ~PairedBuffer() override;
 
     public:

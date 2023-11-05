@@ -33,7 +33,7 @@ tl::expected<asyncio::ev::Timer, std::error_code> asyncio::ev::makeTimer() {
 
     event *e = evtimer_new(
             getEventLoop()->base(),
-            [](evutil_socket_t fd, short what, void *arg) {
+            [](evutil_socket_t, short, void *arg) {
                 std::exchange(*static_cast<Event::Context *>(arg), std::nullopt)->resolve();
             },
             context

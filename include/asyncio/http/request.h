@@ -54,7 +54,7 @@ namespace asyncio::http {
     class Response {
     public:
         Response(std::shared_ptr<Requests> requests, std::unique_ptr<Connection> connection);
-        Response(Response &&rhs) = default;
+        Response(Response &&) = default;
         ~Response();
 
     public:

@@ -49,7 +49,7 @@ tl::expected<asyncio::ev::Event, std::error_code> asyncio::ev::makeEvent(FileDes
             getEventLoop()->base(),
             fd,
             events,
-            [](evutil_socket_t fd, short what, void *arg) {
+            [](evutil_socket_t, short what, void *arg) {
                 std::exchange(*static_cast<Event::Context *>(arg), std::nullopt)->resolve(what);
             },
             context

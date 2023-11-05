@@ -11,7 +11,7 @@ namespace asyncio::net {
         std::array<std::byte, 4> ip;
 
         [[nodiscard]] std::string string() const;
-        bool operator==(const IPv4Address &rhs) const = default;
+        bool operator==(const IPv4Address &) const = default;
 
         static tl::expected<IPv4Address, std::error_code> from(const std::string &ip, unsigned short port);
     };
@@ -22,7 +22,7 @@ namespace asyncio::net {
         std::optional<std::string> zone;
 
         [[nodiscard]] std::string string() const;
-        bool operator==(const IPv6Address &rhs) const = default;
+        bool operator==(const IPv6Address &) const = default;
 
         static IPv6Address from(const IPv4Address &ipv4);
         static tl::expected<IPv6Address, std::error_code> from(const std::string &ip, unsigned short port);
@@ -32,7 +32,7 @@ namespace asyncio::net {
         std::string path;
 
         [[nodiscard]] std::string string() const;
-        bool operator==(const UnixAddress &rhs) const = default;
+        bool operator==(const UnixAddress &) const = default;
     };
 
     using Address = std::variant<IPv4Address, IPv6Address, UnixAddress>;

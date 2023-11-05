@@ -236,7 +236,6 @@ void asyncio::http::Requests::onCURLTimer(long timeout) {
 void asyncio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, void *data) {
     struct Context {
         event e;
-        curl_socket_t s;
         std::shared_ptr<Requests> requests;
     };
 
@@ -252,7 +251,7 @@ void asyncio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what,
     }
 
     if (!context) {
-        context = new Context{.s = s, .requests = shared_from_this()};
+        context = new Context{.requests = shared_from_this()};
         curl_multi_assign(mMulti.get(), s, context);
     } else {
         event_del(&context->e);
@@ -269,7 +268,7 @@ void asyncio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what,
 
                 curl_multi_socket_action(
                         requests->mMulti.get(),
-                        context->s,
+                        fd,
                         ((what & ev::READ) ? CURL_CSELECT_IN : 0) | ((what & ev::WRITE) ? CURL_CSELECT_OUT : 0),
                         &requests->mRunning
                 );

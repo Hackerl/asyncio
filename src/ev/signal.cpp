@@ -33,7 +33,7 @@ tl::expected<asyncio::ev::Signal, std::error_code> asyncio::ev::makeSignal(int s
     event *e = evsignal_new(
             getEventLoop()->base(),
             sig,
-            [](evutil_socket_t fd, short what, void *arg) {
+            [](evutil_socket_t, short, void *arg) {
                 std::exchange(*static_cast<Event::Context *>(arg), std::nullopt)->resolve();
             },
             context
