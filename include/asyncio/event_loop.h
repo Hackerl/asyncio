@@ -68,7 +68,7 @@ namespace asyncio {
     };
 
     std::shared_ptr<EventLoop> getEventLoop();
-    bool setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
+    void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
 
     tl::expected<EventLoop, std::error_code> createEventLoop(size_t maxWorkers = 16);
     zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);

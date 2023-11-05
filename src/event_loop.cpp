@@ -52,12 +52,8 @@ std::shared_ptr<asyncio::EventLoop> asyncio::getEventLoop() {
     return threadEventLoop.lock();
 }
 
-bool asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
-    if (!threadEventLoop.expired())
-        return false;
-
+void asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
     threadEventLoop = eventLoop;
-    return true;
 }
 
 tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(size_t maxWorkers) {
