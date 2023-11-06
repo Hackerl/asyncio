@@ -1,9 +1,16 @@
 #include <asyncio/fs/framework.h>
-#include <asyncio/event_loop.h>
+#include <cassert>
+
+#ifdef _WIN32
+#include <zero/defer.h>
+#elif __unix__ || __APPLE__
 #include <csignal>
+#endif
 
 #if __unix__ || __APPLE__
-asyncio::fs::PosixAIO::PosixAIO(std::unique_ptr<event, decltype(event_free) *> event) : mEvent(std::move(event)) {
+asyncio::fs::PosixAIO::PosixAIO(EventLoop *eventLoop, std::unique_ptr<event, decltype(event_free) *> event)
+        : mEventLoop(eventLoop), mEvent(std::move(event)) {
+    assert(mEventLoop);
     auto e = mEvent.get();
 
     evsignal_assign(
@@ -19,7 +26,8 @@ asyncio::fs::PosixAIO::PosixAIO(std::unique_ptr<event, decltype(event_free) *> e
     evsignal_add(e, nullptr);
 }
 
-asyncio::fs::PosixAIO::PosixAIO(asyncio::fs::PosixAIO &&rhs) noexcept: mEvent(std::move(rhs.mEvent)) {
+asyncio::fs::PosixAIO::PosixAIO(asyncio::fs::PosixAIO &&rhs) noexcept
+        : mEventLoop(rhs.mEventLoop), mEvent(std::move(rhs.mEvent)) {
     assert(mPending.empty());
     auto e = mEvent.get();
 
@@ -44,8 +52,12 @@ asyncio::fs::PosixAIO::~PosixAIO() {
     evsignal_del(mEvent.get());
 }
 
+tl::expected<void, std::error_code> asyncio::fs::PosixAIO::associate(FileDescriptor fd) {
+    return {};
+}
+
 zero::async::coroutine::Task<size_t, std::error_code>
-asyncio::fs::PosixAIO::read(FileDescriptor fd, off_t offset, std::span<std::byte> data) {
+asyncio::fs::PosixAIO::read(FileDescriptor fd, std::streamoff offset, std::span<std::byte> data) {
     aiocb cb = {};
 
     cb.aio_fildes = fd;
@@ -74,8 +86,11 @@ asyncio::fs::PosixAIO::read(FileDescriptor fd, off_t offset, std::span<std::byte
                 if (result == -1)
                     return tl::unexpected(std::error_code(errno, std::system_category()));
 
-                if (result == AIO_ALLDONE || result == AIO_NOTCANCELED)
-                    return tl::unexpected(make_error_code(std::errc::io_error));
+                if (result == AIO_ALLDONE)
+                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
+                if (result == AIO_NOTCANCELED)
+                    return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
                 mPending.remove(pending);
                 pending.second.reject(make_error_code(std::errc::operation_canceled));
@@ -86,7 +101,7 @@ asyncio::fs::PosixAIO::read(FileDescriptor fd, off_t offset, std::span<std::byte
 }
 
 zero::async::coroutine::Task<size_t, std::error_code>
-asyncio::fs::PosixAIO::write(FileDescriptor fd, off_t offset, std::span<const std::byte> data) {
+asyncio::fs::PosixAIO::write(FileDescriptor fd, std::streamoff offset, std::span<const std::byte> data) {
     aiocb cb = {};
 
     cb.aio_fildes = fd;
@@ -115,8 +130,11 @@ asyncio::fs::PosixAIO::write(FileDescriptor fd, off_t offset, std::span<const st
                 if (result == -1)
                     return tl::unexpected(std::error_code(errno, std::system_category()));
 
-                if (result == AIO_ALLDONE || result == AIO_NOTCANCELED)
-                    return tl::unexpected(make_error_code(std::errc::io_error));
+                if (result == AIO_ALLDONE)
+                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
+                if (result == AIO_NOTCANCELED)
+                    return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
                 mPending.remove(pending);
                 pending.second.reject(make_error_code(std::errc::operation_canceled));
@@ -139,8 +157,8 @@ void asyncio::fs::PosixAIO::onSignal() {
                 continue;
             }
 
-            getEventLoop()->post([promise = std::move(it->second)]() mutable {
-                promise.reject(std::error_code(errno, std::system_category()));
+            mEventLoop->post([error = errno, promise = std::move(it->second)]() mutable {
+                promise.reject(std::error_code(error, std::system_category()));
             });
 
             it = mPending.erase(it);
@@ -150,15 +168,15 @@ void asyncio::fs::PosixAIO::onSignal() {
         ssize_t size = aio_return(it->first);
 
         if (size == -1) {
-            getEventLoop()->post([promise = std::move(it->second)]() mutable {
-                promise.reject(std::error_code(errno, std::system_category()));
+            mEventLoop->post([error = errno, promise = std::move(it->second)]() mutable {
+                promise.reject(std::error_code(error, std::system_category()));
             });
 
             it = mPending.erase(it);
             continue;
         }
 
-        getEventLoop()->post([=, promise = std::move(it->second)]() mutable {
+        mEventLoop->post([=, promise = std::move(it->second)]() mutable {
             promise.resolve(size);
         });
 
@@ -166,12 +184,138 @@ void asyncio::fs::PosixAIO::onSignal() {
     }
 }
 
-tl::expected<asyncio::fs::PosixAIO, std::error_code> asyncio::fs::makePosixAIO() {
-    event *e = evsignal_new(getEventLoop()->base(), -1, nullptr, nullptr);
+tl::expected<asyncio::fs::PosixAIO, std::error_code> asyncio::fs::makePosixAIO(EventLoop *eventLoop) {
+    event *e = evsignal_new(eventLoop->base(), -1, nullptr, nullptr);
 
     if (!e)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    return PosixAIO{{e, event_free}};
+    return PosixAIO{eventLoop, {e, event_free}};
+}
+#endif
+
+#ifdef _WIN32
+struct IORequest {
+    OVERLAPPED overlapped{};
+    zero::async::promise::Promise<size_t, std::error_code> promise;
+};
+
+asyncio::fs::IOCP::IOCP(EventLoop *eventLoop, HANDLE handle)
+        : mHandle(handle), mEventLoop(eventLoop), mThread(&IOCP::dispatch, this) {
+    assert(mEventLoop);
+}
+
+asyncio::fs::IOCP::IOCP(asyncio::fs::IOCP &&rhs) noexcept: mEventLoop(rhs.mEventLoop) {
+    assert(mHandle);
+    assert(rhs.mThread.joinable());
+
+    PostQueuedCompletionStatus(rhs.mHandle, 0, -1, nullptr);
+    rhs.mThread.join();
+
+    mHandle = std::exchange(rhs.mHandle, nullptr);
+    mThread = std::thread(&IOCP::dispatch, this);
+}
+
+asyncio::fs::IOCP::~IOCP() {
+    if (!mHandle)
+        return;
+
+    PostQueuedCompletionStatus(mHandle, 0, -1, nullptr);
+    mThread.join();
+    CloseHandle(mHandle);
+}
+
+tl::expected<void, std::error_code> asyncio::fs::IOCP::associate(FileDescriptor fd) {
+    if (!CreateIoCompletionPort((HANDLE) fd, mHandle, 0, 0))
+        return tl::unexpected(std::error_code((int) GetLastError(), std::system_category()));
+
+    return {};
+}
+
+zero::async::coroutine::Task<size_t, std::error_code>
+asyncio::fs::IOCP::read(FileDescriptor fd, std::streamoff offset, std::span<std::byte> data) {
+    IORequest request;
+
+    request.overlapped.Offset = (DWORD) offset;
+    request.overlapped.OffsetHigh = (DWORD) (offset >> 32);
+
+    DWORD n;
+    auto handle = (HANDLE) fd;
+
+    if (!ReadFile(handle, data.data(), data.size(), &n, &request.overlapped) && GetLastError() != ERROR_IO_PENDING)
+        co_return tl::unexpected(std::error_code((int) GetLastError(), std::system_category()));
+
+    co_return co_await zero::async::coroutine::Cancellable{
+            request.promise,
+            [&]() -> tl::expected<void, std::error_code> {
+                if (!CancelIoEx(handle, &request.overlapped))
+                    return tl::unexpected(std::error_code((int) GetLastError(), std::system_category()));
+
+                return {};
+            }
+    };
+}
+
+zero::async::coroutine::Task<size_t, std::error_code>
+asyncio::fs::IOCP::write(FileDescriptor fd, std::streamoff offset, std::span<const std::byte> data) {
+    IORequest request;
+
+    request.overlapped.Offset = (DWORD) offset;
+    request.overlapped.OffsetHigh = (DWORD) (offset >> 32);
+
+    DWORD n;
+    auto handle = (HANDLE) fd;
+
+    if (!WriteFile(handle, data.data(), data.size(), &n, &request.overlapped) && GetLastError() != ERROR_IO_PENDING)
+        co_return tl::unexpected(std::error_code((int) GetLastError(), std::system_category()));
+
+    co_return co_await zero::async::coroutine::Cancellable{
+            request.promise,
+            [&]() -> tl::expected<void, std::error_code> {
+                if (!CancelIoEx(handle, &request.overlapped))
+                    return tl::unexpected(std::error_code((int) GetLastError(), std::system_category()));
+
+                return {};
+            }
+    };
+}
+
+void asyncio::fs::IOCP::dispatch() {
+    while (true) {
+        DWORD n;
+        ULONG_PTR key;
+        LPOVERLAPPED overlapped;
+
+        int result = GetQueuedCompletionStatus(mHandle, &n, &key, &overlapped, INFINITE);
+
+        if (key == -1)
+            break;
+
+        if (!overlapped && !result)
+            throw std::system_error((int) GetLastError(), std::system_category());
+
+        auto request = reinterpret_cast<IORequest *>(overlapped);
+
+        if (!result) {
+            mEventLoop->post([error = GetLastError(), promise = request->promise]() mutable {
+                promise.reject(std::error_code((int) error, std::system_category()));
+            });
+
+            continue;
+        }
+
+        mEventLoop->post([=, promise = request->promise]() mutable {
+            promise.resolve(n);
+        });
+    }
+}
+
+tl::expected<asyncio::fs::IOCP, std::error_code> asyncio::fs::makeIOCP(EventLoop *eventLoop) {
+    HANDLE handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1);
+
+    if (!handle)
+        return tl::unexpected(std::error_code((int) GetLastError(), std::system_category()));
+
+    return IOCP{eventLoop, handle};
 }
 #endif

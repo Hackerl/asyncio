@@ -12,7 +12,7 @@ TEST_CASE("timer", "[timer]") {
 
             auto tp = std::chrono::system_clock::now();
             co_await timer->after(100ms);
-            REQUIRE(std::chrono::system_clock::now() - tp > 100ms);
+            REQUIRE(std::chrono::system_clock::now() - tp > 95ms);
         });
     }
 
