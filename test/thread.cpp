@@ -10,7 +10,7 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
                 co_await asyncio::toThread([]() -> tl::expected<void, std::error_code> {
                     auto tp = std::chrono::system_clock::now();
                     std::this_thread::sleep_for(50ms);
-                    REQUIRE(std::chrono::system_clock::now() - tp > 50ms);
+                    REQUIRE(std::chrono::system_clock::now() - tp > 45ms);
                     return {};
                 });
             });

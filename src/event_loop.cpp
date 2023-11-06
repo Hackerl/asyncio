@@ -2,6 +2,7 @@
 #include <asyncio/ev/timer.h>
 #include <event2/dns.h>
 #include <event2/thread.h>
+#include <zero/defer.h>
 
 thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 
@@ -71,7 +72,15 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(size_
         });
     });
 
-    event_base *base = event_base_new();
+    event_config *cfg = event_config_new();
+
+    if (!cfg)
+        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+
+    DEFER(event_config_free(cfg));
+    event_config_set_flag(cfg, EVENT_BASE_FLAG_DISALLOW_SIGNALFD);
+
+    event_base *base = event_base_new_with_config(cfg);
 
     if (!base)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
