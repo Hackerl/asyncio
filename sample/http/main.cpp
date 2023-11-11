@@ -2,7 +2,7 @@
 #include <asyncio/event_loop.h>
 #include <zero/log.h>
 #include <zero/cmdline.h>
-#include <iostream>
+#include <fmt/std.h>
 
 #ifdef __unix__
 #include <csignal>
@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
                 auto tokens = zero::strings::split(header, "=");
 
                 if (tokens.size() != 2) {
-                    LOG_WARNING("invalid header[%s]", header.c_str());
+                    LOG_WARNING("invalid header[{}]", header);
                     continue;
                 }
 
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
         auto result = asyncio::http::makeRequests(options);
 
         if (!result) {
-            LOG_ERROR("make result failed[%s]", result.error().message().c_str());
+            LOG_ERROR("make result failed[{}]", result.error());
             co_return;
         }
 
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
         }());
 
         if (!response) {
-            LOG_ERROR("request failed[%s]", response.error().message().c_str());
+            LOG_ERROR("request failed[{}]", response.error());
             co_return;
         }
 
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
             auto res = co_await response->output(*output);
 
             if (!res) {
-                LOG_ERROR("output to %s failed[%s]", output->string().c_str(), res.error().message().c_str());
+                LOG_ERROR("output to {} failed[{}]", *output, res.error());
                 co_return;
             }
 
@@ -119,11 +119,11 @@ int main(int argc, char *argv[]) {
         auto content = co_await response->string();
 
         if (!content) {
-            LOG_ERROR("get response content failed[%s]", content.error().message().c_str());
+            LOG_ERROR("get response content failed[{}]", content.error());
             co_return;
         }
 
-        std::cout << *content;
+        fmt::print("{}", *content);
     });
 
 #ifdef _WIN32

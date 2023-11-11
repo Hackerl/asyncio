@@ -4,15 +4,14 @@
 #include <event.h>
 #include <variant>
 #include <asyncio/io.h>
+#include <zero/os/net.h>
 
 namespace asyncio::net {
     struct IPv4Address {
         unsigned short port;
         std::array<std::byte, 4> ip;
 
-        [[nodiscard]] std::string string() const;
         bool operator==(const IPv4Address &) const = default;
-
         static tl::expected<IPv4Address, std::error_code> from(const std::string &ip, unsigned short port);
     };
 
@@ -21,7 +20,6 @@ namespace asyncio::net {
         std::array<std::byte, 16> ip{};
         std::optional<std::string> zone;
 
-        [[nodiscard]] std::string string() const;
         bool operator==(const IPv6Address &) const = default;
 
         static IPv6Address from(const IPv4Address &ipv4);
@@ -31,7 +29,6 @@ namespace asyncio::net {
     struct UnixAddress {
         std::string path;
 
-        [[nodiscard]] std::string string() const;
         bool operator==(const UnixAddress &) const = default;
     };
 
@@ -48,8 +45,6 @@ namespace asyncio::net {
             return lhs.index() == 2 && std::get<UnixAddress>(lhs) == rhs;
         }
     }
-
-    std::string stringify(const Address &address);
 
     tl::expected<Address, std::error_code> addressFrom(const std::string &ip, unsigned short port);
     tl::expected<Address, std::error_code> addressFrom(FileDescriptor fd, bool peer);
@@ -76,5 +71,53 @@ namespace asyncio::net {
         writeTo(std::span<const std::byte> data, Address address) = 0;
     };
 }
+
+template<typename Char>
+struct fmt::formatter<asyncio::net::IPv4Address, Char> {
+    template<typename ParseContext>
+    constexpr ParseContext::iterator parse(ParseContext &ctx) {
+        return ctx.begin();
+    }
+
+    template<typename FmtContext>
+    FmtContext::iterator format(const asyncio::net::IPv4Address &address, FmtContext &ctx) const {
+        return fmt::format_to(ctx.out(), "{}:{}", zero::os::net::stringify(address.ip), address.port);
+    }
+};
+
+template<typename Char>
+struct fmt::formatter<asyncio::net::IPv6Address, Char> {
+    template<typename ParseContext>
+    constexpr ParseContext::iterator parse(ParseContext &ctx) {
+        return ctx.begin();
+    }
+
+    template<typename FmtContext>
+    FmtContext::iterator format(const asyncio::net::IPv6Address &address, FmtContext &ctx) const {
+        if (!address.zone)
+            return fmt::format_to(ctx.out(), "[{}]:{}", zero::os::net::stringify(address.ip), address.port);
+
+        return fmt::format_to(
+                ctx.out(),
+                "[{}%{}]:{}",
+                zero::os::net::stringify(address.ip),
+                *address.zone,
+                address.port
+        );
+    }
+};
+
+template<typename Char>
+struct fmt::formatter<asyncio::net::UnixAddress, Char> {
+    template<typename ParseContext>
+    constexpr ParseContext::iterator parse(ParseContext &ctx) {
+        return ctx.begin();
+    }
+
+    template<typename FmtContext>
+    FmtContext::iterator format(const asyncio::net::UnixAddress &address, FmtContext &ctx) const {
+        return std::ranges::copy(address.path, ctx.out()).out;
+    }
+};
 
 #endif //ASYNCIO_NET_H

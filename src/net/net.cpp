@@ -1,6 +1,4 @@
 #include <asyncio/net/net.h>
-#include <zero/os/net.h>
-#include <zero/strings/strings.h>
 #include <cstring>
 
 #ifdef _WIN32
@@ -16,10 +14,6 @@
 #include <sys/un.h>
 #endif
 
-std::string asyncio::net::IPv4Address::string() const {
-    return zero::os::net::stringify(ip) + ":" + std::to_string(port);
-}
-
 tl::expected<asyncio::net::IPv4Address, std::error_code>
 asyncio::net::IPv4Address::from(const std::string &ip, unsigned short port) {
     std::array<std::byte, 4> ipv4 = {};
@@ -28,13 +22,6 @@ asyncio::net::IPv4Address::from(const std::string &ip, unsigned short port) {
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
     return IPv4Address{port, ipv4};
-}
-
-std::string asyncio::net::IPv6Address::string() const {
-    if (!zone)
-        return zero::strings::format("[%s]:%hu", zero::os::net::stringify(ip).c_str(), port);
-
-    return zero::strings::format("[%s%%%s]:%hu", zero::os::net::stringify(ip).c_str(), zone->c_str(), port);
 }
 
 asyncio::net::IPv6Address asyncio::net::IPv6Address::from(const IPv4Address &ipv4) {
@@ -66,30 +53,6 @@ asyncio::net::IPv6Address::from(const std::string &ip, unsigned short port) {
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
     return IPv6Address{port, ipv6, name};
-}
-
-std::string asyncio::net::UnixAddress::string() const {
-    return path;
-}
-
-std::string asyncio::net::stringify(const Address &address) {
-    std::string result;
-
-    switch (address.index()) {
-        case 0:
-            result = std::get<IPv4Address>(address).string();
-            break;
-
-        case 1:
-            result = std::get<IPv6Address>(address).string();
-            break;
-
-        case 2:
-            result = std::get<UnixAddress>(address).string();
-            break;
-    }
-
-    return result;
 }
 
 tl::expected<asyncio::net::Address, std::error_code>
@@ -163,11 +126,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::addressFrom(c
 
             if (address->sun_path[0] == '\0') {
                 result = UnixAddress{
-                        zero::strings::format(
-                                "@%.*s",
-                                (int) (length - sizeof(sa_family_t) - 1),
-                                address->sun_path + 1
-                        )
+                        fmt::format("@{}", std::string_view{address->sun_path + 1, length - sizeof(sa_family_t) - 1})
                 };
                 break;
             }

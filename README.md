@@ -188,7 +188,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
       auto buffer = std::move(co_await asyncio::net::stream::connect(host, port));
 
       if (!buffer) {
-          LOG_ERROR("stream buffer connect failed[%s]", buffer.error().message().c_str());
+          LOG_ERROR("stream buffer connect failed{}]", buffer.error());
           co_return;
       }
 
@@ -197,18 +197,18 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
           auto res = co_await buffer->drain();
 
           if (!res) {
-              LOG_ERROR("stream buffer drain failed[%s]", res.error().message().c_str());
+              LOG_ERROR("stream buffer drain failed[{}]", res.error());
               break;
           }
 
           auto line = co_await buffer->readLine();
 
           if (!line) {
-              LOG_ERROR("stream buffer read line failed[%s]", line.error().message().c_str());
+              LOG_ERROR("stream buffer read line failed[{}]", line.error());
               break;
           }
 
-          LOG_INFO("receive message[%s]", line->c_str());
+          LOG_INFO("receive message[{}]", *line);
           co_await asyncio::sleep(1s);
       }
   });
@@ -235,14 +235,14 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
       auto context = asyncio::net::ssl::newContext(config);
 
       if (!context) {
-          LOG_ERROR("create ssl context failed[%s]", context.error().message().c_str());
+          LOG_ERROR("create ssl context failed[{}]", context.error());
           co_return;
       }
 
       auto buffer = std::move(co_await asyncio::net::ssl::stream::connect(*context, host, port));
 
       if (!buffer) {
-          LOG_ERROR("stream buffer connect failed[%s]", buffer.error().message().c_str());
+          LOG_ERROR("stream buffer connect failed[{}]", buffer.error());
           co_return;
       }
 
@@ -251,18 +251,18 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
           auto res = co_await buffer->drain();
 
           if (!res) {
-              LOG_ERROR("stream buffer drain failed[%s]", res.error().message().c_str());
+              LOG_ERROR("stream buffer drain failed[{}]", res.error());
               break;
           }
 
           auto line = co_await buffer->readLine();
 
           if (!line) {
-              LOG_ERROR("stream buffer read line failed[%s]", line.error().message().c_str());
+              LOG_ERROR("stream buffer read line failed[{}]", line.error());
               break;
           }
 
-          LOG_INFO("receive message[%s]", line->c_str());
+          LOG_INFO("receive message[{}]", *line);
           co_await asyncio::sleep(1s);
       }
   });

@@ -1,5 +1,4 @@
 #include <asyncio/http/url.h>
-#include <zero/strings/strings.h>
 
 const char *asyncio::http::URLCategory::name() const noexcept {
     return "asyncio::http::url";

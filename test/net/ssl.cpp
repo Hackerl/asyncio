@@ -1,6 +1,7 @@
 #include <asyncio/net/ssl.h>
 #include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
+#include <fmt/std.h>
 
 constexpr auto CA_CERT = "-----BEGIN CERTIFICATE-----\n"
                          "MIIDYTCCAkkCFF5tqhRQzORYNN/5dVTYVMORdAZUMA0GCSqGSIb3DQEBCwUAMG0x\n"
@@ -147,11 +148,11 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
-                        REQUIRE(asyncio::net::stringify(*localAddress) == "127.0.0.1:30000");
+                        REQUIRE(fmt::to_string(*localAddress) == "variant(127.0.0.1:30000)");
 
                         auto remoteAddress = buffer->remoteAddress();
                         REQUIRE(remoteAddress);
-                        REQUIRE(asyncio::net::stringify(*remoteAddress).starts_with("127.0.0.1"));
+                        REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
                         buffer->writeLine("hello world");
                         co_await buffer->drain();
@@ -183,11 +184,11 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
-                        REQUIRE(asyncio::net::stringify(*localAddress).starts_with("127.0.0.1"));
+                        REQUIRE(fmt::to_string(*localAddress).find("127.0.0.1") != std::string::npos);
 
                         auto remoteAddress = buffer->remoteAddress();
                         REQUIRE(remoteAddress);
-                        REQUIRE(asyncio::net::stringify(*remoteAddress) == "127.0.0.1:30000");
+                        REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
 
                         auto line = co_await buffer->readLine();
 
@@ -225,11 +226,11 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
-                        REQUIRE(asyncio::net::stringify(*localAddress) == "127.0.0.1:30000");
+                        REQUIRE(fmt::to_string(*localAddress) == "variant(127.0.0.1:30000)");
 
                         auto remoteAddress = buffer->remoteAddress();
                         REQUIRE(remoteAddress);
-                        REQUIRE(asyncio::net::stringify(*remoteAddress).starts_with("127.0.0.1"));
+                        REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
                         buffer->writeLine("hello world");
                         co_await buffer->drain();
@@ -243,11 +244,7 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         listener.close();
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
-                        auto context = asyncio::net::ssl::newContext(
-                                {
-                                        .ca = std::string{CA_CERT}
-                                }
-                        );
+                        auto context = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
                         REQUIRE(context);
 
                         auto buffer = std::move(co_await asyncio::net::ssl::stream::connect(
@@ -259,11 +256,11 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
-                        REQUIRE(asyncio::net::stringify(*localAddress).starts_with("127.0.0.1"));
+                        REQUIRE(fmt::to_string(*localAddress).find("127.0.0.1") != std::string::npos);
 
                         auto remoteAddress = buffer->remoteAddress();
                         REQUIRE(remoteAddress);
-                        REQUIRE(asyncio::net::stringify(*remoteAddress) == "127.0.0.1:30000");
+                        REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
 
                         auto line = co_await buffer->readLine();
 

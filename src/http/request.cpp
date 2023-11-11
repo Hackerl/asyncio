@@ -1,7 +1,6 @@
 #include <asyncio/http/request.h>
 #include <asyncio/thread.h>
 #include <asyncio/event_loop.h>
-#include <zero/strings/strings.h>
 #include <fstream>
 
 #ifdef ASYNCIO_EMBED_CA_CERT
@@ -376,24 +375,20 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         curl_easy_setopt(connection->easy.get(), CURLOPT_PROXY, opt.proxy->c_str());
 
     if (!opt.cookies.empty()) {
-        std::list<std::string> cookies;
-
-        std::transform(
-                opt.cookies.begin(),
-                opt.cookies.end(),
-                std::back_inserter(cookies),
-                [](const auto &it) {
-                    return it.first + "=" + it.second;
-                }
+        curl_easy_setopt(
+                connection->easy.get(),
+                CURLOPT_COOKIE,
+                fmt::to_string(fmt::join(
+                        opt.cookies | std::views::transform([](const auto it) { return it.first + "=" + it.second; }),
+                        "; "
+                )).c_str()
         );
-
-        curl_easy_setopt(connection->easy.get(), CURLOPT_COOKIE, zero::strings::join(cookies, "; ").c_str());
     }
 
     curl_slist *headers = nullptr;
 
     for (const auto &[k, v]: opt.headers)
-        headers = curl_slist_append(headers, zero::strings::format("%s: %s", k.c_str(), v.c_str()).c_str());
+        headers = curl_slist_append(headers, fmt::format("{}: {}", k, v).c_str());
 
     if (headers) {
         curl_easy_setopt(connection->easy.get(), CURLOPT_HTTPHEADER, headers);
@@ -462,18 +457,14 @@ zero::async::coroutine::Task<asyncio::http::Response, std::error_code> asyncio::
 ) {
     auto connection = CO_TRY(prepare(std::move(method), url, options));
 
-    std::list<std::string> items;
-
-    std::transform(
-            payload.begin(),
-            payload.end(),
-            std::back_inserter(items),
-            [](const auto &it) {
-                return it.first + "=" + it.second;
-            }
+    curl_easy_setopt(
+            connection->get()->easy.get(),
+            CURLOPT_COPYPOSTFIELDS,
+            fmt::to_string(fmt::join(
+                    payload | std::views::transform([](const auto it) { return it.first + "=" + it.second; }),
+                    "&"
+            )).c_str()
     );
-
-    curl_easy_setopt(connection->get()->easy.get(), CURLOPT_COPYPOSTFIELDS, zero::strings::join(items, "&").c_str());
 
     co_return std::move(co_await perform(std::move(*connection)));
 }

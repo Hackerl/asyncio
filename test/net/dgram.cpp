@@ -1,6 +1,7 @@
 #include <asyncio/net/dgram.h>
 #include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
+#include <fmt/std.h>
 
 using namespace std::chrono_literals;
 
@@ -23,7 +24,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
 
                         REQUIRE(n);
                         REQUIRE(from.index() == 0);
-                        REQUIRE(asyncio::net::stringify(from) == "127.0.0.1:30001");
+                        REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30001)");
                         REQUIRE(data[0] == std::byte{1});
                         REQUIRE(data[1] == std::byte{2});
 
@@ -42,7 +43,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
 
                         REQUIRE(n);
                         REQUIRE(from.index() == 0);
-                        REQUIRE(asyncio::net::stringify(from) == "127.0.0.1:30000");
+                        REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
                         REQUIRE(std::equal(data, data + n, message.begin()));
 
                         client.close();
@@ -66,7 +67,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
 
                         REQUIRE(n);
                         REQUIRE(from.index() == 0);
-                        REQUIRE(asyncio::net::stringify(from).starts_with("127.0.0.1"));
+                        REQUIRE(fmt::to_string(from).find("127.0.0.1") != std::string::npos);
                         REQUIRE(data[0] == std::byte{1});
                         REQUIRE(data[1] == std::byte{2});
 
@@ -88,7 +89,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
 
                         REQUIRE(n);
                         REQUIRE(from.index() == 0);
-                        REQUIRE(asyncio::net::stringify(from) == "127.0.0.1:30000");
+                        REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
                         REQUIRE(std::equal(data, data + n, message.begin()));
 
                         client->close();

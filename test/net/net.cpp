@@ -1,7 +1,7 @@
 #include <asyncio/net/net.h>
 #include <zero/os/net.h>
-#include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
+#include <fmt/std.h>
 #include <regex>
 
 #ifdef _WIN32
@@ -30,7 +30,7 @@ TEST_CASE("network components", "[network]") {
         REQUIRE(address != asyncio::net::UnixAddress{});
         REQUIRE(address != asyncio::net::UnixAddress{});
 
-        REQUIRE(asyncio::net::stringify(address) == "127.0.0.1:80");
+        REQUIRE(fmt::to_string(address) == "variant(127.0.0.1:80)");
 
         REQUIRE(*asyncio::net::addressFrom("127.0.0.1", 80) == address);
         REQUIRE(*asyncio::net::IPv4Address::from("127.0.0.1", 80) == address);
@@ -51,7 +51,7 @@ TEST_CASE("network components", "[network]") {
 
         REQUIRE(ipv6Address.port == 80);
         REQUIRE(zero::os::net::stringify(ipv6Address.ip) == "::ffff:8.8.8.8");
-        REQUIRE(asyncio::net::stringify(ipv6Address) == "[::ffff:8.8.8.8]:80");
+        REQUIRE(fmt::to_string(ipv6Address) == "[::ffff:8.8.8.8]:80");
     }
 
     SECTION("IPv6") {
@@ -66,12 +66,12 @@ TEST_CASE("network components", "[network]") {
         REQUIRE(address != asyncio::net::IPv4Address{});
         REQUIRE(address != asyncio::net::UnixAddress{});
 
-        REQUIRE(std::regex_match(asyncio::net::stringify(address), std::regex(R"(\[::%.*\]:80)")));
+        REQUIRE(std::regex_match(fmt::to_string(address), std::regex(R"(variant\(\[::%.*\]:80\))")));
 
         REQUIRE(*asyncio::net::addressFrom("::", 80) != address);
         REQUIRE(*asyncio::net::IPv6Address::from("::", 80) != address);
-        REQUIRE(*asyncio::net::addressFrom(zero::strings::format("::%%%s", name), 80) == address);
-        REQUIRE(*asyncio::net::IPv6Address::from(zero::strings::format("::%%%s", name), 80) == address);
+        REQUIRE(*asyncio::net::addressFrom(fmt::format("::%{}", name), 80) == address);
+        REQUIRE(*asyncio::net::IPv6Address::from(fmt::format("::%{}", name), 80) == address);
 
         auto socketAddress = asyncio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);

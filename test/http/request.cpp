@@ -1,7 +1,6 @@
 #include <asyncio/http/request.h>
 #include <asyncio/event_loop.h>
 #include <asyncio/net/stream.h>
-#include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
 #include <fstream>
 

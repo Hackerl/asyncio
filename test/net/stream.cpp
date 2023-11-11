@@ -2,6 +2,7 @@
 #include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
+#include <fmt/std.h>
 
 TEST_CASE("stream network connection", "[stream]") {
     SECTION("TCP") {
@@ -16,11 +17,11 @@ TEST_CASE("stream network connection", "[stream]") {
 
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
-                        REQUIRE(asyncio::net::stringify(*localAddress) == "127.0.0.1:30000");
+                        REQUIRE(fmt::to_string(*localAddress) == "variant(127.0.0.1:30000)");
 
                         auto remoteAddress = buffer->remoteAddress();
                         REQUIRE(remoteAddress);
-                        REQUIRE(asyncio::net::stringify(*remoteAddress).starts_with("127.0.0.1"));
+                        REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
                         buffer->writeLine("hello world");
                         co_await buffer->drain();
@@ -39,11 +40,11 @@ TEST_CASE("stream network connection", "[stream]") {
 
                         auto localAddress = buffer->localAddress();
                         REQUIRE(localAddress);
-                        REQUIRE(asyncio::net::stringify(*localAddress).starts_with("127.0.0.1"));
+                        REQUIRE(fmt::to_string(*localAddress).find("127.0.0.1") != std::string::npos);
 
                         auto remoteAddress = buffer->remoteAddress();
                         REQUIRE(remoteAddress);
-                        REQUIRE(asyncio::net::stringify(*remoteAddress) == "127.0.0.1:30000");
+                        REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
 
                         auto line = co_await buffer->readLine();
 

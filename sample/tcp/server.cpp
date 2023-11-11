@@ -4,25 +4,26 @@
 #include <zero/log.h>
 #include <zero/cmdline.h>
 #include <csignal>
+#include <fmt/std.h>
 
 zero::async::coroutine::Task<void> handle(asyncio::net::stream::Buffer buffer) {
-    LOG_INFO("new connection[%s]", asyncio::net::stringify(*buffer.remoteAddress()).c_str());
+    LOG_INFO("new connection[{}]", fmt::to_string(*buffer.remoteAddress()));
 
     while (true) {
         auto line = co_await buffer.readLine();
 
         if (!line) {
-            LOG_ERROR("stream buffer read line failed[%s]", line.error().message().c_str());
+            LOG_ERROR("stream buffer read line failed[{}]", line.error());
             break;
         }
 
-        LOG_INFO("receive message[%s]", line->c_str());
+        LOG_INFO("receive message[{}]", *line);
 
         buffer.writeLine(*line);
         auto res = co_await buffer.drain();
 
         if (!res) {
-            LOG_ERROR("stream buffer drain failed[%s]", res.error().message().c_str());
+            LOG_ERROR("stream buffer drain failed[{}]", res.error());
             break;
         }
     }
@@ -75,14 +76,14 @@ int main(int argc, char *argv[]) {
         auto listener = asyncio::net::stream::listen(host, port);
 
         if (!listener) {
-            LOG_ERROR("listen failed[%s]", listener.error().message().c_str());
+            LOG_ERROR("listen failed[{}]", listener.error());
             co_return;
         }
 
         auto signal = asyncio::ev::makeSignal(SIGINT);
 
         if (!signal) {
-            LOG_ERROR("make signal failed[%s]", signal.error().message().c_str());
+            LOG_ERROR("make signal failed[{}]", signal.error());
             co_return;
         }
 
