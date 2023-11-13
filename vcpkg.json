@@ -1,15 +1,12 @@
 {
   "name": "asyncio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "builtin-baseline": "c9e2aa851e987698519f58518aa16564af3a85ab",
   "dependencies": [
     "curl",
     "libevent",
     "nlohmann-json",
-    {
-      "name": "zero",
-      "version>=": "1.0.5"
-    }
+    "zero"
   ],
   "default-features": [
     "openssl",

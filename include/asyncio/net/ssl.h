@@ -55,17 +55,23 @@ namespace asyncio::net::ssl {
 
         class Buffer : public net::stream::Buffer {
         public:
-            explicit Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev);
+            Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, size_t capacity);
 
         public:
-            tl::expected<void, std::error_code> close() override;
+            zero::async::coroutine::Task<void, std::error_code> close() override;
 
         private:
             std::error_code getError() override;
         };
 
         tl::expected<Buffer, std::error_code>
-        makeBuffer(FileDescriptor fd, const std::shared_ptr<Context> &context, State state, bool own = true);
+        makeBuffer(
+                FileDescriptor fd,
+                const std::shared_ptr<Context> &context,
+                State state,
+                size_t capacity = DEFAULT_BUFFER_CAPACITY,
+                bool own = true
+        );
 
         class Listener : public net::stream::Acceptor {
         public:

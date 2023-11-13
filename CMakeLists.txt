@@ -8,7 +8,7 @@ option(ASYNCIO_DISABLE_SAMPLES "disable asyncio samples" OFF)
 option(ASYNCIO_EMBED_CA_CERT "use embedded CA certificates" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-set(ASYNCIO_VERSION 1.0.0)
+set(ASYNCIO_VERSION 1.0.1)
 
 include(CTest)
 include(GNUInstallDirs)

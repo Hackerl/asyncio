@@ -149,7 +149,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
       {
         "kind": "git",
         "repository": "https://github.com/Hackerl/vcpkg-registry",
-        "baseline": "92418a6fb93305df4ce936291b3d5122a3e94fd2",
+        "baseline": "4abdfe14cbaee3e51d28a169061b7d3e54dbcc37",
         "packages": [
           "asyncio",
           "zero"
@@ -164,11 +164,11 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
   {
     "name": "demo",
     "version-string": "1.0.0",
-    "builtin-baseline": "c95000e1b5bb62884de08d5e952993c8bced9db6",
+    "builtin-baseline": "c9e2aa851e987698519f58518aa16564af3a85ab",
     "dependencies": [
       {
         "name": "asyncio",
-        "version>=": "1.0.0"
+        "version>=": "1.0.1"
       }
     ]
   }
@@ -193,11 +193,11 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
       }
 
       while (true) {
-          buffer->writeLine("hello world");
-          auto res = co_await buffer->drain();
+          std::string message = "hello world\r\n";
+          auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
 
-          if (!res) {
-              LOG_ERROR("stream buffer drain failed[{}]", res.error());
+          if (!result) {
+              LOG_ERROR("stream buffer drain failed[{}]", result.error());
               break;
           }
 
@@ -247,11 +247,11 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
       }
 
       while (true) {
-          buffer->writeLine("hello world");
-          auto res = co_await buffer->drain();
+          std::string message = "hello world\r\n";
+          auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
 
-          if (!res) {
-              LOG_ERROR("stream buffer drain failed[{}]", res.error());
+          if (!result) {
+              LOG_ERROR("stream buffer drain failed[{}]", result.error());
               break;
           }
 
@@ -394,7 +394,7 @@ _For more examples, please refer to the [Documentation](https://github.com/Hacke
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] HTTP Client
+- [ ] HTTP WebSocket
 - [ ] Asynchronous Filesystem
   - [ ] Linux AIO
   - [ ] Windows IOCP

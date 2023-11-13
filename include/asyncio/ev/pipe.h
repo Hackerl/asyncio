@@ -5,20 +5,15 @@
 #include <array>
 
 namespace asyncio::ev {
-    class IPairedBuffer : public virtual IBuffer {
+    class PairedBuffer : public Buffer {
     public:
-        virtual tl::expected<void, std::error_code> throws(const std::error_code &ec) = 0;
-    };
-
-    class PairedBuffer : public Buffer, public IPairedBuffer {
-    public:
-        PairedBuffer(bufferevent *bev, std::shared_ptr<std::error_code> ec);
+        PairedBuffer(bufferevent *bev, size_t capacity, std::shared_ptr<std::error_code> ec);
         PairedBuffer(PairedBuffer &&) = default;
         ~PairedBuffer() override;
 
     public:
-        tl::expected<void, std::error_code> close() override;
-        tl::expected<void, std::error_code> throws(const std::error_code &ec) override;
+        zero::async::coroutine::Task<void, std::error_code> close() override;
+        tl::expected<void, std::error_code> throws(const std::error_code &ec);
 
     private:
         std::error_code getError() override;
@@ -27,7 +22,7 @@ namespace asyncio::ev {
         std::shared_ptr<std::error_code> mErrorCode;
     };
 
-    tl::expected<std::array<PairedBuffer, 2>, std::error_code> pipe();
+    tl::expected<std::array<PairedBuffer, 2>, std::error_code> pipe(size_t capacity = DEFAULT_BUFFER_CAPACITY);
 }
 
 #endif //ASYNCIO_PIPE_H

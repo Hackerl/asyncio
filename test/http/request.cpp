@@ -17,7 +17,6 @@ TEST_CASE("http requests", "[request]") {
                             REQUIRE(buffer);
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "GET /object?id=0 HTTP/1.1");
 
@@ -29,18 +28,18 @@ TEST_CASE("http requests", "[request]") {
                                     break;
                             }
 
-                            buffer->writeLine("HTTP/1.1 200 OK");
-                            buffer->writeLine("Content-Length: 11");
-                            buffer->writeLine("Content-Type: text/html");
-                            buffer->writeLine("Server: asyncio");
-                            buffer->writeLine("Set-Cookie: user=jack");
-                            buffer->writeLine("");
-                            buffer->writeLine("hello world");
+                            std::string response = "HTTP/1.1 200 OK\r\n"
+                                                   "Content-Length: 11\r\n"
+                                                   "Content-Type: text/html\r\n"
+                                                   "Server: asyncio\r\n"
+                                                   "Set-Cookie: user=jack\r\n\r\n"
+                                                   "hello world";
 
-                            co_await buffer->drain();
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{response}));
+                            REQUIRE(result);
 
-                            buffer->close();
-                            listener.close();
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
                         }(std::move(*listener)),
                         []() -> zero::async::coroutine::Task<void> {
                             auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
@@ -90,7 +89,6 @@ TEST_CASE("http requests", "[request]") {
                             REQUIRE(buffer);
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "GET /object?id=0 HTTP/1.1");
 
@@ -102,14 +100,14 @@ TEST_CASE("http requests", "[request]") {
                                     break;
                             }
 
-                            buffer->writeLine("HTTP/1.1 200 OK");
-                            buffer->writeLine("Content-Length: 0");
-                            buffer->writeLine("");
+                            std::string response = "HTTP/1.1 200 OK\r\n"
+                                                   "Content-Length: 0\r\n\r\n";
 
-                            co_await buffer->drain();
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{response}));
+                            REQUIRE(result);
 
-                            buffer->close();
-                            listener.close();
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
                         }(std::move(*listener)),
                         []() -> zero::async::coroutine::Task<void> {
                             auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
@@ -143,7 +141,6 @@ TEST_CASE("http requests", "[request]") {
                             REQUIRE(buffer);
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
 
@@ -171,15 +168,15 @@ TEST_CASE("http requests", "[request]") {
                             co_await buffer->readExactly(data);
                             REQUIRE(memcmp(data.data(), "name=jack", 9) == 0);
 
-                            buffer->writeLine("HTTP/1.1 200 OK");
-                            buffer->writeLine("Content-Length: 11");
-                            buffer->writeLine("");
-                            buffer->writeLine("hello world");
+                            std::string response = "HTTP/1.1 200 OK\r\n"
+                                                   "Content-Length: 11\r\n\r\n"
+                                                   "hello world";
 
-                            co_await buffer->drain();
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{response}));
+                            REQUIRE(result);
 
-                            buffer->close();
-                            listener.close();
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
                         }(std::move(*listener)),
                         []() -> zero::async::coroutine::Task<void> {
                             auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
@@ -213,7 +210,6 @@ TEST_CASE("http requests", "[request]") {
                             REQUIRE(buffer);
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
 
@@ -240,15 +236,15 @@ TEST_CASE("http requests", "[request]") {
                             std::vector<std::byte> data(*length);
                             co_await buffer->readExactly(data);
 
-                            buffer->writeLine("HTTP/1.1 200 OK");
-                            buffer->writeLine("Content-Length: 11");
-                            buffer->writeLine("");
-                            buffer->writeLine("hello world");
+                            std::string response = "HTTP/1.1 200 OK\r\n"
+                                                   "Content-Length: 11\r\n\r\n"
+                                                   "hello world";
 
-                            co_await buffer->drain();
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{response}));
+                            REQUIRE(result);
 
-                            buffer->close();
-                            listener.close();
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
                         }(std::move(*listener)),
                         []() -> zero::async::coroutine::Task<void> {
                             auto path = std::filesystem::temp_directory_path() / "asyncio-file";
@@ -291,7 +287,6 @@ TEST_CASE("http requests", "[request]") {
                             REQUIRE(buffer);
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
 
@@ -318,15 +313,15 @@ TEST_CASE("http requests", "[request]") {
                             std::vector<std::byte> data(*length);
                             co_await buffer->readExactly(data);
 
-                            buffer->writeLine("HTTP/1.1 200 OK");
-                            buffer->writeLine("Content-Length: 11");
-                            buffer->writeLine("");
-                            buffer->writeLine("hello world");
+                            std::string response = "HTTP/1.1 200 OK\r\n"
+                                                   "Content-Length: 11\r\n\r\n"
+                                                   "hello world";
 
-                            co_await buffer->drain();
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{response}));
+                            REQUIRE(result);
 
-                            buffer->close();
-                            listener.close();
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
                         }(std::move(*listener)),
                         []() -> zero::async::coroutine::Task<void> {
                             auto path = std::filesystem::temp_directory_path() / "asyncio-file";
@@ -372,7 +367,6 @@ TEST_CASE("http requests", "[request]") {
                             REQUIRE(buffer);
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
 
@@ -407,15 +401,15 @@ TEST_CASE("http requests", "[request]") {
                             REQUIRE(j["name"] == "jack");
                             REQUIRE(j["age"] == 12);
 
-                            buffer->writeLine("HTTP/1.1 200 OK");
-                            buffer->writeLine("Content-Length: 11");
-                            buffer->writeLine("");
-                            buffer->writeLine("hello world");
+                            std::string response = "HTTP/1.1 200 OK\r\n"
+                                                   "Content-Length: 11\r\n\r\n"
+                                                   "hello world";
 
-                            co_await buffer->drain();
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{response}));
+                            REQUIRE(result);
 
-                            buffer->close();
-                            listener.close();
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
                         }(std::move(*listener)),
                         []() -> zero::async::coroutine::Task<void> {
                             auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
@@ -453,7 +447,6 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(buffer);
 
                         auto line = co_await buffer->readLine();
-
                         REQUIRE(line);
                         REQUIRE(*line == "GET /object?id=0 HTTP/1.1");
 
@@ -465,15 +458,15 @@ TEST_CASE("http requests", "[request]") {
                                 break;
                         }
 
-                        buffer->writeLine("HTTP/1.1 200 OK");
-                        buffer->writeLine("Content-Length: 11");
-                        buffer->writeLine("");
-                        buffer->writeLine("hello world");
+                        std::string response = "HTTP/1.1 200 OK\r\n"
+                                               "Content-Length: 11\r\n\r\n"
+                                               "hello world";
 
-                        co_await buffer->drain();
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{response}));
+                        REQUIRE(result);
 
-                        buffer->close();
-                        listener.close();
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");

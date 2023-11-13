@@ -29,7 +29,6 @@ TEST_CASE("datagram network connection", "[dgram]") {
                         REQUIRE(data[1] == std::byte{2});
 
                         co_await server.writeTo({data, n}, from);
-                        server.close();
                     }(std::move(*server)),
                     [](auto client) -> zero::async::coroutine::Task<void> {
                         auto message = {std::byte{1}, std::byte{2}};
@@ -45,8 +44,6 @@ TEST_CASE("datagram network connection", "[dgram]") {
                         REQUIRE(from.index() == 0);
                         REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
                         REQUIRE(std::equal(data, data + n, message.begin()));
-
-                        client.close();
                     }(std::move(*client))
             );
         });
@@ -72,27 +69,26 @@ TEST_CASE("datagram network connection", "[dgram]") {
                         REQUIRE(data[1] == std::byte{2});
 
                         co_await server.writeTo({data, n}, from);
-                        server.close();
                     }(std::move(*server)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto client = std::move(co_await asyncio::net::dgram::connect("127.0.0.1", 30000));
                         REQUIRE(client);
 
                         auto message = {std::byte{1}, std::byte{2}};
-                        co_await client->write(message);
+                        auto result = co_await client->write(message);
+                        REQUIRE(result);
+                        REQUIRE(*result == message.size());
 
                         std::byte data[1024];
-                        auto result = co_await client->readFrom(data);
-                        REQUIRE(result);
+                        auto res = co_await client->readFrom(data);
+                        REQUIRE(res);
 
-                        auto &[n, from] = *result;
+                        auto &[n, from] = *res;
 
                         REQUIRE(n);
                         REQUIRE(from.index() == 0);
                         REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
                         REQUIRE(std::equal(data, data + n, message.begin()));
-
-                        client->close();
                     }()
             );
         });
@@ -110,8 +106,6 @@ TEST_CASE("datagram network connection", "[dgram]") {
 
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
-
-            socket->close();
         });
     }
 
@@ -153,8 +147,6 @@ TEST_CASE("datagram network connection", "[dgram]") {
             REQUIRE(task.result().error() == std::errc::operation_canceled);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
-
-            socket->close();
         });
     }
 }

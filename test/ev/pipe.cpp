@@ -10,29 +10,34 @@ TEST_CASE("buffer pipe", "[pipe]") {
 
             co_await zero::async::coroutine::allSettled(
                     [](auto buffer) -> zero::async::coroutine::Task<void> {
-                        buffer.writeLine("hello world");
-                        co_await buffer.drain();
-
-                        auto result = co_await buffer.readLine();
-
+                        std::string message = "hello world\r\n";
+                        auto result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
                         REQUIRE(result);
-                        REQUIRE(*result == "world hello");
 
-                        buffer.close();
+                        result = co_await buffer.flush();
+                        REQUIRE(result);
+
+                        auto line = co_await buffer.readLine();
+
+                        REQUIRE(line);
+                        REQUIRE(*line == "world hello");
                     }(std::move(buffers->at(0))),
                     [](auto buffer) -> zero::async::coroutine::Task<void> {
-                        auto result = co_await buffer.readLine();
+                        auto line = co_await buffer.readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == "hello world");
 
+                        std::string message = "world hello\r\n";
+                        auto result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
                         REQUIRE(result);
-                        REQUIRE(*result == "hello world");
 
-                        buffer.writeLine("world hello");
+                        result = co_await buffer.flush();
+                        REQUIRE(result);
 
-                        co_await buffer.drain();
-                        result = co_await buffer.readLine();
+                        line = co_await buffer.readLine();
 
-                        REQUIRE(!result);
-                        REQUIRE(result.error() == asyncio::Error::IO_EOF);
+                        REQUIRE(!line);
+                        REQUIRE(line.error() == asyncio::Error::IO_EOF);
                     }(std::move(buffers->at(1)))
             );
         });
@@ -45,29 +50,35 @@ TEST_CASE("buffer pipe", "[pipe]") {
 
             co_await zero::async::coroutine::allSettled(
                     [](auto buffer) -> zero::async::coroutine::Task<void> {
-                        buffer.writeLine("hello world");
-                        co_await buffer.drain();
-
-                        auto result = co_await buffer.readLine();
-
+                        std::string message = "hello world\r\n";
+                        auto result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
                         REQUIRE(result);
-                        REQUIRE(*result == "world hello");
+
+                        result = co_await buffer.flush();
+                        REQUIRE(result);
+
+                        auto line = co_await buffer.readLine();
+
+                        REQUIRE(line);
+                        REQUIRE(*line == "world hello");
 
                         buffer.throws(make_error_code(std::errc::interrupted));
                     }(std::move(buffers->at(0))),
                     [](auto buffer) -> zero::async::coroutine::Task<void> {
-                        auto result = co_await buffer.readLine();
+                        auto line = co_await buffer.readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == "hello world");
 
+                        std::string message = "world hello\r\n";
+                        auto result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
                         REQUIRE(result);
-                        REQUIRE(*result == "hello world");
 
-                        buffer.writeLine("world hello");
+                        result = co_await buffer.flush();
+                        REQUIRE(result);
 
-                        co_await buffer.drain();
-                        result = co_await buffer.readLine();
-
-                        REQUIRE(!result);
-                        REQUIRE(result.error() == std::errc::interrupted);
+                        line = co_await buffer.readLine();
+                        REQUIRE(!line);
+                        REQUIRE(line.error() == std::errc::interrupted);
                     }(std::move(buffers->at(1)))
             );
         });

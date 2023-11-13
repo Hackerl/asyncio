@@ -17,18 +17,24 @@ size_t onWrite(char *buffer, size_t size, size_t n, void *userdata) {
         connection->promise.resolve();
     }
 
-    if (connection->buffers[0].pending() >= 1024 * 1024) {
-        connection->buffers[0].drain().promise().then([=]() {
+    size_t length = size * n;
+    auto &pairedBuffer = connection->buffers[0];
+    assert(length <= pairedBuffer.capacity());
+
+    if (pairedBuffer.capacity() - pairedBuffer.pending() < length) {
+        pairedBuffer.flush().promise().then([=]() {
             curl_easy_pause(connection->easy.get(), CURLPAUSE_CONT);
         });
 
         return CURL_WRITEFUNC_PAUSE;
     }
 
-    if (!connection->buffers[0].submit({(const std::byte *) buffer, size * n}))
+    auto result = pairedBuffer.submit({(const std::byte *) buffer, length});
+
+    if (!result || *result != length)
         return CURL_WRITEFUNC_ERROR;
 
-    return size * n;
+    return length;
 }
 
 const char *asyncio::http::CURLCategory::name() const noexcept {
@@ -127,7 +133,7 @@ std::optional<std::string> asyncio::http::Response::header(const std::string &na
 }
 
 zero::async::coroutine::Task<std::string, std::error_code> asyncio::http::Response::string() {
-    auto data = CO_TRY(co_await readAll(std::move(mConnection->buffers[1])));
+    auto data = CO_TRY(co_await mConnection->buffers[1].readAll());
     co_return std::string{(const char *) data->data(), data->size()};
 }
 
@@ -172,11 +178,11 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::Response::out
     co_return result;
 }
 
-asyncio::ev::IBufferReader &asyncio::http::Response::operator*() {
+asyncio::IBufReader &asyncio::http::Response::operator*() {
     return mConnection->buffers[1];
 }
 
-asyncio::ev::IBufferReader *asyncio::http::Response::operator->() {
+asyncio::IBufReader *asyncio::http::Response::operator->() {
     return &mConnection->buffers[1];
 }
 
@@ -191,9 +197,8 @@ asyncio::http::Requests::Requests(CURLM *multi, ev::Timer timer, Options options
             mMulti.get(),
             CURLMOPT_SOCKETFUNCTION,
             static_cast<int (*)(CURL *, curl_socket_t, int, void *, void *)>(
-                    [](CURL *easy, curl_socket_t s, int what,
-                       void *userdata, void *data) {
-                        static_cast<Requests *>(userdata)->onCURLEvent(easy, s, what, data);
+                    [](CURL *, curl_socket_t s, int what, void *userdata, void *data) {
+                        static_cast<Requests *>(userdata)->onCURLEvent(s, what, data);
                         return 0;
                     }
             )
@@ -232,7 +237,7 @@ void asyncio::http::Requests::onCURLTimer(long timeout) {
     });
 }
 
-void asyncio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what, void *data) {
+void asyncio::http::Requests::onCURLEvent(curl_socket_t s, int what, void *data) {
     struct Context {
         event e;
         std::shared_ptr<Requests> requests;
@@ -259,7 +264,7 @@ void asyncio::http::Requests::onCURLEvent(CURL *easy, curl_socket_t s, int what,
     event_assign(
             &context->e,
             getEventLoop()->base(),
-            s,
+            (evutil_socket_t) s,
             (short) ((((what & CURL_POLL_IN) ? ev::READ : 0) | ((what & CURL_POLL_OUT) ? ev::WRITE : 0)) | EV_PERSIST),
             [](evutil_socket_t fd, short what, void *arg) {
                 auto context = static_cast<Context *>(arg);

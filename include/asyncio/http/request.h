@@ -81,8 +81,8 @@ namespace asyncio::http {
         }
 
     public:
-        ev::IBufferReader &operator*();
-        ev::IBufferReader *operator->();
+        IBufReader &operator*();
+        IBufReader *operator->();
 
     private:
         std::shared_ptr<Requests> mRequests;
@@ -105,7 +105,7 @@ namespace asyncio::http {
 
     private:
         void onCURLTimer(long timeout);
-        void onCURLEvent(CURL *easy, curl_socket_t s, int what, void *data);
+        void onCURLEvent(curl_socket_t s, int what, void *data);
 
     private:
         void recycle();

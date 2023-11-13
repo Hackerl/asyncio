@@ -101,7 +101,7 @@ TEST_CASE("network components", "[network]") {
         REQUIRE(address != asyncio::net::IPv4Address{});
         REQUIRE(address != asyncio::net::IPv6Address{});
 
-        REQUIRE(asyncio::net::stringify(address) == "/tmp/test.sock");
+        REQUIRE(fmt::to_string(address) == "variant(/tmp/test.sock)");
 
         auto socketAddress = asyncio::net::socketAddressFrom(address);
         REQUIRE(socketAddress);

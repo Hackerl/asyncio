@@ -1,8 +1,8 @@
 #include <asyncio/ev/pipe.h>
 #include <asyncio/event_loop.h>
 
-asyncio::ev::PairedBuffer::PairedBuffer(bufferevent *bev, std::shared_ptr<std::error_code> ec)
-        : Buffer(bev), mErrorCode(std::move(ec)) {
+asyncio::ev::PairedBuffer::PairedBuffer(bufferevent *bev, size_t capacity, std::shared_ptr<std::error_code> ec)
+        : Buffer(bev, capacity), mErrorCode(std::move(ec)) {
 
 }
 
@@ -13,7 +13,7 @@ asyncio::ev::PairedBuffer::~PairedBuffer() {
     bufferevent_flush(mBev.get(), EV_WRITE, BEV_FINISHED);
 }
 
-tl::expected<void, std::error_code> asyncio::ev::PairedBuffer::close() {
+zero::async::coroutine::Task<void, std::error_code> asyncio::ev::PairedBuffer::close() {
     bufferevent_flush(mBev.get(), EV_WRITE, BEV_FINISHED);
     return Buffer::close();
 }
@@ -23,7 +23,7 @@ tl::expected<void, std::error_code> asyncio::ev::PairedBuffer::throws(const std:
         return tl::unexpected(Error::RESOURCE_DESTROYED);
 
     if (mClosed)
-        return tl::unexpected(mLastError);
+        return tl::unexpected(Error::IO_EOF);
 
     *mErrorCode = ec;
 
@@ -40,7 +40,7 @@ std::error_code asyncio::ev::PairedBuffer::getError() {
     return *mErrorCode;
 }
 
-tl::expected<std::array<asyncio::ev::PairedBuffer, 2>, std::error_code> asyncio::ev::pipe() {
+tl::expected<std::array<asyncio::ev::PairedBuffer, 2>, std::error_code> asyncio::ev::pipe(size_t capacity) {
     bufferevent *pair[2];
     auto base = getEventLoop()->base();
 
@@ -57,5 +57,5 @@ tl::expected<std::array<asyncio::ev::PairedBuffer, 2>, std::error_code> asyncio:
 
     std::shared_ptr<std::error_code> ec = std::make_shared<std::error_code>();
 
-    return std::array{PairedBuffer(pair[0], ec), PairedBuffer(pair[1], ec)};
+    return std::array{PairedBuffer(pair[0], capacity, ec), PairedBuffer(pair[1], capacity, ec)};
 }

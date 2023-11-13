@@ -5,7 +5,7 @@
 #include <asyncio/ev/event.h>
 
 namespace asyncio::net::dgram {
-    class Socket : public ISocket {
+    class Socket : public ISocket, public Reader, public Writer{
     public:
         Socket(FileDescriptor fd, std::array<ev::Event, 2> events);
         Socket(Socket &&rhs) noexcept;
@@ -13,8 +13,8 @@ namespace asyncio::net::dgram {
 
     public:
         zero::async::coroutine::Task<size_t, std::error_code> read(std::span<std::byte> data) override;
-        zero::async::coroutine::Task<void, std::error_code> write(std::span<const std::byte> data) override;
-        tl::expected<void, std::error_code> close() override;
+        zero::async::coroutine::Task<size_t, std::error_code> write(std::span<const std::byte> data) override;
+        zero::async::coroutine::Task<void, std::error_code> close() override;
 
     public:
         zero::async::coroutine::Task<std::pair<size_t, Address>, std::error_code>
@@ -24,17 +24,19 @@ namespace asyncio::net::dgram {
         writeTo(std::span<const std::byte> data, Address address) override;
 
     public:
-        void setTimeout(std::chrono::milliseconds timeout) override;
-        void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
-
-    public:
         tl::expected<Address, std::error_code> localAddress() override;
         tl::expected<Address, std::error_code> remoteAddress() override;
 
     public:
-        FileDescriptor fd() override;
         tl::expected<void, std::error_code> bind(const Address &address) override;
         zero::async::coroutine::Task<void, std::error_code> connect(Address address) override;
+
+    public:
+        FileDescriptor fd() override;
+
+    public:
+        void setTimeout(std::chrono::milliseconds timeout) override;
+        void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     private:
         bool mClosed;

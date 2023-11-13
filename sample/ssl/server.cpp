@@ -19,11 +19,10 @@ zero::async::coroutine::Task<void> handle(asyncio::net::stream::Buffer buffer) {
 
         LOG_INFO("receive message[{}]", *line);
 
-        buffer.writeLine(*line);
-        auto res = co_await buffer.drain();
+        auto result = co_await buffer.writeAll(std::as_bytes(std::span{*line}));
 
-        if (!res) {
-            LOG_ERROR("stream buffer drain failed[{}]", res.error());
+        if (!result) {
+            LOG_ERROR("stream buffer drain failed[{}]", result.error());
             break;
         }
     }

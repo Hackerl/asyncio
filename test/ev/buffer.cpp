@@ -25,15 +25,16 @@ TEST_CASE("async stream buffer", "[buffer]") {
                         REQUIRE(buffer);
                         REQUIRE(buffer->fd() > 0);
 
-                        buffer->writeLine("hello world");
-                        co_await buffer->drain();
-
-                        auto result = co_await buffer->readLine();
-
+                        std::string message = "hello world\r\n";
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
                         REQUIRE(result);
-                        REQUIRE(*result == "world hello");
 
-                        buffer->close();
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
+
+                        auto line = co_await buffer->readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == "world hello");
                     }(fds[0]),
                     [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
                         auto buffer = asyncio::ev::makeBuffer(fd);
@@ -41,15 +42,16 @@ TEST_CASE("async stream buffer", "[buffer]") {
                         REQUIRE(buffer);
                         REQUIRE(buffer->fd() > 0);
 
-                        auto result = co_await buffer->readLine();
+                        auto line = co_await buffer->readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == "hello world");
 
+                        std::string message = "world hello\r\n";
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
                         REQUIRE(result);
-                        REQUIRE(*result == "hello world");
 
-                        buffer->writeLine("world hello");
-
-                        co_await buffer->drain();
-                        co_await buffer->waitClosed();
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
                     }(fds[1])
             );
         });
@@ -83,11 +85,10 @@ TEST_CASE("async stream buffer", "[buffer]") {
 
             buffer->setTimeout(0ms, 500ms);
 
-            std::unique_ptr<std::byte[]> data = std::make_unique<std::byte[]>(1024 * 1024);
-
+            auto data = std::make_unique<std::byte[]>(1024 * 1024);
             buffer->submit({data.get(), 1024 * 1024});
-            auto result = co_await buffer->drain();
 
+            auto result = co_await buffer->flush();
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         });

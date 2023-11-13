@@ -77,11 +77,11 @@ int main(int argc, char *argv[]) {
         }
 
         while (true) {
-            buffer->writeLine("hello world");
-            auto res = co_await buffer->drain();
+            std::string message = "hello world\r\n";
+            auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
 
-            if (!res) {
-                LOG_ERROR("stream buffer drain failed[{}]", res.error());
+            if (!result) {
+                LOG_ERROR("stream buffer drain failed[{}]", result.error());
                 break;
             }
 

@@ -57,17 +57,16 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install LLVM
         run: |
-          brew install llvm@16
-          echo "LLVM16=$(brew --prefix llvm@16)" >> $GITHUB_ENV
+          brew install llvm@17
+          echo "LLVM_HOME=$(brew --prefix llvm@17)" >> $GITHUB_ENV
       - name: Build
         run: |
           mkdir -p build
           cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
           cmake --build build -j$(sysctl -n hw.physicalcpu)
         env:
-          CC: ${{ env.LLVM16 }}/bin/clang
-          CXX: ${{ env.LLVM16 }}/bin/clang++
-          CPPFLAGS: -I${{ env.LLVM16 }}/include
-          LDFLAGS: -L${{ env.LLVM16 }}/lib -L${{ env.LLVM16 }}/lib/c++ -Wl,-rpath,${{ env.LLVM16 }}/lib/c++
+          CC: ${{ env.LLVM_HOME }}/bin/clang
+          CXX: ${{ env.LLVM_HOME }}/bin/clang++
+          LDFLAGS: -L${{ env.LLVM_HOME }}/lib -L${{ env.LLVM_HOME }}/lib/c++ -Wl,-rpath,${{ env.LLVM_HOME }}/lib/c++
       - name: Test
         run: ctest --output-on-failure --test-dir build

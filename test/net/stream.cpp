@@ -23,16 +23,16 @@ TEST_CASE("stream network connection", "[stream]") {
                         REQUIRE(remoteAddress);
                         REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
-                        buffer->writeLine("hello world");
-                        co_await buffer->drain();
+                        std::string message = "hello world\r\n";
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                        REQUIRE(result);
+
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
 
                         auto line = co_await buffer->readLine();
-
                         REQUIRE(line);
                         REQUIRE(*line == "world hello");
-
-                        buffer->close();
-                        listener.close();
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto buffer = std::move(co_await asyncio::net::stream::connect("127.0.0.1", 30000));
@@ -47,13 +47,15 @@ TEST_CASE("stream network connection", "[stream]") {
                         REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
 
                         auto line = co_await buffer->readLine();
-
                         REQUIRE(line);
                         REQUIRE(*line == "hello world");
 
-                        buffer->writeLine("world hello");
-                        co_await buffer->drain();
-                        co_await buffer->waitClosed();
+                        std::string message = "world hello\r\n";
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                        REQUIRE(result);
+
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
                     }()
             );
         });
@@ -74,18 +76,18 @@ TEST_CASE("stream network connection", "[stream]") {
 
                             auto localAddress = buffer->localAddress();
                             REQUIRE(localAddress);
-                            REQUIRE(asyncio::net::stringify(*localAddress).ends_with("asyncio-test.sock"));
+                            REQUIRE(fmt::to_string(*localAddress).find("asyncio-test.sock") != std::string::npos);
 
-                            buffer->writeLine("hello world");
-                            co_await buffer->drain();
+                            std::string message = "hello world\r\n";
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                            REQUIRE(result);
+
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "world hello");
-
-                            buffer->close();
-                            listener.close();
                         }(std::move(*listener)),
                         [](auto path) -> zero::async::coroutine::Task<void> {
                             auto buffer = std::move(co_await asyncio::net::stream::connect(path.string()));
@@ -93,16 +95,18 @@ TEST_CASE("stream network connection", "[stream]") {
 
                             auto remoteAddress = buffer->remoteAddress();
                             REQUIRE(remoteAddress);
-                            REQUIRE(asyncio::net::stringify(*remoteAddress).ends_with("asyncio-test.sock"));
+                            REQUIRE(fmt::to_string(*remoteAddress).find("asyncio-test.sock") != std::string::npos);
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "hello world");
 
-                            buffer->writeLine("world hello");
-                            co_await buffer->drain();
-                            co_await buffer->waitClosed();
+                            std::string message = "world hello\r\n";
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                            REQUIRE(result);
+
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
                         }(path)
                 );
 
@@ -123,18 +127,18 @@ TEST_CASE("stream network connection", "[stream]") {
 
                             auto localAddress = buffer->localAddress();
                             REQUIRE(localAddress);
-                            REQUIRE(asyncio::net::stringify(*localAddress) == "@asyncio-test.sock");
+                            REQUIRE(fmt::to_string(*localAddress) == "variant(@asyncio-test.sock)");
 
-                            buffer->writeLine("hello world");
-                            co_await buffer->drain();
+                            std::string message = "hello world\r\n";
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                            REQUIRE(result);
+
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "world hello");
-
-                            buffer->close();
-                            listener.close();
                         }(std::move(*listener)),
                         []() -> zero::async::coroutine::Task<void> {
                             auto buffer = std::move(co_await asyncio::net::stream::connect("@asyncio-test.sock"));
@@ -142,16 +146,18 @@ TEST_CASE("stream network connection", "[stream]") {
 
                             auto remoteAddress = buffer->remoteAddress();
                             REQUIRE(remoteAddress);
-                            REQUIRE(asyncio::net::stringify(*remoteAddress) == "@asyncio-test.sock");
+                            REQUIRE(fmt::to_string(*remoteAddress) == "variant(@asyncio-test.sock)");
 
                             auto line = co_await buffer->readLine();
-
                             REQUIRE(line);
                             REQUIRE(*line == "hello world");
 
-                            buffer->writeLine("world hello");
-                            co_await buffer->drain();
-                            co_await buffer->waitClosed();
+                            std::string message = "world hello\r\n";
+                            auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                            REQUIRE(result);
+
+                            result = co_await buffer->flush();
+                            REQUIRE(result);
                         }()
                 );
             });

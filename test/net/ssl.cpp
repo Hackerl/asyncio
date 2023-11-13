@@ -154,16 +154,16 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         REQUIRE(remoteAddress);
                         REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
-                        buffer->writeLine("hello world");
-                        co_await buffer->drain();
+                        std::string message = "hello world\r\n";
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                        REQUIRE(result);
+
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
 
                         auto line = co_await buffer->readLine();
-
                         REQUIRE(line);
                         REQUIRE(*line == "world hello");
-
-                        buffer->close();
-                        listener.close();
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto context = asyncio::net::ssl::newContext(
@@ -191,13 +191,15 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
 
                         auto line = co_await buffer->readLine();
-
                         REQUIRE(line);
                         REQUIRE(*line == "hello world");
 
-                        buffer->writeLine("world hello");
-                        co_await buffer->drain();
-                        co_await buffer->waitClosed();
+                        std::string message = "world hello\r\n";
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                        REQUIRE(result);
+
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
                     }()
             );
         });
@@ -232,16 +234,16 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         REQUIRE(remoteAddress);
                         REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
-                        buffer->writeLine("hello world");
-                        co_await buffer->drain();
+                        std::string message = "hello world\r\n";
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                        REQUIRE(result);
+
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
 
                         auto line = co_await buffer->readLine();
-
                         REQUIRE(line);
                         REQUIRE(*line == "world hello");
-
-                        buffer->close();
-                        listener.close();
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto context = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
@@ -263,13 +265,15 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                         REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
 
                         auto line = co_await buffer->readLine();
-
                         REQUIRE(line);
                         REQUIRE(*line == "hello world");
 
-                        buffer->writeLine("world hello");
-                        co_await buffer->drain();
-                        co_await buffer->waitClosed();
+                        std::string message = "world hello\r\n";
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                        REQUIRE(result);
+
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
                     }()
             );
         });

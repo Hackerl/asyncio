@@ -9,12 +9,12 @@
 #include <sys/un.h>
 #endif
 
-asyncio::net::stream::Buffer::Buffer(bufferevent *bev) : ev::Buffer(bev) {
+asyncio::net::stream::Buffer::Buffer(bufferevent *bev, size_t capacity) : ev::Buffer(bev, capacity) {
 
 }
 
-asyncio::net::stream::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev)
-        : ev::Buffer(std::move(bev)) {
+asyncio::net::stream::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, size_t capacity)
+        : ev::Buffer(std::move(bev), capacity) {
 
 }
 
@@ -37,13 +37,13 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffe
 }
 
 tl::expected<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::makeBuffer(FileDescriptor fd, bool own) {
+asyncio::net::stream::makeBuffer(FileDescriptor fd, size_t capacity, bool own) {
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), fd, own ? BEV_OPT_CLOSE_ON_FREE : 0);
 
     if (!bev)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    return Buffer{bev};
+    return Buffer{bev, capacity};
 }
 
 asyncio::net::stream::Acceptor::Acceptor(evconnlistener *listener) : mListener(listener, evconnlistener_free) {
@@ -113,7 +113,7 @@ asyncio::net::stream::Listener::Listener(evconnlistener *listener) : Acceptor(li
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::Listener::accept() {
     auto result = CO_TRY(co_await fd());
-    co_return makeBuffer(*result, true);
+    co_return makeBuffer(*result);
 }
 
 tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const Address &address) {
@@ -252,7 +252,7 @@ asyncio::net::stream::connect(std::string host, unsigned short port) {
         co_return tl::unexpected(result.error());
     }
 
-    co_return Buffer{bev};
+    co_return Buffer{bev, DEFAULT_BUFFER_CAPACITY};
 }
 
 #if __unix__ || __APPLE__
@@ -351,6 +351,6 @@ asyncio::net::stream::connect(std::string path) {
         co_return tl::unexpected(result.error());
     }
 
-    co_return Buffer{bev};
+    co_return Buffer{bev, DEFAULT_BUFFER_CAPACITY};
 }
 #endif

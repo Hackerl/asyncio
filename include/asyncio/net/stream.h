@@ -6,21 +6,22 @@
 #include <asyncio/ev/buffer.h>
 
 namespace asyncio::net::stream {
-    class IBuffer : public virtual IEndpoint, public virtual ev::IBuffer {
+    class IBuffer : public virtual IEndpoint, public virtual asyncio::IBuffer {
 
     };
 
     class Buffer : public ev::Buffer, public IBuffer {
     public:
-        explicit Buffer(bufferevent *bev);
-        explicit Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev);
+        Buffer(bufferevent *bev, size_t capacity);
+        Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, size_t capacity);
 
     public:
         tl::expected<Address, std::error_code> localAddress() override;
         tl::expected<Address, std::error_code> remoteAddress() override;
     };
 
-    tl::expected<Buffer, std::error_code> makeBuffer(FileDescriptor fd, bool own = true);
+    tl::expected<Buffer, std::error_code>
+    makeBuffer(FileDescriptor fd, size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
 
     class Acceptor {
     public:

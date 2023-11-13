@@ -224,23 +224,23 @@ asyncio::net::ssl::newContext(const Config &config) {
     return ctx;
 }
 
-asyncio::net::ssl::stream::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev)
-        : net::stream::Buffer(std::move(bev)) {
+asyncio::net::ssl::stream::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, size_t capacity)
+        : net::stream::Buffer(std::move(bev), capacity) {
 
 }
 
-tl::expected<void, std::error_code> asyncio::net::ssl::stream::Buffer::close() {
+zero::async::coroutine::Task<void, std::error_code> asyncio::net::ssl::stream::Buffer::close() {
     if (!mBev)
-        return tl::unexpected(asyncio::Error::RESOURCE_DESTROYED);
+        co_return tl::unexpected(asyncio::Error::RESOURCE_DESTROYED);
 
     if (mClosed)
-        return tl::unexpected(mLastError);
+        co_return tl::unexpected(asyncio::Error::IO_EOF);
 
     SSL *ctx = bufferevent_openssl_get_ssl(mBev.get());
     SSL_set_shutdown(ctx, SSL_RECEIVED_SHUTDOWN);
     SSL_shutdown(ctx);
 
-    return net::stream::Buffer::close();
+    co_return co_await net::stream::Buffer::close();
 }
 
 std::error_code asyncio::net::ssl::stream::Buffer::getError() {
@@ -257,6 +257,7 @@ asyncio::net::ssl::stream::makeBuffer(
         FileDescriptor fd,
         const std::shared_ptr<Context> &context,
         State state,
+        size_t capacity,
         bool own
 ) {
     bufferevent *bev = bufferevent_openssl_socket_new(
@@ -279,7 +280,8 @@ asyncio::net::ssl::stream::makeBuffer(
                         SSL_shutdown(ctx);
                         bufferevent_free(bev);
                     }
-            }
+            },
+            capacity
     };
 }
 
@@ -291,7 +293,7 @@ asyncio::net::ssl::stream::Listener::Listener(std::shared_ptr<Context> context, 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::Listener::accept() {
     auto result = CO_TRY(co_await fd());
-    co_return makeBuffer(*result, mContext, State::ACCEPTING, true);
+    co_return makeBuffer(*result, mContext, State::ACCEPTING);
 }
 
 tl::expected<asyncio::net::ssl::stream::Listener, std::error_code>
@@ -485,6 +487,7 @@ asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, std::string
                         SSL_shutdown(ctx);
                         bufferevent_free(bev);
                     }
-            }
+            },
+            DEFAULT_BUFFER_CAPACITY
     };
 }
