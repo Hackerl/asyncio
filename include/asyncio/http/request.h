@@ -94,6 +94,7 @@ namespace asyncio::http {
         std::map<std::string, std::string> headers;
         std::map<std::string, std::string> cookies;
         std::optional<std::chrono::seconds> timeout;
+        std::optional<std::chrono::seconds> connectTimeout;
         std::optional<std::string> userAgent;
     };
 

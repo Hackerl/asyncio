@@ -9,6 +9,9 @@
 
 using namespace std::chrono_literals;
 
+constexpr auto DEFAULT_CONNECT_TIMEOUT = 30s;
+constexpr auto DEFAULT_TRANSFER_TIMEOUT = 1h;
+
 size_t onWrite(char *buffer, size_t size, size_t n, void *userdata) {
     auto connection = static_cast<asyncio::http::Connection *>(userdata);
 
@@ -354,9 +357,20 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     curl_easy_setopt(connection->easy.get(), CURLOPT_PRIVATE, connection.get());
     curl_easy_setopt(connection->easy.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(connection->easy.get(), CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
-    curl_easy_setopt(connection->easy.get(), CURLOPT_CONNECTTIMEOUT, (long) opt.timeout.value_or(30s).count());
     curl_easy_setopt(connection->easy.get(), CURLOPT_USERAGENT, opt.userAgent.value_or("asyncio requests").c_str());
     curl_easy_setopt(connection->easy.get(), CURLOPT_ACCEPT_ENCODING, "");
+
+    curl_easy_setopt(
+            connection->easy.get(),
+            CURLOPT_CONNECTTIMEOUT,
+            (long) opt.connectTimeout.value_or(DEFAULT_CONNECT_TIMEOUT).count()
+    );
+
+    curl_easy_setopt(
+            connection->easy.get(),
+            CURLOPT_TIMEOUT,
+            (long) opt.timeout.value_or(DEFAULT_TRANSFER_TIMEOUT).count()
+    );
 
 #ifdef ASYNCIO_EMBED_CA_CERT
     curl_easy_setopt(connection->easy.get(), CURLOPT_CAINFO, nullptr);
