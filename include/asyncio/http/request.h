@@ -37,6 +37,12 @@ namespace asyncio::http {
     std::error_code make_error_code(CURLMError e);
 
     struct Connection {
+        enum Status {
+            NOT_STARTED,
+            PAUSED,
+            TRANSFERRING
+        };
+
         ~Connection() {
             for (const auto &defer: defers)
                 defer();
@@ -46,7 +52,7 @@ namespace asyncio::http {
         std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy;
         zero::async::promise::Promise<void, std::error_code> promise;
         std::list<std::function<void(void)>> defers;
-        bool transferring;
+        Status status;
     };
 
     class Requests;

@@ -15,29 +15,26 @@ constexpr auto DEFAULT_TRANSFER_TIMEOUT = 1h;
 size_t onWrite(char *buffer, size_t size, size_t n, void *userdata) {
     auto connection = static_cast<asyncio::http::Connection *>(userdata);
 
-    if (!connection->transferring) {
-        connection->transferring = true;
+    if (connection->status == asyncio::http::Connection::NOT_STARTED) {
+        connection->status = asyncio::http::Connection::TRANSFERRING;
         connection->promise.resolve();
+    } else if (connection->status == asyncio::http::Connection::PAUSED) {
+        connection->status = asyncio::http::Connection::TRANSFERRING;
+        return size * n;
     }
 
-    size_t length = size * n;
-    auto &pairedBuffer = connection->buffers[0];
-    assert(length <= pairedBuffer.capacity());
+    auto task = connection->buffers[0].writeAll({(const std::byte *) buffer, size * n});
 
-    if (pairedBuffer.capacity() - pairedBuffer.pending() < length) {
-        pairedBuffer.flush().promise().then([=]() {
+    if (!task.done()) {
+        connection->status = asyncio::http::Connection::PAUSED;
+        task.promise().then([=]() {
             curl_easy_pause(connection->easy.get(), CURLPAUSE_CONT);
         });
 
         return CURL_WRITEFUNC_PAUSE;
     }
 
-    auto result = pairedBuffer.submit({(const std::byte *) buffer, length});
-
-    if (!result || *result != length)
-        return CURL_WRITEFUNC_ERROR;
-
-    return length;
+    return size * n;
 }
 
 const char *asyncio::http::CURLCategory::name() const noexcept {
@@ -302,7 +299,7 @@ void asyncio::http::Requests::recycle() {
         curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &connection);
 
         if (msg->data.result != CURLE_OK) {
-            if (!connection->transferring)
+            if (connection->status == Connection::NOT_STARTED)
                 connection->promise.reject((CURLError) msg->data.result);
             else
                 connection->buffers[0].throws((CURLError) msg->data.result);
@@ -310,7 +307,7 @@ void asyncio::http::Requests::recycle() {
             continue;
         }
 
-        if (!connection->transferring)
+        if (connection->status == Connection::NOT_STARTED)
             connection->promise.resolve();
 
         connection->buffers[0].close();

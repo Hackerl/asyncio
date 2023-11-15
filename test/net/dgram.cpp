@@ -128,7 +128,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
                     }(*socket),
                     [](auto socket) -> zero::async::coroutine::Task<void> {
                         co_await asyncio::sleep(50ms);
-                        socket->close();
+                        co_await socket->close();
                     }(*socket)
             );
         });

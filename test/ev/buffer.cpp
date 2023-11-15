@@ -78,7 +78,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
 
     SECTION("write timeout") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto buffer = asyncio::ev::makeBuffer(fds[0]);
+            auto buffer = asyncio::ev::makeBuffer(fds[0], 1024);
 
             REQUIRE(buffer);
             REQUIRE(buffer->fd() > 0);
@@ -86,9 +86,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
             buffer->setTimeout(0ms, 500ms);
 
             auto data = std::make_unique<std::byte[]>(1024 * 1024);
-            buffer->submit({data.get(), 1024 * 1024});
-
-            auto result = co_await buffer->flush();
+            auto result = co_await buffer->writeAll({data.get(), 1024 * 1024});
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         });

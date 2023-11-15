@@ -15,7 +15,6 @@ namespace asyncio::ev {
 
     public:
         void resize(size_t capacity);
-        tl::expected<size_t, std::error_code> submit(std::span<const std::byte> data);
 
     public:
         zero::async::coroutine::Task<void, std::error_code> close() override;
