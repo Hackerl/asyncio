@@ -88,7 +88,7 @@ namespace asyncio::http {
 }
 
 template<>
-tl::expected<asyncio::http::URL, std::error_code> zero::fromCommandLine(const std::string &str);
+tl::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input);
 
 namespace std {
     template<>

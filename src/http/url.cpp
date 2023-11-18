@@ -244,6 +244,6 @@ asyncio::http::URL &asyncio::http::URL::append(const std::string &subPath) {
 }
 
 template<>
-tl::expected<asyncio::http::URL, std::error_code> zero::fromCommandLine(const std::string &str) {
-    return asyncio::http::URL::from(str);
+tl::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input) {
+    return asyncio::http::URL::from({input.begin(), input.end()});
 }
