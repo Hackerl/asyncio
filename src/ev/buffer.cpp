@@ -5,7 +5,6 @@
 
 constexpr auto READ_INDEX = 0;
 constexpr auto WRITE_INDEX = 1;
-constexpr auto DEFAULT_BUFFER_TIMEOUT = 120;
 
 asyncio::ev::Buffer::Buffer(bufferevent *bev, size_t capacity) : Buffer({bev, bufferevent_free}, capacity) {
 
@@ -30,9 +29,6 @@ asyncio::ev::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)
     bufferevent_enable(mBev.get(), EV_READ | EV_WRITE);
     bufferevent_setwatermark(mBev.get(), EV_READ, 0, mCapacity);
     bufferevent_setwatermark(mBev.get(), EV_WRITE, mCapacity, 0);
-
-    timeval tv = {.tv_sec = DEFAULT_BUFFER_TIMEOUT};
-    bufferevent_set_timeouts(mBev.get(), &tv, &tv);
 }
 
 asyncio::ev::Buffer::Buffer(asyncio::ev::Buffer &&rhs) noexcept
