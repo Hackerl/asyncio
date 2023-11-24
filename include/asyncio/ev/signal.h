@@ -2,7 +2,6 @@
 #define ASYNCIO_SIGNAL_H
 
 #include "event.h"
-#include <zero/interface.h>
 #include <zero/async/coroutine.h>
 
 namespace asyncio::ev {
@@ -10,10 +9,7 @@ namespace asyncio::ev {
     public:
         explicit Signal(event *e);
 
-    public:
-        int sig();
-
-    public:
+        [[nodiscard]] int sig() const;
         zero::async::coroutine::Task<void, std::error_code> on();
     };
 

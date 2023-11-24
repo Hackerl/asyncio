@@ -1,11 +1,9 @@
 #ifndef ASYNCIO_WORKER_H
 #define ASYNCIO_WORKER_H
 
-#include <mutex>
 #include <thread>
 #include <functional>
 #include <condition_variable>
-#include <zero/atomic/event.h>
 #include <zero/async/coroutine.h>
 
 namespace asyncio {
@@ -14,17 +12,17 @@ namespace asyncio {
         Worker();
         ~Worker();
 
+    private:
+        void work();
+
     public:
         template<typename F>
         void execute(F &&f) {
-            std::lock_guard<std::mutex> guard(mMutex);
+            std::lock_guard guard(mMutex);
 
             mTask = std::forward<F>(f);
             mCond.notify_one();
         }
-
-    private:
-        void work();
 
     private:
         std::mutex mMutex;

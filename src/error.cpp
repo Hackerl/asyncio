@@ -1,34 +1,34 @@
 #include <asyncio/error.h>
 
-const char *asyncio::Category::name() const noexcept {
+const char *asyncio::ErrorCategory::name() const noexcept {
     return "asyncio";
 }
 
-std::string asyncio::Category::message(int value) const {
+std::string asyncio::ErrorCategory::message(const int value) const {
     std::string msg;
 
     switch (value) {
-        case IO_EOF:
-            msg = "eof";
-            break;
+    case IO_EOF:
+        msg = "eof";
+        break;
 
-        case RESOURCE_DESTROYED:
-            msg = "resource destroyed";
-            break;
+    case RESOURCE_DESTROYED:
+        msg = "resource destroyed";
+        break;
 
-        default:
-            msg = "unknown";
-            break;
+    default:
+        msg = "unknown";
+        break;
     }
 
     return msg;
 }
 
-const std::error_category &asyncio::category() {
-    static Category instance;
+const std::error_category &asyncio::errorCategory() {
+    static ErrorCategory instance;
     return instance;
 }
 
-std::error_code asyncio::make_error_code(Error e) {
-    return {static_cast<int>(e), category()};
+std::error_code asyncio::make_error_code(const Error e) {
+    return {static_cast<int>(e), errorCategory()};
 }

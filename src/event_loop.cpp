@@ -3,44 +3,44 @@
 #include <event2/dns.h>
 #include <event2/thread.h>
 #include <zero/defer.h>
+#include <mutex>
 
 thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 
-asyncio::EventLoop::EventLoop(event_base *base, evdns_base *dnsBase, size_t maxWorkers)
-        : mMaxWorkers(maxWorkers), mBase(base, event_base_free),
-          mDnsBase(dnsBase, [](evdns_base *base) { evdns_base_free(base, 0); }) {
-
+asyncio::EventLoop::EventLoop(event_base *base, evdns_base *dnsBase, const std::size_t maxWorkers)
+    : mMaxWorkers(maxWorkers), mBase(base, event_base_free),
+      mDnsBase(dnsBase, [](evdns_base *b) { evdns_base_free(b, 0); }) {
 }
 
-event_base *asyncio::EventLoop::base() {
+event_base *asyncio::EventLoop::base() const {
     return mBase.get();
 }
 
-evdns_base *asyncio::EventLoop::dnsBase() {
+evdns_base *asyncio::EventLoop::dnsBase() const {
     return mDnsBase.get();
 }
 
-bool asyncio::EventLoop::addNameserver(const char *ip) {
+bool asyncio::EventLoop::addNameserver(const char *ip) const {
     return evdns_base_nameserver_ip_add(mDnsBase.get(), ip) == 0;
 }
 
-void asyncio::EventLoop::dispatch() {
+void asyncio::EventLoop::dispatch() const {
     event_base_dispatch(mBase.get());
 }
 
-void asyncio::EventLoop::loopBreak() {
+void asyncio::EventLoop::loopBreak() const {
     event_base_loopbreak(mBase.get());
 }
 
-void asyncio::EventLoop::loopExit(std::optional<std::chrono::milliseconds> ms) {
+void asyncio::EventLoop::loopExit(const std::optional<std::chrono::milliseconds> ms) const {
     if (!ms) {
         event_base_loopexit(mBase.get(), nullptr);
         return;
     }
 
-    timeval tv = {
-            (decltype(timeval::tv_sec)) (ms->count() / 1000),
-            (decltype(timeval::tv_usec)) ((ms->count() % 1000) * 1000)
+    const timeval tv = {
+        static_cast<decltype(timeval::tv_sec)>(ms->count() / 1000),
+        static_cast<decltype(timeval::tv_usec)>(ms->count() % 1000 * 1000)
     };
 
     event_base_loopexit(mBase.get(), &tv);
@@ -57,17 +57,17 @@ void asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
     threadEventLoop = eventLoop;
 }
 
-tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(size_t maxWorkers) {
+tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(const std::size_t maxWorkers) {
     static std::once_flag flag;
 
-    std::call_once(flag, []() {
+    std::call_once(flag, [] {
 #ifdef _WIN32
         evthread_use_windows_threads();
 #else
         evthread_use_pthreads();
 #endif
 
-        std::atexit([]() {
+        std::atexit([] {
             libevent_global_shutdown();
         });
     });
@@ -109,7 +109,7 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(size_
     return EventLoop{base, dnsBase, maxWorkers};
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(std::chrono::milliseconds ms) {
+zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
     auto timer = CO_TRY(ev::makeTimer());
     co_return co_await timer->after(ms);
 }

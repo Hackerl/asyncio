@@ -10,14 +10,15 @@ namespace asyncio {
     toThread(F f) {
         using T = std::invoke_result_t<F>;
 
-        auto eventLoop = getEventLoop();
+        const auto eventLoop = getEventLoop();
         zero::async::promise::Promise<void, std::error_code> promise;
 
         std::unique_ptr<Worker> worker;
 
         if (eventLoop->mWorkers.empty()) {
             worker = std::make_unique<Worker>();
-        } else {
+        }
+        else {
             worker = std::move(eventLoop->mWorkers.front());
             eventLoop->mWorkers.pop();
         }
@@ -44,14 +45,15 @@ namespace asyncio {
     toThread(F f, C cancel) {
         using T = std::invoke_result_t<F>;
 
-        auto eventLoop = getEventLoop();
+        const auto eventLoop = getEventLoop();
         zero::async::promise::Promise<void, std::error_code> promise;
 
         std::unique_ptr<Worker> worker;
 
         if (eventLoop->mWorkers.empty()) {
             worker = std::make_unique<Worker>();
-        } else {
+        }
+        else {
             worker = std::move(eventLoop->mWorkers.front());
             eventLoop->mWorkers.pop();
         }
@@ -66,10 +68,10 @@ namespace asyncio {
         });
 
         co_await zero::async::coroutine::Cancellable{
-                promise,
-                [handle = worker->mThread.native_handle(), cancel = std::move(cancel)]() {
-                    return cancel(handle);
-                }
+            promise,
+            [handle = worker->mThread.native_handle(), cancel = std::move(cancel)] {
+                return cancel(handle);
+            }
         };
 
         if (eventLoop->mWorkers.size() < eventLoop->mMaxWorkers)

@@ -1,12 +1,12 @@
 #include <asyncio/io.h>
+#include <asyncio/error.h>
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::Reader::readExactly(std::span<std::byte> data) {
+zero::async::coroutine::Task<void, std::error_code> asyncio::Reader::readExactly(const std::span<std::byte> data) {
     tl::expected<void, std::error_code> result;
-
-    size_t offset = 0;
+    std::size_t offset = 0;
 
     while (offset < data.size()) {
-        auto n = co_await read(data.subspan(offset));
+        const auto n = co_await read(data.subspan(offset));
 
         if (!n) {
             result = tl::unexpected(n.error());
@@ -24,10 +24,10 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::R
 
     while (true) {
         std::byte data[10240];
-        auto n = co_await read(data);
+        const auto n = co_await read(data);
 
         if (!n) {
-            if (n.error() == Error::IO_EOF)
+            if (n.error() == IO_EOF)
                 break;
 
             result = tl::unexpected(n.error());
@@ -40,10 +40,9 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::R
     co_return result;
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::Writer::writeAll(std::span<const std::byte> data) {
+zero::async::coroutine::Task<void, std::error_code> asyncio::Writer::writeAll(const std::span<const std::byte> data) {
     tl::expected<void, std::error_code> result;
-
-    size_t offset = 0;
+    std::size_t offset = 0;
 
     while (offset < data.size()) {
         if (CO_CANCELLED()) {
@@ -51,7 +50,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::Writer::writeAll(st
             break;
         }
 
-        auto n = co_await write(data.subspan(offset));
+        const auto n = co_await write(data.subspan(offset));
 
         if (!n) {
             result = tl::unexpected(n.error());
@@ -74,19 +73,17 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reade
         }
 
         std::byte data[10240];
-        auto n = co_await reader.read(data);
+        const auto n = co_await reader.read(data);
 
         if (!n) {
-            if (n.error() == Error::IO_EOF)
+            if (n.error() == IO_EOF)
                 break;
 
             result = tl::unexpected(n.error());
             break;
         }
 
-        auto res = co_await writer.writeAll({data, *n});
-
-        if (!res) {
+        if (const auto res = co_await writer.writeAll({data, *n}); !res) {
             result = tl::unexpected(res.error());
             break;
         }

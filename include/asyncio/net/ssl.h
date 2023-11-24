@@ -8,22 +8,21 @@
 
 namespace asyncio::net::ssl {
     enum Error {
-
     };
 
-    class Category : public std::error_category {
+    class ErrorCategory final : public std::error_category {
     public:
         [[nodiscard]] const char *name() const noexcept override;
         [[nodiscard]] std::string message(int value) const override;
     };
 
-    const std::error_category &category();
+    const std::error_category &errorCategory();
     std::error_code make_error_code(Error e);
 
     using Context = SSL_CTX;
 
 #ifdef ASYNCIO_EMBED_CA_CERT
-    tl::expected<void, std::error_code> loadEmbeddedCA(Context *ctx);
+    tl::expected<void, std::error_code> loadEmbeddedCA(const Context *ctx);
 #endif
 
     enum Version {
@@ -53,31 +52,29 @@ namespace asyncio::net::ssl {
             ACCEPTING = BUFFEREVENT_SSL_ACCEPTING
         };
 
-        class Buffer : public net::stream::Buffer {
+        class Buffer final : public net::stream::Buffer {
         public:
-            Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, size_t capacity);
+            Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
 
-        public:
             zero::async::coroutine::Task<void, std::error_code> close() override;
 
         private:
-            std::error_code getError() override;
+            [[nodiscard]] std::error_code getError() const override;
         };
 
         tl::expected<Buffer, std::error_code>
         makeBuffer(
-                FileDescriptor fd,
-                const std::shared_ptr<Context> &context,
-                State state,
-                size_t capacity = DEFAULT_BUFFER_CAPACITY,
-                bool own = true
+            FileDescriptor fd,
+            const std::shared_ptr<Context> &context,
+            State state,
+            std::size_t capacity = DEFAULT_BUFFER_CAPACITY,
+            bool own = true
         );
 
         class Listener : public net::stream::Acceptor {
         public:
             Listener(std::shared_ptr<Context> context, evconnlistener *listener);
 
-        public:
             zero::async::coroutine::Task<Buffer, std::error_code> accept();
 
         private:
@@ -92,14 +89,9 @@ namespace asyncio::net::ssl {
         tl::expected<Listener, std::error_code>
         listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port);
 
-        zero::async::coroutine::Task<Buffer, std::error_code>
-        connect(Address address);
-
-        zero::async::coroutine::Task<Buffer, std::error_code>
-        connect(std::span<const Address> addresses);
-
-        zero::async::coroutine::Task<Buffer, std::error_code>
-        connect(std::string host, unsigned short port);
+        zero::async::coroutine::Task<Buffer, std::error_code> connect(Address address);
+        zero::async::coroutine::Task<Buffer, std::error_code> connect(std::span<const Address> addresses);
+        zero::async::coroutine::Task<Buffer, std::error_code> connect(std::string host, unsigned short port);
 
         zero::async::coroutine::Task<Buffer, std::error_code>
         connect(std::shared_ptr<Context> context, Address address);
@@ -112,11 +104,8 @@ namespace asyncio::net::ssl {
     }
 }
 
-namespace std {
-    template<>
-    struct is_error_code_enum<asyncio::net::ssl::Error> : public true_type {
-
-    };
-}
+template<>
+struct std::is_error_code_enum<asyncio::net::ssl::Error> : std::true_type {
+};
 
 #endif //ASYNCIO_SSL_H

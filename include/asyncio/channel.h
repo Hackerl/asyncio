@@ -16,13 +16,11 @@ namespace asyncio {
         virtual tl::expected<void, std::error_code> trySend(const T &element) = 0;
         virtual tl::expected<void, std::error_code> trySend(T &&element) = 0;
 
-    public:
         virtual tl::expected<void, std::error_code> sendSync(const T &element) = 0;
         virtual tl::expected<void, std::error_code> sendSync(T &&element) = 0;
         virtual tl::expected<void, std::error_code> sendSync(const T &element, std::chrono::milliseconds timeout) = 0;
         virtual tl::expected<void, std::error_code> sendSync(T &&element, std::chrono::milliseconds timeout) = 0;
 
-    public:
         virtual zero::async::coroutine::Task<void, std::error_code> send(const T &element) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> send(T &&element) = 0;
 
@@ -32,7 +30,6 @@ namespace asyncio {
         virtual zero::async::coroutine::Task<void, std::error_code>
         send(T &&element, std::chrono::milliseconds timeout) = 0;
 
-    public:
         virtual void close() = 0;
     };
 
@@ -42,23 +39,265 @@ namespace asyncio {
         virtual tl::expected<T, std::error_code> receiveSync() = 0;
         virtual tl::expected<T, std::error_code> receiveSync(std::chrono::milliseconds timeout) = 0;
 
-    public:
         virtual zero::async::coroutine::Task<T, std::error_code> receive() = 0;
         virtual zero::async::coroutine::Task<T, std::error_code> receive(std::chrono::milliseconds timeout) = 0;
 
-    public:
         virtual tl::expected<T, std::error_code> tryReceive() = 0;
     };
 
     template<typename T>
-    class Channel : public ISender<T>, public IReceiver<T> {
-    private:
+    class Channel final : public ISender<T>, public IReceiver<T> {
         static constexpr auto SENDER = 0;
         static constexpr auto RECEIVER = 1;
 
     public:
-        explicit Channel(size_t capacity) : mClosed(false), mBuffer(capacity), mEventLoop(getEventLoop()) {
+        explicit Channel(std::size_t capacity) : mClosed(false), mEventLoop(getEventLoop()), mBuffer(capacity) {
+        }
 
+    private:
+        template<typename U>
+        tl::expected<void, std::error_code> trySendImpl(U &&element) {
+            if (mClosed)
+                return tl::unexpected(IO_EOF);
+
+            const auto index = mBuffer.reserve();
+
+            if (!index)
+                return tl::unexpected(make_error_code(std::errc::operation_would_block));
+
+            mBuffer[*index] = std::forward<U>(element);
+            mBuffer.commit(*index);
+
+            trigger<RECEIVER>();
+            return {};
+        }
+
+        template<typename U>
+        tl::expected<void, std::error_code>
+        sendSyncImpl(U &&element, const std::optional<std::chrono::milliseconds> timeout) {
+            if (mClosed)
+                return tl::unexpected(IO_EOF);
+
+            tl::expected<void, std::error_code> result;
+
+            while (true) {
+                const auto index = mBuffer.reserve();
+
+                if (!index) {
+                    mMutex.lock();
+
+                    if (mClosed) {
+                        mMutex.unlock();
+                        result = tl::unexpected<std::error_code>(IO_EOF);
+                        break;
+                    }
+
+                    if (!mBuffer.full()) {
+                        mMutex.unlock();
+                        continue;
+                    }
+
+                    Future<void> future(mEventLoop);
+                    const auto event = std::make_shared<zero::atomic::Event>();
+
+                    future.get().promise().finally([=] {
+                        event->notify();
+                    });
+
+                    mPending[SENDER].push_back(future);
+                    mMutex.unlock();
+
+                    if (const auto res = event->wait(timeout); !res) {
+                        std::lock_guard guard(mMutex);
+                        mPending[SENDER].remove(future);
+                        result = tl::unexpected(res.error());
+                        break;
+                    }
+
+                    continue;
+                }
+
+                mBuffer[*index] = std::forward<U>(element);
+                mBuffer.commit(*index);
+
+                trigger<RECEIVER>();
+                break;
+            }
+
+            return result;
+        }
+
+        zero::async::coroutine::Task<void, std::error_code>
+        sendImpl(T element, const std::optional<std::chrono::milliseconds> timeout) {
+            if (mClosed)
+                co_return tl::unexpected(IO_EOF);
+
+            tl::expected<void, std::error_code> result;
+
+            while (true) {
+                const auto index = mBuffer.reserve();
+
+                if (!index) {
+                    mMutex.lock();
+
+                    if (mClosed) {
+                        mMutex.unlock();
+                        result = tl::unexpected<std::error_code>(IO_EOF);
+                        break;
+                    }
+
+                    if (!mBuffer.full()) {
+                        mMutex.unlock();
+                        continue;
+                    }
+
+                    Future<void> future(mEventLoop);
+
+                    mPending[SENDER].push_back(future);
+                    mMutex.unlock();
+
+                    if (const auto res = co_await future.get(timeout); !res) {
+                        std::lock_guard guard(mMutex);
+                        mPending[SENDER].remove(future);
+                        result = tl::unexpected(res.error());
+                        break;
+                    }
+
+                    continue;
+                }
+
+                mBuffer[*index] = std::move(element);
+                mBuffer.commit(*index);
+
+                trigger<RECEIVER>();
+                break;
+            }
+
+            co_return result;
+        }
+
+        tl::expected<T, std::error_code> receiveSyncImpl(const std::optional<std::chrono::milliseconds> timeout) {
+            tl::expected<T, std::error_code> result;
+
+            while (true) {
+                const auto index = mBuffer.acquire();
+
+                if (!index) {
+                    mMutex.lock();
+
+                    if (mClosed) {
+                        mMutex.unlock();
+                        result = tl::unexpected<std::error_code>(IO_EOF);
+                        break;
+                    }
+
+                    if (!mBuffer.empty()) {
+                        mMutex.unlock();
+                        continue;
+                    }
+
+                    Future<void> future(mEventLoop);
+                    const auto event = std::make_shared<zero::atomic::Event>();
+
+                    future.get().promise().finally([=] {
+                        event->notify();
+                    });
+
+                    mPending[RECEIVER].push_back(future);
+                    mMutex.unlock();
+
+                    if (const auto res = event->wait(timeout); !res) {
+                        std::lock_guard guard(mMutex);
+                        mPending[RECEIVER].remove(future);
+                        result = tl::unexpected(res.error());
+                        break;
+                    }
+
+                    continue;
+                }
+
+                result = std::move(mBuffer[*index]);
+                mBuffer.release(*index);
+
+                trigger<SENDER>();
+                break;
+            }
+
+            return result;
+        }
+
+        zero::async::coroutine::Task<T, std::error_code>
+        receiveImpl(const std::optional<std::chrono::milliseconds> timeout) {
+            tl::expected<T, std::error_code> result;
+
+            while (true) {
+                const auto index = mBuffer.acquire();
+
+                if (!index) {
+                    mMutex.lock();
+
+                    if (mClosed) {
+                        mMutex.unlock();
+                        result = tl::unexpected<std::error_code>(IO_EOF);
+                        break;
+                    }
+
+                    if (!mBuffer.empty()) {
+                        mMutex.unlock();
+                        continue;
+                    }
+
+                    Future<void> future(mEventLoop);
+
+                    mPending[RECEIVER].push_back(future);
+                    mMutex.unlock();
+
+                    if (const auto res = co_await future.get(timeout); !res) {
+                        std::lock_guard guard(mMutex);
+                        mPending[RECEIVER].remove(future);
+                        result = tl::unexpected(res.error());
+                        break;
+                    }
+
+                    continue;
+                }
+
+                T element = std::move(mBuffer[*index]);
+                mBuffer.release(*index);
+
+                trigger<SENDER>();
+                result = std::move(element);
+
+                break;
+            }
+
+            co_return result;
+        }
+
+        template<int Index>
+        void trigger() {
+            std::lock_guard guard(mMutex);
+
+            if (mPending[Index].empty())
+                return;
+
+            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
+                for (auto &future: pending)
+                    future.set();
+            });
+        }
+
+        template<int Index>
+        void trigger(const std::error_code &ec) {
+            std::lock_guard guard(mMutex);
+
+            if (mPending[Index].empty())
+                return;
+
+            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
+                for (auto &future: pending)
+                    future.setError(ec);
+            });
         }
 
     public:
@@ -104,10 +343,9 @@ namespace asyncio {
             return sendImpl(std::move(element), timeout);
         }
 
-    public:
         void close() override {
             {
-                std::lock_guard<std::mutex> guard(mMutex);
+                std::lock_guard guard(mMutex);
 
                 if (mClosed)
                     return;
@@ -115,11 +353,10 @@ namespace asyncio {
                 mClosed = true;
             }
 
-            trigger<SENDER>(Error::IO_EOF);
-            trigger<RECEIVER>(Error::IO_EOF);
+            trigger<SENDER>(IO_EOF);
+            trigger<RECEIVER>(IO_EOF);
         }
 
-    public:
         tl::expected<T, std::error_code> receiveSync() override {
             return receiveSyncImpl(std::nullopt);
         }
@@ -137,13 +374,11 @@ namespace asyncio {
         }
 
         tl::expected<T, std::error_code> tryReceive() override {
-            auto index = mBuffer.acquire();
+            const auto index = mBuffer.acquire();
 
             if (!index)
                 return tl::unexpected(
-                        mClosed ?
-                        make_error_code(Error::IO_EOF) :
-                        make_error_code(std::errc::operation_would_block)
+                    mClosed ? make_error_code(IO_EOF) : make_error_code(std::errc::operation_would_block)
                 );
 
             T element = std::move(mBuffer[*index]);
@@ -151,261 +386,6 @@ namespace asyncio {
 
             trigger<SENDER>();
             return element;
-        }
-
-    private:
-        template<typename U>
-        tl::expected<void, std::error_code> trySendImpl(U &&element) {
-            if (mClosed)
-                return tl::unexpected(Error::IO_EOF);
-
-            auto index = mBuffer.reserve();
-
-            if (!index)
-                return tl::unexpected(make_error_code(std::errc::operation_would_block));
-
-            mBuffer[*index] = std::forward<U>(element);
-            mBuffer.commit(*index);
-
-            trigger<RECEIVER>();
-            return {};
-        }
-
-        template<typename U>
-        tl::expected<void, std::error_code>
-        sendSyncImpl(U &&element, std::optional<std::chrono::milliseconds> timeout) {
-            if (mClosed)
-                return tl::unexpected(Error::IO_EOF);
-
-            tl::expected<void, std::error_code> result;
-
-            while (true) {
-                auto index = mBuffer.reserve();
-
-                if (!index) {
-                    mMutex.lock();
-
-                    if (mClosed) {
-                        mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(Error::IO_EOF);
-                        break;
-                    }
-
-                    if (!mBuffer.full()) {
-                        mMutex.unlock();
-                        continue;
-                    }
-
-                    Future<void> future(mEventLoop);
-                    auto event = std::make_shared<zero::atomic::Event>();
-
-                    future.get().promise().finally([=]() {
-                        event->notify();
-                    });
-
-                    mPending[SENDER].push_back(future);
-                    mMutex.unlock();
-
-                    auto res = event->wait(timeout);
-
-                    if (!res) {
-                        std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[SENDER].remove(future);
-                        result = tl::unexpected(res.error());
-                        break;
-                    }
-
-                    continue;
-                }
-
-                mBuffer[*index] = std::forward<U>(element);
-                mBuffer.commit(*index);
-
-                trigger<RECEIVER>();
-                break;
-            }
-
-            return result;
-        }
-
-        zero::async::coroutine::Task<void, std::error_code>
-        sendImpl(T element, std::optional<std::chrono::milliseconds> timeout) {
-            if (mClosed)
-                co_return tl::unexpected(Error::IO_EOF);
-
-            tl::expected<void, std::error_code> result;
-
-            while (true) {
-                auto index = mBuffer.reserve();
-
-                if (!index) {
-                    mMutex.lock();
-
-                    if (mClosed) {
-                        mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(Error::IO_EOF);
-                        break;
-                    }
-
-                    if (!mBuffer.full()) {
-                        mMutex.unlock();
-                        continue;
-                    }
-
-                    Future<void> future(mEventLoop);
-
-                    mPending[SENDER].push_back(future);
-                    mMutex.unlock();
-
-                    auto res = co_await future.get(timeout);
-
-                    if (!res) {
-                        std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[SENDER].remove(future);
-                        result = tl::unexpected(res.error());
-                        break;
-                    }
-
-                    continue;
-                }
-
-                mBuffer[*index] = std::move(element);
-                mBuffer.commit(*index);
-
-                trigger<RECEIVER>();
-                break;
-            }
-
-            co_return result;
-        }
-
-    private:
-        tl::expected<T, std::error_code> receiveSyncImpl(std::optional<std::chrono::milliseconds> timeout) {
-            tl::expected<T, std::error_code> result;
-
-            while (true) {
-                auto index = mBuffer.acquire();
-
-                if (!index) {
-                    mMutex.lock();
-
-                    if (mClosed) {
-                        mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(Error::IO_EOF);
-                        break;
-                    }
-
-                    if (!mBuffer.empty()) {
-                        mMutex.unlock();
-                        continue;
-                    }
-
-                    Future<void> future(mEventLoop);
-                    auto event = std::make_shared<zero::atomic::Event>();
-
-                    future.get().promise().finally([=]() {
-                        event->notify();
-                    });
-
-                    mPending[RECEIVER].push_back(future);
-                    mMutex.unlock();
-
-                    auto res = event->wait(timeout);
-
-                    if (!res) {
-                        std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[RECEIVER].remove(future);
-                        result = tl::unexpected(res.error());
-                        break;
-                    }
-
-                    continue;
-                }
-
-                result = std::move(mBuffer[*index]);
-                mBuffer.release(*index);
-
-                trigger<SENDER>();
-                break;
-            }
-
-            return result;
-        }
-
-        zero::async::coroutine::Task<T, std::error_code> receiveImpl(std::optional<std::chrono::milliseconds> timeout) {
-            tl::expected<T, std::error_code> result;
-
-            while (true) {
-                auto index = mBuffer.acquire();
-
-                if (!index) {
-                    mMutex.lock();
-
-                    if (mClosed) {
-                        mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(Error::IO_EOF);
-                        break;
-                    }
-
-                    if (!mBuffer.empty()) {
-                        mMutex.unlock();
-                        continue;
-                    }
-
-                    Future<void> future(mEventLoop);
-
-                    mPending[RECEIVER].push_back(future);
-                    mMutex.unlock();
-
-                    auto res = co_await future.get(timeout);
-
-                    if (!res) {
-                        std::lock_guard<std::mutex> guard(mMutex);
-                        mPending[RECEIVER].remove(future);
-                        result = tl::unexpected(res.error());
-                        break;
-                    }
-
-                    continue;
-                }
-
-                T element = std::move(mBuffer[*index]);
-                mBuffer.release(*index);
-
-                trigger<SENDER>();
-                result = std::move(element);
-
-                break;
-            }
-
-            co_return result;
-        }
-
-    private:
-        template<int Index>
-        void trigger() {
-            std::lock_guard<std::mutex> guard(mMutex);
-
-            if (mPending[Index].empty())
-                return;
-
-            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
-                for (auto &future: pending)
-                    future.set();
-            });
-        }
-
-        template<int Index>
-        void trigger(const std::error_code &ec) {
-            std::lock_guard<std::mutex> guard(mMutex);
-
-            if (mPending[Index].empty())
-                return;
-
-            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
-                for (auto &future: pending)
-                    future.setError(ec);
-            });
         }
 
     private:

@@ -10,50 +10,46 @@
 namespace asyncio {
     class EventLoop {
     public:
-        EventLoop(event_base *base, evdns_base *dnsBase, size_t maxWorkers);
+        EventLoop(event_base *base, evdns_base *dnsBase, std::size_t maxWorkers);
 
-    public:
-        event_base *base();
-        evdns_base *dnsBase();
+        [[nodiscard]] event_base *base() const;
+        [[nodiscard]] evdns_base *dnsBase() const;
 
-    public:
-        bool addNameserver(const char *ip);
+        bool addNameserver(const char *ip) const;
 
-    public:
-        void dispatch();
-        void loopBreak();
-        void loopExit(std::optional<std::chrono::milliseconds> ms = std::nullopt);
+        void dispatch() const;
+        void loopBreak() const;
+        void loopExit(std::optional<std::chrono::milliseconds> ms = std::nullopt) const;
 
-    public:
         template<typename F>
-        void post(F &&f, std::optional<std::chrono::milliseconds> ms = std::nullopt) {
+        void post(F &&f, const std::optional<std::chrono::milliseconds> ms = std::nullopt) const {
             std::optional<timeval> tv;
 
             if (ms)
                 tv = {
-                        (decltype(timeval::tv_sec)) (ms->count() / 1000),
-                        (decltype(timeval::tv_usec)) ((ms->count() % 1000) * 1000)
+                    static_cast<decltype(timeval::tv_sec)>(ms->count() / 1000),
+                    static_cast<decltype(timeval::tv_usec)>(ms->count() % 1000 * 1000)
                 };
 
             auto ctx = new std::decay_t<F>(std::forward<F>(f));
 
             event_base_once(
-                    mBase.get(),
-                    -1,
-                    EV_TIMEOUT,
-                    [](evutil_socket_t, short, void *arg) {
-                        auto ctx = (std::decay_t<F> *) arg;
+                mBase.get(),
+                -1,
+                EV_TIMEOUT,
+                [](evutil_socket_t, short, void *arg) {
+                    auto func = static_cast<std::decay_t<F> *>(arg);
 
-                        ctx->operator()();
-                        delete ctx;
-                    },
-                    ctx,
-                    tv ? &*tv : nullptr
+                    func->operator()();
+                    delete func;
+                },
+                ctx,
+                tv ? &*tv : nullptr
             );
         }
 
     private:
-        size_t mMaxWorkers;
+        std::size_t mMaxWorkers;
         std::queue<std::unique_ptr<Worker>> mWorkers;
         std::unique_ptr<event_base, decltype(event_base_free) *> mBase;
         std::unique_ptr<evdns_base, void (*)(evdns_base *)> mDnsBase;
@@ -70,12 +66,12 @@ namespace asyncio {
     std::shared_ptr<EventLoop> getEventLoop();
     void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
 
-    tl::expected<EventLoop, std::error_code> createEventLoop(size_t maxWorkers = 16);
+    tl::expected<EventLoop, std::error_code> createEventLoop(std::size_t maxWorkers = 16);
     zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
     template<typename T, typename E>
     zero::async::coroutine::Task<tl::expected<T, E>, std::error_code>
-    timeout(zero::async::coroutine::Task<T, E> task, std::chrono::milliseconds ms) {
+    timeout(zero::async::coroutine::Task<T, E> task, const std::chrono::milliseconds ms) {
         if (ms == std::chrono::milliseconds::zero()) {
             co_await task;
             co_return tl::expected<tl::expected<T, E>, std::error_code>{tl::in_place, std::move(task.result())};
@@ -84,17 +80,24 @@ namespace asyncio {
         auto timer = sleep(ms);
 
         if constexpr (std::is_void_v<T>) {
-            task.promise().then([=]() mutable {
-                timer.cancel();
-            }, [=](const E &reason) mutable {
-                timer.cancel();
-            });
-        } else {
-            task.promise().then([=](const T &) mutable {
-                timer.cancel();
-            }, [=](const E &reason) mutable {
-                timer.cancel();
-            });
+            task.promise().then(
+                [=]() mutable {
+                    timer.cancel();
+                },
+                [=](const E &) mutable {
+                    timer.cancel();
+                }
+            );
+        }
+        else {
+            task.promise().then(
+                [=](const T &) mutable {
+                    timer.cancel();
+                },
+                [=](const E &) mutable {
+                    timer.cancel();
+                }
+            );
         }
 
         auto result = co_await timer;
@@ -114,13 +117,13 @@ namespace asyncio {
 
     template<typename F>
     tl::expected<void, std::error_code> run(F &&f) {
-        auto eventLoop = TRY(createEventLoop().transform([](EventLoop &&eventLoop) {
-            return std::make_shared<EventLoop>(std::move(eventLoop));
+        const auto eventLoop = TRY(createEventLoop().transform([](EventLoop &&e) {
+            return std::make_shared<EventLoop>(std::move(e));
         }));
 
         setEventLoop(*eventLoop);
 
-        f().promise().finally([&]() {
+        f().promise().finally([&] {
             eventLoop.value()->loopExit();
         });
 

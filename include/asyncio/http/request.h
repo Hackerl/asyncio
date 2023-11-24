@@ -11,29 +11,27 @@
 
 namespace asyncio::http {
     enum CURLError {
-
     };
 
-    class CURLCategory : public std::error_category {
+    class CURLErrorCategory final : public std::error_category {
     public:
         [[nodiscard]] const char *name() const noexcept override;
         [[nodiscard]] std::string message(int value) const override;
     };
 
-    const std::error_category &getCURLCategory();
+    const std::error_category &curlErrorCategory();
     std::error_code make_error_code(CURLError e);
 
     enum CURLMError {
-
     };
 
-    class CURLMCategory : public std::error_category {
+    class CURLMErrorCategory final : public std::error_category {
     public:
         [[nodiscard]] const char *name() const noexcept override;
         [[nodiscard]] std::string message(int value) const override;
     };
 
-    const std::error_category &getCURLMCategory();
+    const std::error_category &curlMErrorCategory();
     std::error_code make_error_code(CURLMError e);
 
     struct Connection {
@@ -51,7 +49,7 @@ namespace asyncio::http {
         std::array<ev::PairedBuffer, 2> buffers;
         std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy;
         zero::async::promise::Promise<void, std::error_code> promise;
-        std::list<std::function<void(void)>> defers;
+        std::list<std::function<void()>> defers;
         Status status;
     };
 
@@ -63,16 +61,14 @@ namespace asyncio::http {
         Response(Response &&) = default;
         ~Response();
 
-    public:
-        long statusCode();
-        std::optional<curl_off_t> contentLength();
-        std::optional<std::string> contentType();
-        std::vector<std::string> cookies();
-        std::optional<std::string> header(const std::string &name);
+        [[nodiscard]] long statusCode() const;
+        [[nodiscard]] std::optional<curl_off_t> contentLength() const;
+        [[nodiscard]] std::optional<std::string> contentType() const;
+        [[nodiscard]] std::vector<std::string> cookies() const;
+        [[nodiscard]] std::optional<std::string> header(const std::string &name) const;
 
-    public:
-        zero::async::coroutine::Task<std::string, std::error_code> string();
-        zero::async::coroutine::Task<void, std::error_code> output(std::filesystem::path path);
+        [[nodiscard]] zero::async::coroutine::Task<std::string, std::error_code> string() const;
+        [[nodiscard]] zero::async::coroutine::Task<void, std::error_code> output(std::filesystem::path path) const;
         zero::async::coroutine::Task<nlohmann::json, std::error_code> json();
 
         template<typename T>
@@ -81,14 +77,14 @@ namespace asyncio::http {
 
             try {
                 co_return j->get<T>();
-            } catch (const nlohmann::json::exception &) {
+            }
+            catch (const nlohmann::json::exception &) {
                 co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
             }
         }
 
-    public:
-        IBufReader &operator*();
-        IBufReader *operator->();
+        IBufReader &operator*() const;
+        IBufReader *operator->() const;
 
     private:
         std::shared_ptr<Requests> mRequests;
@@ -113,9 +109,7 @@ namespace asyncio::http {
     private:
         void onCURLTimer(long timeout);
         void onCURLEvent(curl_socket_t s, int what, void *data);
-
-    private:
-        void recycle();
+        void recycle() const;
 
     public:
         Options &options();
@@ -135,56 +129,55 @@ namespace asyncio::http {
         request(std::string method, URL url, std::optional<Options> options, std::string payload);
 
         zero::async::coroutine::Task<Response, std::error_code> request(
-                std::string method,
-                URL url,
-                std::optional<Options> options,
-                std::map<std::string, std::string> payload
+            std::string method,
+            URL url,
+            std::optional<Options> options,
+            std::map<std::string, std::string> payload
         );
 
         zero::async::coroutine::Task<Response, std::error_code> request(
-                std::string method,
-                URL url,
-                std::optional<Options> options,
-                std::map<std::string, std::filesystem::path> payload
+            std::string method,
+            URL url,
+            std::optional<Options> options,
+            std::map<std::string, std::filesystem::path> payload
         );
 
         zero::async::coroutine::Task<Response, std::error_code> request(
-                std::string method,
-                URL url,
-                std::optional<Options> options,
-                std::map<std::string, std::variant<std::string, std::filesystem::path>> payload
+            std::string method,
+            URL url,
+            std::optional<Options> options,
+            std::map<std::string, std::variant<std::string, std::filesystem::path>> payload
         );
 
         zero::async::coroutine::Task<Response, std::error_code> request(
-                std::string method,
-                URL url,
-                std::optional<Options> options,
-                nlohmann::json payload
+            std::string method,
+            URL url,
+            std::optional<Options> options,
+            nlohmann::json payload
         );
 
         template<typename T>
-        requires nlohmann::detail::has_to_json<nlohmann::json, T>::value
+            requires nlohmann::detail::has_to_json<nlohmann::json, T>::value
         zero::async::coroutine::Task<Response, std::error_code> request(
-                std::string method,
-                URL url,
-                std::optional<Options> options,
-                T payload
+            std::string method,
+            const URL url,
+            const std::optional<Options> options,
+            T payload
         ) {
             Options opt = options.value_or(mOptions);
             opt.headers["Content-Type"] = "application/json";
 
-            auto connection = CO_TRY(prepare(std::move(method), std::move(url), std::move(opt)));
+            auto connection = CO_TRY(prepare(std::move(method), url, std::move(opt)));
 
             curl_easy_setopt(
-                    connection->get()->easy.get(),
-                    CURLOPT_COPYPOSTFIELDS,
-                    nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
+                connection->get()->easy.get(),
+                CURLOPT_COPYPOSTFIELDS,
+                nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
             );
 
             co_return std::move(co_await perform(std::move(*connection)));
         }
 
-    public:
         zero::async::coroutine::Task<Response, std::error_code>
         get(const URL &url, const std::optional<Options> &options = std::nullopt) {
             return request("GET", url, options);
@@ -230,16 +223,12 @@ namespace asyncio::http {
     tl::expected<std::shared_ptr<Requests>, std::error_code> makeRequests(const Options &options = {});
 }
 
-namespace std {
-    template<>
-    struct is_error_code_enum<asyncio::http::CURLError> : public true_type {
+template<>
+struct std::is_error_code_enum<asyncio::http::CURLError> : std::true_type {
+};
 
-    };
-
-    template<>
-    struct is_error_code_enum<asyncio::http::CURLMError> : public true_type {
-
-    };
-}
+template<>
+struct std::is_error_code_enum<asyncio::http::CURLMError> : std::true_type {
+};
 
 #endif //ASYNCIO_REQUEST_H

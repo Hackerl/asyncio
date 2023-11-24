@@ -4,7 +4,6 @@
 #include <span>
 #include <chrono>
 #include <event2/util.h>
-#include <asyncio/error.h>
 #include <zero/interface.h>
 #include <zero/async/coroutine.h>
 
@@ -21,19 +20,18 @@ namespace asyncio {
 
     class IReader : public virtual ICloseable {
     public:
-        virtual zero::async::coroutine::Task<size_t, std::error_code> read(std::span<std::byte> data) = 0;
+        virtual zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> readExactly(std::span<std::byte> data) = 0;
         virtual zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll() = 0;
     };
 
     class IWriter : public virtual ICloseable {
     public:
-        virtual zero::async::coroutine::Task<size_t, std::error_code> write(std::span<const std::byte> data) = 0;
+        virtual zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> writeAll(std::span<const std::byte> data) = 0;
     };
 
     class IStreamIO : public virtual IReader, public virtual IWriter {
-
     };
 
     class IFileDescriptor : public virtual zero::Interface {
@@ -49,12 +47,12 @@ namespace asyncio {
 
     class IBuffered : public virtual zero::Interface {
     public:
-        virtual size_t capacity() = 0;
+        virtual std::size_t capacity() = 0;
     };
 
     class IBufReader : public virtual IReader, public virtual IBuffered {
     public:
-        virtual size_t available() = 0;
+        virtual std::size_t available() = 0;
         virtual zero::async::coroutine::Task<std::string, std::error_code> readLine() = 0;
         virtual zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) = 0;
@@ -62,12 +60,11 @@ namespace asyncio {
 
     class IBufWriter : public virtual IWriter, public virtual IBuffered {
     public:
-        virtual size_t pending() = 0;
+        virtual std::size_t pending() = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> flush() = 0;
     };
 
     class IBuffer : public virtual IStreamIO, public IBufReader, public IBufWriter {
-
     };
 
     class Reader : public virtual IReader {
@@ -81,11 +78,10 @@ namespace asyncio {
         zero::async::coroutine::Task<void, std::error_code> writeAll(std::span<const std::byte> data) override;
     };
 
-    zero::async::coroutine::Task<void, std::error_code>
-    copy(IReader &reader, IWriter &writer);
+    zero::async::coroutine::Task<void, std::error_code> copy(IReader &reader, IWriter &writer);
 
     template<typename R, typename W>
-    requires (std::derived_from<R, IReader> && std::derived_from<W, IWriter>)
+        requires (std::derived_from<R, IReader> && std::derived_from<W, IWriter>)
     zero::async::coroutine::Task<void, std::error_code> copy(R &&reader, W &&writer) {
         auto r = std::forward<R>(reader);
         auto w = std::forward<W>(writer);

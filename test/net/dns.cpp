@@ -11,48 +11,47 @@ TEST_CASE("DNS query", "[dns]") {
             hints.ai_family = AF_UNSPEC;
             hints.ai_socktype = SOCK_STREAM;
 
-            auto result = co_await asyncio::net::dns::getAddressInfo("localhost", "http", hints);
+            const auto result = co_await asyncio::net::dns::getAddressInfo("localhost", "http", hints);
             REQUIRE(result);
 
             REQUIRE(
-                    std::all_of(
-                            result->begin(),
-                            result->end(),
-                            [](const auto &address) {
-                                if (address.index() == 0)
-                                    return std::get<asyncio::net::IPv4Address>(address).port == 80;
+                std::all_of(
+                    result->begin(),
+                    result->end(),
+                    [](const auto &address) {
+                    if (address.index() == 0)
+                    return std::get<asyncio::net::IPv4Address>(address).port == 80;
 
-                                return std::get<asyncio::net::IPv6Address>(address).port == 80;
-                            }
-                    )
+                    return std::get<asyncio::net::IPv6Address>(address).port == 80;
+                    }
+                )
             );
         });
     }
 
     SECTION("lookup IP") {
         asyncio::run([]() -> zero::async::coroutine::Task<void> {
-            auto result = co_await asyncio::net::dns::lookupIP("localhost");
+            const auto result = co_await asyncio::net::dns::lookupIP("localhost");
             REQUIRE(result);
 
             REQUIRE(
-                    std::all_of(
-                            result->begin(),
-                            result->end(),
-                            [](const auto &ip) {
-                                if (ip.index() == 0)
-                                    return zero::os::net::stringify(std::get<0>(ip)) == "127.0.0.1";
+                std::all_of(
+                    result->begin(),
+                    result->end(),
+                    [](const auto &ip) {
+                    if (ip.index() == 0)
+                    return zero::os::net::stringify(std::get<0>(ip)) == "127.0.0.1";
 
-                                return zero::os::net::stringify(std::get<1>(ip)) == "::1";
-                            }
-                    )
+                    return zero::os::net::stringify(std::get<1>(ip)) == "::1";
+                    }
+                )
             );
         });
     }
 
     SECTION("lookup IPv4") {
         asyncio::run([]() -> zero::async::coroutine::Task<void> {
-            auto result = co_await asyncio::net::dns::lookupIPv4("localhost");
-
+            const auto result = co_await asyncio::net::dns::lookupIPv4("localhost");
             REQUIRE(result);
             REQUIRE(result->size() == 1);
             REQUIRE(zero::os::net::stringify(result->front()) == "127.0.0.1");

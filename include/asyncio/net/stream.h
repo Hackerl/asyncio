@@ -7,21 +7,19 @@
 
 namespace asyncio::net::stream {
     class IBuffer : public virtual IEndpoint, public virtual asyncio::IBuffer {
-
     };
 
     class Buffer : public ev::Buffer, public IBuffer {
     public:
-        Buffer(bufferevent *bev, size_t capacity);
-        Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, size_t capacity);
+        Buffer(bufferevent *bev, std::size_t capacity);
+        Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
 
-    public:
         tl::expected<Address, std::error_code> localAddress() override;
         tl::expected<Address, std::error_code> remoteAddress() override;
     };
 
     tl::expected<Buffer, std::error_code>
-    makeBuffer(FileDescriptor fd, size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
+    makeBuffer(FileDescriptor fd, std::size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
 
     class Acceptor {
     public:
@@ -44,7 +42,6 @@ namespace asyncio::net::stream {
     public:
         explicit Listener(evconnlistener *listener);
 
-    public:
         zero::async::coroutine::Task<Buffer, std::error_code> accept();
     };
 

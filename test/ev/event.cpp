@@ -18,51 +18,50 @@ TEST_CASE("async event notification", "[event]") {
 
     SECTION("normal") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            co_await zero::async::coroutine::allSettled(
-                    [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
-                        auto event = asyncio::ev::makeEvent(fd, asyncio::ev::What::READ);
-                        REQUIRE(event);
+            co_await allSettled(
+                [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
+                    auto event = makeEvent(fd, asyncio::ev::What::READ);
+                    REQUIRE(event);
 
-                        auto result = co_await event->on();
+                    auto result = co_await event->on();
 
-                        REQUIRE(result);
-                        REQUIRE(*result & asyncio::ev::What::READ);
+                    REQUIRE(result);
+                    REQUIRE(*result & asyncio::ev::What::READ);
 
-                        char buffer[1024] = {};
-                        REQUIRE(recv(fd, buffer, sizeof(buffer), 0) == 11);
-                        REQUIRE(strcmp(buffer, "hello world") == 0);
+                    char buffer[1024] = {};
+                    REQUIRE(recv(fd, buffer, sizeof(buffer), 0) == 11);
+                    REQUIRE(strcmp(buffer, "hello world") == 0);
 
-                        result = co_await event->on();
+                    result = co_await event->on();
+                    REQUIRE(result);
+                    REQUIRE(*result & asyncio::ev::What::READ);
 
-                        REQUIRE(result);
-                        REQUIRE(*result & asyncio::ev::What::READ);
-                        REQUIRE(recv(fd, buffer, sizeof(buffer), 0) == 0);
+                    REQUIRE(recv(fd, buffer, sizeof(buffer), 0) == 0);
 
-                        evutil_closesocket(fd);
-                    }(fds[0]),
-                    [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
-                        auto event = asyncio::ev::makeEvent(fd, asyncio::ev::What::WRITE);
-                        REQUIRE(event);
+                    evutil_closesocket(fd);
+                }(fds[0]),
+                [](const evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
+                    auto event = makeEvent(fd, asyncio::ev::What::WRITE);
+                    REQUIRE(event);
 
-                        auto result = co_await event->on();
+                    const auto result = co_await event->on();
+                    REQUIRE(result);
+                    REQUIRE(*result & asyncio::ev::What::WRITE);
 
-                        REQUIRE(result);
-                        REQUIRE(*result & asyncio::ev::What::WRITE);
-                        REQUIRE(send(fd, "hello world", 11, 0) == 11);
+                    REQUIRE(send(fd, "hello world", 11, 0) == 11);
 
-                        evutil_closesocket(fd);
-                    }(fds[1])
+                    evutil_closesocket(fd);
+                }(fds[1])
             );
         });
     }
 
     SECTION("wait timeout") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::READ);
+            auto event = makeEvent(fds[0], asyncio::ev::What::READ);
             REQUIRE(event);
 
-            auto result = co_await event->on(50ms);
-
+            const auto result = co_await event->on(50ms);
             REQUIRE(result);
             REQUIRE(*result & asyncio::ev::What::TIMEOUT);
         });
@@ -73,11 +72,11 @@ TEST_CASE("async event notification", "[event]") {
 
     SECTION("cancel") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto event = asyncio::ev::makeEvent(fds[0], asyncio::ev::What::READ);
+            auto event = makeEvent(fds[0], asyncio::ev::What::READ);
             REQUIRE(event);
 
-            auto task = event->on();
-            auto result = co_await asyncio::timeout(task, 50ms);
+            const auto task = event->on();
+            const auto result = co_await asyncio::timeout(task, 50ms);
 
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);

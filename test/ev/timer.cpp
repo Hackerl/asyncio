@@ -10,7 +10,7 @@ TEST_CASE("timer", "[timer]") {
             auto timer = asyncio::ev::makeTimer();
             REQUIRE(timer);
 
-            auto tp = std::chrono::system_clock::now();
+            const auto tp = std::chrono::system_clock::now();
             co_await timer->after(100ms);
             REQUIRE(std::chrono::system_clock::now() - tp > 95ms);
         });
@@ -21,8 +21,8 @@ TEST_CASE("timer", "[timer]") {
             auto timer = asyncio::ev::makeTimer();
             REQUIRE(timer);
 
-            auto task = timer->after(100ms);
-            auto result = co_await asyncio::timeout(task, 50ms);
+            const auto task = timer->after(100ms);
+            const auto result = co_await asyncio::timeout(task, 50ms);
 
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);

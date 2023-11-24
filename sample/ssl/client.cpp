@@ -25,12 +25,12 @@ int main(int argc, char *argv[]) {
 
     cmdline.parse(argc, argv);
 
-    auto host = cmdline.get<std::string>("host");
-    auto port = cmdline.get<unsigned short>("port");
+    const auto host = cmdline.get<std::string>("host");
+    const auto port = cmdline.get<unsigned short>("port");
 
-    auto ca = cmdline.getOptional<std::filesystem::path>("ca");
-    auto cert = cmdline.getOptional<std::filesystem::path>("cert");
-    auto privateKey = cmdline.getOptional<std::filesystem::path>("key");
+    const auto ca = cmdline.getOptional<std::filesystem::path>("ca");
+    const auto cert = cmdline.getOptional<std::filesystem::path>("cert");
+    const auto privateKey = cmdline.getOptional<std::filesystem::path>("key");
 
     bool insecure = cmdline.exist("insecure");
 
@@ -49,8 +49,8 @@ int main(int argc, char *argv[]) {
 
     asyncio::run([&]() -> zero::async::coroutine::Task<void> {
         asyncio::net::ssl::Config config = {
-                .insecure = insecure,
-                .server = false
+            .insecure = insecure,
+            .server = false
         };
 
         if (ca)
@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
         if (privateKey)
             config.privateKey = *privateKey;
 
-        auto context = asyncio::net::ssl::newContext(config);
+        const auto context = newContext(config);
 
         if (!context) {
             LOG_ERROR("create ssl context failed[{}]", context.error());
@@ -78,14 +78,13 @@ int main(int argc, char *argv[]) {
 
         while (true) {
             std::string message = "hello world\r\n";
-            auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
 
-            if (!result) {
+            if (const auto result = co_await buffer->writeAll(std::as_bytes(std::span{message})); !result) {
                 LOG_ERROR("stream buffer drain failed[{}]", result.error());
                 break;
             }
 
-            auto line = co_await buffer->readLine();
+            const auto line = co_await buffer->readLine();
 
             if (!line) {
                 LOG_ERROR("stream buffer read line failed[{}]", line.error());

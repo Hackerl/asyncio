@@ -1,25 +1,24 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/dns.h>
 #include <asyncio/event_loop.h>
+#include <asyncio/error.h>
 #include <zero/os/net.h>
-#include <cstring>
 #include <cassert>
 
 #if __unix__ || __APPLE__
 #include <sys/un.h>
 #endif
 
-asyncio::net::stream::Buffer::Buffer(bufferevent *bev, size_t capacity) : ev::Buffer(bev, capacity) {
-
+asyncio::net::stream::Buffer::Buffer(bufferevent *bev, const std::size_t capacity) : ev::Buffer(bev, capacity) {
 }
 
-asyncio::net::stream::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, size_t capacity)
-        : ev::Buffer(std::move(bev), capacity) {
-
+asyncio::net::stream::Buffer::Buffer(
+    std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev,
+    const std::size_t capacity) : ev::Buffer(std::move(bev), capacity) {
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::localAddress() {
-    FileDescriptor fd = this->fd();
+    const FileDescriptor fd = this->fd();
 
     if (fd == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
@@ -28,7 +27,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffe
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::remoteAddress() {
-    FileDescriptor fd = this->fd();
+    const FileDescriptor fd = this->fd();
 
     if (fd == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
@@ -37,7 +36,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffe
 }
 
 tl::expected<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::makeBuffer(FileDescriptor fd, size_t capacity, bool own) {
+asyncio::net::stream::makeBuffer(const FileDescriptor fd, const std::size_t capacity, const bool own) {
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), fd, own ? BEV_OPT_CLOSE_ON_FREE : 0);
 
     if (!bev)
@@ -48,23 +47,22 @@ asyncio::net::stream::makeBuffer(FileDescriptor fd, size_t capacity, bool own) {
 
 asyncio::net::stream::Acceptor::Acceptor(evconnlistener *listener) : mListener(listener, evconnlistener_free) {
     evconnlistener_set_cb(
-            mListener.get(),
-            [](evconnlistener *listener, evutil_socket_t fd, sockaddr *addr, int socklen, void *arg) {
-                std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
-            },
-            this
+        mListener.get(),
+        [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
+            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
+        },
+        this
     );
 }
 
-asyncio::net::stream::Acceptor::Acceptor(asyncio::net::stream::Acceptor &&rhs) noexcept
-        : mListener(std::move(rhs.mListener)) {
+asyncio::net::stream::Acceptor::Acceptor(Acceptor &&rhs) noexcept : mListener(std::move(rhs.mListener)) {
     assert(!mPromise);
     evconnlistener_set_cb(
-            mListener.get(),
-            [](evconnlistener *listener, evutil_socket_t fd, sockaddr *addr, int socklen, void *arg) {
-                std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
-            },
-            this
+        mListener.get(),
+        [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
+            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
+        },
+        this
     );
 }
 
@@ -74,40 +72,37 @@ asyncio::net::stream::Acceptor::~Acceptor() {
 
 zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::net::stream::Acceptor::fd() {
     if (!mListener)
-        co_return tl::unexpected(Error::RESOURCE_DESTROYED);
+        co_return tl::unexpected(RESOURCE_DESTROYED);
 
     if (mPromise)
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
     co_return co_await zero::async::coroutine::Cancellable{
-            zero::async::promise::chain<FileDescriptor, std::error_code>([this](auto promise) {
-                mPromise = promise;
-                evconnlistener_enable(mListener.get());
-            }).finally([this]() {
-                evconnlistener_disable(mListener.get());
-            }),
-            [this]() -> tl::expected<void, std::error_code> {
-                std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
-                return {};
-            }
+        zero::async::promise::chain<FileDescriptor, std::error_code>([this](auto promise) {
+            mPromise = promise;
+            evconnlistener_enable(mListener.get());
+        }).finally([this] {
+            evconnlistener_disable(mListener.get());
+        }),
+        [this]() -> tl::expected<void, std::error_code> {
+            std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+            return {};
+        }
     };
 }
 
 tl::expected<void, std::error_code> asyncio::net::stream::Acceptor::close() {
     if (!mListener)
-        return tl::unexpected(Error::RESOURCE_DESTROYED);
+        return tl::unexpected(RESOURCE_DESTROYED);
 
-    auto promise = std::exchange(mPromise, std::nullopt);
-
-    if (promise)
-        promise->reject(Error::RESOURCE_DESTROYED);
+    if (auto promise = std::exchange(mPromise, std::nullopt); promise)
+        promise->reject(RESOURCE_DESTROYED);
 
     mListener.reset();
     return {};
 }
 
 asyncio::net::stream::Listener::Listener(evconnlistener *listener) : Acceptor(listener) {
-
 }
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
@@ -120,13 +115,17 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
     auto socketAddress = TRY(socketAddressFrom(address));
 
     evconnlistener *listener = evconnlistener_new_bind(
-            getEventLoop()->base(),
-            nullptr,
-            nullptr,
-            LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
-            -1,
-            (const sockaddr *) socketAddress->data(),
-            (int) socketAddress->size()
+        getEventLoop()->base(),
+        nullptr,
+        nullptr,
+        LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
+        -1,
+        socketAddress->first.get(),
+#ifdef _WIN32
+        socketAddress->second
+#else
+        static_cast<int>(socketAddress->second)
+#endif
     );
 
     if (!listener)
@@ -154,26 +153,26 @@ asyncio::net::stream::listen(std::span<const Address> addresses) {
 }
 
 tl::expected<asyncio::net::stream::Listener, std::error_code>
-asyncio::net::stream::listen(const std::string &ip, unsigned short port) {
-    auto address = TRY(addressFrom(ip, port));
+asyncio::net::stream::listen(const std::string &ip, const unsigned short port) {
+    const auto address = TRY(addressFrom(ip, port));
     return listen(*address);
 }
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(Address address) {
-    size_t index = address.index();
-
-    if (index == 0) {
-        IPv4Address ipv4 = std::get<IPv4Address>(address);
-        co_return std::move(co_await connect(zero::os::net::stringify(ipv4.ip), ipv4.port));
-    } else if (index == 1) {
-        IPv6Address ipv6 = std::get<IPv6Address>(address);
-        co_return std::move(co_await connect(zero::os::net::stringify(ipv6.ip), ipv6.port));
-    } else if (index == 2) {
-#if __unix__ || __APPLE__
-        co_return std::move(co_await connect(std::get<UnixAddress>(address).path));
-#endif
+asyncio::net::stream::connect(const Address address) {
+    if (const std::size_t index = address.index(); index == 0) {
+        const auto [port, ip] = std::get<IPv4Address>(address);
+        co_return std::move(co_await connect(zero::os::net::stringify(ip), port));
     }
+    else if (index == 1) {
+        const auto &[port, ip, zone] = std::get<IPv6Address>(address);
+        co_return std::move(co_await connect(zero::os::net::stringify(ip), port));
+    }
+#if __unix__ || __APPLE__
+    else if (index == 2) {
+        co_return std::move(co_await connect(std::get<UnixAddress>(address).path));
+    }
+#endif
 
     co_return tl::unexpected(make_error_code(std::errc::address_family_not_supported));
 }
@@ -197,38 +196,38 @@ asyncio::net::stream::connect(std::span<const Address> addresses) {
 }
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(std::string host, unsigned short port) {
+asyncio::net::stream::connect(const std::string host, const unsigned short port) {
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
     zero::async::promise::Promise<void, std::error_code> promise;
-    auto ctx = new zero::async::promise::Promise<void, std::error_code>(promise);
+    const auto ctx = new zero::async::promise::Promise(promise);
 
     bufferevent_setcb(
-            bev,
-            nullptr,
-            nullptr,
-            [](bufferevent *bev, short what, void *arg) {
-                auto promise = static_cast<zero::async::promise::Promise<void, std::error_code> *>(arg);
+        bev,
+        nullptr,
+        nullptr,
+        [](bufferevent *b, const short what, void *arg) {
+            const auto p = static_cast<zero::async::promise::Promise<void, std::error_code> *>(arg);
 
-                if ((what & BEV_EVENT_CONNECTED) == 0) {
-                    if (int e = bufferevent_socket_get_dns_error(bev); e) {
-                        promise->reject((dns::Error) e);
-                        delete promise;
-                        return;
-                    }
-
-                    promise->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-                    delete promise;
+            if ((what & BEV_EVENT_CONNECTED) == 0) {
+                if (const int e = bufferevent_socket_get_dns_error(b)) {
+                    p->reject(static_cast<dns::Error>(e));
+                    delete p;
                     return;
                 }
 
-                promise->resolve();
-                delete promise;
-            },
-            ctx
+                p->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+                delete p;
+                return;
+            }
+
+            p->resolve();
+            delete p;
+        },
+        ctx
     );
 
     if (bufferevent_socket_connect_hostname(bev, getEventLoop()->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
@@ -237,17 +236,15 @@ asyncio::net::stream::connect(std::string host, unsigned short port) {
         co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
     }
 
-    auto result = co_await zero::async::coroutine::Cancellable{
-            promise,
-            [=]() mutable -> tl::expected<void, std::error_code> {
-                bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
-                promise.reject(make_error_code(std::errc::operation_canceled));
-                delete ctx;
-                return {};
-            }
-    };
-
-    if (!result) {
+    if (const auto result = co_await zero::async::coroutine::Cancellable{
+        promise,
+        [=]() mutable -> tl::expected<void, std::error_code> {
+            bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
+            promise.reject(make_error_code(std::errc::operation_canceled));
+            delete ctx;
+            return {};
+        }
+    }; !result) {
         bufferevent_free(bev);
         co_return tl::unexpected(result.error());
     }
@@ -272,13 +269,13 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
     }
 
     evconnlistener *listener = evconnlistener_new_bind(
-            getEventLoop()->base(),
-            nullptr,
-            nullptr,
-            LEV_OPT_CLOSE_ON_FREE | LEV_OPT_DISABLED,
-            -1,
-            (const sockaddr *) &sa,
-            (int) length
+        getEventLoop()->base(),
+        nullptr,
+        nullptr,
+        LEV_OPT_CLOSE_ON_FREE | LEV_OPT_DISABLED,
+        -1,
+        reinterpret_cast<const sockaddr *>(&sa),
+        static_cast<int>(length)
     );
 
     if (!listener)
@@ -288,7 +285,7 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
 }
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(std::string path) {
+asyncio::net::stream::connect(const std::string path) {
     if (path.empty())
         co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
 
@@ -309,44 +306,42 @@ asyncio::net::stream::connect(std::string path) {
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
     zero::async::promise::Promise<void, std::error_code> promise;
-    auto ctx = new zero::async::promise::Promise<void, std::error_code>(promise);
+    const auto ctx = new zero::async::promise::Promise(promise);
 
     bufferevent_setcb(
-            bev,
-            nullptr,
-            nullptr,
-            [](bufferevent *bev, short what, void *arg) {
-                auto promise = static_cast<zero::async::promise::Promise<void, std::error_code> *>(arg);
+        bev,
+        nullptr,
+        nullptr,
+        [](bufferevent *, const short what, void *arg) {
+            const auto p = static_cast<zero::async::promise::Promise<void, std::error_code> *>(arg);
 
-                if ((what & BEV_EVENT_CONNECTED) == 0) {
-                    promise->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-                    delete promise;
-                    return;
-                }
+            if ((what & BEV_EVENT_CONNECTED) == 0) {
+                p->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+                delete p;
+                return;
+            }
 
-                promise->resolve();
-                delete promise;
-            },
-            ctx
+            p->resolve();
+            delete p;
+        },
+        ctx
     );
 
-    if (bufferevent_socket_connect(bev, (const sockaddr *) &sa, (int) length) < 0) {
+    if (bufferevent_socket_connect(bev, reinterpret_cast<const sockaddr *>(&sa), static_cast<int>(length)) < 0) {
         delete ctx;
         bufferevent_free(bev);
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
-    auto result = co_await zero::async::coroutine::Cancellable{
-            promise,
-            [=]() mutable -> tl::expected<void, std::error_code> {
-                bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
-                promise.reject(make_error_code(std::errc::operation_canceled));
-                delete ctx;
-                return {};
-            }
-    };
-
-    if (!result) {
+    if (const auto result = co_await zero::async::coroutine::Cancellable{
+        promise,
+        [=]() mutable -> tl::expected<void, std::error_code> {
+            bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
+            promise.reject(make_error_code(std::errc::operation_canceled));
+            delete ctx;
+            return {};
+        }
+    }; !result) {
         bufferevent_free(bev);
         co_return tl::unexpected(result.error());
     }

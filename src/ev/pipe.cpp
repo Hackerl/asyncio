@@ -1,9 +1,12 @@
 #include <asyncio/ev/pipe.h>
 #include <asyncio/event_loop.h>
+#include <asyncio/error.h>
 
-asyncio::ev::PairedBuffer::PairedBuffer(bufferevent *bev, size_t capacity, std::shared_ptr<std::error_code> ec)
-        : Buffer(bev, capacity), mErrorCode(std::move(ec)) {
-
+asyncio::ev::PairedBuffer::PairedBuffer(
+    bufferevent *bev,
+    const std::size_t capacity,
+    std::shared_ptr<std::error_code> ec
+) : Buffer(bev, capacity), mErrorCode(std::move(ec)) {
 }
 
 asyncio::ev::PairedBuffer::~PairedBuffer() {
@@ -13,6 +16,10 @@ asyncio::ev::PairedBuffer::~PairedBuffer() {
     bufferevent_flush(mBev.get(), EV_WRITE, BEV_FINISHED);
 }
 
+std::error_code asyncio::ev::PairedBuffer::getError() const {
+    return *mErrorCode;
+}
+
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::PairedBuffer::close() {
     bufferevent_flush(mBev.get(), EV_WRITE, BEV_FINISHED);
     return Buffer::close();
@@ -20,10 +27,10 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::PairedBuffer::c
 
 tl::expected<void, std::error_code> asyncio::ev::PairedBuffer::throws(const std::error_code &ec) {
     if (!mBev)
-        return tl::unexpected(Error::RESOURCE_DESTROYED);
+        return tl::unexpected(RESOURCE_DESTROYED);
 
     if (mClosed)
-        return tl::unexpected(Error::IO_EOF);
+        return tl::unexpected(IO_EOF);
 
     *mErrorCode = ec;
 
@@ -36,13 +43,9 @@ tl::expected<void, std::error_code> asyncio::ev::PairedBuffer::throws(const std:
     return {};
 }
 
-std::error_code asyncio::ev::PairedBuffer::getError() {
-    return *mErrorCode;
-}
-
-tl::expected<std::array<asyncio::ev::PairedBuffer, 2>, std::error_code> asyncio::ev::pipe(size_t capacity) {
+tl::expected<std::array<asyncio::ev::PairedBuffer, 2>, std::error_code> asyncio::ev::pipe(const std::size_t capacity) {
     bufferevent *pair[2];
-    auto base = getEventLoop()->base();
+    const auto base = getEventLoop()->base();
 
     if (bufferevent_pair_new(base, BEV_OPT_DEFER_CALLBACKS, pair) < 0)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
@@ -55,7 +58,6 @@ tl::expected<std::array<asyncio::ev::PairedBuffer, 2>, std::error_code> asyncio:
     evbuffer_defer_callbacks(bufferevent_get_output(pair[0]), base);
     evbuffer_defer_callbacks(bufferevent_get_output(pair[1]), base);
 
-    std::shared_ptr<std::error_code> ec = std::make_shared<std::error_code>();
-
+    const auto ec = std::make_shared<std::error_code>();
     return std::array{PairedBuffer(pair[0], capacity, ec), PairedBuffer(pair[1], capacity, ec)};
 }

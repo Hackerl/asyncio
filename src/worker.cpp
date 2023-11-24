@@ -1,12 +1,11 @@
 #include <asyncio/worker.h>
 
 asyncio::Worker::Worker() : mExit(false), mThread(&Worker::work, this) {
-
 }
 
 asyncio::Worker::~Worker() {
     {
-        std::lock_guard<std::mutex> guard(mMutex);
+        std::lock_guard guard(mMutex);
         mExit = true;
     }
 
@@ -16,7 +15,7 @@ asyncio::Worker::~Worker() {
 
 void asyncio::Worker::work() {
     while (true) {
-        std::unique_lock<std::mutex> lock(mMutex);
+        std::unique_lock lock(mMutex);
 
         if (mExit)
             break;

@@ -7,7 +7,6 @@
 namespace asyncio {
     template<typename T>
     class Future {
-    private:
         struct Storage {
             std::optional<tl::expected<T, std::error_code>> result;
             std::list<zero::async::promise::Promise<void, std::error_code>> pending;
@@ -15,21 +14,20 @@ namespace asyncio {
 
     public:
         Future() : mEventLoop(getEventLoop()), mStorage(std::make_shared<Storage>()) {
-
         }
 
         explicit Future(std::shared_ptr<EventLoop> eventLoop)
-                : mEventLoop(std::move(eventLoop)), mStorage(std::make_shared<Storage>()) {
-
+            : mEventLoop(std::move(eventLoop)), mStorage(std::make_shared<Storage>()) {
         }
 
-    public:
-        template<typename ...Ts>
-        void set(Ts &&...args) {
+        auto operator<=>(const Future &) const = default;
+
+        template<typename... Ts>
+        void set(Ts &&... args) {
             assert(!mStorage->result);
             mStorage->result = tl::expected<T, std::error_code>(std::forward<Ts>(args)...);
 
-            for (auto &promise: std::exchange(mStorage->pending, {})) {
+            for (auto &promise : std::exchange(mStorage->pending, {})) {
                 mEventLoop->post([promise = std::move(promise)]() mutable {
                     promise.resolve();
                 });
@@ -40,14 +38,13 @@ namespace asyncio {
             assert(!mStorage->result);
             mStorage->result = tl::unexpected(ec);
 
-            for (auto &promise: std::exchange(mStorage->pending, {})) {
+            for (auto &promise : std::exchange(mStorage->pending, {})) {
                 mEventLoop->post([promise = std::move(promise)]() mutable {
                     promise.resolve();
                 });
             }
         }
 
-    public:
         zero::async::coroutine::Task<T, std::error_code> get() {
             if (mStorage->result)
                 co_return *mStorage->result;
@@ -56,12 +53,12 @@ namespace asyncio {
             mStorage->pending.push_back(promise);
 
             CO_TRY(co_await zero::async::coroutine::Cancellable{
-                    promise,
-                    [=, this]() mutable -> tl::expected<void, std::error_code> {
-                        mStorage->pending.remove(promise);
-                        promise.reject(make_error_code(std::errc::operation_canceled));
-                        return {};
-                    }
+                promise,
+                [=, this]() mutable -> tl::expected<void, std::error_code> {
+                    mStorage->pending.remove(promise);
+                    promise.reject(make_error_code(std::errc::operation_canceled));
+                    return {};
+                }
             });
 
             co_return *mStorage->result;
@@ -75,12 +72,9 @@ namespace asyncio {
             co_return std::move(*result);
         }
 
-    public:
-        auto operator<=>(const Future &) const = default;
-
     private:
-        std::shared_ptr<Storage> mStorage;
         std::shared_ptr<EventLoop> mEventLoop;
+        std::shared_ptr<Storage> mStorage;
     };
 }
 

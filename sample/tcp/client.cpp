@@ -10,7 +10,7 @@
 
 using namespace std::chrono_literals;
 
-int main(int argc, char *argv[]) {
+int main(const int argc, char *argv[]) {
     INIT_CONSOLE_LOG(zero::INFO_LEVEL);
 
     zero::Cmdline cmdline;
@@ -20,8 +20,8 @@ int main(int argc, char *argv[]) {
 
     cmdline.parse(argc, argv);
 
-    auto host = cmdline.get<std::string>("host");
-    auto port = cmdline.get<unsigned short>("port");
+    const auto host = cmdline.get<std::string>("host");
+    const auto port = cmdline.get<unsigned short>("port");
 
 #ifdef _WIN32
     WSADATA wsaData;
@@ -46,14 +46,13 @@ int main(int argc, char *argv[]) {
 
         while (true) {
             std::string message = "hello world\r\n";
-            auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
 
-            if (!result) {
+            if (const auto result = co_await buffer->writeAll(std::as_bytes(std::span{message})); !result) {
                 LOG_ERROR("stream buffer drain failed[{}]", result.error());
                 break;
             }
 
-            auto line = co_await buffer->readLine();
+            const auto line = co_await buffer->readLine();
 
             if (!line) {
                 LOG_ERROR("stream buffer read line failed[{}]", line.error());

@@ -9,21 +9,18 @@ namespace asyncio {
         RESOURCE_DESTROYED
     };
 
-    class Category : public std::error_category {
+    class ErrorCategory final : public std::error_category {
     public:
         [[nodiscard]] const char *name() const noexcept override;
         [[nodiscard]] std::string message(int value) const override;
     };
 
-    const std::error_category &category();
+    const std::error_category &errorCategory();
     std::error_code make_error_code(Error e);
 }
 
-namespace std {
-    template<>
-    struct is_error_code_enum<asyncio::Error> : public true_type {
-
-    };
-}
+template<>
+struct std::is_error_code_enum<asyncio::Error> : std::true_type {
+};
 
 #endif //ASYNCIO_ERROR_H

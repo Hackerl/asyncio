@@ -21,15 +21,15 @@ TEST_CASE("signal handler", "[signal]") {
                 kill(getpid(), SIGINT);
             });
 
-            auto result = co_await signal->on();
+            const auto result = co_await signal->on();
             REQUIRE(result);
 
             thread.join();
 #else
-            auto task = signal->on();
+            const auto task = signal->on();
             raise(SIGINT);
 
-            auto result = co_await task;
+            const auto result = co_await task;
             REQUIRE(result);
 #endif
         });
@@ -40,8 +40,8 @@ TEST_CASE("signal handler", "[signal]") {
             auto signal = asyncio::ev::makeSignal(SIGINT);
             REQUIRE(signal);
 
-            auto task = signal->on();
-            auto result = co_await asyncio::timeout(task, 50ms);
+            const auto task = signal->on();
+            const auto result = co_await asyncio::timeout(task, 50ms);
 
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);

@@ -16,18 +16,18 @@ TEST_CASE("asynchronous filesystem framework", "[filesystem framework]") {
             auto framework = asyncio::fs::makePosixAIO(asyncio::getEventLoop().get());
             REQUIRE(framework);
 
-            auto path = std::filesystem::temp_directory_path() / "asyncio-fs-file";
-            int fd = open(path.string().c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+            const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-file";
+            const int fd = open(path.string().c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
             REQUIRE(fd > 0);
             DEFER(close(fd));
             DEFER(std::filesystem::remove(path));
 
-            auto content = {
-                    std::byte{'h'},
-                    std::byte{'e'},
-                    std::byte{'l'},
-                    std::byte{'l'},
-                    std::byte{'o'}
+            constexpr std::array content = {
+                std::byte{'h'},
+                std::byte{'e'},
+                std::byte{'l'},
+                std::byte{'l'},
+                std::byte{'o'}
             };
 
             auto result = co_await framework->write(fd, 0, content);
@@ -50,29 +50,29 @@ TEST_CASE("asynchronous filesystem framework", "[filesystem framework]") {
                 auto framework = asyncio::fs::makeIOCP(asyncio::getEventLoop().get());
                 REQUIRE(framework);
 
-                auto path = std::filesystem::temp_directory_path() / "asyncio-fs-file";
-                HANDLE handle = CreateFileA(
-                        path.string().c_str(),
-                        GENERIC_READ | GENERIC_WRITE,
-                        0,
-                        nullptr,
-                        CREATE_ALWAYS,
-                        FILE_FLAG_DELETE_ON_CLOSE | FILE_FLAG_OVERLAPPED,
-                        nullptr
+                const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-file";
+                const auto handle = CreateFileA(
+                    path.string().c_str(),
+                    GENERIC_READ | GENERIC_WRITE,
+                    0,
+                    nullptr,
+                    CREATE_ALWAYS,
+                    FILE_FLAG_DELETE_ON_CLOSE | FILE_FLAG_OVERLAPPED,
+                    nullptr
                 );
                 REQUIRE(handle != INVALID_HANDLE_VALUE);
                 DEFER(CloseHandle(handle));
 
-                auto fd = (asyncio::FileDescriptor) handle;
-                auto result = framework->associate(fd);
+                const auto fd = reinterpret_cast<asyncio::FileDescriptor>(handle);
+                const auto result = framework->associate(fd);
                 REQUIRE(result);
 
-                auto content = {
-                        std::byte{'h'},
-                        std::byte{'e'},
-                        std::byte{'l'},
-                        std::byte{'l'},
-                        std::byte{'o'}
+                constexpr std::array content = {
+                    std::byte{'h'},
+                    std::byte{'e'},
+                    std::byte{'l'},
+                    std::byte{'l'},
+                    std::byte{'o'}
                 };
 
                 auto res = co_await framework->write(fd, 0, content);
@@ -92,33 +92,33 @@ TEST_CASE("asynchronous filesystem framework", "[filesystem framework]") {
                 auto framework = asyncio::fs::makeIOCP(asyncio::getEventLoop().get());
                 REQUIRE(framework);
 
-                HANDLE pipe = CreateNamedPipeA(
-                        R"(\\.\pipe\asyncio)",
-                        PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
-                        PIPE_TYPE_BYTE | PIPE_READMODE_BYTE,
-                        PIPE_UNLIMITED_INSTANCES,
-                        4096,
-                        4096,
-                        0,
-                        nullptr
+                const auto pipe = CreateNamedPipeA(
+                    R"(\\.\pipe\asyncio)",
+                    PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+                    PIPE_TYPE_BYTE | PIPE_READMODE_BYTE,
+                    PIPE_UNLIMITED_INSTANCES,
+                    4096,
+                    4096,
+                    0,
+                    nullptr
                 );
                 REQUIRE(pipe != INVALID_HANDLE_VALUE);
                 DEFER(CloseHandle(pipe));
 
-                HANDLE handle = CreateFile(
-                        R"(\\.\pipe\asyncio)",
-                        GENERIC_READ | GENERIC_WRITE,
-                        0,
-                        nullptr,
-                        OPEN_EXISTING,
-                        FILE_FLAG_OVERLAPPED,
-                        nullptr
+                const auto handle = CreateFile(
+                    R"(\\.\pipe\asyncio)",
+                    GENERIC_READ | GENERIC_WRITE,
+                    0,
+                    nullptr,
+                    OPEN_EXISTING,
+                    FILE_FLAG_OVERLAPPED,
+                    nullptr
                 );
                 REQUIRE(handle != INVALID_HANDLE_VALUE);
                 DEFER(CloseHandle(handle));
 
-                auto fd = (asyncio::FileDescriptor) pipe;
-                auto result = framework->associate(fd);
+                const auto fd = reinterpret_cast<asyncio::FileDescriptor>(pipe);
+                const auto result = framework->associate(fd);
                 REQUIRE(result);
 
                 std::byte data[5];
@@ -126,7 +126,7 @@ TEST_CASE("asynchronous filesystem framework", "[filesystem framework]") {
 
                 task.cancel();
                 co_await task;
-                auto res = task.result();
+                const auto res = task.result();
 
                 REQUIRE(!res);
                 REQUIRE(res.error() == std::errc::operation_canceled);

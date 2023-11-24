@@ -1,5 +1,6 @@
 #include <asyncio/net/dgram.h>
 #include <asyncio/event_loop.h>
+#include <asyncio/error.h>
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/std.h>
 
@@ -14,37 +15,44 @@ TEST_CASE("datagram network connection", "[dgram]") {
             auto client = asyncio::net::dgram::bind("127.0.0.1", 30001);
             REQUIRE(client);
 
-            co_await zero::async::coroutine::allSettled(
-                    [](auto server) -> zero::async::coroutine::Task<void> {
-                        std::byte data[1024];
-                        auto result = co_await server.readFrom(data);
-                        REQUIRE(result);
+            co_await allSettled(
+                [](auto s) -> zero::async::coroutine::Task<void> {
+                    std::byte data[1024];
+                    const auto result = co_await s.readFrom(data);
+                    REQUIRE(result);
 
-                        auto &[n, from] = *result;
+                    const auto &[n, from] = *result;
 
-                        REQUIRE(n);
-                        REQUIRE(from.index() == 0);
-                        REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30001)");
-                        REQUIRE(data[0] == std::byte{1});
-                        REQUIRE(data[1] == std::byte{2});
+                    REQUIRE(n);
+                    REQUIRE(from.index() == 0);
+                    REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30001)");
+                    REQUIRE(data[0] == std::byte{1});
+                    REQUIRE(data[1] == std::byte{2});
 
-                        co_await server.writeTo({data, n}, from);
-                    }(std::move(*server)),
-                    [](auto client) -> zero::async::coroutine::Task<void> {
-                        auto message = {std::byte{1}, std::byte{2}};
-                        co_await client.writeTo(message, *asyncio::net::IPv4Address::from("127.0.0.1", 30000));
+                    const auto res = co_await s.writeTo({data, n}, from);
+                    REQUIRE(res);
+                    REQUIRE(*res == n);
+                }(std::move(*server)),
+                [](auto c) -> zero::async::coroutine::Task<void> {
+                    constexpr std::array message = {std::byte{1}, std::byte{2}};
+                    const auto result = co_await c.writeTo(
+                        message,
+                        *asyncio::net::IPv4Address::from("127.0.0.1", 30000)
+                    );
+                    REQUIRE(result);
+                    REQUIRE(*result == message.size());
 
-                        std::byte data[1024];
-                        auto result = co_await client.readFrom(data);
-                        REQUIRE(result);
+                    std::byte data[1024];
+                    const auto res = co_await c.readFrom(data);
+                    REQUIRE(res);
 
-                        auto &[n, from] = *result;
+                    const auto &[n, from] = *res;
 
-                        REQUIRE(n);
-                        REQUIRE(from.index() == 0);
-                        REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
-                        REQUIRE(std::equal(data, data + n, message.begin()));
-                    }(std::move(*client))
+                    REQUIRE(n);
+                    REQUIRE(from.index() == 0);
+                    REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
+                    REQUIRE(std::equal(data, data + n, message.begin()));
+                }(std::move(*client))
             );
         });
     }
@@ -54,42 +62,44 @@ TEST_CASE("datagram network connection", "[dgram]") {
             auto server = asyncio::net::dgram::bind("127.0.0.1", 30000);
             REQUIRE(server);
 
-            co_await zero::async::coroutine::allSettled(
-                    [](auto server) -> zero::async::coroutine::Task<void> {
-                        std::byte data[1024];
-                        auto result = co_await server.readFrom(data);
-                        REQUIRE(result);
+            co_await allSettled(
+                [](auto s) -> zero::async::coroutine::Task<void> {
+                    std::byte data[1024];
+                    const auto result = co_await s.readFrom(data);
+                    REQUIRE(result);
 
-                        auto &[n, from] = *result;
+                    const auto &[n, from] = *result;
 
-                        REQUIRE(n);
-                        REQUIRE(from.index() == 0);
-                        REQUIRE(fmt::to_string(from).find("127.0.0.1") != std::string::npos);
-                        REQUIRE(data[0] == std::byte{1});
-                        REQUIRE(data[1] == std::byte{2});
+                    REQUIRE(n);
+                    REQUIRE(from.index() == 0);
+                    REQUIRE(fmt::to_string(from).find("127.0.0.1") != std::string::npos);
+                    REQUIRE(data[0] == std::byte{1});
+                    REQUIRE(data[1] == std::byte{2});
 
-                        co_await server.writeTo({data, n}, from);
-                    }(std::move(*server)),
-                    []() -> zero::async::coroutine::Task<void> {
-                        auto client = std::move(co_await asyncio::net::dgram::connect("127.0.0.1", 30000));
-                        REQUIRE(client);
+                    const auto res = co_await s.writeTo({data, n}, from);
+                    REQUIRE(res);
+                    REQUIRE(*res == n);
+                }(std::move(*server)),
+                []() -> zero::async::coroutine::Task<void> {
+                    auto client = std::move(co_await asyncio::net::dgram::connect("127.0.0.1", 30000));
+                    REQUIRE(client);
 
-                        auto message = {std::byte{1}, std::byte{2}};
-                        auto result = co_await client->write(message);
-                        REQUIRE(result);
-                        REQUIRE(*result == message.size());
+                    constexpr std::array message = {std::byte{1}, std::byte{2}};
+                    const auto result = co_await client->write(message);
+                    REQUIRE(result);
+                    REQUIRE(*result == message.size());
 
-                        std::byte data[1024];
-                        auto res = co_await client->readFrom(data);
-                        REQUIRE(res);
+                    std::byte data[1024];
+                    const auto res = co_await client->readFrom(data);
+                    REQUIRE(res);
 
-                        auto &[n, from] = *res;
+                    const auto &[n, from] = *res;
 
-                        REQUIRE(n);
-                        REQUIRE(from.index() == 0);
-                        REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
-                        REQUIRE(std::equal(data, data + n, message.begin()));
-                    }()
+                    REQUIRE(n);
+                    REQUIRE(from.index() == 0);
+                    REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
+                    REQUIRE(std::equal(data, data + n, message.begin()));
+                }()
             );
         });
     }
@@ -102,8 +112,7 @@ TEST_CASE("datagram network connection", "[dgram]") {
             socket->setTimeout(50ms, 0ms);
 
             std::byte data[1024];
-            auto result = co_await socket->readFrom(data);
-
+            const auto result = co_await socket->readFrom(data);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         });
@@ -111,25 +120,23 @@ TEST_CASE("datagram network connection", "[dgram]") {
 
     SECTION("close") {
         asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto socket = asyncio::net::dgram::bind("127.0.0.1", 30000)
-                    .transform([](asyncio::net::dgram::Socket &&socket) {
-                        return std::make_shared<asyncio::net::dgram::Socket>(std::move(socket));
-                    });
-
+            const auto socket = asyncio::net::dgram::bind("127.0.0.1", 30000)
+                .transform([](asyncio::net::dgram::Socket &&s) {
+                    return std::make_shared<asyncio::net::dgram::Socket>(std::move(s));
+                });
             REQUIRE(socket);
 
-            co_await zero::async::coroutine::allSettled(
-                    [](auto socket) -> zero::async::coroutine::Task<void> {
-                        std::byte data[1024];
-                        auto result = co_await socket->readFrom(data);
-
-                        REQUIRE(!result);
-                        REQUIRE(result.error() == asyncio::Error::IO_EOF);
-                    }(*socket),
-                    [](auto socket) -> zero::async::coroutine::Task<void> {
-                        co_await asyncio::sleep(50ms);
-                        co_await socket->close();
-                    }(*socket)
+            co_await allSettled(
+                [](auto s) -> zero::async::coroutine::Task<void> {
+                    std::byte data[1024];
+                    const auto result = co_await s->readFrom(data);
+                    REQUIRE(!result);
+                    REQUIRE(result.error() == asyncio::Error::IO_EOF);
+                }(*socket),
+                [](auto s) -> zero::async::coroutine::Task<void> {
+                    co_await asyncio::sleep(50ms);
+                    co_await s->close();
+                }(*socket)
             );
         });
     }
@@ -140,8 +147,8 @@ TEST_CASE("datagram network connection", "[dgram]") {
             REQUIRE(socket);
 
             std::byte data[1024];
-            auto task = socket->readFrom(data);
-            auto result = co_await asyncio::timeout(task, 50ms);
+            const auto task = socket->readFrom(data);
+            const auto result = co_await asyncio::timeout(task, 50ms);
 
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);

@@ -14,62 +14,59 @@ namespace asyncio::fs {
     public:
         virtual tl::expected<void, std::error_code> associate(FileDescriptor fd) = 0;
 
-    public:
-        virtual zero::async::coroutine::Task<size_t, std::error_code>
+        virtual zero::async::coroutine::Task<std::size_t, std::error_code>
         read(FileDescriptor fd, std::streamoff offset, std::span<std::byte> data) = 0;
 
-        virtual zero::async::coroutine::Task<size_t, std::error_code>
+        virtual zero::async::coroutine::Task<std::size_t, std::error_code>
         write(FileDescriptor fd, std::streamoff offset, std::span<const std::byte> data) = 0;
     };
 
 #if __unix__ || __APPLE__
-    class PosixAIO : public IFramework {
+    class PosixAIO final : public IFramework {
     public:
         PosixAIO(EventLoop *eventLoop, std::unique_ptr<event, decltype(event_free) *> event);
         PosixAIO(PosixAIO && rhs) noexcept;
         ~PosixAIO() override;
 
+    private:
+        void onSignal();
+
     public:
         tl::expected<void, std::error_code> associate(FileDescriptor fd) override;
 
-    public:
-        zero::async::coroutine::Task<size_t, std::error_code>
+        zero::async::coroutine::Task<std::size_t, std::error_code>
         read(FileDescriptor fd, std::streamoff offset, std::span<std::byte> data) override;
 
-        zero::async::coroutine::Task<size_t, std::error_code>
+        zero::async::coroutine::Task<std::size_t, std::error_code>
         write(FileDescriptor fd, std::streamoff offset, std::span<const std::byte> data) override;
-
-    private:
-        void onSignal();
 
     private:
         EventLoop *mEventLoop;
         std::unique_ptr<event, decltype(event_free) *> mEvent;
-        std::list<std::pair<aiocb *, zero::async::promise::Promise<size_t, std::error_code>>> mPending;
+        std::list<std::pair<aiocb *, zero::async::promise::Promise<std::size_t, std::error_code>>> mPending;
     };
 
     tl::expected<PosixAIO, std::error_code> makePosixAIO(EventLoop *eventLoop);
 #endif
 
 #ifdef _WIN32
-    class IOCP : public IFramework {
+    class IOCP final : public IFramework {
     public:
-        IOCP(EventLoop * eventLoop, HANDLE handle);
-        IOCP(IOCP && rhs) noexcept;
+        IOCP(EventLoop *eventLoop, HANDLE handle);
+        IOCP(IOCP &&rhs) noexcept;
         ~IOCP() override;
+
+    private:
+        void dispatch() const;
 
     public:
         tl::expected<void, std::error_code> associate(FileDescriptor fd) override;
 
-    public:
-        zero::async::coroutine::Task<size_t, std::error_code>
+        zero::async::coroutine::Task<std::size_t, std::error_code>
         read(FileDescriptor fd, std::streamoff offset, std::span<std::byte> data) override;
 
-        zero::async::coroutine::Task<size_t, std::error_code>
+        zero::async::coroutine::Task<std::size_t, std::error_code>
         write(FileDescriptor fd, std::streamoff offset, std::span<const std::byte> data) override;
-
-    private:
-        void dispatch();
 
     private:
         HANDLE mHandle;

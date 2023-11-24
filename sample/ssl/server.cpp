@@ -6,11 +6,11 @@
 #include <csignal>
 #include <fmt/std.h>
 
-zero::async::coroutine::Task<void> handle(asyncio::net::stream::Buffer buffer) {
+zero::async::coroutine::Task<void> handle(asyncio::net::ssl::stream::Buffer buffer) {
     LOG_INFO("new connection[{}]", fmt::to_string(*buffer.remoteAddress()));
 
     while (true) {
-        auto line = co_await buffer.readLine();
+        const auto line = co_await buffer.readLine();
 
         if (!line) {
             LOG_ERROR("stream buffer read line failed[{}]", line.error());
@@ -19,9 +19,7 @@ zero::async::coroutine::Task<void> handle(asyncio::net::stream::Buffer buffer) {
 
         LOG_INFO("receive message[{}]", *line);
 
-        auto result = co_await buffer.writeAll(std::as_bytes(std::span{*line}));
-
-        if (!result) {
+        if (const auto result = co_await buffer.writeAll(std::as_bytes(std::span{*line})); !result) {
             LOG_ERROR("stream buffer drain failed[{}]", result.error());
             break;
         }
@@ -45,7 +43,7 @@ zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::ssl::str
     co_return result;
 }
 
-int main(int argc, char *argv[]) {
+int main(const int argc, char *argv[]) {
     INIT_CONSOLE_LOG(zero::INFO_LEVEL);
 
     zero::Cmdline cmdline;
@@ -59,14 +57,14 @@ int main(int argc, char *argv[]) {
     cmdline.addOptional("secure", 's', "verify client cert");
     cmdline.parse(argc, argv);
 
-    auto host = cmdline.get<std::string>("host");
-    auto port = cmdline.get<unsigned short>("port");
+    const auto host = cmdline.get<std::string>("host");
+    const auto port = cmdline.get<unsigned short>("port");
 
-    auto ca = cmdline.get<std::filesystem::path>("ca");
-    auto cert = cmdline.get<std::filesystem::path>("cert");
-    auto privateKey = cmdline.get<std::filesystem::path>("key");
+    const auto ca = cmdline.get<std::filesystem::path>("ca");
+    const auto cert = cmdline.get<std::filesystem::path>("cert");
+    const auto privateKey = cmdline.get<std::filesystem::path>("key");
 
-    bool secure = cmdline.exist("secure");
+    const bool secure = cmdline.exist("secure");
 
 #ifdef _WIN32
     WSADATA wsaData;
@@ -82,15 +80,13 @@ int main(int argc, char *argv[]) {
 #endif
 
     asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-        asyncio::net::ssl::Config config = {
-                .ca = ca,
-                .cert = cert,
-                .privateKey = privateKey,
-                .insecure = !secure,
-                .server = true
-        };
-
-        auto context = asyncio::net::ssl::newContext(config);
+        const auto context = asyncio::net::ssl::newContext({
+            .ca = ca,
+            .cert = cert,
+            .privateKey = privateKey,
+            .insecure = !secure,
+            .server = true
+        });
 
         if (!context) {
             LOG_ERROR("create ssl context failed[{}]", context.error());
@@ -111,7 +107,7 @@ int main(int argc, char *argv[]) {
             co_return;
         }
 
-        co_await zero::async::coroutine::race(signal->on(), serve(std::move(*listener)));
+        co_await race(signal->on(), serve(std::move(*listener)));
     });
 
 #ifdef _WIN32

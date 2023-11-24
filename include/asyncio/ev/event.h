@@ -1,7 +1,6 @@
 #ifndef ASYNCIO_EVENT_H
 #define ASYNCIO_EVENT_H
 
-#include <chrono>
 #include <optional>
 #include <event.h>
 #include <cassert>
@@ -21,15 +20,14 @@ namespace asyncio::ev {
     public:
         using Context = std::optional<zero::async::promise::Promise<T, std::error_code>>;
 
-    public:
-        explicit Notifier(event *e) : mEvent(
+        explicit Notifier(event *e)
+            : mEvent(
                 e,
-                [](event *e) {
-                    delete static_cast<Context *>(event_get_callback_arg(e));
-                    event_free(e);
+                [](event *ptr) {
+                    delete static_cast<Context *>(event_get_callback_arg(ptr));
+                    event_free(ptr);
                 }
-        ) {
-
+            ) {
         }
 
         Notifier(Notifier &&) = default;
@@ -66,13 +64,9 @@ namespace asyncio::ev {
     public:
         explicit Event(event *e);
 
-    public:
-        FileDescriptor fd();
+        [[nodiscard]] FileDescriptor fd() const;
+        void trigger(short events) const;
 
-    public:
-        void trigger(short events);
-
-    public:
         zero::async::coroutine::Task<short, std::error_code>
         on(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
     };

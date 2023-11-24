@@ -2,8 +2,6 @@
 #define ASYNCIO_TIMER_H
 
 #include "event.h"
-#include <chrono>
-#include <zero/interface.h>
 #include <zero/async/coroutine.h>
 
 namespace asyncio::ev {
@@ -11,7 +9,6 @@ namespace asyncio::ev {
     public:
         explicit Timer(event *e);
 
-    public:
         zero::async::coroutine::Task<void, std::error_code> after(std::chrono::milliseconds delay);
     };
 

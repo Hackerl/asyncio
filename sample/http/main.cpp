@@ -27,14 +27,14 @@ int main(int argc, char *argv[]) {
 
     cmdline.parse(argc, argv);
 
-    auto url = cmdline.get<asyncio::http::URL>("url");
-    auto method = cmdline.getOptional<std::string>("method");
-    auto headers = cmdline.getOptional<std::vector<std::string>>("headers");
-    auto body = cmdline.getOptional<std::string>("body");
-    auto output = cmdline.getOptional<std::filesystem::path>("output");
+    const auto url = cmdline.get<asyncio::http::URL>("url");
+    const auto method = cmdline.getOptional<std::string>("method");
+    const auto headers = cmdline.getOptional<std::vector<std::string>>("headers");
+    const auto body = cmdline.getOptional<std::string>("body");
+    const auto output = cmdline.getOptional<std::filesystem::path>("output");
 
-    auto json = cmdline.exist("json");
-    auto form = cmdline.exist("form");
+    const auto json = cmdline.exist("json");
+    const auto form = cmdline.exist("form");
 
 #ifdef _WIN32
     WSADATA wsaData;
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
         if (headers) {
             for (const auto &header: *headers) {
-                auto tokens = zero::strings::split(header, "=");
+                const auto tokens = zero::strings::split(header, "=");
 
                 if (tokens.size() != 2) {
                     LOG_WARNING("invalid header[{}]", header);
@@ -65,14 +65,14 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        auto result = asyncio::http::makeRequests(options);
+        const auto result = makeRequests(options);
 
         if (!result) {
             LOG_ERROR("make result failed[{}]", result.error());
             co_return;
         }
 
-        auto response = std::move(co_await [&, requests = *result]() {
+        const auto response = std::move(co_await [&, requests = *result] {
             if (!body)
                 return requests->request(*method, url, options);
 
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
                 std::map<std::string, std::variant<std::string, std::filesystem::path>> data;
 
                 for (const auto &part: zero::strings::split(*body, ",")) {
-                    auto tokens = zero::strings::split(part, "=");
+                    const auto tokens = zero::strings::split(part, "=");
 
                     if (tokens.size() != 2)
                         continue;
@@ -106,9 +106,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (output) {
-            auto res = co_await response->output(*output);
-
-            if (!res) {
+            if (const auto res = co_await response->output(*output); !res) {
                 LOG_ERROR("output to {} failed[{}]", *output, res.error());
                 co_return;
             }
@@ -116,7 +114,7 @@ int main(int argc, char *argv[]) {
             co_return;
         }
 
-        auto content = co_await response->string();
+        const auto content = co_await response->string();
 
         if (!content) {
             LOG_ERROR("get response content failed[{}]", content.error());
