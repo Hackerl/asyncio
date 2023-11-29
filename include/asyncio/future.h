@@ -22,6 +22,10 @@ namespace asyncio {
 
         auto operator<=>(const Future &) const = default;
 
+        [[nodiscard]] bool done() const {
+            return mStorage->result.has_value();
+        }
+
         template<typename... Ts>
         void set(Ts &&... args) {
             assert(!mStorage->result);
