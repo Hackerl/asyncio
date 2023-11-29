@@ -6,11 +6,17 @@
 #include <event2/dns.h>
 #include <zero/try.h>
 #include "worker.h"
+#include "fs/framework.h"
 
 namespace asyncio {
     class EventLoop {
     public:
-        EventLoop(event_base *base, evdns_base *dnsBase, std::size_t maxWorkers);
+        EventLoop(
+            std::unique_ptr<event_base, decltype(event_base_free) *> base,
+            std::unique_ptr<evdns_base, void (*)(evdns_base *)> dnsBase,
+            std::unique_ptr<fs::IFramework> framework,
+            std::size_t maxWorkers
+        );
 
         [[nodiscard]] event_base *base() const;
         [[nodiscard]] evdns_base *dnsBase() const;
@@ -53,6 +59,7 @@ namespace asyncio {
         std::queue<std::unique_ptr<Worker>> mWorkers;
         std::unique_ptr<event_base, decltype(event_base_free) *> mBase;
         std::unique_ptr<evdns_base, void (*)(evdns_base *)> mDnsBase;
+        std::unique_ptr<fs::IFramework> mFramework;
 
         template<typename F>
         friend zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>

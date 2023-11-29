@@ -32,13 +32,14 @@ add_library(
         src/ev/buffer.cpp
         src/ev/signal.cpp
         src/ev/timer.cpp
-        src/fs/framework.cpp
         src/net/net.cpp
         src/net/dns.cpp
         src/net/dgram.cpp
         src/net/stream.cpp
         src/http/url.cpp
         src/http/request.cpp
+        $<$<PLATFORM_ID:Windows>:src/fs/iocp.cpp>
+        $<$<PLATFORM_ID:Linux,Darwin>:src/fs/posix.cpp>
         $<$<NOT:$<BOOL:${ASYNCIO_DISABLE_SSL}>>:src/net/ssl.cpp>
 )
 

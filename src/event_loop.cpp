@@ -1,3 +1,4 @@
+#include <event.h>
 #include <asyncio/event_loop.h>
 #include <asyncio/ev/timer.h>
 #include <event2/dns.h>
@@ -5,11 +6,20 @@
 #include <zero/defer.h>
 #include <mutex>
 
+#ifdef _WIN32
+#include <asyncio/fs/iocp.h>
+#elif __APPLE__ || (__unix__ && !__ANDROID__)
+#include <asyncio/fs/posix.h>
+#endif
+
 thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 
-asyncio::EventLoop::EventLoop(event_base *base, evdns_base *dnsBase, const std::size_t maxWorkers)
-    : mMaxWorkers(maxWorkers), mBase(base, event_base_free),
-      mDnsBase(dnsBase, [](evdns_base *b) { evdns_base_free(b, 0); }) {
+asyncio::EventLoop::EventLoop(
+    std::unique_ptr<event_base, decltype(event_base_free) *> base,
+    std::unique_ptr<evdns_base, void (*)(evdns_base *)> dnsBase,
+    std::unique_ptr<fs::IFramework> framework,
+    const std::size_t maxWorkers
+) : mMaxWorkers(maxWorkers), mBase(std::move(base)), mDnsBase(std::move(dnsBase)), mFramework(std::move(framework)) {
 }
 
 event_base *asyncio::EventLoop::base() const {
@@ -80,33 +90,59 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(const
     DEFER(event_config_free(cfg));
     event_config_set_flag(cfg, EVENT_BASE_FLAG_DISALLOW_SIGNALFD);
 
-    event_base *base = event_base_new_with_config(cfg);
+    auto base = std::unique_ptr<event_base, decltype(event_base_free) *>(
+        event_base_new_with_config(cfg),
+        event_base_free
+    );
 
     if (!base)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
 #ifdef __ANDROID__
-    evdns_base *dnsBase = evdns_base_new(base, 0);
+    auto dnsBase = std::unique_ptr<evdns_base, void (*)(evdns_base *)>(
+        evdns_base_new(base.get(), 0),
+        [](evdns_base *b) {
+            evdns_base_free(b, 0);
+        }
+    );
+
+    if (!dnsBase)
+        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
 #ifndef NO_DEFAULT_NAMESERVER
 #ifndef DEFAULT_NAMESERVER
 #define DEFAULT_NAMESERVER "8.8.8.8"
 #endif
-    if (evdns_base_nameserver_ip_add(dnsBase, DEFAULT_NAMESERVER) != 0) {
-        event_base_free(base);
+    if (evdns_base_nameserver_ip_add(dnsBase.get(), DEFAULT_NAMESERVER) != 0)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-    }
 #endif
 #else
-    evdns_base *dnsBase = evdns_base_new(base, EVDNS_BASE_INITIALIZE_NAMESERVERS);
+    auto dnsBase = std::unique_ptr<evdns_base, void (*)(evdns_base *)>(
+        evdns_base_new(base.get(), EVDNS_BASE_INITIALIZE_NAMESERVERS),
+        [](evdns_base *b) {
+            evdns_base_free(b, 0);
+        }
+    );
+
+    if (!dnsBase)
+        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 #endif
 
-    if (!dnsBase) {
-        event_base_free(base);
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-    }
+#ifdef __ANDROID__
+    return EventLoop{std::move(base), std::move(dnsBase), nullptr, maxWorkers};
+#else
+#ifdef _WIN32
+    auto framework = TRY(fs::makeIOCP().transform([](fs::IOCP &&iocp) {
+        return std::make_unique<fs::IOCP>(std::move(iocp));
+    }));
+#elif __APPLE__ || (__unix__ && !__ANDROID__)
+    auto framework = fs::makePosixAIO(base.get()).transform([](fs::PosixAIO &&aio) {
+        return std::make_unique<fs::PosixAIO>(std::move(aio));
+    });
+#endif
 
-    return EventLoop{base, dnsBase, maxWorkers};
+    return EventLoop{std::move(base), std::move(dnsBase), std::move(*framework), maxWorkers};
+#endif
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
