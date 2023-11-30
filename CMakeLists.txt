@@ -32,6 +32,7 @@ add_library(
         src/ev/buffer.cpp
         src/ev/signal.cpp
         src/ev/timer.cpp
+        src/fs/file.cpp
         src/net/net.cpp
         src/net/dns.cpp
         src/net/dgram.cpp

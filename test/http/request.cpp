@@ -245,7 +245,7 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(result);
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
-                        const auto path = std::filesystem::temp_directory_path() / "asyncio-file";
+                        const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
                         std::ofstream stream(path);
                         REQUIRE(stream.is_open());
 
@@ -321,7 +321,7 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(result);
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
-                        const auto path = std::filesystem::temp_directory_path() / "asyncio-file";
+                        const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
                         std::ofstream stream(path);
                         REQUIRE(stream.is_open());
 
@@ -470,7 +470,7 @@ TEST_CASE("http requests", "[request]") {
                     const auto response = std::move(co_await requests.value()->get(*url));
                     REQUIRE(response);
 
-                    const auto path = std::filesystem::temp_directory_path() / "asyncio-file";
+                    const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
                     const auto result = co_await response->output(path);
                     REQUIRE(result);
 

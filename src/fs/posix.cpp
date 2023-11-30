@@ -3,6 +3,10 @@
 #include <csignal>
 #include <cassert>
 
+bool asyncio::fs::PosixAIO::Request::operator==(const Request &rhs) const {
+    return cb == rhs.cb && eventLoop == rhs.eventLoop && promise == rhs.promise;
+}
+
 asyncio::fs::PosixAIO::PosixAIO(std::unique_ptr<event, decltype(event_free) *> event): mEvent(std::move(event)) {
     const auto e = mEvent.get();
 
@@ -49,7 +53,7 @@ void asyncio::fs::PosixAIO::onSignal() {
                 continue;
             }
 
-            it->eventLoop->post([error = errno, promise = std::move(it->promise)]() mutable {
+            it->eventLoop->post([=, promise = std::move(it->promise)]() mutable {
                 promise.reject(std::error_code(error, std::system_category()));
             });
 
@@ -84,13 +88,13 @@ zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::fs::PosixAIO::read(
     std::shared_ptr<EventLoop> eventLoop,
     const FileDescriptor fd,
-    const std::streamoff offset,
+    const std::uint64_t offset,
     std::span<std::byte> data
 ) {
     aiocb cb = {};
 
     cb.aio_fildes = fd;
-    cb.aio_offset = offset;
+    cb.aio_offset = static_cast<off_t>(offset);
     cb.aio_buf = data.data();
     cb.aio_nbytes = data.size();
 
@@ -133,13 +137,13 @@ zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::fs::PosixAIO::write(
     std::shared_ptr<EventLoop> eventLoop,
     const FileDescriptor fd,
-    const std::streamoff offset,
+    const std::uint64_t offset,
     std::span<const std::byte> data
 ) {
     aiocb cb = {};
 
     cb.aio_fildes = fd;
-    cb.aio_offset = offset;
+    cb.aio_offset = static_cast<off_t>(offset);
     cb.aio_buf = static_cast<void *>(const_cast<std::byte *>(data.data()));
     cb.aio_nbytes = data.size();
 

@@ -15,7 +15,7 @@ namespace asyncio {
             read(
                 std::shared_ptr<EventLoop> eventLoop,
                 FileDescriptor fd,
-                std::streamoff offset,
+                std::uint64_t offset,
                 std::span<std::byte> data
             ) = 0;
 
@@ -23,7 +23,7 @@ namespace asyncio {
             write(
                 std::shared_ptr<EventLoop> eventLoop,
                 FileDescriptor fd,
-                std::streamoff offset,
+                std::uint64_t offset,
                 std::span<const std::byte> data
             ) = 0;
         };

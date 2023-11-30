@@ -20,6 +20,7 @@ namespace asyncio {
 
         [[nodiscard]] event_base *base() const;
         [[nodiscard]] evdns_base *dnsBase() const;
+        [[nodiscard]] fs::IFramework *framework() const;
 
         bool addNameserver(const char *ip) const;
 

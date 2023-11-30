@@ -73,7 +73,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::fs::IOCP::read(
     std::shared_ptr<EventLoop> eventLoop,
     const FileDescriptor fd,
-    const std::streamoff offset,
+    const std::uint64_t offset,
     std::span<std::byte> data
 ) {
     Request request;
@@ -103,7 +103,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::fs::IOCP::write(
     std::shared_ptr<EventLoop> eventLoop,
     const FileDescriptor fd,
-    const std::streamoff offset,
+    const std::uint64_t offset,
     const std::span<const std::byte> data
 ) {
     Request request;

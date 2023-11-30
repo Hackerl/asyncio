@@ -45,6 +45,20 @@ namespace asyncio {
         virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
     };
 
+    class ISeekable : public virtual zero::Interface {
+    public:
+        enum Whence {
+            BEGIN,
+            CURRENT,
+            END
+        };
+
+        virtual tl::expected<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
+        virtual tl::expected<void, std::error_code> rewind() = 0;
+        virtual tl::expected<std::uint64_t, std::error_code> length() = 0;
+        virtual tl::expected<std::uint64_t, std::error_code> position() = 0;
+    };
+
     class IBuffered : public virtual zero::Interface {
     public:
         virtual std::size_t capacity() = 0;

@@ -15,7 +15,7 @@ TEST_CASE("posix aio", "[filesystem framework]") {
             auto framework = asyncio::fs::makePosixAIO(eventLoop->base());
             REQUIRE(framework);
 
-            const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-file";
+            const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-posix";
             const int fd = open(path.string().c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
             REQUIRE(fd > 0);
             DEFER(close(fd));

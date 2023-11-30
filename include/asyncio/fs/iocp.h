@@ -20,7 +20,7 @@ namespace asyncio::fs {
         read(
             std::shared_ptr<EventLoop> eventLoop,
             FileDescriptor fd,
-            std::streamoff offset,
+            std::uint64_t offset,
             std::span<std::byte> data
         ) override;
 
@@ -28,7 +28,7 @@ namespace asyncio::fs {
         write(
             std::shared_ptr<EventLoop> eventLoop,
             FileDescriptor fd,
-            std::streamoff offset,
+            std::uint64_t offset,
             std::span<const std::byte> data
         ) override;
 

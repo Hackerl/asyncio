@@ -12,7 +12,7 @@ namespace asyncio::fs {
             std::shared_ptr<EventLoop> eventLoop;
             zero::async::promise::Promise<std::size_t, std::error_code> promise;
 
-            auto operator<=>(const Request &) const = default;
+            bool operator==(const Request &rhs) const;
         };
 
     public:
@@ -30,7 +30,7 @@ namespace asyncio::fs {
         read(
             std::shared_ptr<EventLoop> eventLoop,
             FileDescriptor fd,
-            std::streamoff offset,
+            std::uint64_t offset,
             std::span<std::byte> data
         ) override;
 
@@ -38,7 +38,7 @@ namespace asyncio::fs {
         write(
             std::shared_ptr<EventLoop> eventLoop,
             FileDescriptor fd,
-            std::streamoff offset,
+            std::uint64_t offset,
             std::span<const std::byte> data
         ) override;
 

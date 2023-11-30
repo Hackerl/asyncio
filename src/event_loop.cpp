@@ -30,6 +30,10 @@ evdns_base *asyncio::EventLoop::dnsBase() const {
     return mDnsBase.get();
 }
 
+asyncio::fs::IFramework * asyncio::EventLoop::framework() const {
+    return mFramework.get();
+}
+
 bool asyncio::EventLoop::addNameserver(const char *ip) const {
     return evdns_base_nameserver_ip_add(mDnsBase.get(), ip) == 0;
 }

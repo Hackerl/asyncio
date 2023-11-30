@@ -13,7 +13,7 @@ TEST_CASE("IOCP", "[filesystem framework]") {
             auto framework = asyncio::fs::makeIOCP();
             REQUIRE(framework);
 
-            const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-file";
+            const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-iocp";
             const auto handle = CreateFileA(
                 path.string().c_str(),
                 GENERIC_READ | GENERIC_WRITE,

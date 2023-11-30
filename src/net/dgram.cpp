@@ -159,7 +159,9 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket:
         event.trigger(ev::What::CLOSED);
     }
 
-    evutil_closesocket(std::exchange(mFD, INVALID_FILE_DESCRIPTOR));
+    if (evutil_closesocket(std::exchange(mFD, INVALID_FILE_DESCRIPTOR)) != 0)
+        co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+
     co_return tl::expected<void, std::error_code>{};
 }
 
