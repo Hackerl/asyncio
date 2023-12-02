@@ -28,6 +28,15 @@ asyncio::fs::File::~File() {
 #endif
 }
 
+tl::expected<asyncio::fs::File, std::error_code> asyncio::fs::File::from(const FileDescriptor fd, const bool append) {
+    auto eventLoop = getEventLoop();
+    assert(eventLoop);
+    assert(eventLoop->framework());
+
+    TRY(eventLoop->framework()->associate(fd));
+    return File{std::move(eventLoop), fd, append};
+}
+
 zero::async::coroutine::Task<void, std::error_code> asyncio::fs::File::close() {
     if (mFD == INVALID_FILE_DESCRIPTOR)
         co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
@@ -75,13 +84,11 @@ asyncio::fs::File::write(const std::span<const std::byte> data) {
     if (mFD == INVALID_FILE_DESCRIPTOR)
         co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
-    const auto result = CO_TRY(co_await mEventLoop->framework()->write(mEventLoop, mFD, mOffset, data));
-
     if (mAppend) {
         CO_TRY(seek(0, END));
-        co_return *result;
     }
 
+    const auto result = CO_TRY(co_await mEventLoop->framework()->write(mEventLoop, mFD, mOffset, data));
     mOffset += *result;
     co_return *result;
 }

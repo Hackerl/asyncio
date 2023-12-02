@@ -443,7 +443,11 @@ asyncio::net::dgram::connect(const std::string host, const unsigned short port) 
 }
 
 tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::makeSocket(const int family) {
+#ifdef _WIN32
     const auto fd = static_cast<FileDescriptor>(socket(family, SOCK_DGRAM, 0));
+#else
+    const auto fd = socket(family, SOCK_DGRAM, 0);
+#endif
 
     if (fd == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));

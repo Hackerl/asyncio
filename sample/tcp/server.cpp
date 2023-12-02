@@ -65,7 +65,7 @@ int main(const int argc, char *argv[]) {
     }
 #endif
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
     signal(SIGPIPE, SIG_IGN);
 #endif
 

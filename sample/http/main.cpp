@@ -4,7 +4,7 @@
 #include <zero/cmdline.h>
 #include <fmt/std.h>
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
 #include <csignal>
 #endif
 
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-#ifdef __unix__
+#if __unix__ || __APPLE__
     signal(SIGPIPE, SIG_IGN);
 #endif
 

@@ -15,6 +15,7 @@ add_executable(
         ev/signal.cpp
         ev/timer.cpp
         fs/file.cpp
+        fs/pipe.cpp
         net/net.cpp
         net/dns.cpp
         net/dgram.cpp

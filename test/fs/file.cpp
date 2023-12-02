@@ -317,6 +317,42 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
             REQUIRE(!n);
             REQUIRE(n.error() == std::errc::bad_file_descriptor);
         }
+
+        SECTION("from file descriptor") {
+#ifdef _WIN32
+            const auto handle = CreateFileA(
+                path.string().c_str(),
+                GENERIC_READ,
+                FILE_SHARE_READ,
+                nullptr,
+                OPEN_EXISTING,
+                FILE_FLAG_OVERLAPPED,
+                nullptr
+            );
+            REQUIRE(handle != INVALID_HANDLE_VALUE);
+            const auto fd = reinterpret_cast<asyncio::FileDescriptor>(handle);
+#else
+            const int fd = open(path.string().c_str(), O_RDONLY);
+            REQUIRE(fd != -1);
+#endif
+
+            auto file = asyncio::fs::File::from(fd);
+
+            std::byte data[6];
+            auto n = co_await file->read(data);
+            REQUIRE(n);
+            REQUIRE(*n == 6);
+            REQUIRE(memcmp(data, "hello ", 6) == 0);
+
+            n = co_await file->read(data);
+            REQUIRE(n);
+            REQUIRE(*n == 5);
+            REQUIRE(memcmp(data, "world", 5) == 0);
+
+            n = co_await file->read(data);
+            REQUIRE(!n);
+            REQUIRE(n.error() == asyncio::Error::IO_EOF);
+        }
     });
 
     REQUIRE(std::filesystem::remove(path));
