@@ -1,19 +1,20 @@
 #include <asyncio/fs/file.h>
 #include <asyncio/error.h>
+#include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
 #include <fstream>
 #include <fcntl.h>
 
-TEST_CASE("asynchronous filesystem", "[filesystem]") {
-    const auto path = std::filesystem::temp_directory_path() / "asyncio-fs";
-    constexpr std::string_view content = "hello world";
+constexpr std::string_view CONTENT = "hello world";
+const auto path = std::filesystem::temp_directory_path() / "asyncio-fs";
 
+TEST_CASE("asynchronous filesystem", "[filesystem]") {
     std::ofstream stream(path);
     REQUIRE(stream.is_open());
-    stream << content;
+    stream << CONTENT;
     stream.close();
 
-    asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("read only") {
             auto file = asyncio::fs::open(path);
             REQUIRE(file);
@@ -38,8 +39,8 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
             SECTION("read all") {
                 const auto result = co_await file->readAll();
                 REQUIRE(result);
-                REQUIRE(result->size() == content.size());
-                REQUIRE(memcmp(result->data(), content.data(), 11) == 0);
+                REQUIRE(result->size() == CONTENT.size());
+                REQUIRE(memcmp(result->data(), CONTENT.data(), CONTENT.size()) == 0);
 
                 std::byte data[1024];
                 const auto res = co_await file->read(data);
@@ -48,7 +49,8 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
             }
 
             SECTION("write") {
-                REQUIRE(!co_await file->write(std::as_bytes(std::span{content})));
+                const auto result = co_await file->write(std::as_bytes(std::span{CONTENT}));
+                REQUIRE(!result);
             }
         }
 
@@ -58,18 +60,19 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
 
             SECTION("read") {
                 std::byte data[6];
-                REQUIRE(!co_await file->read(data));
+                const auto result = co_await file->read(data);
+                REQUIRE(!result);
             }
 
             SECTION("write") {
-                constexpr std::string_view repalce = "wolrd hello";
-                const auto n = co_await file->write(std::as_bytes(std::span{repalce}));
+                const std::string replace = zero::strings::toupper(CONTENT);
+                const auto n = co_await file->write(std::as_bytes(std::span{replace}));
                 REQUIRE(n);
-                REQUIRE(*n == repalce.size());
+                REQUIRE(*n == replace.size());
 
                 std::ifstream s(path);
                 REQUIRE(s.is_open());
-                REQUIRE(std::string{std::istreambuf_iterator(s), std::istreambuf_iterator<char>()} == repalce);
+                REQUIRE(std::string{std::istreambuf_iterator(s), std::istreambuf_iterator<char>()} == replace);
             }
         }
 
@@ -83,9 +86,9 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
             REQUIRE(*n == 6);
             REQUIRE(memcmp(data, "hello ", 6) == 0);
 
-            n = co_await file->write(std::as_bytes(std::span{content}));
+            n = co_await file->write(std::as_bytes(std::span{CONTENT}));
             REQUIRE(n);
-            REQUIRE(*n == content.size());
+            REQUIRE(*n == CONTENT.size());
 
             std::ifstream s(path);
             REQUIRE(s.is_open());
@@ -187,15 +190,15 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
 
             auto length = file->length();
             REQUIRE(length);
-            REQUIRE(*length == content.size());
+            REQUIRE(*length == CONTENT.size());
 
-            const auto n = co_await file->write(std::as_bytes(std::span{content}));
+            const auto n = co_await file->write(std::as_bytes(std::span{CONTENT}));
             REQUIRE(n);
-            REQUIRE(*n == content.size());
+            REQUIRE(*n == CONTENT.size());
 
             length = file->length();
             REQUIRE(length);
-            REQUIRE(*length == content.size() * 2);
+            REQUIRE(*length == CONTENT.size() * 2);
         }
 
         SECTION("append") {
@@ -216,13 +219,13 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
             REQUIRE(pos);
             REQUIRE(*pos == 5);
 
-            n = co_await file->write(std::as_bytes(std::span{content}));
+            n = co_await file->write(std::as_bytes(std::span{CONTENT}));
             REQUIRE(n);
-            REQUIRE(*n == content.size());
+            REQUIRE(*n == CONTENT.size());
 
             pos = file->position();
             REQUIRE(pos);
-            REQUIRE(*pos == content.size() * 2);
+            REQUIRE(*pos == CONTENT.size() * 2);
 
             n = co_await file->read(data);
             REQUIRE(!n);
@@ -246,13 +249,13 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
             REQUIRE(length);
             REQUIRE(*length == 0);
 
-            const auto n = co_await file->write(std::as_bytes(std::span{content}));
+            const auto n = co_await file->write(std::as_bytes(std::span{CONTENT}));
             REQUIRE(n);
-            REQUIRE(*n == content.size());
+            REQUIRE(*n == CONTENT.size());
 
             length = file->length();
             REQUIRE(length);
-            REQUIRE(*length == content.size());
+            REQUIRE(*length == CONTENT.size());
         }
 
         SECTION("truncate") {
@@ -263,13 +266,13 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
             REQUIRE(length);
             REQUIRE(*length == 0);
 
-            const auto n = co_await file->write(std::as_bytes(std::span{content}));
+            const auto n = co_await file->write(std::as_bytes(std::span{CONTENT}));
             REQUIRE(n);
-            REQUIRE(*n == content.size());
+            REQUIRE(*n == CONTENT.size());
 
             length = file->length();
             REQUIRE(length);
-            REQUIRE(*length == content.size());
+            REQUIRE(*length == CONTENT.size());
         }
 
         SECTION("create new") {
@@ -284,13 +287,13 @@ TEST_CASE("asynchronous filesystem", "[filesystem]") {
                 REQUIRE(length);
                 REQUIRE(*length == 0);
 
-                const auto n = co_await file->write(std::as_bytes(std::span{content}));
+                const auto n = co_await file->write(std::as_bytes(std::span{CONTENT}));
                 REQUIRE(n);
-                REQUIRE(*n == content.size());
+                REQUIRE(*n == CONTENT.size());
 
                 length = file->length();
                 REQUIRE(length);
-                REQUIRE(*length == content.size());
+                REQUIRE(*length == CONTENT.size());
             }
 
             SECTION("failure") {

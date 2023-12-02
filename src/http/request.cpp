@@ -1,8 +1,8 @@
 #include <asyncio/http/request.h>
-#include <asyncio/thread.h>
 #include <asyncio/event_loop.h>
+#include <asyncio/fs/file.h>
 #include <asyncio/error.h>
-#include <fstream>
+#include <fcntl.h>
 #include <mutex>
 
 #ifdef ASYNCIO_EMBED_CA_CERT
@@ -133,57 +133,67 @@ std::optional<std::string> asyncio::http::Response::header(const std::string &na
 
 zero::async::coroutine::Task<std::string, std::error_code> asyncio::http::Response::string() const {
     auto data = CO_TRY(co_await mConnection->buffers[1].readAll());
+
+    if (mConnection->error)
+        co_return tl::unexpected(*mConnection->error);
+
     co_return std::string{reinterpret_cast<const char *>(data->data()), data->size()};
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::http::Response::output(std::filesystem::path path) const {
-    const auto stream = std::make_shared<std::ofstream>(path, std::ios::binary);
+    auto file = CO_TRY(fs::open(path, O_WRONLY | O_CREAT | O_TRUNC));
+    CO_TRY(co_await copy(mConnection->buffers[1], *file));
+    CO_TRY(co_await file->close());
 
-    if (!stream->is_open())
-        co_return tl::unexpected(std::error_code(errno, std::system_category()));
+    if (mConnection->error)
+        co_return tl::unexpected(*mConnection->error);
 
-    tl::expected<void, std::error_code> result;
+    co_return tl::expected<void, std::error_code>{};
+}
 
-    while (true) {
-        std::byte data[10240];
-        auto n = co_await operator*().read(data);
+zero::async::coroutine::Task<nlohmann::json, std::error_code> asyncio::http::Response::json() const {
+    auto content = CO_TRY(co_await string());
 
-        if (!n) {
-            if (n.error() == IO_EOF)
-                break;
-
-            result = tl::unexpected(n.error());
-            break;
-        }
-
-        if (const auto res = co_await toThread(
-            [=, data = std::vector<std::byte>{data, data + *n}]() -> tl::expected<void, std::error_code> {
-                stream->write(
-                    reinterpret_cast<const char *>(data.data()),
-                    static_cast<std::streamsize>(data.size())
-                );
-
-                if (!stream->good())
-                    return tl::unexpected(std::error_code(errno, std::system_category()));
-
-                return {};
-            }
-        ); !res) {
-            result = tl::unexpected(res.error());
-            break;
-        }
+    try {
+        co_return nlohmann::json::parse(std::move(*content));
     }
-
-    stream->close();
-    co_return result;
+    catch (const nlohmann::json::exception &) {
+        co_return tl::unexpected(make_error_code(std::errc::bad_message));
+    }
 }
 
-asyncio::IBufReader &asyncio::http::Response::operator*() const {
-    return mConnection->buffers[1];
+zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::http::Response::read(const std::span<std::byte> data) {
+    return mConnection->buffers[1].read(data).transformError([this](const auto &ec) {
+        return mConnection->error.value_or(ec);
+    });
 }
 
-asyncio::IBufReader *asyncio::http::Response::operator->() const {
-    return &mConnection->buffers[1];
+std::size_t asyncio::http::Response::capacity() {
+    return mConnection->buffers[1].capacity();
+}
+
+std::size_t asyncio::http::Response::available() {
+    return mConnection->buffers[1].available();
+}
+
+zero::async::coroutine::Task<std::string, std::error_code> asyncio::http::Response::readLine() {
+    return mConnection->buffers[1].readLine().transformError([this](const auto &ec) {
+        return mConnection->error.value_or(ec);
+    });
+}
+
+zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
+asyncio::http::Response::readUntil(const std::byte byte) {
+    return mConnection->buffers[1].readUntil(byte).transformError([this](const auto &ec) {
+        return mConnection->error.value_or(ec);
+    });
+}
+
+zero::async::coroutine::Task<void, std::error_code> asyncio::http::Response::peek(const std::span<std::byte> data) {
+    return mConnection->buffers[1].peek(data).transformError([this](const auto &ec) {
+        return mConnection->error.value_or(ec);
+    });
 }
 
 asyncio::http::Requests::Requests(CURLM *multi, ev::Timer timer) : Requests(multi, std::move(timer), {}) {
@@ -297,19 +307,22 @@ void asyncio::http::Requests::recycle() const {
         Connection *connection;
         curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &connection);
 
-        if (msg->data.result != CURLE_OK) {
-            if (connection->status == Connection::NOT_STARTED)
-                connection->promise.reject(static_cast<CURLError>(msg->data.result));
-            else
-                connection->buffers[0].throws(static_cast<CURLError>(msg->data.result));
+        connection->buffers[0].close();
 
+        if (msg->data.result != CURLE_OK) {
+            connection->error = static_cast<CURLError>(msg->data.result);
+
+            if (connection->status != Connection::NOT_STARTED)
+                continue;
+
+            connection->promise.reject(static_cast<CURLError>(msg->data.result));
             continue;
         }
 
-        if (connection->status == Connection::NOT_STARTED)
-            connection->promise.resolve();
+        if (connection->status != Connection::NOT_STARTED)
+            continue;
 
-        connection->buffers[0].close();
+        connection->promise.resolve();
     }
 }
 

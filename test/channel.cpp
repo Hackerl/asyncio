@@ -61,8 +61,8 @@ TEST_CASE("async channel buffer", "[channel]") {
         std::make_shared<std::atomic<int>>()
     };
 
-    SECTION("async sender/async receiver") {
-        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+        SECTION("async sender/async receiver") {
             const auto channel = std::make_shared<asyncio::Channel<int>>(100);
 
             co_await allSettled(
@@ -71,19 +71,20 @@ TEST_CASE("async channel buffer", "[channel]") {
                     ch->close();
                 }(channel, counters[0]),
                 [](auto ch, auto ct) -> zero::async::coroutine::Task<void> {
-                    const auto result = co_await zero::async::coroutine::allSettled(consume(ch, ct), consume(ch, ct));
+                    const auto result = co_await zero::async::coroutine::allSettled(
+                        consume(ch, ct),
+                        consume(ch, ct)
+                    );
                     REQUIRE(std::get<0>(result).error() == asyncio::Error::IO_EOF);
                     REQUIRE(std::get<1>(result).error() == asyncio::Error::IO_EOF);
                 }(channel, counters[1])
             );
 
             REQUIRE(*counters[0] == *counters[1]);
-        });
-    }
+        }
 
-    SECTION("sync sender/async receiver") {
-        SECTION("normal") {
-            asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+        SECTION("sync sender/async receiver") {
+            SECTION("normal") {
                 const auto channel = std::make_shared<asyncio::Channel<int>>(100);
 
                 co_await allSettled(
@@ -107,11 +108,9 @@ TEST_CASE("async channel buffer", "[channel]") {
                 );
 
                 REQUIRE(*counters[0] == *counters[1]);
-            });
-        }
+            }
 
-        SECTION("send timeout") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+            SECTION("send timeout") {
                 const auto channel = std::make_shared<asyncio::Channel<int>>(2);
 
                 co_await asyncio::toThread([=]() -> tl::expected<void, std::error_code> {
@@ -125,22 +124,18 @@ TEST_CASE("async channel buffer", "[channel]") {
 
                     return {};
                 });
-            });
-        }
+            }
 
-        SECTION("receive timeout") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+            SECTION("receive timeout") {
                 asyncio::Channel<int> channel(2);
                 const auto result = co_await channel.receive(50ms);
                 REQUIRE(!result);
                 REQUIRE(result.error() == std::errc::timed_out);
-            });
+            }
         }
-    }
 
-    SECTION("async sender/sync receiver") {
-        SECTION("normal") {
-            asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+        SECTION("async sender/sync receiver") {
+            SECTION("normal") {
                 const auto channel = std::make_shared<asyncio::Channel<int>>(100);
 
                 co_await allSettled(
@@ -160,11 +155,9 @@ TEST_CASE("async channel buffer", "[channel]") {
                 );
 
                 REQUIRE(*counters[0] == *counters[1]);
-            });
-        }
+            }
 
-        SECTION("send timeout") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+            SECTION("send timeout") {
                 asyncio::Channel<int> channel(2);
 
                 auto result = co_await channel.send(0, 50ms);
@@ -173,11 +166,9 @@ TEST_CASE("async channel buffer", "[channel]") {
                 result = co_await channel.send(0, 50ms);
                 REQUIRE(!result);
                 REQUIRE(result.error() == std::errc::timed_out);
-            });
-        }
+            }
 
-        SECTION("receive timeout") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+            SECTION("receive timeout") {
                 const auto channel = std::make_shared<asyncio::Channel<int>>(2);
 
                 co_await asyncio::toThread([=]() -> tl::expected<void, std::error_code> {
@@ -188,7 +179,7 @@ TEST_CASE("async channel buffer", "[channel]") {
 
                     return {};
                 });
-            });
+            }
         }
-    }
+    });
 }

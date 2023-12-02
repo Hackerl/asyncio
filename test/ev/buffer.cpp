@@ -1,8 +1,12 @@
 #include <asyncio/ev/buffer.h>
 #include <asyncio/event_loop.h>
+#include <asyncio/error.h>
+#include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
 
 using namespace std::chrono_literals;
+
+constexpr std::string_view MESSAGE = "hello world\r\n";
 
 TEST_CASE("async stream buffer", "[buffer]") {
     evutil_socket_t fds[2];
@@ -13,98 +17,107 @@ TEST_CASE("async stream buffer", "[buffer]") {
     REQUIRE(evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
 #endif
 
-    REQUIRE(evutil_make_socket_nonblocking(fds[0]) != -1);
-    REQUIRE(evutil_make_socket_nonblocking(fds[1]) != -1);
+    REQUIRE(evutil_make_socket_nonblocking(fds[0]) == 0);
+    REQUIRE(evutil_make_socket_nonblocking(fds[1]) == 0);
 
-    SECTION("normal") {
-        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+        std::array buffers = {
+            asyncio::ev::makeBuffer(fds[0], 1024),
+            asyncio::ev::makeBuffer(fds[1], 1024)
+        };
+
+        REQUIRE(buffers[0]);
+        REQUIRE(buffers[1]);
+        REQUIRE(buffers[0]->fd() != asyncio::INVALID_FILE_DESCRIPTOR);
+        REQUIRE(buffers[1]->fd() != asyncio::INVALID_FILE_DESCRIPTOR);
+
+        SECTION("read after closing") {
             co_await allSettled(
-                [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
-                    auto buffer = asyncio::ev::makeBuffer(fd);
-                    REQUIRE(buffer);
-                    REQUIRE(buffer->fd() > 0);
-
-                    constexpr std::string_view message = "hello world\r\n";
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                [](auto buffer) -> zero::async::coroutine::Task<void> {
+                    auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(result);
 
-                    result = co_await buffer->flush();
+                    result = co_await buffer.flush();
                     REQUIRE(result);
 
-                    auto line = co_await buffer->readLine();
+                    auto line = co_await buffer.readLine();
                     REQUIRE(line);
-                    REQUIRE(*line == "world hello");
-                }(fds[0]),
-                [](evutil_socket_t fd) -> zero::async::coroutine::Task<void> {
-                    auto buffer = asyncio::ev::makeBuffer(fd);
-                    REQUIRE(buffer);
-                    REQUIRE(buffer->fd() > 0);
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
 
-                    const auto line = co_await buffer->readLine();
+                    line = co_await buffer.readLine();
+                    REQUIRE(!line);
+                    REQUIRE(line.error() == asyncio::Error::IO_EOF);
+                }(std::move(*buffers[0])),
+                [](auto buffer) -> zero::async::coroutine::Task<void> {
+                    const auto line = co_await buffer.readLine();
                     REQUIRE(line);
-                    REQUIRE(*line == "hello world");
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
 
-                    constexpr std::string_view message = "world hello\r\n";
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                    auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(result);
 
-                    result = co_await buffer->flush();
+                    result = co_await buffer.flush();
                     REQUIRE(result);
-                }(fds[1])
+
+                    result = co_await buffer.close();
+                    REQUIRE(result);
+                }(std::move(*buffers[1]))
             );
-        });
-    }
+        }
 
-    SECTION("read timeout") {
-        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto buffer = asyncio::ev::makeBuffer(fds[0]);
-            REQUIRE(buffer);
-            REQUIRE(buffer->fd() > 0);
+        SECTION("write after closing") {
+            co_await allSettled(
+                [](auto buffer) -> zero::async::coroutine::Task<void> {
+                    auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
+                    REQUIRE(result);
 
-            buffer->setTimeout(50ms, 0ms);
+                    result = co_await buffer.flush();
+                    REQUIRE(result);
+
+                    result = co_await buffer.close();
+                    REQUIRE(result);
+                }(std::move(*buffers[0])),
+                [](auto buffer) -> zero::async::coroutine::Task<void> {
+                    const auto line = co_await buffer.readLine();
+                    REQUIRE(line);
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
+
+                    co_await asyncio::sleep(10ms);
+                    const auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
+                    REQUIRE(!result);
+                    REQUIRE(result.error() == std::errc::broken_pipe);
+                }(std::move(*buffers[1]))
+            );
+        }
+
+        SECTION("read timeout") {
+            buffers[0]->setTimeout(50ms, 0ms);
 
             std::byte data[10240];
-            const auto result = co_await buffer->read(data);
-            REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::timed_out);
-        });
+            const auto n = co_await buffers[0]->read(data);
+            REQUIRE(!n);
+            REQUIRE(n.error() == std::errc::timed_out);
+        }
 
-        evutil_closesocket(fds[1]);
-    }
-
-    SECTION("write timeout") {
-        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto buffer = asyncio::ev::makeBuffer(fds[0], 1024);
-            REQUIRE(buffer);
-            REQUIRE(buffer->fd() > 0);
-
-            buffer->setTimeout(0ms, 500ms);
+        SECTION("write timeout") {
+            buffers[0]->setTimeout(0ms, 500ms);
 
             const auto data = std::make_unique<std::byte[]>(1024 * 1024);
-            const auto result = co_await buffer->writeAll({data.get(), 1024 * 1024});
+            const auto result = co_await buffers[0]->writeAll({data.get(), 1024 * 1024});
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
-        });
+        }
 
-        evutil_closesocket(fds[1]);
-    }
-
-    SECTION("cancel") {
-        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto buffer = asyncio::ev::makeBuffer(fds[0]);
-            REQUIRE(buffer);
-            REQUIRE(buffer->fd() > 0);
-
+        SECTION("cancel") {
             std::byte data[10240];
-            const auto task = buffer->read(data);
-            const auto result = co_await asyncio::timeout(task, 50ms);
+            const auto task = buffers[0]->read(data);
+            REQUIRE(!task.done());
 
+            const auto result = co_await asyncio::timeout(task, 50ms);
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
-        });
-
-        evutil_closesocket(fds[1]);
-    }
+        }
+    });
 }

@@ -2,11 +2,14 @@
 #include <asyncio/ev/pipe.h>
 #include <asyncio/event_loop.h>
 #include <asyncio/error.h>
+#include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
 
+constexpr std::string_view MESSAGE = "hello world\r\n";
+
 TEST_CASE("asynchronous io", "[io]") {
-    SECTION("copy") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("copy") {
             auto buffers1 = asyncio::ev::pipe();
             REQUIRE(buffers1);
 
@@ -19,8 +22,7 @@ TEST_CASE("asynchronous io", "[io]") {
                     REQUIRE(result);
                 }(std::move(buffers1->at(1)), std::move(buffers2->at(0))),
                 [](auto buffer) -> zero::async::coroutine::Task<void> {
-                    constexpr std::string_view message = "hello world\r\n";
-                    auto result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
+                    auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(result);
 
                     result = co_await buffer.flush();
@@ -29,32 +31,28 @@ TEST_CASE("asynchronous io", "[io]") {
                 [](auto buffer) -> zero::async::coroutine::Task<void> {
                     auto result = co_await buffer.readLine();
                     REQUIRE(result);
-                    REQUIRE(*result == "hello world");
+                    REQUIRE(*result == zero::strings::trim(MESSAGE));
 
                     result = co_await buffer.readLine();
                     REQUIRE(!result);
                     REQUIRE(result.error() == asyncio::Error::IO_EOF);
                 }(std::move(buffers2->at(1)))
             );
-        });
-    }
+        }
 
-    SECTION("read all") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("read all") {
             auto buffers = asyncio::ev::pipe();
             REQUIRE(buffers);
 
             co_await allSettled(
                 [](auto buffer) -> zero::async::coroutine::Task<void> {
-                    std::string_view message = "hello world\r\n";
-                    auto result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
+                    auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(result);
 
                     result = co_await buffer.flush();
                     REQUIRE(result);
 
-                    message = "world hello\r\n";
-                    result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
+                    result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(result);
 
                     result = co_await buffer.flush();
@@ -63,81 +61,75 @@ TEST_CASE("asynchronous io", "[io]") {
                 [](auto buffer) -> zero::async::coroutine::Task<void> {
                     const auto result = co_await buffer.readAll();
                     REQUIRE(result);
-                    REQUIRE(result->size() == 26);
-                    REQUIRE(memcmp(result->data(), "hello world\r\nworld hello\r\n", 26) == 0);
+                    REQUIRE(result->size() == MESSAGE.size() * 2);
+                    REQUIRE(memcmp(result->data(), MESSAGE.data(), MESSAGE.size()) == 0);
+                    REQUIRE(memcmp(result->data() + MESSAGE.size(), MESSAGE.data(), MESSAGE.size()) == 0);
                 }(std::move(buffers->at(1)))
             );
-        });
-    }
-
-    SECTION("read exactly") {
-        SECTION("normal") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                auto buffers = asyncio::ev::pipe();
-                REQUIRE(buffers);
-
-                co_await allSettled(
-                    [](auto buffer) -> zero::async::coroutine::Task<void> {
-                        std::string_view message = "hello world\r\n";
-                        auto result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(result);
-
-                        result = co_await buffer.flush();
-                        REQUIRE(result);
-
-                        message = "world hello\r\n";
-                        result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(result);
-
-                        result = co_await buffer.flush();
-                        REQUIRE(result);
-
-                        message = "hello world\r\n";
-                        result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(result);
-
-                        result = co_await buffer.flush();
-                        REQUIRE(result);
-                    }(std::move(buffers->at(0))),
-                    [](auto buffer) -> zero::async::coroutine::Task<void> {
-                        std::byte data[39];
-                        const auto result = co_await buffer.readExactly(data);
-                        REQUIRE(result);
-                        REQUIRE(memcmp(data, "hello world\r\nworld hello\r\nhello world\r\n", 39) == 0);
-                    }(std::move(buffers->at(1)))
-                );
-            });
         }
 
-        SECTION("error") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("read exactly") {
+            SECTION("normal") {
                 auto buffers = asyncio::ev::pipe();
                 REQUIRE(buffers);
 
                 co_await allSettled(
                     [](auto buffer) -> zero::async::coroutine::Task<void> {
-                        std::string_view message = "hello world\r\n";
-                        auto result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
+                        auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
                         REQUIRE(result);
 
                         result = co_await buffer.flush();
                         REQUIRE(result);
 
-                        message = "world hello\r\n";
-                        result = co_await buffer.writeAll(std::as_bytes(std::span{message}));
+                        result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
+                        REQUIRE(result);
+
+                        result = co_await buffer.flush();
+                        REQUIRE(result);
+
+                        result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
                         REQUIRE(result);
 
                         result = co_await buffer.flush();
                         REQUIRE(result);
                     }(std::move(buffers->at(0))),
                     [](auto buffer) -> zero::async::coroutine::Task<void> {
-                        std::byte data[39];
+                        std::byte data[MESSAGE.size() * 3];
+                        const auto result = co_await buffer.readExactly(data);
+                        REQUIRE(result);
+                        REQUIRE(memcmp(data, MESSAGE.data(), MESSAGE.size()) == 0);
+                        REQUIRE(memcmp(data + MESSAGE.size(), MESSAGE.data(), MESSAGE.size()) == 0);
+                        REQUIRE(memcmp(data + MESSAGE.size() * 2, MESSAGE.data(), MESSAGE.size()) == 0);
+                    }(std::move(buffers->at(1)))
+                );
+            }
+
+            SECTION("error") {
+                auto buffers = asyncio::ev::pipe();
+                REQUIRE(buffers);
+
+                co_await allSettled(
+                    [](auto buffer) -> zero::async::coroutine::Task<void> {
+                        auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
+                        REQUIRE(result);
+
+                        result = co_await buffer.flush();
+                        REQUIRE(result);
+
+                        result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
+                        REQUIRE(result);
+
+                        result = co_await buffer.flush();
+                        REQUIRE(result);
+                    }(std::move(buffers->at(0))),
+                    [](auto buffer) -> zero::async::coroutine::Task<void> {
+                        std::byte data[MESSAGE.size() * 3];
                         const auto result = co_await buffer.readExactly(data);
                         REQUIRE(!result);
                         REQUIRE(result.error() == asyncio::Error::IO_EOF);
                     }(std::move(buffers->at(1)))
                 );
-            });
+            }
         }
-    }
+    });
 }

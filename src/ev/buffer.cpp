@@ -4,9 +4,6 @@
 #include <optional>
 #include <cassert>
 
-constexpr auto READ_INDEX = 0;
-constexpr auto WRITE_INDEX = 1;
-
 asyncio::ev::Buffer::Buffer(bufferevent *bev, const std::size_t capacity) : Buffer({bev, bufferevent_free}, capacity) {
 }
 
@@ -15,13 +12,23 @@ asyncio::ev::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)
     bufferevent_setcb(
         mBev.get(),
         [](bufferevent *, void *arg) {
-            static_cast<Buffer *>(arg)->onBufferRead();
+            auto promise = std::exchange(static_cast<Buffer *>(arg)->mPromises[READ_INDEX], std::nullopt);
+
+            if (!promise)
+                return;
+
+            promise->resolve();
         },
         [](bufferevent *, void *arg) {
-            static_cast<Buffer *>(arg)->onBufferWrite();
+            auto promise = std::exchange(static_cast<Buffer *>(arg)->mPromises[WRITE_INDEX], std::nullopt);
+
+            if (!promise)
+                return;
+
+            promise->resolve();
         },
         [](bufferevent *, const short what, void *arg) {
-            static_cast<Buffer *>(arg)->onBufferEvent(what);
+            static_cast<Buffer *>(arg)->onEvent(what);
         },
         this
     );
@@ -57,25 +64,7 @@ void asyncio::ev::Buffer::resize(const std::size_t capacity) {
     bufferevent_setwatermark(mBev.get(), EV_WRITE, mCapacity, 0);
 }
 
-void asyncio::ev::Buffer::onBufferRead() {
-    auto promise = std::exchange(mPromises[READ_INDEX], std::nullopt);
-
-    if (!promise)
-        return;
-
-    promise->resolve();
-}
-
-void asyncio::ev::Buffer::onBufferWrite() {
-    auto promise = std::exchange(mPromises[WRITE_INDEX], std::nullopt);
-
-    if (!promise)
-        return;
-
-    promise->resolve();
-}
-
-void asyncio::ev::Buffer::onBufferEvent(const short what) {
+void asyncio::ev::Buffer::onEvent(const short what) {
     if (what & BEV_EVENT_EOF) {
         onClose(IO_EOF);
     }
@@ -121,16 +110,12 @@ std::error_code asyncio::ev::Buffer::getError() const {
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::close() {
     if (!mBev)
-        co_return tl::unexpected(RESOURCE_DESTROYED);
+        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
-    if (mClosed) {
-        mBev.reset();
-        co_return tl::unexpected(mLastError);
-    }
+    assert(!mPromises[READ_INDEX]);
+    assert(!mPromises[WRITE_INDEX]);
 
     co_await flush();
-
-    onClose(IO_EOF);
     mBev.reset();
 
     co_return tl::expected<void, std::error_code>{};
@@ -138,7 +123,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::close()
 
 zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::read(std::span<std::byte> data) {
     if (!mBev)
-        co_return tl::unexpected(RESOURCE_DESTROYED);
+        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mPromises[READ_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
@@ -185,7 +170,7 @@ size_t asyncio::ev::Buffer::available() {
 
 zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::readLine() {
     if (!mBev)
-        co_return tl::unexpected(RESOURCE_DESTROYED);
+        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mPromises[READ_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
@@ -233,7 +218,7 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::e
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(std::span<std::byte> data) {
     if (!mBev)
-        co_return tl::unexpected(RESOURCE_DESTROYED);
+        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mPromises[READ_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
@@ -275,13 +260,13 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(st
 zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::ev::Buffer::write(const std::span<const std::byte> data) {
     if (!mBev)
-        co_return tl::unexpected(RESOURCE_DESTROYED);
+        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+
+    if (mClosed)
+        co_return tl::unexpected(make_error_code(std::errc::broken_pipe));
 
     if (mPromises[WRITE_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
-
-    if (mClosed)
-        co_return tl::unexpected(mLastError);
 
     evbuffer *output = bufferevent_get_output(mBev.get());
     tl::expected<std::size_t, std::error_code> result;
@@ -333,13 +318,13 @@ size_t asyncio::ev::Buffer::pending() {
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::flush() {
     if (!mBev)
-        co_return tl::unexpected(RESOURCE_DESTROYED);
+        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+
+    if (mClosed)
+        co_return tl::unexpected(make_error_code(std::errc::broken_pipe));
 
     if (mPromises[WRITE_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
-
-    if (mClosed)
-        co_return tl::unexpected(mLastError);
 
     if (evbuffer_get_length(bufferevent_get_output(mBev.get())) == 0)
         co_return tl::expected<void, std::error_code>{};

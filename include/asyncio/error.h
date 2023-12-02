@@ -5,8 +5,7 @@
 
 namespace asyncio {
     enum Error {
-        IO_EOF = 1,
-        RESOURCE_DESTROYED
+        IO_EOF = 1
     };
 
     class ErrorCategory final : public std::error_category {

@@ -86,7 +86,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
 
             return {};
         }
-    ).transformError([](const std::error_code &ec) -> std::error_code {
+    ).transformError([](const auto &ec) -> std::error_code {
         if (ec == std::errc::broken_pipe)
             return IO_EOF;
 
@@ -156,7 +156,7 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
 
             return {};
         }
-    ).transformError([](const std::error_code &ec) -> std::error_code {
+    ).transformError([](const auto &ec) -> std::error_code {
         if (ec == std::error_code{ERROR_NO_DATA, std::system_category()})
             return make_error_code(std::errc::broken_pipe);
 

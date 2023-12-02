@@ -1,7 +1,6 @@
 #ifndef ASYNCIO_THREAD_H
 #define ASYNCIO_THREAD_H
 
-#include "ev/event.h"
 #include "event_loop.h"
 
 namespace asyncio {

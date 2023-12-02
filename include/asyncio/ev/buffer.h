@@ -7,6 +7,10 @@
 
 namespace asyncio::ev {
     class Buffer : public virtual IBuffer, public IDeadline, public IFileDescriptor, public Reader, public Writer {
+    protected:
+        static constexpr auto READ_INDEX = 0;
+        static constexpr auto WRITE_INDEX = 1;
+
     public:
         explicit Buffer(bufferevent *bev, std::size_t capacity);
         explicit Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
@@ -14,9 +18,7 @@ namespace asyncio::ev {
         ~Buffer() override;
 
     private:
-        void onBufferRead();
-        void onBufferWrite();
-        void onBufferEvent(short what);
+        void onEvent(short what);
         void onClose(const std::error_code &ec);
 
         [[nodiscard]] virtual std::error_code getError() const;
@@ -47,8 +49,6 @@ namespace asyncio::ev {
         std::size_t mCapacity;
         std::error_code mLastError;
         std::unique_ptr<bufferevent, void (*)(bufferevent *)> mBev;
-
-    private:
         std::array<std::optional<zero::async::promise::Promise<void, std::error_code>>, 2> mPromises;
     };
 

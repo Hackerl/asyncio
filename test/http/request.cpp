@@ -4,13 +4,22 @@
 #include <catch2/catch_test_macros.hpp>
 #include <fstream>
 
-TEST_CASE("http requests", "[request]") {
-    SECTION("get") {
-        SECTION("normal") {
-            asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-                auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);
-                REQUIRE(listener);
+constexpr auto URL = "http://localhost:30000/object?id=0";
 
+struct People {
+    std::string name;
+    int age{};
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(People, name, age);
+
+TEST_CASE("http requests", "[request]") {
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);
+        REQUIRE(listener);
+
+        SECTION("get") {
+            SECTION("normal") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
                         auto buffer = std::move(co_await l.accept());
@@ -42,7 +51,7 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(result);
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
-                        const auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
+                        const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
                         const auto requests = asyncio::http::makeRequests();
@@ -73,14 +82,9 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(*content == "hello world");
                     }()
                 );
-            });
-        }
+            }
 
-        SECTION("empty body") {
-            asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-                auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);
-                REQUIRE(listener);
-
+            SECTION("empty body") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
                         auto buffer = std::move(co_await l.accept());
@@ -108,7 +112,7 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(result);
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
-                        const auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
+                        const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
                         const auto requests = asyncio::http::makeRequests();
@@ -122,16 +126,57 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(content->empty());
                     }()
                 );
-            });
+            }
+
+            SECTION("get json") {
+                co_await allSettled(
+                    [](auto l) -> zero::async::coroutine::Task<void> {
+                        auto buffer = std::move(co_await l.accept());
+                        REQUIRE(buffer);
+
+                        auto line = co_await buffer->readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == "GET /object?id=0 HTTP/1.1");
+
+                        while (true) {
+                            line = co_await buffer->readLine();
+                            REQUIRE(line);
+
+                            if (line->empty())
+                                break;
+                        }
+
+                        constexpr std::string_view response = "HTTP/1.1 200 OK\r\n"
+                            "Content-Length: 27\r\n\r\n"
+                            "{\"name\": \"rose\", \"age\": 17}";
+
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{response}));
+                        REQUIRE(result);
+
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
+                    }(std::move(*listener)),
+                    []() -> zero::async::coroutine::Task<void> {
+                        const auto url = asyncio::http::URL::from(URL);
+                        REQUIRE(url);
+
+                        const auto requests = asyncio::http::makeRequests();
+                        REQUIRE(requests);
+
+                        const auto response = std::move(co_await requests.value()->get(*url));
+                        REQUIRE(response);
+
+                        const auto people = co_await response->json<People>();
+                        REQUIRE(people);
+                        REQUIRE(people->name == "rose");
+                        REQUIRE(people->age == 17);
+                    }()
+                );
+            }
         }
-    }
 
-    SECTION("post") {
-        SECTION("post form") {
-            asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-                auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);
-                REQUIRE(listener);
-
+        SECTION("post") {
+            SECTION("post form") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
                         auto buffer = std::move(co_await l.accept());
@@ -177,14 +222,13 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(result);
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
-                        const auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
+                        const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
                         const auto requests = asyncio::http::makeRequests();
                         REQUIRE(requests);
 
-                        std::map<std::string, std::string> payload{{"name", "jack"}};
-
+                        const std::map<std::string, std::string> payload = {{"name", "jack"}};
                         const auto response = std::move(co_await requests.value()->post(*url, payload));
                         REQUIRE(response);
 
@@ -193,14 +237,9 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(*content == "hello world");
                     }()
                 );
-            });
-        }
+            }
 
-        SECTION("post file") {
-            asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-                auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);
-                REQUIRE(listener);
-
+            SECTION("post file") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
                         auto buffer = std::move(co_await l.accept());
@@ -252,13 +291,13 @@ TEST_CASE("http requests", "[request]") {
                         stream << "hello world";
                         stream.close();
 
-                        const auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
+                        const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
                         const auto requests = asyncio::http::makeRequests();
                         REQUIRE(requests);
 
-                        const std::map<std::string, std::filesystem::path> payload{{"file", path}};
+                        const std::map<std::string, std::filesystem::path> payload = {{"file", path}};
                         const auto response = std::move(co_await requests.value()->post(*url, payload));
                         REQUIRE(response);
 
@@ -266,17 +305,12 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(content);
                         REQUIRE(*content == "hello world");
 
-                        std::filesystem::remove(path);
+                        REQUIRE(std::filesystem::remove(path));
                     }()
                 );
-            });
-        }
+            }
 
-        SECTION("post multipart") {
-            asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-                auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);
-                REQUIRE(listener);
-
+            SECTION("post multipart") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
                         auto buffer = std::move(co_await l.accept());
@@ -328,13 +362,13 @@ TEST_CASE("http requests", "[request]") {
                         stream << "hello world";
                         stream.close();
 
-                        const auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
+                        const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
                         const auto requests = asyncio::http::makeRequests();
                         REQUIRE(requests);
 
-                        const std::map<std::string, std::variant<std::string, std::filesystem::path>> payload{
+                        const std::map<std::string, std::variant<std::string, std::filesystem::path>> payload = {
                             {"name", std::string{"jack"}},
                             {"file", path}
                         };
@@ -346,17 +380,12 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(content);
                         REQUIRE(*content == "hello world");
 
-                        std::filesystem::remove(path);
+                        REQUIRE(std::filesystem::remove(path));
                     }()
                 );
-            });
-        }
+            }
 
-        SECTION("post json") {
-            asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-                auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);
-                REQUIRE(listener);
-
+            SECTION("post json") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
                         auto buffer = std::move(co_await l.accept());
@@ -394,9 +423,9 @@ TEST_CASE("http requests", "[request]") {
                         auto result = co_await buffer->readExactly(data);
                         REQUIRE(result);
 
-                        const auto j = nlohmann::json::parse(data);
-                        REQUIRE(j["name"] == "jack");
-                        REQUIRE(j["age"] == 12);
+                        const auto [name, age] = nlohmann::json::parse(data).get<People>();
+                        REQUIRE(name == "jack");
+                        REQUIRE(age == 18);
 
                         constexpr std::string_view response = "HTTP/1.1 200 OK\r\n"
                             "Content-Length: 11\r\n\r\n"
@@ -409,14 +438,13 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(result);
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
-                        const auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
+                        const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
                         const auto requests = asyncio::http::makeRequests();
                         REQUIRE(requests);
 
-                        const nlohmann::json payload{{"name", "jack"}, {"age", 12}};
-                        const auto response = std::move(co_await requests.value()->post(*url, payload));
+                        const auto response = std::move(co_await requests.value()->post(*url, People{"jack", 18}));
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -424,15 +452,10 @@ TEST_CASE("http requests", "[request]") {
                         REQUIRE(*content == "hello world");
                     }()
                 );
-            });
+            }
         }
-    }
 
-    SECTION("output to file") {
-        asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-            auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);
-            REQUIRE(listener);
-
+        SECTION("output to file") {
             co_await allSettled(
                 [](auto l) -> zero::async::coroutine::Task<void> {
                     auto buffer = std::move(co_await l.accept());
@@ -461,7 +484,7 @@ TEST_CASE("http requests", "[request]") {
                     REQUIRE(result);
                 }(std::move(*listener)),
                 []() -> zero::async::coroutine::Task<void> {
-                    const auto url = asyncio::http::URL::from("http://localhost:30000/object?id=0");
+                    const auto url = asyncio::http::URL::from(URL);
                     REQUIRE(url);
 
                     const auto requests = asyncio::http::makeRequests();
@@ -476,17 +499,15 @@ TEST_CASE("http requests", "[request]") {
 
                     std::ifstream stream(path);
                     REQUIRE(stream.is_open());
-
-                    const std::string content = {
-                        std::istreambuf_iterator(stream),
-                        std::istreambuf_iterator<char>()
-                    };
-                    REQUIRE(content == "hello world");
+                    REQUIRE(
+                        std::string{std::istreambuf_iterator(stream), std::istreambuf_iterator<char>()}
+                        == "hello world"
+                    );
 
                     stream.close();
-                    std::filesystem::remove(path);
+                    REQUIRE(std::filesystem::remove(path));
                 }()
             );
-        });
-    }
+        }
+    });
 }

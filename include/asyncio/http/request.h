@@ -50,16 +50,17 @@ namespace asyncio::http {
         std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy;
         zero::async::promise::Promise<void, std::error_code> promise;
         std::list<std::function<void()>> defers;
+        std::optional<std::error_code> error;
         Status status;
     };
 
     class Requests;
 
-    class Response {
+    class Response: public IBufReader, public Reader {
     public:
         Response(std::shared_ptr<Requests> requests, std::unique_ptr<Connection> connection);
         Response(Response &&) = default;
-        ~Response();
+        ~Response() override;
 
         [[nodiscard]] long statusCode() const;
         [[nodiscard]] std::optional<curl_off_t> contentLength() const;
@@ -69,22 +70,26 @@ namespace asyncio::http {
 
         [[nodiscard]] zero::async::coroutine::Task<std::string, std::error_code> string() const;
         [[nodiscard]] zero::async::coroutine::Task<void, std::error_code> output(std::filesystem::path path) const;
-        zero::async::coroutine::Task<nlohmann::json, std::error_code> json();
+        [[nodiscard]] zero::async::coroutine::Task<nlohmann::json, std::error_code> json() const;
 
         template<typename T>
-        zero::async::coroutine::Task<T, std::error_code> json() {
-            tl::expected<nlohmann::json, std::error_code> j = CO_TRY(co_await json());
+        zero::async::coroutine::Task<T, std::error_code> json() const {
+            const auto j = CO_TRY(co_await json());
 
             try {
-                co_return j->get<T>();
+                co_return j->template get<T>();
             }
             catch (const nlohmann::json::exception &) {
-                co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+                co_return tl::unexpected(make_error_code(std::errc::bad_message));
             }
         }
 
-        IBufReader &operator*() const;
-        IBufReader *operator->() const;
+        zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
+        std::size_t capacity() override;
+        std::size_t available() override;
+        zero::async::coroutine::Task<std::string, std::error_code> readLine() override;
+        zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) override;
+        zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) override;
 
     private:
         std::shared_ptr<Requests> mRequests;

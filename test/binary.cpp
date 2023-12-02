@@ -2,399 +2,63 @@
 #include <asyncio/event_loop.h>
 #include <asyncio/ev/pipe.h>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+
+template<typename T>
+zero::async::coroutine::Task<void> transfer(auto buffers) {
+    const auto i = GENERATE(
+        T{6789},
+        (std::numeric_limits<T>::max)(),
+        (std::numeric_limits<T>::min)()
+    );
+
+    co_await allSettled(
+        [](auto buffer, auto value) -> zero::async::coroutine::Task<void> {
+            auto result = co_await asyncio::binary::writeLE(buffer, value);
+            REQUIRE(result);
+
+            result = co_await asyncio::binary::writeBE(buffer, value);
+            REQUIRE(result);
+        }(std::move(buffers[0]), i),
+        [](auto buffer, auto value) -> zero::async::coroutine::Task<void> {
+            auto result = co_await asyncio::binary::readLE<T>(buffer);
+            REQUIRE(result);
+            REQUIRE(*result == value);
+
+            result = co_await asyncio::binary::readBE<T>(buffer);
+            REQUIRE(result);
+            REQUIRE(*result == value);
+        }(std::move(buffers[1]), i)
+    );
+}
 
 TEST_CASE("binary transfer", "[binary]") {
-    SECTION("little endian") {
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        auto buffers = asyncio::ev::pipe();
+        REQUIRE(buffers);
+
         SECTION("int16_t") {
-            SECTION("random") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
+            co_await transfer<std::int16_t>(std::move(*buffers));
+        }
 
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeLE(buffer, std::int16_t{6789});
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readLE<std::int16_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == 6789);
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("max") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeLE(
-                                buffer,
-                                (std::numeric_limits<std::int16_t>::max)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readLE<std::int16_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int16_t>::max)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("min") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeLE(
-                                buffer,
-                                (std::numeric_limits<std::int16_t>::min)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readLE<std::int16_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int16_t>::min)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
+        SECTION("uint16_t") {
+            co_await transfer<std::uint16_t>(std::move(*buffers));
         }
 
         SECTION("int32_t") {
-            SECTION("random") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
+            co_await transfer<std::int32_t>(std::move(*buffers));
+        }
 
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeLE(buffer, std::int32_t{6789});
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readLE<std::int32_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == 6789);
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("max") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeLE(
-                                buffer,
-                                (std::numeric_limits<std::int32_t>::max)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readLE<std::int32_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int32_t>::max)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("min") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeLE(
-                                buffer,
-                                (std::numeric_limits<std::int32_t>::min)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readLE<std::int32_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int32_t>::min)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
+        SECTION("uint32_t") {
+            co_await transfer<std::uint32_t>(std::move(*buffers));
         }
 
         SECTION("int64_t") {
-            SECTION("random") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeLE(buffer, std::int64_t{6789});
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readLE<std::int64_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == 6789);
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("max") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeLE(
-                                buffer,
-                                (std::numeric_limits<std::int64_t>::max)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readLE<std::int64_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int64_t>::max)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("min") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeLE(
-                                buffer,
-                                (std::numeric_limits<std::int64_t>::min)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readLE<std::int64_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int64_t>::min)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-        }
-    }
-
-    SECTION("big endian") {
-        SECTION("int16_t") {
-            SECTION("random") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeBE(buffer, std::int16_t{6789});
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readBE<std::int16_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == 6789);
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("max") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeBE(
-                                buffer,
-                                (std::numeric_limits<std::int16_t>::max)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readBE<std::int16_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int16_t>::max)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("min") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeBE(
-                                buffer,
-                                (std::numeric_limits<std::int16_t>::min)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readBE<std::int16_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int16_t>::min)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
+            co_await transfer<std::int64_t>(std::move(*buffers));
         }
 
-        SECTION("int32_t") {
-            SECTION("random") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeBE(buffer, std::int32_t{6789});
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readBE<std::int32_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == 6789);
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("max") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeBE(
-                                buffer,
-                                (std::numeric_limits<std::int32_t>::max)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readBE<std::int32_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int32_t>::max)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("min") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeBE(
-                                buffer,
-                                (std::numeric_limits<std::int32_t>::min)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readBE<std::int32_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int32_t>::min)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
+        SECTION("uint64_t") {
+            co_await transfer<std::uint64_t>(std::move(*buffers));
         }
-
-        SECTION("int64_t") {
-            SECTION("random") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeBE(buffer, std::int64_t{6789});
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readBE<std::int64_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == 6789);
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("max") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeBE(
-                                buffer,
-                                (std::numeric_limits<std::int64_t>::max)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readBE<std::int64_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int64_t>::max)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-
-            SECTION("min") {
-                asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                    auto buffers = asyncio::ev::pipe();
-                    REQUIRE(buffers);
-
-                    co_await allSettled(
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::writeBE(
-                                buffer,
-                                (std::numeric_limits<std::int64_t>::min)()
-                            );
-                            REQUIRE(result);
-                        }(std::move(buffers->at(0))),
-                        [](auto buffer) -> zero::async::coroutine::Task<void> {
-                            const auto result = co_await asyncio::binary::readBE<std::int64_t>(buffer);
-                            REQUIRE(result);
-                            REQUIRE(*result == (std::numeric_limits<std::int64_t>::min)());
-                        }(std::move(buffers->at(1)))
-                    );
-                });
-            }
-        }
-    }
+    });
 }

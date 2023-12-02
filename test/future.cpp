@@ -4,12 +4,12 @@
 using namespace std::chrono_literals;
 
 TEST_CASE("asyncio future", "[future]") {
-    SECTION("have result") {
-        SECTION("no error") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                const asyncio::Future<int> future;
-                REQUIRE(!future.done());
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("have result") {
+            const asyncio::Future<int> future;
+            REQUIRE(!future.done());
 
+            SECTION("no error") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         const auto result = co_await f.get();
@@ -35,14 +35,9 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future)
                 );
-            });
-        }
+            }
 
-        SECTION("error") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                const asyncio::Future<int> future;
-                REQUIRE(!future.done());
-
+            SECTION("error") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         const auto result = co_await f.get();
@@ -68,14 +63,9 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future)
                 );
-            });
-        }
+            }
 
-        SECTION("timeout") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                const asyncio::Future<int> future;
-                REQUIRE(!future.done());
-
+            SECTION("timeout") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         const auto result = co_await f.get(10ms);
@@ -101,14 +91,9 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future)
                 );
-            });
-        }
+            }
 
-        SECTION("cancel") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                const asyncio::Future<int> future;
-                REQUIRE(!future.done());
-
+            SECTION("cancel") {
                 auto task = allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         const auto result = co_await f.get();
@@ -132,16 +117,14 @@ TEST_CASE("asyncio future", "[future]") {
 
                 task.cancel();
                 co_await task;
-            });
+            }
         }
-    }
 
-    SECTION("no result") {
-        SECTION("no error") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                const asyncio::Future<void> future;
-                REQUIRE(!future.done());
+        SECTION("no result") {
+            const asyncio::Future<void> future;
+            REQUIRE(!future.done());
 
+            SECTION("no error") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         const auto result = co_await f.get();
@@ -164,14 +147,9 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future)
                 );
-            });
-        }
+            }
 
-        SECTION("error") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                const asyncio::Future<void> future;
-                REQUIRE(!future.done());
-
+            SECTION("error") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         const auto result = co_await f.get();
@@ -197,14 +175,9 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future)
                 );
-            });
-        }
+            }
 
-        SECTION("timeout") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                const asyncio::Future<void> future;
-                REQUIRE(!future.done());
-
+            SECTION("timeout") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         auto result = co_await f.get(10ms);
@@ -228,14 +201,9 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future)
                 );
-            });
-        }
+            }
 
-        SECTION("cancel") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
-                const asyncio::Future<void> future;
-                REQUIRE(!future.done());
-
+            SECTION("cancel") {
                 auto task = allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         const auto result = co_await f.get();
@@ -259,7 +227,7 @@ TEST_CASE("asyncio future", "[future]") {
 
                 task.cancel();
                 co_await task;
-            });
+            }
         }
-    }
+    });
 }

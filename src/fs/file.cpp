@@ -61,7 +61,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::File::re
         co_await mEventLoop
                  ->framework()
                  ->read(mEventLoop, mFD, mOffset, data)
-                 .transformError([](const std::error_code &ec) -> std::error_code {
+                 .transformError([](const auto &ec) -> std::error_code {
                      if (ec == std::error_code{ERROR_HANDLE_EOF, std::system_category()})
                          return IO_EOF;
 

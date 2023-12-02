@@ -10,8 +10,8 @@
 using namespace std::chrono_literals;
 
 TEST_CASE("signal handler", "[signal]") {
-    SECTION("normal") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("normal") {
             auto signal = asyncio::ev::makeSignal(SIGINT);
             REQUIRE(signal);
 
@@ -32,21 +32,19 @@ TEST_CASE("signal handler", "[signal]") {
             const auto result = co_await task;
             REQUIRE(result);
 #endif
-        });
-    }
+        }
 
-    SECTION("cancel") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("cancel") {
             auto signal = asyncio::ev::makeSignal(SIGINT);
             REQUIRE(signal);
 
             const auto task = signal->on();
-            const auto result = co_await asyncio::timeout(task, 50ms);
+            const auto result = co_await asyncio::timeout(task, 10ms);
 
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
-        });
-    }
+        }
+    });
 }

@@ -224,7 +224,7 @@ asyncio::net::ssl::stream::Buffer::Buffer(
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::net::ssl::stream::Buffer::close() {
     if (!mBev)
-        co_return tl::unexpected(RESOURCE_DESTROYED);
+        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mClosed)
         co_return tl::unexpected(IO_EOF);

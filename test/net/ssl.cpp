@@ -1,5 +1,6 @@
 #include <asyncio/net/ssl.h>
 #include <asyncio/event_loop.h>
+#include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/std.h>
 
@@ -125,9 +126,11 @@ constexpr auto CLIENT_KEY = "-----BEGIN RSA PRIVATE KEY-----\n"
     "rqtIHR7De/4WKI8TWL6ismjqd5WOcD21AlMBiLQr1KWlAFa2Vn6x\n"
     "-----END RSA PRIVATE KEY-----";
 
+constexpr std::string_view MESSAGE = "hello world\r\n";
+
 TEST_CASE("ssl stream network connection", "[ssl]") {
-    SECTION("mutual authentication") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("mutual authentication") {
             const auto context = asyncio::net::ssl::newContext(
                 {
                     .ca = std::string{CA_CERT},
@@ -154,8 +157,7 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                     REQUIRE(remoteAddress);
                     REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
-                    constexpr std::string_view message = "hello world\r\n";
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(result);
 
                     result = co_await buffer->flush();
@@ -163,7 +165,7 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
                     const auto line = co_await buffer->readLine();
                     REQUIRE(line);
-                    REQUIRE(*line == "world hello");
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
                 }(std::move(*listener)),
                 []() -> zero::async::coroutine::Task<void> {
                     const auto ctx = asyncio::net::ssl::newContext(
@@ -192,21 +194,18 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
                     const auto line = co_await buffer->readLine();
                     REQUIRE(line);
-                    REQUIRE(*line == "hello world");
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
 
-                    constexpr std::string_view message = "world hello\r\n";
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(result);
 
                     result = co_await buffer->flush();
                     REQUIRE(result);
                 }()
             );
-        });
-    }
+        }
 
-    SECTION("verify server") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("verify server") {
             const auto context = asyncio::net::ssl::newContext(
                 {
                     .ca = std::string{CA_CERT},
@@ -234,8 +233,7 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
                     REQUIRE(remoteAddress);
                     REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
-                    constexpr std::string_view message = "hello world\r\n";
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(result);
 
                     result = co_await buffer->flush();
@@ -243,7 +241,7 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
                     const auto line = co_await buffer->readLine();
                     REQUIRE(line);
-                    REQUIRE(*line == "world hello");
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
                 }(std::move(*listener)),
                 []() -> zero::async::coroutine::Task<void> {
                     const auto ctx = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
@@ -266,16 +264,15 @@ TEST_CASE("ssl stream network connection", "[ssl]") {
 
                     const auto line = co_await buffer->readLine();
                     REQUIRE(line);
-                    REQUIRE(*line == "hello world");
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
 
-                    constexpr std::string_view message = "world hello\r\n";
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(result);
 
                     result = co_await buffer->flush();
                     REQUIRE(result);
                 }()
             );
-        });
-    }
+        }
+    });
 }

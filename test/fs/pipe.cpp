@@ -15,7 +15,7 @@ TEST_CASE("pipe", "[filesystem]") {
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-    asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("create") {
             auto pipes = asyncio::fs::pipe();
             REQUIRE(pipes);

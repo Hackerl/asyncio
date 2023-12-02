@@ -14,7 +14,8 @@ asyncio::net::stream::Buffer::Buffer(bufferevent *bev, const std::size_t capacit
 
 asyncio::net::stream::Buffer::Buffer(
     std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev,
-    const std::size_t capacity) : ev::Buffer(std::move(bev), capacity) {
+    const std::size_t capacity
+) : ev::Buffer(std::move(bev), capacity) {
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::localAddress() {
@@ -72,7 +73,7 @@ asyncio::net::stream::Acceptor::~Acceptor() {
 
 zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::net::stream::Acceptor::fd() {
     if (!mListener)
-        co_return tl::unexpected(RESOURCE_DESTROYED);
+        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mPromise)
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
@@ -93,10 +94,10 @@ zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::
 
 tl::expected<void, std::error_code> asyncio::net::stream::Acceptor::close() {
     if (!mListener)
-        return tl::unexpected(RESOURCE_DESTROYED);
+        return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (auto promise = std::exchange(mPromise, std::nullopt); promise)
-        promise->reject(RESOURCE_DESTROYED);
+        promise->reject(make_error_code(std::errc::bad_file_descriptor));
 
     mListener.reset();
     return {};

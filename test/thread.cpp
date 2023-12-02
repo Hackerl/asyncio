@@ -4,20 +4,20 @@
 using namespace std::chrono_literals;
 
 TEST_CASE("asynchronously run in a separate thread", "[thread]") {
-    SECTION("no result") {
-        SECTION("no error") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("no result") {
+            SECTION("no error") {
+                const auto tp = std::chrono::system_clock::now();
+
                 co_await asyncio::toThread([]() -> tl::expected<void, std::error_code> {
-                    const auto tp = std::chrono::system_clock::now();
                     std::this_thread::sleep_for(50ms);
-                    REQUIRE(std::chrono::system_clock::now() - tp > 45ms);
                     return {};
                 });
-            });
-        }
 
-        SECTION("error") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+                REQUIRE(std::chrono::system_clock::now() - tp > 45ms);
+            }
+
+            SECTION("error") {
                 const auto result = co_await asyncio::toThread([]() -> tl::expected<void, std::error_code> {
                     std::this_thread::sleep_for(10ms);
                     return tl::unexpected(make_error_code(std::errc::bad_message));
@@ -25,13 +25,11 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
 
                 REQUIRE(!result);
                 REQUIRE(result.error() == std::errc::bad_message);
-            });
+            }
         }
-    }
 
-    SECTION("have result") {
-        SECTION("no error") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("have result") {
+            SECTION("no error") {
                 const auto result = co_await asyncio::toThread([]() -> tl::expected<int, std::error_code> {
                     std::this_thread::sleep_for(10ms);
                     return 1024;
@@ -39,11 +37,9 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
 
                 REQUIRE(result);
                 REQUIRE(*result == 1024);
-            });
-        }
+            }
 
-        SECTION("error") {
-            asyncio::run([]() -> zero::async::coroutine::Task<void> {
+            SECTION("error") {
                 const auto result = co_await asyncio::toThread([]() -> tl::expected<int, std::error_code> {
                     std::this_thread::sleep_for(10ms);
                     return tl::unexpected(make_error_code(std::errc::bad_message));
@@ -51,12 +47,10 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
 
                 REQUIRE(!result);
                 REQUIRE(result.error() == std::errc::bad_message);
-            });
+            }
         }
-    }
 
-    SECTION("cancel") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("cancel") {
             const auto stop = std::make_shared<bool>();
 
             auto task = asyncio::toThread(
@@ -80,6 +74,6 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
 
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);
-        });
-    }
+        }
+    });
 }

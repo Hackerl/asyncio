@@ -13,25 +13,22 @@ namespace asyncio {
 
     using FileDescriptor = evutil_socket_t;
 
-    class ICloseable : public virtual zero::Interface {
-    public:
-        virtual zero::async::coroutine::Task<void, std::error_code> close() = 0;
-    };
-
-    class IReader : public virtual ICloseable {
+    class IReader : public virtual zero::Interface {
     public:
         virtual zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> readExactly(std::span<std::byte> data) = 0;
         virtual zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll() = 0;
     };
 
-    class IWriter : public virtual ICloseable {
+    class IWriter : public virtual zero::Interface {
     public:
         virtual zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> writeAll(std::span<const std::byte> data) = 0;
     };
 
     class IStreamIO : public virtual IReader, public virtual IWriter {
+    public:
+        virtual zero::async::coroutine::Task<void, std::error_code> close() = 0;
     };
 
     class IFileDescriptor : public virtual zero::Interface {

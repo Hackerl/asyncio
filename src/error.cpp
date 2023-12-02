@@ -5,23 +5,10 @@ const char *asyncio::ErrorCategory::name() const noexcept {
 }
 
 std::string asyncio::ErrorCategory::message(const int value) const {
-    std::string msg;
+    if (value == IO_EOF)
+        return "eof";
 
-    switch (value) {
-    case IO_EOF:
-        msg = "eof";
-        break;
-
-    case RESOURCE_DESTROYED:
-        msg = "resource destroyed";
-        break;
-
-    default:
-        msg = "unknown";
-        break;
-    }
-
-    return msg;
+    return "unknown";
 }
 
 const std::error_category &asyncio::errorCategory() {

@@ -1,18 +1,17 @@
 #include <asyncio/fs/iocp.h>
 #include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
-#include <zero/defer.h>
 #include <filesystem>
 
 TEST_CASE("IOCP", "[filesystem framework]") {
-    SECTION("normal") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
-            const auto eventLoop = asyncio::getEventLoop();
-            REQUIRE(eventLoop);
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        const auto eventLoop = asyncio::getEventLoop();
+        REQUIRE(eventLoop);
 
-            auto framework = asyncio::fs::makeIOCP();
-            REQUIRE(framework);
+        auto framework = asyncio::fs::makeIOCP();
+        REQUIRE(framework);
 
+        SECTION("normal") {
             const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-iocp";
             const auto handle = CreateFileA(
                 path.string().c_str(),
@@ -24,40 +23,25 @@ TEST_CASE("IOCP", "[filesystem framework]") {
                 nullptr
             );
             REQUIRE(handle != INVALID_HANDLE_VALUE);
-            DEFER(CloseHandle(handle));
 
             const auto fd = reinterpret_cast<asyncio::FileDescriptor>(handle);
             const auto result = framework->associate(fd);
             REQUIRE(result);
 
-            constexpr std::array content = {
-                std::byte{'h'},
-                std::byte{'e'},
-                std::byte{'l'},
-                std::byte{'l'},
-                std::byte{'o'}
-            };
-
-            auto res = co_await framework->write(eventLoop, fd, 0, content);
-            REQUIRE(res);
-            REQUIRE(*res == content.size());
+            constexpr std::string_view content = "hello";
+            auto n = co_await framework->write(eventLoop, fd, 0, std::as_bytes(std::span{content}));
+            REQUIRE(n);
+            REQUIRE(*n == content.size());
 
             std::byte data[5];
-            res = co_await framework->read(eventLoop, fd, 0, data);
-            REQUIRE(res);
-            REQUIRE(*res == sizeof(data));
-            REQUIRE(std::equal(data, data + sizeof(data), content.begin()));
-        });
-    }
+            n = co_await framework->read(eventLoop, fd, 0, data);
+            REQUIRE(n);
+            REQUIRE(*n == sizeof(data));
+            REQUIRE(memcmp(data, content.data(), content.size()) == 0);
+            REQUIRE(CloseHandle(handle));
+        }
 
-    SECTION("cancel") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
-            const auto eventLoop = asyncio::getEventLoop();
-            REQUIRE(eventLoop);
-
-            auto framework = asyncio::fs::makeIOCP();
-            REQUIRE(framework);
-
+        SECTION("cancel") {
             const auto pipe = CreateNamedPipeA(
                 R"(\\.\pipe\asyncio)",
                 PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
@@ -69,7 +53,6 @@ TEST_CASE("IOCP", "[filesystem framework]") {
                 nullptr
             );
             REQUIRE(pipe != INVALID_HANDLE_VALUE);
-            DEFER(CloseHandle(pipe));
 
             const auto handle = CreateFile(
                 R"(\\.\pipe\asyncio)",
@@ -81,7 +64,6 @@ TEST_CASE("IOCP", "[filesystem framework]") {
                 nullptr
             );
             REQUIRE(handle != INVALID_HANDLE_VALUE);
-            DEFER(CloseHandle(handle));
 
             const auto fd = reinterpret_cast<asyncio::FileDescriptor>(pipe);
             const auto result = framework->associate(fd);
@@ -92,10 +74,13 @@ TEST_CASE("IOCP", "[filesystem framework]") {
 
             task.cancel();
             co_await task;
-            const auto res = task.result();
+            const auto n = task.result();
 
-            REQUIRE(!res);
-            REQUIRE(res.error() == std::errc::operation_canceled);
-        });
-    }
+            REQUIRE(!n);
+            REQUIRE(n.error() == std::errc::operation_canceled);
+
+            REQUIRE(CloseHandle(pipe));
+            REQUIRE(CloseHandle(handle));
+        }
+    });
 }

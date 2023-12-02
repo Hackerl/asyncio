@@ -58,7 +58,7 @@ namespace asyncio {
         template<typename U>
         tl::expected<void, std::error_code> trySendImpl(U &&element) {
             if (mClosed)
-                return tl::unexpected(IO_EOF);
+                return tl::unexpected(make_error_code(std::errc::broken_pipe));
 
             const auto index = mBuffer.reserve();
 
@@ -76,7 +76,7 @@ namespace asyncio {
         tl::expected<void, std::error_code>
         sendSyncImpl(U &&element, const std::optional<std::chrono::milliseconds> timeout) {
             if (mClosed)
-                return tl::unexpected(IO_EOF);
+                return tl::unexpected(make_error_code(std::errc::broken_pipe));
 
             tl::expected<void, std::error_code> result;
 
@@ -88,7 +88,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(IO_EOF);
+                        result = tl::unexpected(make_error_code(std::errc::broken_pipe));
                         break;
                     }
 
@@ -130,7 +130,7 @@ namespace asyncio {
         zero::async::coroutine::Task<void, std::error_code>
         sendImpl(T element, const std::optional<std::chrono::milliseconds> timeout) {
             if (mClosed)
-                co_return tl::unexpected(IO_EOF);
+                co_return tl::unexpected(make_error_code(std::errc::broken_pipe));
 
             tl::expected<void, std::error_code> result;
 
@@ -142,7 +142,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(IO_EOF);
+                        result = tl::unexpected(make_error_code(std::errc::broken_pipe));
                         break;
                     }
 
@@ -353,7 +353,7 @@ namespace asyncio {
                 mClosed = true;
             }
 
-            trigger<SENDER>(IO_EOF);
+            trigger<SENDER>(make_error_code(std::errc::broken_pipe));
             trigger<RECEIVER>(IO_EOF);
         }
 

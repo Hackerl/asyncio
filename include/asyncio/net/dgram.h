@@ -33,7 +33,6 @@ namespace asyncio::net::dgram {
         void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     private:
-        bool mClosed;
         FileDescriptor mFD;
         std::array<ev::Event, 2> mEvents;
         std::array<std::optional<std::chrono::milliseconds>, 2> mTimeouts;

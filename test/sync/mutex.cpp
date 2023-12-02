@@ -4,12 +4,12 @@
 using namespace std::chrono_literals;
 
 TEST_CASE("asyncio mutex", "[mutex]") {
-    SECTION("normal") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
-            const auto mutex = std::make_shared<asyncio::sync::Mutex>();
-            const auto result = co_await mutex->lock();
-            REQUIRE(result);
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        const auto mutex = std::make_shared<asyncio::sync::Mutex>();
+        const auto result = co_await mutex->lock();
+        REQUIRE(result);
 
+        SECTION("normal") {
             co_await allSettled(
                 [](auto m) -> zero::async::coroutine::Task<void> {
                     auto res = co_await m->lock();
@@ -31,15 +31,9 @@ TEST_CASE("asyncio mutex", "[mutex]") {
                     m->unlock();
                 }(mutex)
             );
-        });
-    }
+        }
 
-    SECTION("cancel") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
-            const auto mutex = std::make_shared<asyncio::sync::Mutex>();
-            const auto result = co_await mutex->lock();
-            REQUIRE(result);
-
+        SECTION("cancel") {
             auto task = allSettled(
                 [](auto m) -> zero::async::coroutine::Task<void> {
                     auto res = co_await m->lock();
@@ -60,6 +54,6 @@ TEST_CASE("asyncio mutex", "[mutex]") {
 
             task.cancel();
             co_await task;
-        });
-    }
+        }
+    });
 }

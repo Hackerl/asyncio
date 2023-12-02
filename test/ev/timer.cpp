@@ -5,29 +5,27 @@
 using namespace std::chrono_literals;
 
 TEST_CASE("timer", "[timer]") {
-    SECTION("normal") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("normal") {
             auto timer = asyncio::ev::makeTimer();
             REQUIRE(timer);
 
             const auto tp = std::chrono::system_clock::now();
-            co_await timer->after(100ms);
-            REQUIRE(std::chrono::system_clock::now() - tp > 95ms);
-        });
-    }
+            co_await timer->after(50ms);
+            REQUIRE(std::chrono::system_clock::now() - tp > 45ms);
+        }
 
-    SECTION("cancel") {
-        asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        SECTION("cancel") {
             auto timer = asyncio::ev::makeTimer();
             REQUIRE(timer);
 
-            const auto task = timer->after(100ms);
-            const auto result = co_await asyncio::timeout(task, 50ms);
+            const auto task = timer->after(50ms);
+            const auto result = co_await asyncio::timeout(task, 20ms);
 
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
-        });
-    }
+        }
+    });
 }
