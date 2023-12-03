@@ -1,19 +1,19 @@
-#include <asyncio/fs/posix.h>
+#include <asyncio/fs/aio.h>
 #include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
-#include <unistd.h>
 #include <fcntl.h>
+#include <unistd.h>
 
-TEST_CASE("posix aio", "[filesystem framework]") {
+TEST_CASE("linux aio", "[filesystem framework]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         const auto eventLoop = asyncio::getEventLoop();
         REQUIRE(eventLoop);
 
-        auto framework = asyncio::fs::makePosixAIO(eventLoop->base());
+        auto framework = asyncio::fs::makeAIO(eventLoop->base());
         REQUIRE(framework);
 
-        const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-posix";
+        const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-aio";
         const int fd = open(path.string().c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
         REQUIRE(fd > 0);
 

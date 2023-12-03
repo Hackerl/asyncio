@@ -144,7 +144,7 @@ TEST_CASE("async channel buffer", "[channel]") {
                         ch->close();
                     }(channel, counters[0]),
                     [](auto ch, auto ct) -> zero::async::coroutine::Task<void> {
-                        auto result = co_await zero::async::coroutine::allSettled(
+                        const auto result = co_await zero::async::coroutine::allSettled(
                             asyncio::toThread([=] { return consumeSync(ch, ct); }),
                             asyncio::toThread([=] { return consumeSync(ch, ct); })
                         );

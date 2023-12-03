@@ -1,27 +1,19 @@
-#ifndef ASYNCIO_POSIX_H
-#define ASYNCIO_POSIX_H
+#ifndef ASYNCIO_AIO_H
+#define ASYNCIO_AIO_H
 
 #include "framework.h"
+#include <linux/aio_abi.h>
 #include <event.h>
-#include <aio.h>
 
 namespace asyncio::fs {
-    class PosixAIO final : public IFramework {
-        struct Request {
-            aiocb *cb;
-            std::shared_ptr<EventLoop> eventLoop;
-            zero::async::promise::Promise<std::size_t, std::error_code> promise;
-
-            bool operator==(const Request &rhs) const;
-        };
-
+    class AIO final : public IFramework {
     public:
-        explicit PosixAIO(std::unique_ptr<event, decltype(event_free) *> event);
-        PosixAIO(PosixAIO && rhs) noexcept;
-        ~PosixAIO() override;
+        explicit AIO(aio_context_t context, int efd, std::unique_ptr<event, decltype(event_free) *> event);
+        AIO(AIO &&rhs) noexcept;
+        ~AIO() override;
 
     private:
-        void onSignal();
+        void onEvent() const;
 
     public:
         tl::expected<void, std::error_code> associate(FileDescriptor fd) override;
@@ -43,11 +35,12 @@ namespace asyncio::fs {
         ) override;
 
     private:
-        std::list<Request> mPending;
+        int mEventFD;
+        aio_context_t mContext;
         std::unique_ptr<event, decltype(event_free) *> mEvent;
     };
 
-    tl::expected<PosixAIO, std::error_code> makePosixAIO(event_base *base);
+    tl::expected<AIO, std::error_code> makeAIO(event_base *base);
 }
 
-#endif //ASYNCIO_POSIX_H
+#endif //ASYNCIO_AIO_H

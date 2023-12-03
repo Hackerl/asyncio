@@ -8,7 +8,13 @@
 
 #ifdef _WIN32
 #include <asyncio/fs/iocp.h>
-#elif __APPLE__ || (__unix__ && !__ANDROID__)
+#endif
+
+#if __linux__
+#include <asyncio/fs/aio.h>
+#endif
+
+#if __APPLE__ || (__unix__ && !__ANDROID__)
 #include <asyncio/fs/posix.h>
 #endif
 
@@ -132,21 +138,32 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(const
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 #endif
 
-#ifdef __ANDROID__
-    return EventLoop{std::move(base), std::move(dnsBase), nullptr, maxWorkers};
-#else
 #ifdef _WIN32
     auto framework = TRY(fs::makeIOCP().transform([](fs::IOCP &&iocp) {
         return std::make_unique<fs::IOCP>(std::move(iocp));
     }));
-#elif __APPLE__ || (__unix__ && !__ANDROID__)
-    auto framework = fs::makePosixAIO(base.get()).transform([](fs::PosixAIO &&aio) {
+#elif __ANDROID__
+    auto framework = TRY(fs::makeAIO(base.get()).transform([](fs::AIO &&aio) {
+        return std::make_unique<fs::AIO>(std::move(aio));
+    }));
+#elif __linux__
+    auto framework = TRY(fs::makeAIO(base.get())
+                     .transform([](fs::AIO &&aio) -> std::unique_ptr<fs::IFramework> {
+                         return std::make_unique<fs::AIO>(std::move(aio));
+                     })
+                     .or_else([&](const auto &) {
+                         return fs::makePosixAIO(base.get())
+                             .transform([](fs::PosixAIO &&aio) -> std::unique_ptr<fs::IFramework> {
+                                 return std::make_unique<fs::PosixAIO>(std::move(aio));
+                             });
+                     }));
+#elif __APPLE__
+    auto framework = TRY(fs::makePosixAIO(base.get()).transform([](fs::PosixAIO &&aio) {
         return std::make_unique<fs::PosixAIO>(std::move(aio));
-    });
+    }));
 #endif
 
     return EventLoop{std::move(base), std::move(dnsBase), std::move(*framework), maxWorkers};
-#endif
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {

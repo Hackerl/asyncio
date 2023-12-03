@@ -41,6 +41,7 @@ add_library(
         src/http/url.cpp
         src/http/request.cpp
         $<$<PLATFORM_ID:Windows>:src/fs/iocp.cpp>
+        $<$<PLATFORM_ID:Linux,Android>:src/fs/aio.cpp>
         $<$<PLATFORM_ID:Linux,Darwin>:src/fs/posix.cpp>
         $<$<NOT:$<BOOL:${ASYNCIO_DISABLE_SSL}>>:src/net/ssl.cpp>
 )

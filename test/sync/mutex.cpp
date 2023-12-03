@@ -12,17 +12,17 @@ TEST_CASE("asyncio mutex", "[mutex]") {
         SECTION("normal") {
             co_await allSettled(
                 [](auto m) -> zero::async::coroutine::Task<void> {
-                    auto res = co_await m->lock();
+                    const auto res = co_await m->lock();
                     REQUIRE(res);
                     m->unlock();
                 }(mutex),
                 [](auto m) -> zero::async::coroutine::Task<void> {
-                    auto res = co_await m->lock();
+                    const auto res = co_await m->lock();
                     REQUIRE(res);
                     m->unlock();
                 }(mutex),
                 [](auto m) -> zero::async::coroutine::Task<void> {
-                    auto res = co_await m->lock();
+                    const auto res = co_await m->lock();
                     REQUIRE(res);
                     m->unlock();
                 }(mutex),
@@ -36,17 +36,17 @@ TEST_CASE("asyncio mutex", "[mutex]") {
         SECTION("cancel") {
             auto task = allSettled(
                 [](auto m) -> zero::async::coroutine::Task<void> {
-                    auto res = co_await m->lock();
+                    const auto res = co_await m->lock();
                     REQUIRE(!res);
                     REQUIRE(res.error() == std::errc::operation_canceled);
                 }(mutex),
                 [](auto m) -> zero::async::coroutine::Task<void> {
-                    auto res = co_await m->lock();
+                    const auto res = co_await m->lock();
                     REQUIRE(!res);
                     REQUIRE(res.error() == std::errc::operation_canceled);
                 }(mutex),
                 [](auto m) -> zero::async::coroutine::Task<void> {
-                    auto res = co_await m->lock();
+                    const auto res = co_await m->lock();
                     REQUIRE(!res);
                     REQUIRE(res.error() == std::errc::operation_canceled);
                 }(mutex)

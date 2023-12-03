@@ -126,7 +126,9 @@ asyncio::fs::PosixAIO::read(
                 return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
             mPending.remove(pending);
-            pending.promise.reject(make_error_code(std::errc::operation_canceled));
+            pending.eventLoop->post([promise = pending.promise]() mutable {
+                promise.reject(make_error_code(std::errc::operation_canceled));
+            });
 
             return {};
         }
@@ -175,7 +177,9 @@ asyncio::fs::PosixAIO::write(
                 return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
             mPending.remove(pending);
-            pending.promise.reject(make_error_code(std::errc::operation_canceled));
+            pending.eventLoop->post([promise = pending.promise]() mutable {
+                promise.reject(make_error_code(std::errc::operation_canceled));
+            });
 
             return {};
         }

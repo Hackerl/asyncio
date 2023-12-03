@@ -43,10 +43,10 @@ TEST_CASE("datagram network connection", "[dgram]") {
                     REQUIRE(*n == MESSAGE.size());
 
                     std::byte data[1024];
-                    const auto res = co_await client->readFrom(data);
-                    REQUIRE(res);
+                    const auto result = co_await client->readFrom(data);
+                    REQUIRE(result);
 
-                    const auto &[num, from] = *res;
+                    const auto &[num, from] = *result;
                     REQUIRE(num);
                     REQUIRE(num == MESSAGE.size());
                     REQUIRE(from.index() == 0);

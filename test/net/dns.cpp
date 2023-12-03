@@ -54,7 +54,7 @@ TEST_CASE("DNS query", "[dns]") {
         }
 
         SECTION("lookup IPv6") {
-            auto result = co_await asyncio::net::dns::lookupIPv6("localhost");
+            const auto result = co_await asyncio::net::dns::lookupIPv6("localhost");
             REQUIRE((!result || result->empty() || zero::os::net::stringify(result->front()) == "::1"));
         }
     });

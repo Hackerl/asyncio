@@ -180,18 +180,18 @@ TEST_CASE("asyncio future", "[future]") {
             SECTION("timeout") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        auto result = co_await f.get(10ms);
+                        const auto result = co_await f.get(10ms);
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::timed_out);
                         REQUIRE(!f.done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        auto result = co_await f.get(100ms);
+                        const auto result = co_await f.get(100ms);
                         REQUIRE(result);
                         REQUIRE(f.done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        auto result = co_await f.get();
+                        const auto result = co_await f.get();
                         REQUIRE(result);
                         REQUIRE(f.done());
                     }(future),
