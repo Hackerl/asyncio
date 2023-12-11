@@ -309,7 +309,7 @@ namespace asyncio {
             if (mPending[Index].empty())
                 return;
 
-            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
+            mEventLoop->post([pending = std::exchange(mPending[Index], {})]() mutable {
                 for (auto &promise: pending)
                     promise.resolve();
             });

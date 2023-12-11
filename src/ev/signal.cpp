@@ -1,47 +1,48 @@
 #include <asyncio/ev/signal.h>
-#include <asyncio/event_loop.h>
 
-asyncio::ev::Signal::Signal(event *e) : Notifier(e) {
+asyncio::ev::Signal::Signal(event *e, const std::size_t capacity)
+    : mChannel(std::make_unique<Channel<int>>(capacity)), mEvent(e, event_free) {
+    evsignal_assign(
+        e,
+        event_get_base(e),
+        event_get_signal(e),
+        [](const evutil_socket_t fd, short, void *arg) {
+            static_cast<Signal *>(arg)->mChannel->trySend(fd);
+        },
+        this
+    );
+
+    evsignal_add(e, nullptr);
+}
+
+asyncio::ev::Signal::Signal(Signal &&rhs) noexcept : mChannel(std::move(rhs.mChannel)), mEvent(std::move(rhs.mEvent)) {
+    const auto e = mEvent.get();
+
+    evsignal_del(e);
+    evsignal_assign(e, event_get_base(e), event_get_signal(e), event_get_callback(e), this);
+    evsignal_add(e, nullptr);
+}
+
+asyncio::ev::Signal::~Signal() {
+    if (!mEvent)
+        return;
+
+    evsignal_del(mEvent.get());
 }
 
 int asyncio::ev::Signal::sig() const {
     return event_get_signal(mEvent.get());
 }
 
-zero::async::coroutine::Task<void, std::error_code>
-asyncio::ev::Signal::on() {
-    if (pending())
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
-
-    co_return co_await zero::async::coroutine::Cancellable{
-        zero::async::promise::chain<void, std::error_code>([&](const auto &promise) {
-            context() = promise;
-            evsignal_add(mEvent.get(), nullptr);
-        }),
-        [this]() -> tl::expected<void, std::error_code> {
-            evsignal_del(mEvent.get());
-            std::exchange(context(), std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
-            return {};
-        }
-    };
+zero::async::coroutine::Task<int, std::error_code> asyncio::ev::Signal::on() const {
+    co_return co_await mChannel->receive();
 }
 
-tl::expected<asyncio::ev::Signal, std::error_code> asyncio::ev::makeSignal(const int sig) {
-    const auto context = new Signal::Context();
+tl::expected<asyncio::ev::Signal, std::error_code> asyncio::ev::makeSignal(const int sig, const std::size_t capacity) {
+    event *e = evsignal_new(getEventLoop()->base(), sig, nullptr, nullptr);
 
-    event *e = evsignal_new(
-        getEventLoop()->base(),
-        sig,
-        [](evutil_socket_t, short, void *arg) {
-        std::exchange(*static_cast<Event::Context *>(arg), std::nullopt)->resolve();
-        },
-        context
-    );
-
-    if (!e) {
-        delete context;
+    if (!e)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-    }
 
-    return Signal{e};
+    return Signal{e, capacity};
 }

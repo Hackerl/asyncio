@@ -1,19 +1,24 @@
 #ifndef ASYNCIO_SIGNAL_H
 #define ASYNCIO_SIGNAL_H
 
-#include "event.h"
-#include <zero/async/coroutine.h>
+#include <asyncio/channel.h>
 
 namespace asyncio::ev {
-    class Signal : public Notifier<void> {
+    class Signal {
     public:
-        explicit Signal(event *e);
+        Signal(event *e, std::size_t capacity);
+        Signal(Signal &&rhs) noexcept;
+        ~Signal();
 
         [[nodiscard]] int sig() const;
-        zero::async::coroutine::Task<void, std::error_code> on();
+        [[nodiscard]] zero::async::coroutine::Task<int, std::error_code> on() const;
+
+    private:
+        std::unique_ptr<Channel<int>> mChannel;
+        std::unique_ptr<event, decltype(event_free) *> mEvent;
     };
 
-    tl::expected<Signal, std::error_code> makeSignal(int sig);
+    tl::expected<Signal, std::error_code> makeSignal(int sig, std::size_t capacity = 64);
 }
 
 #endif //ASYNCIO_SIGNAL_H

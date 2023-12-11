@@ -57,7 +57,7 @@ asyncio::net::stream::Acceptor::Acceptor(evconnlistener *listener) : mListener(l
 }
 
 asyncio::net::stream::Acceptor::Acceptor(Acceptor &&rhs) noexcept : mListener(std::move(rhs.mListener)) {
-    assert(!mPromise);
+    assert(!rhs.mPromise);
     evconnlistener_set_cb(
         mListener.get(),
         [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
