@@ -10,7 +10,7 @@
 
 using namespace std::chrono_literals;
 
-TEST_CASE("pipe", "[filesystem]") {
+TEST_CASE("pipe", "[fs]") {
 #if __unix__ || __APPLE__
     signal(SIGPIPE, SIG_IGN);
 #endif

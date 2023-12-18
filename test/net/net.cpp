@@ -17,7 +17,7 @@
 #include <sys/un.h>
 #endif
 
-TEST_CASE("network components", "[network]") {
+TEST_CASE("network components", "[net]") {
     SECTION("IPv4") {
         asyncio::net::Address address = asyncio::net::IPv4Address{
             80,

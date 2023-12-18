@@ -114,10 +114,10 @@ TEST_CASE("async channel buffer", "[channel]") {
                 const auto channel = std::make_shared<asyncio::Channel<int>>(2);
 
                 co_await asyncio::toThread([=]() -> tl::expected<void, std::error_code> {
-                    auto result = channel->sendSync(0, 50ms);
+                    auto result = channel->sendSync(0, 20ms);
                     REQUIRE(result);
 
-                    result = channel->sendSync(0, 50ms);
+                    result = channel->sendSync(0, 20ms);
 
                     REQUIRE(!result);
                     REQUIRE(result.error() == std::errc::timed_out);
@@ -128,7 +128,7 @@ TEST_CASE("async channel buffer", "[channel]") {
 
             SECTION("receive timeout") {
                 asyncio::Channel<int> channel(2);
-                const auto result = co_await channel.receive(50ms);
+                const auto result = co_await channel.receive(20ms);
                 REQUIRE(!result);
                 REQUIRE(result.error() == std::errc::timed_out);
             }
@@ -160,10 +160,10 @@ TEST_CASE("async channel buffer", "[channel]") {
             SECTION("send timeout") {
                 asyncio::Channel<int> channel(2);
 
-                auto result = co_await channel.send(0, 50ms);
+                auto result = co_await channel.send(0, 20ms);
                 REQUIRE(result);
 
-                result = co_await channel.send(0, 50ms);
+                result = co_await channel.send(0, 20ms);
                 REQUIRE(!result);
                 REQUIRE(result.error() == std::errc::timed_out);
             }
@@ -172,7 +172,7 @@ TEST_CASE("async channel buffer", "[channel]") {
                 const auto channel = std::make_shared<asyncio::Channel<int>>(2);
 
                 co_await asyncio::toThread([=]() -> tl::expected<void, std::error_code> {
-                    const auto result = channel->receiveSync(50ms);
+                    const auto result = channel->receiveSync(20ms);
 
                     REQUIRE(!result);
                     REQUIRE(result.error() == std::errc::timed_out);

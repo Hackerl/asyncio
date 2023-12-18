@@ -6,7 +6,7 @@ using namespace std::chrono_literals;
 
 constexpr std::string_view MESSAGE = "hello world";
 
-TEST_CASE("async event notification", "[event]") {
+TEST_CASE("async event notification", "[ev]") {
     evutil_socket_t fds[2];
 
 #ifdef _WIN32

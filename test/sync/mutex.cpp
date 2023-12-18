@@ -3,7 +3,7 @@
 
 using namespace std::chrono_literals;
 
-TEST_CASE("asyncio mutex", "[mutex]") {
+TEST_CASE("asyncio mutex", "[sync]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         const auto mutex = std::make_shared<asyncio::sync::Mutex>();
         REQUIRE(!mutex->locked());
@@ -30,7 +30,7 @@ TEST_CASE("asyncio mutex", "[mutex]") {
                     m->unlock();
                 }(mutex),
                 [](auto m) -> zero::async::coroutine::Task<void> {
-                    co_await asyncio::sleep(50ms);
+                    co_await asyncio::sleep(20ms);
                     m->unlock();
                 }(mutex)
             );
@@ -54,7 +54,7 @@ TEST_CASE("asyncio mutex", "[mutex]") {
                     m->unlock();
                 }(mutex),
                 [](auto m) -> zero::async::coroutine::Task<void> {
-                    co_await asyncio::sleep(50ms);
+                    co_await asyncio::sleep(20ms);
                     m->unlock();
                 }(mutex)
             );

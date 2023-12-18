@@ -9,7 +9,7 @@
 
 using namespace std::chrono_literals;
 
-TEST_CASE("signal handler", "[signal]") {
+TEST_CASE("signal handler", "[ev]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("normal") {
             auto signal = asyncio::ev::makeSignal(SIGINT);
@@ -17,7 +17,7 @@ TEST_CASE("signal handler", "[signal]") {
 
 #ifdef __APPLE__
             std::thread thread([]() {
-                std::this_thread::sleep_for(50ms);
+                std::this_thread::sleep_for(20ms);
                 kill(getpid(), SIGINT);
             });
 

@@ -3,7 +3,7 @@
 #include <zero/os/net.h>
 #include <catch2/catch_test_macros.hpp>
 
-TEST_CASE("DNS query", "[dns]") {
+TEST_CASE("DNS query", "[net]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("get address info") {
             asyncio::net::dns::AddressInfo hints = {};

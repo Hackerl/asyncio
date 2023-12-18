@@ -1,7 +1,7 @@
 #include <asyncio/http/url.h>
 #include <catch2/catch_test_macros.hpp>
 
-TEST_CASE("http url", "[url]") {
+TEST_CASE("http url", "[http]") {
     SECTION("parse") {
         REQUIRE(!asyncio::http::URL::from(":/qq.com"));
 

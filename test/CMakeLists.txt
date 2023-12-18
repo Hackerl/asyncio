@@ -10,6 +10,7 @@ add_executable(
         channel.cpp
         sync/mutex.cpp
         sync/event.cpp
+        sync/condition.cpp
         ev/pipe.cpp
         ev/event.cpp
         ev/buffer.cpp

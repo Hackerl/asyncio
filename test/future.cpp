@@ -30,7 +30,7 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        co_await asyncio::sleep(50ms);
+                        co_await asyncio::sleep(20ms);
                         f.set(1024);
                         REQUIRE(f.done());
                     }(future)
@@ -58,7 +58,7 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        co_await asyncio::sleep(50ms);
+                        co_await asyncio::sleep(20ms);
                         f.setError(make_error_code(std::errc::owner_dead));
                         REQUIRE(f.done());
                     }(future)
@@ -86,7 +86,7 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        co_await asyncio::sleep(50ms);
+                        co_await asyncio::sleep(20ms);
                         f.set(1024);
                         REQUIRE(f.done());
                     }(future)
@@ -142,7 +142,7 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        co_await asyncio::sleep(50ms);
+                        co_await asyncio::sleep(20ms);
                         f.set();
                         REQUIRE(f.done());
                     }(future)
@@ -170,7 +170,7 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        co_await asyncio::sleep(50ms);
+                        co_await asyncio::sleep(20ms);
                         f.setError(make_error_code(std::errc::owner_dead));
                         REQUIRE(f.done());
                     }(future)
@@ -196,7 +196,7 @@ TEST_CASE("asyncio future", "[future]") {
                         REQUIRE(f.done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        co_await asyncio::sleep(50ms);
+                        co_await asyncio::sleep(20ms);
                         f.set();
                         REQUIRE(f.done());
                     }(future)

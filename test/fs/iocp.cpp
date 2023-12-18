@@ -3,7 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 
-TEST_CASE("IOCP", "[filesystem framework]") {
+TEST_CASE("IOCP", "[fs]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         const auto eventLoop = asyncio::getEventLoop();
         REQUIRE(eventLoop);

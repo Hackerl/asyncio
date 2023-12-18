@@ -6,7 +6,7 @@
 
 constexpr std::string_view MESSAGE = "hello world\r\n";
 
-TEST_CASE("stream network connection", "[stream]") {
+TEST_CASE("stream network connection", "[net]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("TCP") {
             auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);

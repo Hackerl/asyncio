@@ -3,7 +3,7 @@
 
 using namespace std::chrono_literals;
 
-TEST_CASE("asyncio event", "[mutex]") {
+TEST_CASE("asyncio event", "[sync]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         const auto event = std::make_shared<asyncio::sync::Event>();
         REQUIRE(!event->isSet());
@@ -26,7 +26,7 @@ TEST_CASE("asyncio event", "[mutex]") {
                     REQUIRE(e->isSet());
                 }(event),
                 [](auto e) -> zero::async::coroutine::Task<void> {
-                    co_await asyncio::sleep(50ms);
+                    co_await asyncio::sleep(20ms);
                     REQUIRE(!e->isSet());
                     e->set();
                     REQUIRE(e->isSet());
@@ -53,7 +53,7 @@ TEST_CASE("asyncio event", "[mutex]") {
                     REQUIRE(e->isSet());
                 }(event),
                 [](auto e) -> zero::async::coroutine::Task<void> {
-                    co_await asyncio::sleep(50ms);
+                    co_await asyncio::sleep(20ms);
                     REQUIRE(!e->isSet());
                     e->set();
                     REQUIRE(e->isSet());

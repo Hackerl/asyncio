@@ -4,7 +4,7 @@
 
 using namespace std::chrono_literals;
 
-TEST_CASE("timer", "[timer]") {
+TEST_CASE("timer", "[ev]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("normal") {
             auto timer = asyncio::ev::makeTimer();

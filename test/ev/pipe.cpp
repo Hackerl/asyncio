@@ -8,7 +8,7 @@ using namespace std::chrono_literals;
 
 constexpr std::string_view MESSAGE = "hello world\r\n";
 
-TEST_CASE("buffer pipe", "[pipe]") {
+TEST_CASE("buffer pipe", "[ev]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         auto buffers = asyncio::ev::pipe(1024);
         REQUIRE(buffers);
@@ -73,7 +73,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
         }
 
         SECTION("read timeout") {
-            buffers->at(0).setTimeout(50ms, 0ms);
+            buffers->at(0).setTimeout(20ms, 0ms);
 
             std::byte data[10240];
             const auto n = co_await buffers->at(0).read(data);
@@ -95,7 +95,7 @@ TEST_CASE("buffer pipe", "[pipe]") {
             const auto task = buffers->at(0).read(data);
             REQUIRE(!task.done());
 
-            const auto result = co_await asyncio::timeout(task, 50ms);
+            const auto result = co_await asyncio::timeout(task, 20ms);
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);
             REQUIRE(!result);

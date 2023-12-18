@@ -8,7 +8,7 @@ using namespace std::chrono_literals;
 
 constexpr std::string_view MESSAGE = "hello world\r\n";
 
-TEST_CASE("async stream buffer", "[buffer]") {
+TEST_CASE("async stream buffer", "[ev]") {
     evutil_socket_t fds[2];
 
 #ifdef _WIN32
@@ -91,7 +91,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
         }
 
         SECTION("read timeout") {
-            buffers[0]->setTimeout(50ms, 0ms);
+            buffers[0]->setTimeout(20ms, 0ms);
 
             std::byte data[10240];
             const auto n = co_await buffers[0]->read(data);
@@ -113,7 +113,7 @@ TEST_CASE("async stream buffer", "[buffer]") {
             const auto task = buffers[0]->read(data);
             REQUIRE(!task.done());
 
-            const auto result = co_await asyncio::timeout(task, 50ms);
+            const auto result = co_await asyncio::timeout(task, 20ms);
             REQUIRE(task.done());
             REQUIRE(task.result().error() == std::errc::operation_canceled);
             REQUIRE(!result);

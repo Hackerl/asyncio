@@ -8,7 +8,7 @@ using namespace std::chrono_literals;
 
 constexpr std::string_view MESSAGE = "hello";
 
-TEST_CASE("datagram network connection", "[dgram]") {
+TEST_CASE("datagram network connection", "[net]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         auto server = asyncio::net::dgram::bind("127.0.0.1", 30000);
         REQUIRE(server);

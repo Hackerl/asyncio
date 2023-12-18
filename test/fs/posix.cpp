@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-TEST_CASE("posix aio", "[filesystem framework]") {
+TEST_CASE("posix aio", "[fs]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         const auto eventLoop = asyncio::getEventLoop();
         REQUIRE(eventLoop);

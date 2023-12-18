@@ -128,7 +128,7 @@ constexpr auto CLIENT_KEY = "-----BEGIN RSA PRIVATE KEY-----\n"
 
 constexpr std::string_view MESSAGE = "hello world\r\n";
 
-TEST_CASE("ssl stream network connection", "[ssl]") {
+TEST_CASE("ssl stream network connection", "[net]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("mutual authentication") {
             const auto context = asyncio::net::ssl::newContext(

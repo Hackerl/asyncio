@@ -8,7 +8,7 @@
 constexpr std::string_view CONTENT = "hello world";
 const auto path = std::filesystem::temp_directory_path() / "asyncio-fs";
 
-TEST_CASE("asynchronous filesystem", "[filesystem]") {
+TEST_CASE("asynchronous filesystem", "[fs]") {
     std::ofstream stream(path);
     REQUIRE(stream.is_open());
     stream << CONTENT;

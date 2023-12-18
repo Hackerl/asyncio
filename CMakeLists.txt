@@ -28,6 +28,7 @@ add_library(
         src/event_loop.cpp
         src/sync/mutex.cpp
         src/sync/event.cpp
+        src/sync/condition.cpp
         src/ev/pipe.cpp
         src/ev/event.cpp
         src/ev/buffer.cpp
