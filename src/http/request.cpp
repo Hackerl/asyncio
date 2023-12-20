@@ -20,7 +20,9 @@ std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_
 
     if (connection->status == asyncio::http::Connection::NOT_STARTED) {
         connection->status = asyncio::http::Connection::TRANSFERRING;
-        connection->promise.resolve();
+        asyncio::getEventLoop()->post([promise = connection->promise]() mutable {
+            promise.resolve();
+        });
     }
     else if (connection->status == asyncio::http::Connection::PAUSED) {
         connection->status = asyncio::http::Connection::TRANSFERRING;
@@ -316,14 +318,18 @@ void asyncio::http::Requests::recycle() const {
             if (connection->status != Connection::NOT_STARTED)
                 continue;
 
-            connection->promise.reject(static_cast<CURLError>(msg->data.result));
+            getEventLoop()->post([error = msg->data.result, promise = connection->promise]() mutable {
+                promise.reject(static_cast<CURLError>(error));
+            });
             continue;
         }
 
         if (connection->status != Connection::NOT_STARTED)
             continue;
 
-        connection->promise.resolve();
+        getEventLoop()->post([promise = connection->promise]() mutable {
+            promise.resolve();
+        });
     }
 }
 
