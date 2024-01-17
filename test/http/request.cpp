@@ -22,7 +22,7 @@ TEST_CASE("http requests", "[http]") {
             SECTION("normal") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await l.accept());
+                        auto buffer = co_await l.accept();
                         REQUIRE(buffer);
 
                         auto line = co_await buffer->readLine();
@@ -57,7 +57,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto requests = asyncio::http::makeRequests();
                         REQUIRE(requests);
 
-                        const auto response = std::move(co_await requests.value()->get(*url));
+                        const auto response = co_await requests.value()->get(*url);
                         REQUIRE(response);
                         REQUIRE(response->statusCode() == 200);
 
@@ -87,7 +87,7 @@ TEST_CASE("http requests", "[http]") {
             SECTION("empty body") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await l.accept());
+                        auto buffer = co_await l.accept();
                         REQUIRE(buffer);
 
                         auto line = co_await buffer->readLine();
@@ -118,7 +118,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto requests = asyncio::http::makeRequests();
                         REQUIRE(requests);
 
-                        const auto response = std::move(co_await requests.value()->get(*url));
+                        const auto response = co_await requests.value()->get(*url);
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -131,7 +131,7 @@ TEST_CASE("http requests", "[http]") {
             SECTION("get json") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await l.accept());
+                        auto buffer = co_await l.accept();
                         REQUIRE(buffer);
 
                         auto line = co_await buffer->readLine();
@@ -163,7 +163,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto requests = asyncio::http::makeRequests();
                         REQUIRE(requests);
 
-                        const auto response = std::move(co_await requests.value()->get(*url));
+                        const auto response = co_await requests.value()->get(*url);
                         REQUIRE(response);
 
                         const auto people = co_await response->json<People>();
@@ -179,7 +179,7 @@ TEST_CASE("http requests", "[http]") {
             SECTION("post form") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await l.accept());
+                        auto buffer = co_await l.accept();
                         REQUIRE(buffer);
 
                         auto line = co_await buffer->readLine();
@@ -229,7 +229,7 @@ TEST_CASE("http requests", "[http]") {
                         REQUIRE(requests);
 
                         const std::map<std::string, std::string> payload = {{"name", "jack"}};
-                        const auto response = std::move(co_await requests.value()->post(*url, payload));
+                        const auto response = co_await requests.value()->post(*url, payload);
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -242,7 +242,7 @@ TEST_CASE("http requests", "[http]") {
             SECTION("post file") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await l.accept());
+                        auto buffer = co_await l.accept();
                         REQUIRE(buffer);
 
                         auto line = co_await buffer->readLine();
@@ -298,7 +298,7 @@ TEST_CASE("http requests", "[http]") {
                         REQUIRE(requests);
 
                         const std::map<std::string, std::filesystem::path> payload = {{"file", path}};
-                        const auto response = std::move(co_await requests.value()->post(*url, payload));
+                        const auto response = co_await requests.value()->post(*url, payload);
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -313,7 +313,7 @@ TEST_CASE("http requests", "[http]") {
             SECTION("post multipart") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await l.accept());
+                        auto buffer = co_await l.accept();
                         REQUIRE(buffer);
 
                         auto line = co_await buffer->readLine();
@@ -373,7 +373,7 @@ TEST_CASE("http requests", "[http]") {
                             {"file", path}
                         };
 
-                        const auto response = std::move(co_await requests.value()->post(*url, payload));
+                        const auto response = co_await requests.value()->post(*url, payload);
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -388,7 +388,7 @@ TEST_CASE("http requests", "[http]") {
             SECTION("post json") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
-                        auto buffer = std::move(co_await l.accept());
+                        auto buffer = co_await l.accept();
                         REQUIRE(buffer);
 
                         auto line = co_await buffer->readLine();
@@ -444,7 +444,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto requests = asyncio::http::makeRequests();
                         REQUIRE(requests);
 
-                        const auto response = std::move(co_await requests.value()->post(*url, People{"jack", 18}));
+                        const auto response = co_await requests.value()->post(*url, People{"jack", 18});
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -458,7 +458,7 @@ TEST_CASE("http requests", "[http]") {
         SECTION("output to file") {
             co_await allSettled(
                 [](auto l) -> zero::async::coroutine::Task<void> {
-                    auto buffer = std::move(co_await l.accept());
+                    auto buffer = co_await l.accept();
                     REQUIRE(buffer);
 
                     auto line = co_await buffer->readLine();
@@ -490,7 +490,7 @@ TEST_CASE("http requests", "[http]") {
                     const auto requests = asyncio::http::makeRequests();
                     REQUIRE(requests);
 
-                    const auto response = std::move(co_await requests.value()->get(*url));
+                    const auto response = co_await requests.value()->get(*url);
                     REQUIRE(response);
 
                     const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";

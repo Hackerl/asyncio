@@ -30,7 +30,7 @@ namespace asyncio::ev {
 
     private:
         std::unique_ptr<event, decltype(event_free) *> mEvent;
-        std::optional<zero::async::promise::Promise<short, std::error_code>> mPromise;
+        zero::async::promise::PromisePtr<short, std::error_code> mPromise;
     };
 
     tl::expected<Event, std::error_code> makeEvent(FileDescriptor fd, short events);

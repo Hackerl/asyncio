@@ -185,7 +185,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 
   ```cpp
   asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-      auto buffer = std::move(co_await asyncio::net::stream::connect(host, port));
+      auto buffer = co_await asyncio::net::stream::connect(host, port);
 
       if (!buffer) {
           LOG_ERROR("stream buffer connect failed{}]", buffer.error());
@@ -239,7 +239,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
           co_return;
       }
 
-      auto buffer = std::move(co_await asyncio::net::ssl::stream::connect(*context, host, port));
+      auto buffer = co_await asyncio::net::ssl::stream::connect(*context, host, port);
 
       if (!buffer) {
           LOG_ERROR("stream buffer connect failed[{}]", buffer.error());

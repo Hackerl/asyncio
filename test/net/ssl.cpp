@@ -146,7 +146,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
 
             co_await allSettled(
                 [](auto l) -> zero::async::coroutine::Task<void> {
-                    auto buffer = std::move(co_await l.accept());
+                    auto buffer = co_await l.accept();
                     REQUIRE(buffer);
 
                     const auto localAddress = buffer->localAddress();
@@ -177,11 +177,11 @@ TEST_CASE("ssl stream network connection", "[net]") {
                     );
                     REQUIRE(ctx);
 
-                    auto buffer = std::move(co_await asyncio::net::ssl::stream::connect(
+                    auto buffer = co_await asyncio::net::ssl::stream::connect(
                         *ctx,
                         "localhost",
                         30000
-                    ));
+                    );
                     REQUIRE(buffer);
 
                     const auto localAddress = buffer->localAddress();
@@ -222,7 +222,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
 
             co_await allSettled(
                 [](auto l) -> zero::async::coroutine::Task<void> {
-                    auto buffer = std::move(co_await l.accept());
+                    auto buffer = co_await l.accept();
                     REQUIRE(buffer);
 
                     const auto localAddress = buffer->localAddress();
@@ -247,11 +247,11 @@ TEST_CASE("ssl stream network connection", "[net]") {
                     const auto ctx = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
                     REQUIRE(ctx);
 
-                    auto buffer = std::move(co_await asyncio::net::ssl::stream::connect(
+                    auto buffer = co_await asyncio::net::ssl::stream::connect(
                         *ctx,
                         "localhost",
                         30000
-                    ));
+                    );
                     REQUIRE(buffer);
 
                     const auto localAddress = buffer->localAddress();

@@ -10,7 +10,7 @@ namespace asyncio {
         using T = std::invoke_result_t<F>;
 
         const auto eventLoop = getEventLoop();
-        zero::async::promise::Promise<void, std::error_code> promise;
+        const auto promise = zero::async::promise::make<void, std::error_code>();
 
         std::unique_ptr<Worker> worker;
 
@@ -24,10 +24,10 @@ namespace asyncio {
 
         T result;
 
-        worker->execute([=, &result, f = std::move(f)]() mutable {
+        worker->execute([=, &result, f = std::move(f)] {
             result = f();
-            eventLoop->post([=]() mutable {
-                promise.resolve();
+            eventLoop->post([=] {
+                promise->resolve();
             });
         });
 
@@ -45,7 +45,7 @@ namespace asyncio {
         using T = std::invoke_result_t<F>;
 
         const auto eventLoop = getEventLoop();
-        zero::async::promise::Promise<void, std::error_code> promise;
+        const auto promise = zero::async::promise::make<void, std::error_code>();
 
         std::unique_ptr<Worker> worker;
 
@@ -59,10 +59,10 @@ namespace asyncio {
 
         T result;
 
-        worker->execute([=, &result, f = std::move(f)]() mutable {
+        worker->execute([=, &result, f = std::move(f)] {
             result = f();
-            eventLoop->post([=]() mutable {
-                promise.resolve();
+            eventLoop->post([=] {
+                promise->resolve();
             });
         });
 

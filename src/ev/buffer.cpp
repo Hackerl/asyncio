@@ -12,7 +12,7 @@ asyncio::ev::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)
     bufferevent_setcb(
         mBev.get(),
         [](bufferevent *, void *arg) {
-            auto promise = std::exchange(static_cast<Buffer *>(arg)->mPromises[READ_INDEX], std::nullopt);
+            const auto promise = std::move(static_cast<Buffer *>(arg)->mPromises[READ_INDEX]);
 
             if (!promise)
                 return;
@@ -20,7 +20,7 @@ asyncio::ev::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)
             promise->resolve();
         },
         [](bufferevent *, void *arg) {
-            auto promise = std::exchange(static_cast<Buffer *>(arg)->mPromises[WRITE_INDEX], std::nullopt);
+            const auto promise = std::move(static_cast<Buffer *>(arg)->mPromises[WRITE_INDEX]);
 
             if (!promise)
                 return;
@@ -73,7 +73,7 @@ void asyncio::ev::Buffer::onEvent(const short what) {
     }
     else if (what & BEV_EVENT_TIMEOUT) {
         if (what & BEV_EVENT_READING) {
-            auto promise = std::exchange(mPromises[READ_INDEX], std::nullopt);
+            const auto promise = std::move(mPromises[READ_INDEX]);
 
             if (!promise)
                 return;
@@ -81,7 +81,7 @@ void asyncio::ev::Buffer::onEvent(const short what) {
             promise->reject(make_error_code(std::errc::timed_out));
         }
         else {
-            auto promise = std::exchange(mPromises[WRITE_INDEX], std::nullopt);
+            const auto promise = std::move(mPromises[WRITE_INDEX]);
 
             if (!promise)
                 return;
@@ -96,7 +96,7 @@ void asyncio::ev::Buffer::onClose(const std::error_code &ec) {
     mClosed = true;
     mLastError = ec;
 
-    for (auto &promise: std::exchange(mPromises, {})) {
+    for (const auto &promise: std::exchange(mPromises, {})) {
         if (!promise)
             continue;
 
@@ -115,9 +115,10 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::close()
     assert(!mPromises[READ_INDEX]);
     assert(!mPromises[WRITE_INDEX]);
 
-    co_await flush();
-    mBev.reset();
+    if (!mClosed)
+        co_await flush();
 
+    mBev.reset();
     co_return tl::expected<void, std::error_code>{};
 }
 
@@ -146,7 +147,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::
             bufferevent_enable(mBev.get(), EV_READ);
         }),
         [this]() -> tl::expected<void, std::error_code> {
-            std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
+            std::exchange(mPromises[READ_INDEX], nullptr)->reject(
                 make_error_code(std::errc::operation_canceled)
             );
             return {};
@@ -194,11 +195,11 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::
                 mPromises[READ_INDEX] = promise;
                 bufferevent_enable(mBev.get(), EV_READ);
                 bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
-            }).finally([this] {
+            })->finally([this] {
                 bufferevent_setwatermark(mBev.get(), EV_READ, 0, mCapacity);
             }),
             [this]() -> tl::expected<void, std::error_code> {
-                std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
+                std::exchange(mPromises[READ_INDEX], nullptr)->reject(
                     make_error_code(std::errc::operation_canceled)
                 );
                 return {};
@@ -241,11 +242,11 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(st
             mPromises[READ_INDEX] = promise;
             bufferevent_setwatermark(mBev.get(), EV_READ, data.size(), mCapacity);
             bufferevent_enable(mBev.get(), EV_READ);
-        }).finally([this] {
+        })->finally([this] {
             bufferevent_setwatermark(mBev.get(), EV_READ, 0, mCapacity);
         }),
         [this]() -> tl::expected<void, std::error_code> {
-            std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
+            std::exchange(mPromises[READ_INDEX], nullptr)->reject(
                 make_error_code(std::errc::operation_canceled)
             );
             return {};
@@ -284,7 +285,7 @@ asyncio::ev::Buffer::write(const std::span<const std::byte> data) {
                     if (!mPromises[WRITE_INDEX])
                         return tl::unexpected(make_error_code(std::errc::operation_not_supported));
 
-                    std::exchange(mPromises[WRITE_INDEX], std::nullopt)->reject(
+                    std::exchange(mPromises[WRITE_INDEX], nullptr)->reject(
                         make_error_code(std::errc::operation_canceled)
                     );
                     return {};
@@ -333,14 +334,14 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::flush()
         zero::async::promise::chain<void, std::error_code>([this](const auto &promise) {
             mPromises[WRITE_INDEX] = promise;
             bufferevent_setwatermark(mBev.get(), EV_WRITE, 0, 0);
-        }).finally([this] {
+        })->finally([this] {
             bufferevent_setwatermark(mBev.get(), EV_WRITE, mCapacity, 0);
         }),
         [this]() -> tl::expected<void, std::error_code> {
             if (!mPromises[WRITE_INDEX])
                 return tl::unexpected(make_error_code(std::errc::operation_not_supported));
 
-            std::exchange(mPromises[WRITE_INDEX], std::nullopt)->reject(
+            std::exchange(mPromises[WRITE_INDEX], nullptr)->reject(
                 make_error_code(std::errc::operation_canceled)
             );
             return {};

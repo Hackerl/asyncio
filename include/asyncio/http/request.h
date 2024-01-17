@@ -4,7 +4,7 @@
 #include "url.h"
 #include <map>
 #include <variant>
-#include <zero/try.h>
+#include <zero/expect.h>
 #include <asyncio/ev/pipe.h>
 #include <asyncio/ev/timer.h>
 #include <nlohmann/json.hpp>
@@ -48,7 +48,7 @@ namespace asyncio::http {
 
         std::array<ev::PairedBuffer, 2> buffers;
         std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy;
-        zero::async::promise::Promise<void, std::error_code> promise;
+        zero::async::promise::PromisePtr<void, std::error_code> promise;
         std::list<std::function<void()>> defers;
         std::optional<std::error_code> error;
         Status status;
@@ -74,7 +74,8 @@ namespace asyncio::http {
 
         template<typename T>
         zero::async::coroutine::Task<T, std::error_code> json() const {
-            const auto j = CO_TRY(co_await json());
+            const auto j = co_await json();
+            CO_EXPECT(j);
 
             try {
                 co_return j->template get<T>();
@@ -172,7 +173,8 @@ namespace asyncio::http {
             Options opt = options.value_or(mOptions);
             opt.headers["Content-Type"] = "application/json";
 
-            auto connection = CO_TRY(prepare(std::move(method), url, std::move(opt)));
+            auto connection = prepare(std::move(method), url, std::move(opt));
+            CO_EXPECT(connection);
 
             curl_easy_setopt(
                 connection->get()->easy.get(),
@@ -180,7 +182,7 @@ namespace asyncio::http {
                 nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
             );
 
-            co_return std::move(co_await perform(std::move(*connection)));
+            co_return co_await perform(std::move(*connection));
         }
 
         zero::async::coroutine::Task<Response, std::error_code>

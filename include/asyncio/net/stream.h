@@ -35,7 +35,7 @@ namespace asyncio::net::stream {
 
     protected:
         std::unique_ptr<evconnlistener, decltype(evconnlistener_free) *> mListener;
-        std::optional<zero::async::promise::Promise<FileDescriptor, std::error_code>> mPromise;
+        zero::async::promise::PromisePtr<FileDescriptor, std::error_code> mPromise;
     };
 
     class Listener : public Acceptor {

@@ -10,7 +10,7 @@ namespace asyncio::fs {
         struct Request {
             aiocb *cb;
             std::shared_ptr<EventLoop> eventLoop;
-            zero::async::promise::Promise<std::size_t, std::error_code> promise;
+            zero::async::promise::PromisePtr<std::size_t, std::error_code> promise;
 
             bool operator==(const Request &rhs) const;
         };

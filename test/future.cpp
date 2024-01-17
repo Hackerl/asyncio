@@ -6,33 +6,33 @@ using namespace std::chrono_literals;
 TEST_CASE("asyncio future", "[future]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("have result") {
-            const asyncio::Future<int> future;
-            REQUIRE(!future.done());
+            const auto future = asyncio::makeFuture<int>();
+            REQUIRE(!future->done());
 
             SECTION("no error") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(result);
                         REQUIRE(*result == 1024);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(result);
                         REQUIRE(*result == 1024);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(result);
                         REQUIRE(*result == 1024);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         co_await asyncio::sleep(20ms);
-                        f.set(1024);
-                        REQUIRE(f.done());
+                        f->set(1024);
+                        REQUIRE(f->done());
                     }(future)
                 );
             }
@@ -40,27 +40,27 @@ TEST_CASE("asyncio future", "[future]") {
             SECTION("error") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::owner_dead);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::owner_dead);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::owner_dead);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         co_await asyncio::sleep(20ms);
-                        f.setError(make_error_code(std::errc::owner_dead));
-                        REQUIRE(f.done());
+                        f->setError(make_error_code(std::errc::owner_dead));
+                        REQUIRE(f->done());
                     }(future)
                 );
             }
@@ -68,27 +68,27 @@ TEST_CASE("asyncio future", "[future]") {
             SECTION("timeout") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get(10ms);
+                        const auto result = co_await f->get(10ms);
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::timed_out);
-                        REQUIRE(!f.done());
+                        REQUIRE(!f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get(100ms);
+                        const auto result = co_await f->get(100ms);
                         REQUIRE(result);
                         REQUIRE(*result == 1024);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(result);
                         REQUIRE(*result == 1024);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         co_await asyncio::sleep(20ms);
-                        f.set(1024);
-                        REQUIRE(f.done());
+                        f->set(1024);
+                        REQUIRE(f->done());
                     }(future)
                 );
             }
@@ -96,22 +96,22 @@ TEST_CASE("asyncio future", "[future]") {
             SECTION("cancel") {
                 auto task = allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::operation_canceled);
-                        REQUIRE(!f.done());
+                        REQUIRE(!f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::operation_canceled);
-                        REQUIRE(!f.done());
+                        REQUIRE(!f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::operation_canceled);
-                        REQUIRE(!f.done());
+                        REQUIRE(!f->done());
                     }(future)
                 );
 
@@ -121,30 +121,30 @@ TEST_CASE("asyncio future", "[future]") {
         }
 
         SECTION("no result") {
-            const asyncio::Future<void> future;
-            REQUIRE(!future.done());
+            const auto future = asyncio::makeFuture<void>();
+            REQUIRE(!future->done());
 
             SECTION("no error") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(result);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(result);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(result);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         co_await asyncio::sleep(20ms);
-                        f.set();
-                        REQUIRE(f.done());
+                        f->set();
+                        REQUIRE(f->done());
                     }(future)
                 );
             }
@@ -152,27 +152,27 @@ TEST_CASE("asyncio future", "[future]") {
             SECTION("error") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::owner_dead);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::owner_dead);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::owner_dead);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         co_await asyncio::sleep(20ms);
-                        f.setError(make_error_code(std::errc::owner_dead));
-                        REQUIRE(f.done());
+                        f->setError(make_error_code(std::errc::owner_dead));
+                        REQUIRE(f->done());
                     }(future)
                 );
             }
@@ -180,25 +180,25 @@ TEST_CASE("asyncio future", "[future]") {
             SECTION("timeout") {
                 co_await allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get(10ms);
+                        const auto result = co_await f->get(10ms);
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::timed_out);
-                        REQUIRE(!f.done());
+                        REQUIRE(!f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get(100ms);
+                        const auto result = co_await f->get(100ms);
                         REQUIRE(result);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(result);
-                        REQUIRE(f.done());
+                        REQUIRE(f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
                         co_await asyncio::sleep(20ms);
-                        f.set();
-                        REQUIRE(f.done());
+                        f->set();
+                        REQUIRE(f->done());
                     }(future)
                 );
             }
@@ -206,22 +206,22 @@ TEST_CASE("asyncio future", "[future]") {
             SECTION("cancel") {
                 auto task = allSettled(
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::operation_canceled);
-                        REQUIRE(!f.done());
+                        REQUIRE(!f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::operation_canceled);
-                        REQUIRE(!f.done());
+                        REQUIRE(!f->done());
                     }(future),
                     [](auto f) -> zero::async::coroutine::Task<void> {
-                        const auto result = co_await f.get();
+                        const auto result = co_await f->get();
                         REQUIRE(!result);
                         REQUIRE(result.error() == std::errc::operation_canceled);
-                        REQUIRE(!f.done());
+                        REQUIRE(!f->done());
                     }(future)
                 );
 

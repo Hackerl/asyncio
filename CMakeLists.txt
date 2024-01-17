@@ -3,12 +3,11 @@ project(asyncio)
 
 set(CMAKE_CXX_STANDARD 20)
 
-option(ASYNCIO_DISABLE_SSL "disable ssl support" OFF)
 option(ASYNCIO_DISABLE_SAMPLES "disable asyncio samples" OFF)
 option(ASYNCIO_EMBED_CA_CERT "use embedded CA certificates" OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-set(ASYNCIO_VERSION 1.0.1)
+set(ASYNCIO_VERSION 1.0.2)
 
 include(CTest)
 include(GNUInstallDirs)
@@ -38,14 +37,15 @@ add_library(
         src/fs/pipe.cpp
         src/net/net.cpp
         src/net/dns.cpp
+        src/net/ssl.cpp
         src/net/dgram.cpp
         src/net/stream.cpp
         src/http/url.cpp
         src/http/request.cpp
+        src/http/websocket.cpp
         $<$<PLATFORM_ID:Windows>:src/fs/iocp.cpp>
         $<$<PLATFORM_ID:Linux,Android>:src/fs/aio.cpp>
         $<$<PLATFORM_ID:Linux,Darwin>:src/fs/posix.cpp>
-        $<$<NOT:$<BOOL:${ASYNCIO_DISABLE_SSL}>>:src/net/ssl.cpp>
 )
 
 if (ASYNCIO_EMBED_CA_CERT)
@@ -80,18 +80,10 @@ target_link_libraries(
         CURL::libcurl
         libevent::core
         libevent::extra
+        libevent::openssl
         nlohmann_json::nlohmann_json
         $<$<NOT:$<PLATFORM_ID:Windows>>:libevent::pthreads>
-        $<$<NOT:$<BOOL:${ASYNCIO_DISABLE_SSL}>>:libevent::openssl>
 )
-
-if (ASYNCIO_DISABLE_SSL)
-    set(
-            EXCLUDE_HEADERS
-            ${EXCLUDE_HEADERS}
-            PATTERN "net/ssl.h" EXCLUDE
-    )
-endif ()
 
 install(
         DIRECTORY

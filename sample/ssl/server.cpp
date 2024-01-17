@@ -30,7 +30,7 @@ zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::ssl::str
     tl::expected<void, std::error_code> result;
 
     while (true) {
-        auto buffer = std::move(co_await listener.accept());
+        auto buffer = co_await listener.accept();
 
         if (!buffer) {
             result = tl::unexpected(buffer.error());

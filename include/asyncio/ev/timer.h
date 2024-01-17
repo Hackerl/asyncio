@@ -20,7 +20,7 @@ namespace asyncio::ev {
 
     private:
         std::unique_ptr<event, decltype(event_free) *> mEvent;
-        std::optional<zero::async::promise::Promise<void, std::error_code>> mPromise;
+        zero::async::promise::PromisePtr<void, std::error_code> mPromise;
     };
 
     tl::expected<Timer, std::error_code> makeTimer();

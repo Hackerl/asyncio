@@ -5,7 +5,7 @@
 #include <asyncio/thread.h>
 #else
 #include <unistd.h>
-#include <zero/try.h>
+#include <zero/expect.h>
 #endif
 
 #ifdef _WIN32
@@ -44,7 +44,9 @@ tl::expected<asyncio::fs::Pipe, std::error_code> asyncio::fs::Pipe::from(const F
     if (evutil_make_socket_nonblocking(fd) == -1)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    auto event = TRY(ev::makeEvent(fd,  ev::What::READ | ev::What::WRITE));
+    auto event = ev::makeEvent(fd,  ev::What::READ | ev::What::WRITE);
+    EXPECT(event);
+
     return Pipe{fd, std::move(*event)};
 #endif
 }

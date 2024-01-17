@@ -7,13 +7,13 @@ asyncio::sync::Mutex::lock(const std::optional<std::chrono::milliseconds> ms) {
         co_return tl::expected<void, std::error_code>{};
     }
 
-    Future<void> future;
+    const auto future = makeFuture<void>();
     mPending.push_back(future);
 
-    if (const auto result = co_await future.get(ms); !result) {
+    if (const auto result = co_await future->get(ms); !result) {
         if (mPending.remove(future) == 0 && !mPending.empty()) {
             assert(!mLocked);
-            mPending.front().set();
+            mPending.front()->set();
             mPending.pop_front();
         }
 
@@ -32,7 +32,7 @@ void asyncio::sync::Mutex::unlock() {
     if (mPending.empty())
         return;
 
-    mPending.front().set();
+    mPending.front()->set();
     mPending.pop_front();
 }
 

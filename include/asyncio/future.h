@@ -7,79 +7,89 @@
 namespace asyncio {
     template<typename T>
     class Future {
-        struct Storage {
-            std::optional<tl::expected<T, std::error_code>> result;
-            std::list<zero::async::promise::Promise<void, std::error_code>> pending;
-        };
-
     public:
-        Future() : mEventLoop(getEventLoop()), mStorage(std::make_shared<Storage>()) {
+        Future() : mEventLoop(getEventLoop()) {
         }
 
-        explicit Future(std::shared_ptr<EventLoop> eventLoop)
-            : mEventLoop(std::move(eventLoop)), mStorage(std::make_shared<Storage>()) {
+        explicit Future(std::shared_ptr<EventLoop> eventLoop): mEventLoop(std::move(eventLoop)) {
         }
 
-        auto operator<=>(const Future &) const = default;
+        Future(const Future &) = delete;
+        Future &operator=(const Future &) = delete;
 
         [[nodiscard]] bool done() const {
-            return mStorage->result.has_value();
+            return mResult.has_value();
         }
 
         template<typename... Ts>
         void set(Ts &&... args) {
-            assert(!mStorage->result);
-            mStorage->result = tl::expected<T, std::error_code>(std::forward<Ts>(args)...);
+            assert(!mResult);
+            mResult = tl::expected<T, std::error_code>(std::forward<Ts>(args)...);
 
-            for (auto &promise : std::exchange(mStorage->pending, {})) {
-                mEventLoop->post([promise = std::move(promise)]() mutable {
-                    promise.resolve();
+            for (auto &promise: std::exchange(mPending, {})) {
+                mEventLoop->post([promise = std::move(promise)] {
+                    promise->resolve();
                 });
             }
         }
 
         void setError(const std::error_code &ec) {
-            assert(!mStorage->result);
-            mStorage->result = tl::unexpected(ec);
+            assert(!mResult);
+            mResult = tl::unexpected(ec);
 
-            for (auto &promise : std::exchange(mStorage->pending, {})) {
-                mEventLoop->post([promise = std::move(promise)]() mutable {
-                    promise.resolve();
+            for (auto &promise: std::exchange(mPending, {})) {
+                mEventLoop->post([promise = std::move(promise)] {
+                    promise->resolve();
                 });
             }
         }
 
         zero::async::coroutine::Task<T, std::error_code> get() {
-            if (mStorage->result)
-                co_return *mStorage->result;
+            if (mResult)
+                co_return *mResult;
 
-            zero::async::promise::Promise<void, std::error_code> promise;
-            mStorage->pending.push_back(promise);
+            const auto promise = zero::async::promise::make<void, std::error_code>();
+            mPending.push_back(promise);
 
-            CO_TRY(co_await zero::async::coroutine::Cancellable{
+            const auto result = co_await zero::async::coroutine::Cancellable{
                 promise,
-                [=, this]() mutable -> tl::expected<void, std::error_code> {
-                    mStorage->pending.remove(promise);
-                    promise.reject(make_error_code(std::errc::operation_canceled));
+                [=, this]() -> tl::expected<void, std::error_code> {
+                    mPending.remove(promise);
+                    promise->reject(make_error_code(std::errc::operation_canceled));
                     return {};
                 }
-            });
+            };
+            CO_EXPECT(result);
 
-            co_return *mStorage->result;
+            co_return *mResult;
         }
 
         zero::async::coroutine::Task<T, std::error_code> get(std::optional<std::chrono::milliseconds> ms) {
             if (!ms)
-                co_return std::move(co_await get());
+                co_return co_await get();
 
-            auto result = CO_TRY(std::move(co_await timeout(get(), *ms)));
+            auto result = co_await timeout(get(), *ms);
+            CO_EXPECT(result);
+
             co_return std::move(*result);
         }
 
     private:
         std::shared_ptr<EventLoop> mEventLoop;
-        std::shared_ptr<Storage> mStorage;
+        std::optional<tl::expected<T, std::error_code>> mResult;
+        std::list<zero::async::promise::PromisePtr<void, std::error_code>> mPending;
     };
+
+    template<typename T>
+    using FuturePtr = std::shared_ptr<Future<T>>;
+
+    template<typename T>
+    using FutureConstPtr = std::shared_ptr<const Future<T>>;
+
+    template<typename T>
+    FuturePtr<T> makeFuture() {
+        return std::make_shared<Future<T>>();
+    }
 }
 
 #endif //ASYNCIO_FUTURE_H

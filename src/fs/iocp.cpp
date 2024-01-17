@@ -6,7 +6,7 @@
 struct Request {
     OVERLAPPED overlapped{};
     std::shared_ptr<asyncio::EventLoop> eventLoop;
-    zero::async::promise::Promise<std::size_t, std::error_code> promise;
+    zero::async::promise::PromisePtr<std::size_t, std::error_code> promise;
 };
 
 asyncio::fs::IOCP::IOCP(const HANDLE handle) : mHandle(handle), mThread(&IOCP::dispatch, this) {
@@ -49,15 +49,15 @@ void asyncio::fs::IOCP::dispatch() const {
         const auto request = reinterpret_cast<const Request *>(overlapped);
 
         if (!result) {
-            request->eventLoop->post([error = GetLastError(), promise = request->promise]() mutable {
-                promise.reject(std::error_code(static_cast<int>(error), std::system_category()));
+            request->eventLoop->post([error = GetLastError(), promise = request->promise] {
+                promise->reject(std::error_code(static_cast<int>(error), std::system_category()));
             });
 
             continue;
         }
 
-        request->eventLoop->post([=, promise = request->promise]() mutable {
-            promise.resolve(n);
+        request->eventLoop->post([=, promise = request->promise] {
+            promise->resolve(n);
         });
     }
 }
@@ -79,6 +79,7 @@ asyncio::fs::IOCP::read(
     Request request;
 
     request.eventLoop = std::move(eventLoop);
+    request.promise = zero::async::promise::make<std::size_t, std::error_code>();
     request.overlapped.Offset = static_cast<DWORD>(offset);
     request.overlapped.OffsetHigh = static_cast<DWORD>(offset >> 32);
 
@@ -109,6 +110,7 @@ asyncio::fs::IOCP::write(
     Request request;
 
     request.eventLoop = std::move(eventLoop);
+    request.promise = zero::async::promise::make<std::size_t, std::error_code>();
     request.overlapped.Offset = static_cast<DWORD>(offset);
     request.overlapped.OffsetHigh = static_cast<DWORD>(offset >> 32);
 

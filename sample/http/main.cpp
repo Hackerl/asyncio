@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
             co_return;
         }
 
-        const auto response = std::move(co_await [&, requests = *result] {
+        const auto response = co_await [&, requests = *result] {
             if (!body)
                 return requests->request(*method, url, options);
 
@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
             }
 
             return requests->request(*method, url, options, *body);
-        }());
+        }();
 
         if (!response) {
             LOG_ERROR("request failed[{}]", response.error());

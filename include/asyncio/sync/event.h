@@ -17,7 +17,7 @@ namespace asyncio::sync {
 
     private:
         std::atomic<bool> mValue;
-        std::list<Future<void>> mPending;
+        std::list<FuturePtr<void>> mPending;
     };
 }
 

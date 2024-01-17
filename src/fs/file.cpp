@@ -33,7 +33,9 @@ tl::expected<asyncio::fs::File, std::error_code> asyncio::fs::File::from(const F
     assert(eventLoop);
     assert(eventLoop->framework());
 
-    TRY(eventLoop->framework()->associate(fd));
+    const auto result = eventLoop->framework()->associate(fd);
+    EXPECT(result);
+
     return File{std::move(eventLoop), fd, append};
 }
 
@@ -57,19 +59,19 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::File::re
         co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
 #ifdef _WIN32
-    const auto result = CO_TRY(
-        co_await mEventLoop
-                 ->framework()
-                 ->read(mEventLoop, mFD, mOffset, data)
-                 .transformError([](const auto &ec) -> std::error_code {
-                     if (ec == std::error_code{ERROR_HANDLE_EOF, std::system_category()})
-                         return IO_EOF;
+    const auto result = co_await mEventLoop
+                                 ->framework()
+                                 ->read(mEventLoop, mFD, mOffset, data)
+                                 .transformError([](const auto &ec) -> std::error_code {
+                                     if (ec == std::error_code{ERROR_HANDLE_EOF, std::system_category()})
+                                         return IO_EOF;
 
-                     return ec;
-                 })
-    );
+                                     return ec;
+                                 });
+    CO_EXPECT(result);
 #else
-    const auto result = CO_TRY(co_await mEventLoop->framework()->read(mEventLoop, mFD, mOffset, data));
+    const auto result = co_await mEventLoop->framework()->read(mEventLoop, mFD, mOffset, data);
+    CO_EXPECT(result);
 
     if (*result == 0)
         co_return tl::unexpected(IO_EOF);
@@ -85,10 +87,12 @@ asyncio::fs::File::write(const std::span<const std::byte> data) {
         co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     if (mAppend) {
-        CO_TRY(seek(0, END));
+        CO_EXPECT(seek(0, END));
     }
 
-    const auto result = CO_TRY(co_await mEventLoop->framework()->write(mEventLoop, mFD, mOffset, data));
+    const auto result = co_await mEventLoop->framework()->write(mEventLoop, mFD, mOffset, data);
+    CO_EXPECT(result);
+
     mOffset += *result;
     co_return *result;
 }
@@ -162,7 +166,8 @@ tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::length() {
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     const std::uint64_t current = mOffset;
-    const auto pos = TRY(seek(0, END));
+    const auto pos = seek(0, END);
+    EXPECT(pos);
 
     mOffset = current;
     return *pos;

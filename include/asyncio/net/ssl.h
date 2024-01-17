@@ -56,8 +56,6 @@ namespace asyncio::net::ssl {
         public:
             Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
 
-            zero::async::coroutine::Task<void, std::error_code> close() override;
-
         private:
             [[nodiscard]] std::error_code getError() const override;
         };

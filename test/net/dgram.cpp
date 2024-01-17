@@ -75,7 +75,7 @@ TEST_CASE("datagram network connection", "[net]") {
                     REQUIRE(*n == num);
                 }(std::move(*server)),
                 []() -> zero::async::coroutine::Task<void> {
-                    auto client = std::move(co_await asyncio::net::dgram::connect("127.0.0.1", 30000));
+                    auto client = co_await asyncio::net::dgram::connect("127.0.0.1", 30000);
                     REQUIRE(client);
 
                     const auto n = co_await client->write(std::as_bytes(std::span{MESSAGE}));

@@ -16,7 +16,7 @@ namespace asyncio::sync {
 
     private:
         std::atomic<bool> mLocked;
-        std::list<Future<void>> mPending;
+        std::list<FuturePtr<void>> mPending;
     };
 }
 

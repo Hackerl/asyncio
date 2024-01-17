@@ -37,7 +37,7 @@ int main(const int argc, char *argv[]) {
 #endif
 
     asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-        auto buffer = std::move(co_await asyncio::net::stream::connect(host, port));
+        auto buffer = co_await asyncio::net::stream::connect(host, port);
 
         if (!buffer) {
             LOG_ERROR("stream buffer connect failed[{}]", buffer.error());

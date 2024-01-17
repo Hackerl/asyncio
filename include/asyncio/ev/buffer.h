@@ -2,7 +2,6 @@
 #define ASYNCIO_BUFFER_H
 
 #include <event.h>
-#include <optional>
 #include <asyncio/io.h>
 
 namespace asyncio::ev {
@@ -49,7 +48,7 @@ namespace asyncio::ev {
         std::size_t mCapacity;
         std::error_code mLastError;
         std::unique_ptr<bufferevent, void (*)(bufferevent *)> mBev;
-        std::array<std::optional<zero::async::promise::Promise<void, std::error_code>>, 2> mPromises;
+        std::array<zero::async::promise::PromisePtr<void, std::error_code>, 2> mPromises;
     };
 
     tl::expected<Buffer, std::error_code>

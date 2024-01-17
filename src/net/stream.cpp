@@ -50,7 +50,7 @@ asyncio::net::stream::Acceptor::Acceptor(evconnlistener *listener) : mListener(l
     evconnlistener_set_cb(
         mListener.get(),
         [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
-            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
+            std::exchange(static_cast<Acceptor *>(arg)->mPromise, nullptr)->resolve(fd);
         },
         this
     );
@@ -61,7 +61,7 @@ asyncio::net::stream::Acceptor::Acceptor(Acceptor &&rhs) noexcept : mListener(st
     evconnlistener_set_cb(
         mListener.get(),
         [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
-            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
+            std::exchange(static_cast<Acceptor *>(arg)->mPromise, nullptr)->resolve(fd);
         },
         this
     );
@@ -82,11 +82,11 @@ zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::
         zero::async::promise::chain<FileDescriptor, std::error_code>([this](auto promise) {
             mPromise = promise;
             evconnlistener_enable(mListener.get());
-        }).finally([this] {
+        })->finally([this] {
             evconnlistener_disable(mListener.get());
         }),
         [this]() -> tl::expected<void, std::error_code> {
-            std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+            std::exchange(mPromise, nullptr)->reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
     };
@@ -96,7 +96,7 @@ tl::expected<void, std::error_code> asyncio::net::stream::Acceptor::close() {
     if (!mListener)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
-    if (auto promise = std::exchange(mPromise, std::nullopt); promise)
+    if (auto promise = std::exchange(mPromise, nullptr); promise)
         promise->reject(make_error_code(std::errc::bad_file_descriptor));
 
     mListener.reset();
@@ -108,12 +108,14 @@ asyncio::net::stream::Listener::Listener(evconnlistener *listener) : Acceptor(li
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::Listener::accept() {
-    auto result = CO_TRY(co_await fd());
+    const auto result = co_await fd();
+    CO_EXPECT(result);
     co_return makeBuffer(*result);
 }
 
 tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const Address &address) {
-    auto socketAddress = TRY(socketAddressFrom(address));
+    const auto socketAddress = socketAddressFrom(address);
+    EXPECT(socketAddress);
 
     evconnlistener *listener = evconnlistener_new_bind(
         getEventLoop()->base(),
@@ -146,7 +148,7 @@ asyncio::net::stream::listen(std::span<const Address> addresses) {
         auto result = listen(*it);
 
         if (result)
-            return result;
+            return std::move(*result);
 
         if (++it == addresses.end())
             return tl::unexpected(result.error());
@@ -155,7 +157,8 @@ asyncio::net::stream::listen(std::span<const Address> addresses) {
 
 tl::expected<asyncio::net::stream::Listener, std::error_code>
 asyncio::net::stream::listen(const std::string &ip, const unsigned short port) {
-    const auto address = TRY(addressFrom(ip, port));
+    const auto address = addressFrom(ip, port);
+    EXPECT(address);
     return listen(*address);
 }
 
@@ -163,15 +166,15 @@ zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(const Address address) {
     if (const std::size_t index = address.index(); index == 0) {
         const auto [port, ip] = std::get<IPv4Address>(address);
-        co_return std::move(co_await connect(zero::os::net::stringify(ip), port));
+        co_return co_await connect(zero::os::net::stringify(ip), port);
     }
     else if (index == 1) {
         const auto &[port, ip, zone] = std::get<IPv6Address>(address);
-        co_return std::move(co_await connect(zero::os::net::stringify(ip), port));
+        co_return co_await connect(zero::os::net::stringify(ip), port);
     }
 #if __unix__ || __APPLE__
     else if (index == 2) {
-        co_return std::move(co_await connect(std::get<UnixAddress>(address).path));
+        co_return co_await connect(std::get<UnixAddress>(address).path);
     }
 #endif
 
@@ -186,7 +189,7 @@ asyncio::net::stream::connect(std::span<const Address> addresses) {
     auto it = addresses.begin();
 
     while (true) {
-        auto result = std::move(co_await connect(*it));
+        auto result = co_await connect(*it);
 
         if (result)
             co_return std::move(*result);
@@ -203,29 +206,29 @@ asyncio::net::stream::connect(const std::string host, const unsigned short port)
     if (!bev)
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    zero::async::promise::Promise<void, std::error_code> promise;
-    const auto ctx = new zero::async::promise::Promise(promise);
+    const auto promise = zero::async::promise::make<void, std::error_code>();
+    const auto ctx = new std::decay_t<decltype(promise)>(promise);
 
     bufferevent_setcb(
         bev,
         nullptr,
         nullptr,
         [](bufferevent *b, const short what, void *arg) {
-            const auto p = static_cast<zero::async::promise::Promise<void, std::error_code> *>(arg);
+            const auto p = static_cast<zero::async::promise::PromisePtr<void, std::error_code> *>(arg);
 
             if ((what & BEV_EVENT_CONNECTED) == 0) {
                 if (const int e = bufferevent_socket_get_dns_error(b)) {
-                    p->reject(static_cast<dns::Error>(e));
+                    p->get()->reject(static_cast<dns::Error>(e));
                     delete p;
                     return;
                 }
 
-                p->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+                p->get()->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
                 delete p;
                 return;
             }
 
-            p->resolve();
+            p->get()->resolve();
             delete p;
         },
         ctx
@@ -239,9 +242,9 @@ asyncio::net::stream::connect(const std::string host, const unsigned short port)
 
     if (const auto result = co_await zero::async::coroutine::Cancellable{
         promise,
-        [=]() mutable -> tl::expected<void, std::error_code> {
+        [=]() -> tl::expected<void, std::error_code> {
             bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
-            promise.reject(make_error_code(std::errc::operation_canceled));
+            promise->reject(make_error_code(std::errc::operation_canceled));
             delete ctx;
             return {};
         }
@@ -306,23 +309,23 @@ asyncio::net::stream::connect(const std::string path) {
     if (!bev)
         co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    zero::async::promise::Promise<void, std::error_code> promise;
-    const auto ctx = new zero::async::promise::Promise(promise);
+    const auto promise = zero::async::promise::make<void, std::error_code>();
+    const auto ctx = new std::decay_t<decltype(promise)>(promise);
 
     bufferevent_setcb(
         bev,
         nullptr,
         nullptr,
         [](bufferevent *, const short what, void *arg) {
-            const auto p = static_cast<zero::async::promise::Promise<void, std::error_code> *>(arg);
+            const auto p = static_cast<zero::async::promise::PromisePtr<void, std::error_code> *>(arg);
 
             if ((what & BEV_EVENT_CONNECTED) == 0) {
-                p->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+                p->get()->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
                 delete p;
                 return;
             }
 
-            p->resolve();
+            p->get()->resolve();
             delete p;
         },
         ctx
@@ -336,9 +339,9 @@ asyncio::net::stream::connect(const std::string path) {
 
     if (const auto result = co_await zero::async::coroutine::Cancellable{
         promise,
-        [=]() mutable -> tl::expected<void, std::error_code> {
+        [=]() -> tl::expected<void, std::error_code> {
             bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
-            promise.reject(make_error_code(std::errc::operation_canceled));
+            promise->reject(make_error_code(std::errc::operation_canceled));
             delete ctx;
             return {};
         }

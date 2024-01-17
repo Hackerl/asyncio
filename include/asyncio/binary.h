@@ -2,14 +2,14 @@
 #define ASYNCIO_BINARY_H
 
 #include <asyncio/io.h>
-#include <zero/try.h>
+#include <zero/expect.h>
 
 namespace asyncio::binary {
     template<typename T>
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
     zero::async::coroutine::Task<T, std::error_code> readLE(IReader &reader) {
         std::byte data[sizeof(T)];
-        CO_TRY(co_await reader.readExactly(data));
+        CO_EXPECTED(co_await reader.readExactly(data));
 
         T v = 0;
 
@@ -23,7 +23,7 @@ namespace asyncio::binary {
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
     zero::async::coroutine::Task<T, std::error_code> readBE(IReader &reader) {
         std::byte data[sizeof(T)];
-        CO_TRY(co_await reader.readExactly(data));
+        CO_EXPECTED(co_await reader.readExactly(data));
 
         T v = 0;
 

@@ -45,7 +45,7 @@ void asyncio::fs::PosixAIO::onSignal() {
     auto it = mPending.begin();
 
     while (it != mPending.end()) {
-        assert(it->promise.status() == zero::async::promise::State::PENDING);
+        assert(it->promise->status() == zero::async::promise::State::PENDING);
 
         if (const int error = aio_error(it->cb); error > 0) {
             if (error == EINPROGRESS) {
@@ -53,8 +53,8 @@ void asyncio::fs::PosixAIO::onSignal() {
                 continue;
             }
 
-            it->eventLoop->post([=, promise = std::move(it->promise)]() mutable {
-                promise.reject(std::error_code(error, std::system_category()));
+            it->eventLoop->post([=, promise = std::move(it->promise)] {
+                promise->reject(std::error_code(error, std::system_category()));
             });
 
             it = mPending.erase(it);
@@ -64,16 +64,16 @@ void asyncio::fs::PosixAIO::onSignal() {
         const ssize_t size = aio_return(it->cb);
 
         if (size == -1) {
-            it->eventLoop->post([error = errno, promise = std::move(it->promise)]() mutable {
-                promise.reject(std::error_code(error, std::system_category()));
+            it->eventLoop->post([error = errno, promise = std::move(it->promise)] {
+                promise->reject(std::error_code(error, std::system_category()));
             });
 
             it = mPending.erase(it);
             continue;
         }
 
-        it->eventLoop->post([=, promise = std::move(it->promise)]() mutable {
-            promise.resolve(size);
+        it->eventLoop->post([=, promise = std::move(it->promise)] {
+            promise->resolve(size);
         });
 
         it = mPending.erase(it);
@@ -101,8 +101,8 @@ asyncio::fs::PosixAIO::read(
     cb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
     cb.aio_sigevent.sigev_signo = SIGIO;
 
-    const zero::async::promise::Promise<std::size_t, std::error_code> promise;
-    auto pending = Request{&cb, std::move(eventLoop), promise};
+    const auto promise = zero::async::promise::make<std::size_t, std::error_code>();
+    const auto pending = Request{&cb, std::move(eventLoop), promise};
 
     mPending.push_back(pending);
 
@@ -113,7 +113,7 @@ asyncio::fs::PosixAIO::read(
 
     co_return co_await zero::async::coroutine::Cancellable{
         promise,
-        [=, this]() mutable -> tl::expected<void, std::error_code> {
+        [=, this]() -> tl::expected<void, std::error_code> {
             const int result = aio_cancel(fd, pending.cb);
 
             if (result == -1)
@@ -126,8 +126,8 @@ asyncio::fs::PosixAIO::read(
                 return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
             mPending.remove(pending);
-            pending.eventLoop->post([promise = pending.promise]() mutable {
-                promise.reject(make_error_code(std::errc::operation_canceled));
+            pending.eventLoop->post([promise = pending.promise] {
+                promise->reject(make_error_code(std::errc::operation_canceled));
             });
 
             return {};
@@ -152,8 +152,8 @@ asyncio::fs::PosixAIO::write(
     cb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
     cb.aio_sigevent.sigev_signo = SIGIO;
 
-    const zero::async::promise::Promise<std::size_t, std::error_code> promise;
-    auto pending = Request{&cb, std::move(eventLoop), promise};
+    const auto promise = zero::async::promise::make<std::size_t, std::error_code>();
+    const auto pending = Request{&cb, std::move(eventLoop), promise};
 
     mPending.push_back(pending);
 
@@ -164,7 +164,7 @@ asyncio::fs::PosixAIO::write(
 
     co_return co_await zero::async::coroutine::Cancellable{
         promise,
-        [=, this]() mutable -> tl::expected<void, std::error_code> {
+        [=, this]() -> tl::expected<void, std::error_code> {
             const int result = aio_cancel(fd, pending.cb);
 
             if (result == -1)
@@ -177,8 +177,8 @@ asyncio::fs::PosixAIO::write(
                 return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
             mPending.remove(pending);
-            pending.eventLoop->post([promise = pending.promise]() mutable {
-                promise.reject(make_error_code(std::errc::operation_canceled));
+            pending.eventLoop->post([promise = pending.promise] {
+                promise->reject(make_error_code(std::errc::operation_canceled));
             });
 
             return {};

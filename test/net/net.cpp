@@ -19,7 +19,7 @@
 
 TEST_CASE("network components", "[net]") {
     SECTION("IPv4") {
-        asyncio::net::Address address = asyncio::net::IPv4Address{
+        const asyncio::net::Address address = asyncio::net::IPv4Address{
             80,
             {std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}}
         };

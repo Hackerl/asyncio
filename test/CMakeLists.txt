@@ -20,6 +20,7 @@ add_executable(
         fs/pipe.cpp
         net/net.cpp
         net/dns.cpp
+        net/ssl.cpp
         net/dgram.cpp
         net/stream.cpp
         http/url.cpp
@@ -27,7 +28,6 @@ add_executable(
         $<$<PLATFORM_ID:Linux,Android>:fs/aio.cpp>
         $<$<PLATFORM_ID:Linux,Darwin>:fs/posix.cpp>
         $<$<PLATFORM_ID:Windows>:main.cpp fs/iocp.cpp>
-        $<$<NOT:$<BOOL:${ASYNCIO_DISABLE_SSL}>>:net/ssl.cpp>
 )
 
 target_link_libraries(asyncio_test PRIVATE asyncio $<IF:$<PLATFORM_ID:Windows>,Catch2::Catch2,Catch2::Catch2WithMain>)

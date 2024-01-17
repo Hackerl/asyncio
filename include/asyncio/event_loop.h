@@ -4,7 +4,7 @@
 #include <queue>
 #include <event.h>
 #include <event2/dns.h>
-#include <zero/try.h>
+#include <zero/expect.h>
 #include "worker.h"
 #include "fs/framework.h"
 
@@ -85,30 +85,30 @@ namespace asyncio {
             co_return tl::expected<tl::expected<T, E>, std::error_code>{tl::in_place, std::move(task.result())};
         }
 
-        auto timer = sleep(ms);
+        const auto timer = std::make_shared<zero::async::coroutine::Task<void, std::error_code>>(sleep(ms));
 
         if constexpr (std::is_void_v<T>) {
-            task.promise().then(
-                [=]() mutable {
-                    timer.cancel();
+            task.promise()->then(
+                [=] {
+                    timer->cancel();
                 },
-                [=](const E &) mutable {
-                    timer.cancel();
+                [=](const E &) {
+                    timer->cancel();
                 }
             );
         }
         else {
-            task.promise().then(
-                [=](const T &) mutable {
-                    timer.cancel();
+            task.promise()->then(
+                [=](const T &) {
+                    timer->cancel();
                 },
-                [=](const E &) mutable {
-                    timer.cancel();
+                [=](const E &) {
+                    timer->cancel();
                 }
             );
         }
 
-        auto result = co_await timer;
+        auto result = co_await *timer;
 
         if (result) {
             task.cancel();
@@ -125,13 +125,14 @@ namespace asyncio {
 
     template<typename F>
     tl::expected<void, std::error_code> run(F &&f) {
-        const auto eventLoop = TRY(createEventLoop().transform([](EventLoop &&e) {
+        const auto eventLoop = createEventLoop().transform([](EventLoop &&e) {
             return std::make_shared<EventLoop>(std::move(e));
-        }));
+        });
+        EXPECT(eventLoop);
 
         setEventLoop(*eventLoop);
 
-        f().promise().finally([&] {
+        f().promise()->finally([&] {
             eventLoop.value()->loopExit();
         });
 

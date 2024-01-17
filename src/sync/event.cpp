@@ -5,10 +5,10 @@ asyncio::sync::Event::wait(const std::optional<std::chrono::milliseconds> ms) {
     if (mValue)
         co_return tl::expected<void, std::error_code>{};
 
-    Future<void> future;
+    const auto future = makeFuture<void>();
     mPending.push_back(future);
 
-    if (const auto result = co_await future.get(ms); !result) {
+    if (const auto result = co_await future->get(ms); !result) {
         mPending.remove(future);
         co_return tl::unexpected(result.error());
     }
@@ -22,8 +22,8 @@ void asyncio::sync::Event::set() {
 
     mValue = true;
 
-    for (auto &future: std::exchange(mPending, {}))
-        future.set();
+    for (const auto &future: std::exchange(mPending, {}))
+        future->set();
 }
 
 void asyncio::sync::Event::clear() {

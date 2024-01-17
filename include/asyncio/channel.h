@@ -98,9 +98,9 @@ namespace asyncio {
                     }
 
                     const auto event = std::make_shared<zero::atomic::Event>();
-                    zero::async::promise::Promise<void, std::error_code> promise;
+                    const auto promise = zero::async::promise::make<void, std::error_code>();
 
-                    promise.finally([=] {
+                    promise->finally([=] {
                         event->notify();
                     });
 
@@ -151,7 +151,7 @@ namespace asyncio {
                         continue;
                     }
 
-                    zero::async::promise::Promise<void, std::error_code> promise;
+                    const auto promise = zero::async::promise::make<void, std::error_code>();
 
                     mPending[SENDER].push_back(promise);
                     mMutex.unlock();
@@ -159,8 +159,8 @@ namespace asyncio {
                     if (const auto res = co_await asyncio::timeout(
                         zero::async::coroutine::from(zero::async::coroutine::Cancellable{
                             promise,
-                            [=]() mutable -> tl::expected<void, std::error_code> {
-                                promise.reject(make_error_code(std::errc::operation_canceled));
+                            [=]() -> tl::expected<void, std::error_code> {
+                                promise->reject(make_error_code(std::errc::operation_canceled));
                                 return {};
                             }
                         }),
@@ -211,9 +211,9 @@ namespace asyncio {
                     }
 
                     const auto event = std::make_shared<zero::atomic::Event>();
-                    zero::async::promise::Promise<void, std::error_code> promise;
+                    const auto promise = zero::async::promise::make<void, std::error_code>();
 
-                    promise.finally([=] {
+                    promise->finally([=] {
                         event->notify();
                     });
 
@@ -261,7 +261,7 @@ namespace asyncio {
                         continue;
                     }
 
-                    zero::async::promise::Promise<void, std::error_code> promise;
+                    const auto promise = zero::async::promise::make<void, std::error_code>();
 
                     mPending[RECEIVER].push_back(promise);
                     mMutex.unlock();
@@ -269,8 +269,8 @@ namespace asyncio {
                     if (const auto res = co_await asyncio::timeout(
                         zero::async::coroutine::from(zero::async::coroutine::Cancellable{
                             promise,
-                            [=]() mutable -> tl::expected<void, std::error_code> {
-                                promise.reject(make_error_code(std::errc::operation_canceled));
+                            [=]() -> tl::expected<void, std::error_code> {
+                                promise->reject(make_error_code(std::errc::operation_canceled));
                                 return {};
                             }
                         }),
@@ -309,9 +309,9 @@ namespace asyncio {
             if (mPending[Index].empty())
                 return;
 
-            mEventLoop->post([pending = std::exchange(mPending[Index], {})]() mutable {
-                for (auto &promise: pending)
-                    promise.resolve();
+            mEventLoop->post([pending = std::exchange(mPending[Index], {})] {
+                for (const auto &promise: pending)
+                    promise->resolve();
             });
         }
 
@@ -322,9 +322,9 @@ namespace asyncio {
             if (mPending[Index].empty())
                 return;
 
-            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})]() mutable {
-                for (auto &promise: pending)
-                    promise.reject(ec);
+            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})] {
+                for (const auto &promise: pending)
+                    promise->reject(ec);
             });
         }
 
@@ -421,7 +421,7 @@ namespace asyncio {
         std::atomic<bool> mClosed;
         std::shared_ptr<EventLoop> mEventLoop;
         zero::atomic::CircularBuffer<T> mBuffer;
-        std::array<std::list<zero::async::promise::Promise<void, std::error_code>>, 2> mPending;
+        std::array<std::list<zero::async::promise::PromisePtr<void, std::error_code>>, 2> mPending;
     };
 }
 

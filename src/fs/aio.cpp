@@ -26,7 +26,7 @@ int io_cancel(const aio_context_t ctx_id, iocb *iocb, io_event *result) {
 
 struct Request {
     std::shared_ptr<asyncio::EventLoop> eventLoop;
-    zero::async::promise::Promise<std::size_t, std::error_code> promise;
+    zero::async::promise::PromisePtr<std::size_t, std::error_code> promise;
 };
 
 asyncio::fs::AIO::AIO(const aio_context_t context, const int efd, std::unique_ptr<event, decltype(event_free) *> event)
@@ -79,12 +79,12 @@ void asyncio::fs::AIO::onEvent() const {
         auto &[eventLoop, promise] = *reinterpret_cast<Request *>(event->data);
 
         if (event->res < 0)
-            eventLoop->post([error = -event->res, promise = std::move(promise)]() mutable {
-                promise.reject(std::error_code(static_cast<int>(error), std::system_category()));
+            eventLoop->post([error = -event->res, promise = std::move(promise)] {
+                promise->reject(std::error_code(static_cast<int>(error), std::system_category()));
             });
         else
-            eventLoop->post([result = event->res, promise = std::move(promise)]() mutable {
-                promise.resolve(result);
+            eventLoop->post([result = event->res, promise = std::move(promise)] {
+                promise->resolve(result);
             });
     }
 }
@@ -101,7 +101,10 @@ asyncio::fs::AIO::read(
     std::span<std::byte> data
 ) {
     iocb cb = {};
-    Request request = {std::move(eventLoop)};
+    Request request = {
+        std::move(eventLoop),
+        zero::async::promise::make<std::size_t, std::error_code>()
+    };
 
     cb.aio_data = reinterpret_cast<__u64>(&request);
     cb.aio_lio_opcode = IOCB_CMD_PREAD;
@@ -125,8 +128,8 @@ asyncio::fs::AIO::read(
             if (io_cancel(mContext, *cbs, &result) != 0)
                 return tl::unexpected(std::error_code(errno, std::system_category()));
 
-            request.eventLoop->post([promise = request.promise]() mutable {
-                promise.reject(make_error_code(std::errc::operation_canceled));
+            request.eventLoop->post([promise = request.promise] {
+                promise->reject(make_error_code(std::errc::operation_canceled));
             });
 
             return {};
@@ -142,7 +145,10 @@ asyncio::fs::AIO::write(
     std::span<const std::byte> data
 ) {
     iocb cb = {};
-    Request request = {std::move(eventLoop)};
+    Request request = {
+        std::move(eventLoop),
+        zero::async::promise::make<std::size_t, std::error_code>()
+    };
 
     cb.aio_data = reinterpret_cast<__u64>(&request);
     cb.aio_lio_opcode = IOCB_CMD_PWRITE;
@@ -166,8 +172,8 @@ asyncio::fs::AIO::write(
             if (io_cancel(mContext, *cbs, &result) != 0)
                 return tl::unexpected(std::error_code(errno, std::system_category()));
 
-            request.eventLoop->post([promise = request.promise]() mutable {
-                promise.reject(make_error_code(std::errc::operation_canceled));
+            request.eventLoop->post([promise = request.promise] {
+                promise->reject(make_error_code(std::errc::operation_canceled));
             });
 
             return {};

@@ -5,10 +5,10 @@ asyncio::sync::Condition::wait(Mutex &mutex, const std::optional<std::chrono::mi
     assert(mutex.locked());
     mutex.unlock();
 
-    Future<void> future;
+    const auto future = makeFuture<void>();
     mPending.push_back(future);
 
-    if (const auto result = co_await future.get(ms); !result) {
+    if (const auto result = co_await future->get(ms); !result) {
         mPending.remove(future);
 
         while (true) {
@@ -31,11 +31,11 @@ void asyncio::sync::Condition::notify() {
     if (mPending.empty())
         return;
 
-    mPending.front().set();
+    mPending.front()->set();
     mPending.pop_front();
 }
 
 void asyncio::sync::Condition::broadcast() {
-    for (auto &future: std::exchange(mPending, {}))
-        future.set();
+    for (const auto &future: std::exchange(mPending, {}))
+        future->set();
 }

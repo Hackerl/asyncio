@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
             co_return;
         }
 
-        auto buffer = std::move(co_await asyncio::net::ssl::stream::connect(*context, host, port));
+        auto buffer = co_await asyncio::net::ssl::stream::connect(*context, host, port);
 
         if (!buffer) {
             LOG_ERROR("stream buffer connect failed[{}]", buffer.error());

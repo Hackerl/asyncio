@@ -139,15 +139,15 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(const
 #endif
 
 #ifdef _WIN32
-    auto framework = TRY(fs::makeIOCP().transform([](fs::IOCP &&iocp) {
+    auto framework = fs::makeIOCP().transform([](fs::IOCP &&iocp) {
         return std::make_unique<fs::IOCP>(std::move(iocp));
-    }));
+    });
 #elif __ANDROID__
-    auto framework = TRY(fs::makeAIO(base.get()).transform([](fs::AIO &&aio) {
+    auto framework = fs::makeAIO(base.get()).transform([](fs::AIO &&aio) {
         return std::make_unique<fs::AIO>(std::move(aio));
-    }));
+    });
 #elif __linux__
-    auto framework = TRY(fs::makeAIO(base.get())
+    auto framework = fs::makeAIO(base.get())
                      .transform([](fs::AIO &&aio) -> std::unique_ptr<fs::IFramework> {
                          return std::make_unique<fs::AIO>(std::move(aio));
                      })
@@ -156,17 +156,19 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(const
                              .transform([](fs::PosixAIO &&aio) -> std::unique_ptr<fs::IFramework> {
                                  return std::make_unique<fs::PosixAIO>(std::move(aio));
                              });
-                     }));
+                     });
 #elif __APPLE__
-    auto framework = TRY(fs::makePosixAIO(base.get()).transform([](fs::PosixAIO &&aio) {
+    auto framework = fs::makePosixAIO(base.get()).transform([](fs::PosixAIO &&aio) {
         return std::make_unique<fs::PosixAIO>(std::move(aio));
-    }));
+    });
 #endif
+    EXPECT(framework);
 
     return EventLoop{std::move(base), std::move(dnsBase), std::move(*framework), maxWorkers};
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
-    auto timer = CO_TRY(ev::makeTimer());
+    auto timer = ev::makeTimer();
+    CO_EXPECT(timer);
     co_return co_await timer->after(ms);
 }

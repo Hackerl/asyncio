@@ -1,7 +1,6 @@
 #include <asyncio/channel.h>
 #include <asyncio/thread.h>
 #include <catch2/catch_test_macros.hpp>
-#include <zero/try.h>
 
 using namespace std::chrono_literals;
 
@@ -31,7 +30,7 @@ produceSync(const std::shared_ptr<asyncio::ISender<int>> &sender, const std::sha
 zero::async::coroutine::Task<void, std::error_code>
 consume(const std::shared_ptr<asyncio::IReceiver<int>> receiver, const std::shared_ptr<std::atomic<int>> counter) {
     while (true) {
-        CO_TRY(co_await receiver->receive());
+        CO_EXPECTED(co_await receiver->receive());
         ++*counter;
     }
 }

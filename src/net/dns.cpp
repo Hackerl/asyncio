@@ -25,7 +25,7 @@ asyncio::net::dns::getAddressInfo(
     const std::optional<std::string> service,
     const std::optional<AddressInfo> hints
 ) {
-    zero::async::promise::Promise<std::vector<Address>, Error> promise;
+    const auto promise = zero::async::promise::make<std::vector<Address>, Error>();
 
     evdns_getaddrinfo_request *request = evdns_getaddrinfo(
         getEventLoop()->dnsBase(),
@@ -33,10 +33,10 @@ asyncio::net::dns::getAddressInfo(
         service ? service->c_str() : nullptr,
         hints ? &*hints : nullptr,
         [](int result, evutil_addrinfo *res, void *arg) {
-            const auto p = static_cast<zero::async::promise::Promise<std::vector<Address>, Error> *>(arg);
+            const auto p = static_cast<zero::async::promise::PromisePtr<std::vector<Address>, Error> *>(arg);
 
             if (result != 0) {
-                p->reject(static_cast<Error>(result));
+                p->get()->reject(static_cast<Error>(result));
                 delete p;
                 return;
             }
@@ -57,10 +57,10 @@ asyncio::net::dns::getAddressInfo(
             }
 
             evutil_freeaddrinfo(res);
-            p->resolve(std::move(addresses));
+            p->get()->resolve(std::move(addresses));
             delete p;
         },
-        new zero::async::promise::Promise(promise)
+        new std::decay_t<decltype(promise)>(promise)
     );
 
     if (!request)

@@ -9,7 +9,7 @@ asyncio::ev::Event::Event(event *e) : mEvent(e, event_free) {
         event_get_fd(e),
         event_get_events(e),
         [](evutil_socket_t, short what, void *arg) {
-            std::exchange(static_cast<Event *>(arg)->mPromise, std::nullopt)->resolve(what);
+            std::exchange(static_cast<Event *>(arg)->mPromise, nullptr)->resolve(what);
         },
         this
     );
@@ -42,13 +42,13 @@ bool asyncio::ev::Event::cancel() {
         return false;
 
     event_del(mEvent.get());
-    std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+    std::exchange(mPromise, nullptr)->reject(make_error_code(std::errc::operation_canceled));
 
     return true;
 }
 
 bool asyncio::ev::Event::pending() const {
-    return mPromise.has_value();
+    return mPromise.operator bool();
 }
 
 zero::async::coroutine::Task<short, std::error_code>
@@ -74,7 +74,7 @@ asyncio::ev::Event::on(const std::optional<std::chrono::milliseconds> timeout) {
         }),
         [this]() -> tl::expected<void, std::error_code> {
             event_del(mEvent.get());
-            std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+            std::exchange(mPromise, nullptr)->reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
     };
