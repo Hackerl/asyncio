@@ -29,13 +29,54 @@ TEST_CASE("asynchronous io", "[io]") {
                     REQUIRE(result);
                 }(std::move(buffers1->at(0))),
                 [](auto buffer) -> zero::async::coroutine::Task<void> {
-                    auto result = co_await buffer.readLine();
-                    REQUIRE(result);
-                    REQUIRE(*result == zero::strings::trim(MESSAGE));
+                    auto line = co_await buffer.readLine();
+                    REQUIRE(line);
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
 
-                    result = co_await buffer.readLine();
-                    REQUIRE(!result);
-                    REQUIRE(result.error() == asyncio::Error::IO_EOF);
+                    line = co_await buffer.readLine();
+                    REQUIRE(!line);
+                    REQUIRE(line.error() == asyncio::Error::IO_EOF);
+                }(std::move(buffers2->at(1)))
+            );
+        }
+
+        SECTION("copy bidirectional") {
+            auto buffers1 = asyncio::ev::pipe();
+            REQUIRE(buffers1);
+
+            auto buffers2 = asyncio::ev::pipe();
+            REQUIRE(buffers2);
+
+            co_await allSettled(
+                [](auto first, auto second) -> zero::async::coroutine::Task<void> {
+                    const auto result = co_await asyncio::copyBidirectional(std::move(first), std::move(second));
+                    REQUIRE(result);
+                }(std::move(buffers1->at(1)), std::move(buffers2->at(0))),
+                [](auto buffer) -> zero::async::coroutine::Task<void> {
+                    auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
+                    REQUIRE(result);
+
+                    result = co_await buffer.flush();
+                    REQUIRE(result);
+
+                    auto line = co_await buffer.readLine();
+                    REQUIRE(line);
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
+
+                    line = co_await buffer.readLine();
+                    REQUIRE(!line);
+                    REQUIRE(line.error() == asyncio::Error::IO_EOF);
+                }(std::move(buffers1->at(0))),
+                [](auto buffer) -> zero::async::coroutine::Task<void> {
+                    auto line = co_await buffer.readLine();
+                    REQUIRE(line);
+                    REQUIRE(*line == zero::strings::trim(MESSAGE));
+
+                    auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
+                    REQUIRE(result);
+
+                    result = co_await buffer.flush();
+                    REQUIRE(result);
                 }(std::move(buffers2->at(1)))
             );
         }

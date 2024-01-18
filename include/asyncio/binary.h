@@ -54,34 +54,6 @@ namespace asyncio::binary {
 
         co_return co_await writer.writeAll(data);
     }
-
-    template<typename T, typename R>
-        requires (std::is_arithmetic_v<T> && sizeof(T) > 1 && std::derived_from<R, IReader>)
-    zero::async::coroutine::Task<T, std::error_code> readLE(R &&reader) {
-        auto r = std::forward<R>(reader);
-        co_return co_await readLE<T>(r);
-    }
-
-    template<typename T, typename R>
-        requires (std::is_arithmetic_v<T> && sizeof(T) > 1 && std::derived_from<R, IReader>)
-    zero::async::coroutine::Task<T, std::error_code> readBE(R &&reader) {
-        auto r = std::forward<R>(reader);
-        co_return co_await readBE<T>(r);
-    }
-
-    template<typename W, typename T>
-        requires (std::is_arithmetic_v<T> && sizeof(T) > 1 && std::derived_from<W, IWriter>)
-    zero::async::coroutine::Task<void, std::error_code> writeLE(W &&writer, T value) {
-        auto w = std::forward<W>(writer);
-        co_return co_await writeLE<T>(w, value);
-    }
-
-    template<typename W, typename T>
-        requires (std::is_arithmetic_v<T> && sizeof(T) > 1 && std::derived_from<W, IWriter>)
-    zero::async::coroutine::Task<void, std::error_code> writeBE(W &&writer, T value) {
-        auto w = std::forward<W>(writer);
-        co_return co_await writeBE<T>(w, value);
-    }
 }
 
 #endif //ASYNCIO_BINARY_H

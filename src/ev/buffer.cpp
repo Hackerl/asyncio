@@ -162,7 +162,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::
     co_return n;
 }
 
-size_t asyncio::ev::Buffer::available() {
+std::size_t asyncio::ev::Buffer::available() {
     if (!mBev)
         return -1;
 
@@ -310,7 +310,7 @@ asyncio::ev::Buffer::write(const std::span<const std::byte> data) {
     co_return result;
 }
 
-size_t asyncio::ev::Buffer::pending() {
+std::size_t asyncio::ev::Buffer::pending() {
     if (!mBev)
         return -1;
 
@@ -388,7 +388,7 @@ void asyncio::ev::Buffer::setTimeout(
     );
 }
 
-size_t asyncio::ev::Buffer::capacity() {
+std::size_t asyncio::ev::Buffer::capacity() {
     return mCapacity;
 }
 

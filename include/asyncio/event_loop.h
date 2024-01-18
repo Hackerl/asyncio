@@ -9,6 +9,19 @@
 #include "fs/framework.h"
 
 namespace asyncio {
+    enum EventLoopError {
+        NAMESERVER_ADD_FAILED = 1
+    };
+
+    class EventLoopErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+    };
+
+    const std::error_category &eventLoopErrorCategory();
+    std::error_code make_error_code(EventLoopError e);
+
     class EventLoop {
     public:
         EventLoop(
@@ -22,7 +35,7 @@ namespace asyncio {
         [[nodiscard]] evdns_base *dnsBase() const;
         [[nodiscard]] fs::IFramework *framework() const;
 
-        bool addNameserver(const char *ip) const;
+        tl::expected<void, std::error_code> addNameserver(const char *ip) const;
 
         void dispatch() const;
         void loopBreak() const;
@@ -140,5 +153,9 @@ namespace asyncio {
         return {};
     }
 }
+
+template<>
+struct std::is_error_code_enum<asyncio::EventLoopError> : std::true_type {
+};
 
 #endif //ASYNCIO_EVENT_LOOP_H

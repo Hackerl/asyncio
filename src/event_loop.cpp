@@ -20,6 +20,26 @@
 
 thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 
+const char *asyncio::EventLoopErrorCategory::name() const noexcept {
+    return "asyncio::eventLoop";
+}
+
+std::string asyncio::EventLoopErrorCategory::message(const int value) const {
+    if (value == NAMESERVER_ADD_FAILED)
+        return "nameserver add failed";
+
+    return "unknown";
+}
+
+const std::error_category &asyncio::eventLoopErrorCategory() {
+    static EventLoopErrorCategory instance;
+    return instance;
+}
+
+std::error_code asyncio::make_error_code(const EventLoopError e) {
+    return {static_cast<int>(e), eventLoopErrorCategory()};
+}
+
 asyncio::EventLoop::EventLoop(
     std::unique_ptr<event_base, decltype(event_base_free) *> base,
     std::unique_ptr<evdns_base, void (*)(evdns_base *)> dnsBase,
@@ -36,12 +56,15 @@ evdns_base *asyncio::EventLoop::dnsBase() const {
     return mDnsBase.get();
 }
 
-asyncio::fs::IFramework * asyncio::EventLoop::framework() const {
+asyncio::fs::IFramework *asyncio::EventLoop::framework() const {
     return mFramework.get();
 }
 
-bool asyncio::EventLoop::addNameserver(const char *ip) const {
-    return evdns_base_nameserver_ip_add(mDnsBase.get(), ip) == 0;
+tl::expected<void, std::error_code> asyncio::EventLoop::addNameserver(const char *ip) const {
+    if (evdns_base_nameserver_ip_add(mDnsBase.get(), ip) != 0)
+        return tl::unexpected(NAMESERVER_ADD_FAILED);
+
+    return {};
 }
 
 void asyncio::EventLoop::dispatch() const {
@@ -124,7 +147,7 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(const
 #define DEFAULT_NAMESERVER "8.8.8.8"
 #endif
     if (evdns_base_nameserver_ip_add(dnsBase.get(), DEFAULT_NAMESERVER) != 0)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected(NAMESERVER_ADD_FAILED);
 #endif
 #else
     auto dnsBase = std::unique_ptr<evdns_base, void (*)(evdns_base *)>(

@@ -93,11 +93,25 @@ namespace asyncio {
 
     template<typename R, typename W>
         requires (std::derived_from<R, IReader> && std::derived_from<W, IWriter>)
-    zero::async::coroutine::Task<void, std::error_code> copy(R &&reader, W &&writer) {
-        auto r = std::forward<R>(reader);
-        auto w = std::forward<W>(writer);
+    zero::async::coroutine::Task<void, std::error_code> copy(std::shared_ptr<R> reader, std::shared_ptr<W> writer) {
+        co_return co_await copy(*reader, *writer);
+    }
 
-        co_return co_await copy(r, w);
+    template<typename T, typename U>
+        requires (std::derived_from<T, IStreamIO> && std::derived_from<U, IStreamIO>)
+    zero::async::coroutine::Task<void, std::error_code>
+    copyBidirectional(std::shared_ptr<T> first, std::shared_ptr<U> second) {
+        co_return co_await race(copy(first, second), copy(second, first));
+    }
+
+    template<typename T, typename U>
+        requires (std::derived_from<T, IStreamIO> && std::derived_from<U, IStreamIO>)
+    zero::async::coroutine::Task<void, std::error_code>
+    copyBidirectional(T first, U second) {
+        co_return co_await copyBidirectional(
+            std::make_shared<T>(std::move(first)),
+            std::make_shared<U>(std::move(second))
+        );
     }
 }
 
