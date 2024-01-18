@@ -162,7 +162,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::
     co_return n;
 }
 
-std::size_t asyncio::ev::Buffer::available() {
+std::size_t asyncio::ev::Buffer::available() const {
     if (!mBev)
         return -1;
 
@@ -310,7 +310,7 @@ asyncio::ev::Buffer::write(const std::span<const std::byte> data) {
     co_return result;
 }
 
-std::size_t asyncio::ev::Buffer::pending() {
+std::size_t asyncio::ev::Buffer::pending() const {
     if (!mBev)
         return -1;
 
@@ -349,7 +349,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::flush()
     };
 }
 
-asyncio::FileDescriptor asyncio::ev::Buffer::fd() {
+asyncio::FileDescriptor asyncio::ev::Buffer::fd() const {
     if (!mBev)
         return INVALID_FILE_DESCRIPTOR;
 
@@ -388,7 +388,7 @@ void asyncio::ev::Buffer::setTimeout(
     );
 }
 
-std::size_t asyncio::ev::Buffer::capacity() {
+std::size_t asyncio::ev::Buffer::capacity() const {
     return mCapacity;
 }
 

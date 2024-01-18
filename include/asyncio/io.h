@@ -33,7 +33,7 @@ namespace asyncio {
 
     class IFileDescriptor : public virtual zero::Interface {
     public:
-        virtual FileDescriptor fd() = 0;
+        [[nodiscard]] virtual FileDescriptor fd() const = 0;
     };
 
     class IDeadline : public virtual zero::Interface {
@@ -52,18 +52,18 @@ namespace asyncio {
 
         virtual tl::expected<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
         virtual tl::expected<void, std::error_code> rewind() = 0;
-        virtual tl::expected<std::uint64_t, std::error_code> length() = 0;
-        virtual tl::expected<std::uint64_t, std::error_code> position() = 0;
+        [[nodiscard]] virtual tl::expected<std::uint64_t, std::error_code> length() const = 0;
+        [[nodiscard]] virtual tl::expected<std::uint64_t, std::error_code> position() const = 0;
     };
 
     class IBuffered : public virtual zero::Interface {
     public:
-        virtual std::size_t capacity() = 0;
+        [[nodiscard]] virtual std::size_t capacity() const = 0;
     };
 
     class IBufReader : public virtual IReader, public virtual IBuffered {
     public:
-        virtual std::size_t available() = 0;
+        [[nodiscard]] virtual std::size_t available() const = 0;
         virtual zero::async::coroutine::Task<std::string, std::error_code> readLine() = 0;
         virtual zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) = 0;
@@ -71,7 +71,7 @@ namespace asyncio {
 
     class IBufWriter : public virtual IWriter, public virtual IBuffered {
     public:
-        virtual std::size_t pending() = 0;
+        [[nodiscard]] virtual std::size_t pending() const = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> flush() = 0;
     };
 

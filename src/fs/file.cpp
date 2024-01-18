@@ -161,26 +161,39 @@ tl::expected<void, std::error_code> asyncio::fs::File::rewind() {
     return {};
 }
 
-tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::length() {
+tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::length() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
-    const std::uint64_t current = mOffset;
-    const auto pos = seek(0, END);
-    EXPECT(pos);
+#ifdef _WIN32
+    LARGE_INTEGER pos;
 
-    mOffset = current;
-    return *pos;
+    if (!SetFilePointerEx(reinterpret_cast<HANDLE>(mFD), LARGE_INTEGER{.QuadPart = 0}, &pos, FILE_END))
+        return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+
+    return pos.QuadPart;
+#else
+#ifdef __APPLE__
+    const off_t pos = lseek(mFD, 0, SEEK_END);
+#else
+    const off64_t pos = lseek64(mFD, 0, SEEK_END);
+#endif
+
+    if (pos == -1)
+        return tl::unexpected(std::error_code(errno, std::system_category()));
+
+    return pos;
+#endif
 }
 
-tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::position() {
+tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::position() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     return mOffset;
 }
 
-asyncio::FileDescriptor asyncio::fs::File::fd() {
+asyncio::FileDescriptor asyncio::fs::File::fd() const {
     return mFD;
 }
 

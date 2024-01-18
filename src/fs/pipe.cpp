@@ -202,7 +202,7 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
 #endif
 }
 
-asyncio::FileDescriptor asyncio::fs::Pipe::fd() {
+asyncio::FileDescriptor asyncio::fs::Pipe::fd() const {
     return mFD;
 }
 

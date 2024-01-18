@@ -22,7 +22,7 @@ namespace asyncio::fs {
         zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 
-        FileDescriptor fd() override;
+        [[nodiscard]] FileDescriptor fd() const override;
 
     private:
         FileDescriptor mFD;

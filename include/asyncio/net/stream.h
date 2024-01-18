@@ -14,8 +14,8 @@ namespace asyncio::net::stream {
         Buffer(bufferevent *bev, std::size_t capacity);
         Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
 
-        tl::expected<Address, std::error_code> localAddress() override;
-        tl::expected<Address, std::error_code> remoteAddress() override;
+        [[nodiscard]] tl::expected<Address, std::error_code> localAddress() const override;
+        [[nodiscard]] tl::expected<Address, std::error_code> remoteAddress() const override;
     };
 
     tl::expected<Buffer, std::error_code>

@@ -86,8 +86,8 @@ namespace asyncio::http {
         }
 
         zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
-        std::size_t capacity() override;
-        std::size_t available() override;
+        [[nodiscard]] std::size_t capacity() const override;
+        [[nodiscard]] std::size_t available() const override;
         zero::async::coroutine::Task<std::string, std::error_code> readLine() override;
         zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) override;
         zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) override;

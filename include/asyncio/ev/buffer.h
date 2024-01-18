@@ -28,17 +28,17 @@ namespace asyncio::ev {
         zero::async::coroutine::Task<void, std::error_code> close() override;
         zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
 
-        std::size_t available() override;
+        [[nodiscard]] std::size_t available() const override;
         zero::async::coroutine::Task<std::string, std::error_code> readLine() override;
         zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) override;
         zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) override;
         zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 
-        std::size_t pending() override;
+        [[nodiscard]] std::size_t pending() const override;
         zero::async::coroutine::Task<void, std::error_code> flush() override;
 
-        std::size_t capacity() override;
-        FileDescriptor fd() override;
+        [[nodiscard]] std::size_t capacity() const override;
+        [[nodiscard]] FileDescriptor fd() const override;
 
         void setTimeout(std::chrono::milliseconds timeout) override;
         void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;

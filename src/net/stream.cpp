@@ -18,7 +18,7 @@ asyncio::net::stream::Buffer::Buffer(
 ) : ev::Buffer(std::move(bev), capacity) {
 }
 
-tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::localAddress() {
+tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::localAddress() const {
     const FileDescriptor fd = this->fd();
 
     if (fd == INVALID_FILE_DESCRIPTOR)
@@ -27,7 +27,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffe
     return addressFrom(fd, false);
 }
 
-tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::remoteAddress() {
+tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::remoteAddress() const {
     const FileDescriptor fd = this->fd();
 
     if (fd == INVALID_FILE_DESCRIPTOR)

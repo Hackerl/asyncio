@@ -21,10 +21,10 @@ namespace asyncio::fs {
 
         tl::expected<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) override;
         tl::expected<void, std::error_code> rewind() override;
-        tl::expected<std::uint64_t, std::error_code> length() override;
-        tl::expected<std::uint64_t, std::error_code> position() override;
+        [[nodiscard]] tl::expected<std::uint64_t, std::error_code> length() const override;
+        [[nodiscard]] tl::expected<std::uint64_t, std::error_code> position() const override;
 
-        FileDescriptor fd() override;
+        [[nodiscard]] FileDescriptor fd() const override;
 
     private:
         bool mAppend;

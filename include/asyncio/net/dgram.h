@@ -21,13 +21,13 @@ namespace asyncio::net::dgram {
         zero::async::coroutine::Task<std::size_t, std::error_code>
         writeTo(std::span<const std::byte> data, Address address) override;
 
-        tl::expected<Address, std::error_code> localAddress() override;
-        tl::expected<Address, std::error_code> remoteAddress() override;
+        [[nodiscard]] tl::expected<Address, std::error_code> localAddress() const override;
+        [[nodiscard]] tl::expected<Address, std::error_code> remoteAddress() const override;
 
         tl::expected<void, std::error_code> bind(const Address &address) override;
         zero::async::coroutine::Task<void, std::error_code> connect(Address address) override;
 
-        FileDescriptor fd() override;
+        [[nodiscard]] FileDescriptor fd() const override;
 
         void setTimeout(std::chrono::milliseconds timeout) override;
         void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;

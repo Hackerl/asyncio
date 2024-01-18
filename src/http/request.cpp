@@ -176,11 +176,11 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
     });
 }
 
-std::size_t asyncio::http::Response::capacity() {
+std::size_t asyncio::http::Response::capacity() const {
     return mConnection->buffers[1].capacity();
 }
 
-std::size_t asyncio::http::Response::available() {
+std::size_t asyncio::http::Response::available() const {
     return mConnection->buffers[1].available();
 }
 

@@ -285,14 +285,14 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
     co_return result;
 }
 
-tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::localAddress() {
+tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::localAddress() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
     return addressFrom(mFD, false);
 }
 
-tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::remoteAddress() {
+tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::remoteAddress() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
@@ -337,7 +337,7 @@ void asyncio::net::dgram::Socket::setTimeout(
         mTimeouts[WRITE_INDEX].reset();
 }
 
-asyncio::FileDescriptor asyncio::net::dgram::Socket::fd() {
+asyncio::FileDescriptor asyncio::net::dgram::Socket::fd() const {
     return mFD;
 }
 
