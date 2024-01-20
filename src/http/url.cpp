@@ -217,11 +217,11 @@ asyncio::http::URL &asyncio::http::URL::appendQuery(const std::string &key, cons
 }
 
 asyncio::http::URL &asyncio::http::URL::append(const std::string &subPath) {
-    if (std::string parent = path().value_or("/"); parent.back() != '/') {
-        path(std::move(parent) + '/' + subPath);
+    if (const std::string parent = path().value_or("/"); parent.back() != '/') {
+        path(parent + '/' + subPath);
     }
     else {
-        path(std::move(parent) + subPath);
+        path(parent + subPath);
     }
 
     return *this;
