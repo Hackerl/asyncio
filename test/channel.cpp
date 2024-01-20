@@ -30,7 +30,7 @@ produceSync(const std::shared_ptr<asyncio::ISender<int>> &sender, const std::sha
 zero::async::coroutine::Task<void, std::error_code>
 consume(const std::shared_ptr<asyncio::IReceiver<int>> receiver, const std::shared_ptr<std::atomic<int>> counter) {
     while (true) {
-        CO_EXPECTED(co_await receiver->receive());
+        CO_EXPECT(co_await receiver->receive());
         ++*counter;
     }
 }

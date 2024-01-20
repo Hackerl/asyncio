@@ -14,7 +14,7 @@ namespace asyncio::sync {
         zero::async::coroutine::Task<void, std::error_code>
         wait(Mutex &mutex, F predicate, const std::optional<std::chrono::milliseconds> ms = std::nullopt) {
             while (!predicate()) {
-                CO_EXPECTED(co_await wait(mutex, ms));
+                CO_EXPECT(co_await wait(mutex, ms));
             }
 
             co_return tl::expected<void, std::error_code>{};

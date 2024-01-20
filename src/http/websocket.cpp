@@ -205,7 +205,7 @@ zero::async::coroutine::Task<asyncio::http::ws::Frame, std::error_code>
 asyncio::http::ws::WebSocket::readFrame() const {
     Header header;
 
-    CO_EXPECTED(co_await mBuffer->readExactly({reinterpret_cast<std::byte *>(&header), sizeof(Header)}));
+    CO_EXPECT(co_await mBuffer->readExactly({reinterpret_cast<std::byte *>(&header), sizeof(Header)}));
 
     if (header.mask())
         co_return tl::unexpected(UNSUPPORTED_MASKED_FRAME);
@@ -226,7 +226,7 @@ asyncio::http::ws::WebSocket::readFrame() const {
         data.resize(length);
     }
 
-    CO_EXPECTED(co_await mBuffer->readExactly(data));
+    CO_EXPECT(co_await mBuffer->readExactly(data));
     co_return Frame{header, std::move(data)};
 }
 
@@ -274,13 +274,13 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) cons
         header.length(length);
     }
 
-    CO_EXPECTED(co_await mBuffer->writeAll({reinterpret_cast<const std::byte *>(&header), sizeof(Header)}));
+    CO_EXPECT(co_await mBuffer->writeAll({reinterpret_cast<const std::byte *>(&header), sizeof(Header)}));
 
     if (extendedBytes == 2) {
-        CO_EXPECTED(co_await binary::writeBE(*mBuffer, static_cast<std::uint16_t>(length)));
+        CO_EXPECT(co_await binary::writeBE(*mBuffer, static_cast<std::uint16_t>(length)));
     }
     else if (extendedBytes == 8) {
-        CO_EXPECTED(co_await binary::writeBE<std::uint64_t>(*mBuffer, length));
+        CO_EXPECT(co_await binary::writeBE<std::uint64_t>(*mBuffer, length));
     }
 
     std::random_device rd;
@@ -292,7 +292,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) cons
     for (auto &b: key)
         b = static_cast<std::byte>(dist(gen));
 
-    CO_EXPECTED(co_await mBuffer->writeAll(key));
+    CO_EXPECT(co_await mBuffer->writeAll(key));
 
     for (std::size_t i = 0; i < length; i++) {
         message.data[i] ^= key[i % 4];
@@ -317,11 +317,11 @@ asyncio::http::ws::WebSocket::readMessage() const {
             co_return Message{message->opcode, std::move(message->data)};
         }
         else if (opcode == PING) {
-            CO_EXPECTED(co_await writeInternalMessage({PONG, std::move(message->data)}));
+            CO_EXPECT(co_await writeInternalMessage({PONG, std::move(message->data)}));
         }
         else if (opcode == CLOSE) {
-            CO_EXPECTED(co_await writeInternalMessage({CLOSE, message->data}));
-            CO_EXPECTED(co_await mBuffer->close());
+            CO_EXPECT(co_await writeInternalMessage({CLOSE, message->data}));
+            CO_EXPECT(co_await mBuffer->close());
 
             if (message->data.size() < 2)
                 co_return tl::unexpected(NO_STATUS_RCVD);
@@ -373,7 +373,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
     mState = CLOSING;
     const auto c = htons(code);
 
-    CO_EXPECTED(co_await writeInternalMessage({
+    CO_EXPECT(co_await writeInternalMessage({
         CLOSE,
         {reinterpret_cast<const std::byte *>(&c), reinterpret_cast<const std::byte *>(&c) + sizeof(c)}}
     ));
@@ -388,7 +388,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
         }
     }
 
-    CO_EXPECTED(co_await mBuffer->close());
+    CO_EXPECT(co_await mBuffer->close());
     co_return tl::expected<void, std::error_code>{};
 }
 
@@ -448,7 +448,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
         *scheme, *host, *port
     );
 
-    CO_EXPECTED(co_await buffer->writeAll(std::as_bytes(std::span{header})));
+    CO_EXPECT(co_await buffer->writeAll(std::as_bytes(std::span{header})));
 
     auto line = co_await buffer->readLine();
     CO_EXPECT(line);

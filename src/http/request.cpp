@@ -148,8 +148,8 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::Response::out
     auto file = fs::open(path, O_WRONLY | O_CREAT | O_TRUNC);
     CO_EXPECT(file);
 
-    CO_EXPECTED(co_await copy(mConnection->buffers[1], *file));
-    CO_EXPECTED(co_await file->close());
+    CO_EXPECT(co_await copy(mConnection->buffers[1], *file));
+    CO_EXPECT(co_await file->close());
 
     if (mConnection->error)
         co_return tl::unexpected(*mConnection->error);

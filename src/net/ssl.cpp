@@ -199,7 +199,7 @@ asyncio::net::ssl::newContext(const Config &config) {
 
     if (!config.insecure && config.ca.index() == 0 && !config.server) {
 #ifdef ASYNCIO_EMBED_CA_CERT
-        EXPECTED(loadEmbeddedCA(ctx.get()));
+        EXPECT(loadEmbeddedCA(ctx.get()));
 #else
         if (!SSL_CTX_set_default_verify_paths(ctx.get()))
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
