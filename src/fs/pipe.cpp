@@ -5,6 +5,8 @@
 #include <asyncio/thread.h>
 #else
 #include <unistd.h>
+#include <algorithm>
+#include <zero/defer.h>
 #include <zero/expect.h>
 #endif
 
@@ -15,11 +17,12 @@ asyncio::fs::Pipe::Pipe(const FileDescriptor fd): mFD(fd) {
 asyncio::fs::Pipe::Pipe(Pipe &&rhs) noexcept: mFD(std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR)) {
 }
 #else
-asyncio::fs::Pipe::Pipe(const FileDescriptor fd, ev::Event event): mFD(fd), mEvent(std::move(event)) {
+asyncio::fs::Pipe::Pipe(const FileDescriptor fd, std::array<std::optional<ev::Event>, 2> events)
+    : mFD(fd), mEvents(std::move(events)) {
 }
 
 asyncio::fs::Pipe::Pipe(Pipe &&rhs) noexcept
-    : mFD(std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR)), mEvent(std::move(rhs.mEvent)) {
+    : mFD(std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR)), mEvents(std::move(rhs.mEvents)) {
 }
 #endif
 
@@ -44,10 +47,15 @@ tl::expected<asyncio::fs::Pipe, std::error_code> asyncio::fs::Pipe::from(const F
     if (evutil_make_socket_nonblocking(fd) == -1)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-    auto event = ev::makeEvent(fd,  ev::What::READ | ev::What::WRITE);
-    EXPECT(event);
+    auto events = std::array{
+        makeEvent(fd, ev::What::READ),
+        makeEvent(fd, ev::What::WRITE)
+    };
 
-    return Pipe{fd, std::move(*event)};
+    EXPECT(events[0]);
+    EXPECT(events[1]);
+
+    return Pipe{fd, {std::move(*events[0]), std::move(*events[1])}};
 #endif
 }
 
@@ -59,7 +67,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::fs::Pipe::close() {
     if (!CloseHandle(reinterpret_cast<HANDLE>(std::exchange(mFD, INVALID_FILE_DESCRIPTOR))))
         co_return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
 #else
-    assert(!mEvent.pending());
+    assert(std::ranges::all_of(mEvents, [](const auto &event) {return !event || !event->pending();}));
 
     if (::close(std::exchange(mFD, INVALID_FILE_DESCRIPTOR)) != 0)
         co_return tl::unexpected(std::error_code(errno, std::system_category()));
@@ -95,6 +103,9 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
         return ec;
     });
 #else
+    if (!mEvents[0])
+        co_return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
     tl::expected<size_t, std::error_code> result;
 
     while (true) {
@@ -115,7 +126,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
             break;
         }
 
-        const auto what = co_await mEvent.on();
+        const auto what = co_await mEvents[0]->on();
 
         if (!what) {
             result = tl::unexpected(what.error());
@@ -165,6 +176,9 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
         return ec;
     });
 #else
+    if (!mEvents[1])
+        co_return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
     tl::expected<size_t, std::error_code> result;
 
     while (*result < data.size()) {
@@ -188,7 +202,7 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
             continue;
         }
 
-        const auto what = co_await mEvent.on();
+        const auto what = co_await mEvents[1]->on();
 
         if (!what) {
             result = tl::unexpected(what.error());
@@ -219,36 +233,34 @@ tl::expected<std::array<asyncio::fs::Pipe, 2>, std::error_code> asyncio::fs::pip
     };
 #else
     int fds[2];
+    std::ranges::fill(fds, -1);
+
+    DEFER(
+        for (const auto &fd : fds) {
+            if (fd < 0)
+                continue;
+
+            close(fd);
+        }
+    );
 
     if (::pipe(fds) < 0)
         return tl::unexpected(std::error_code(errno, std::system_category()));
 
-    if (evutil_make_socket_nonblocking(fds[0]) == -1 || evutil_make_socket_nonblocking(fds[1]) == -1) {
-        close(fds[0]);
-        close(fds[1]);
+    if (evutil_make_socket_nonblocking(fds[0]) == -1 || evutil_make_socket_nonblocking(fds[1]) == -1)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-    }
 
     auto events = std::array{
-        ev::makeEvent(fds[0], ev::What::READ | ev::What::WRITE),
-        ev::makeEvent(fds[1], ev::What::READ | ev::What::WRITE)
+        makeEvent(fds[0], ev::What::READ),
+        makeEvent(fds[1], ev::What::WRITE)
     };
 
-    if (!events[0]) {
-        close(fds[0]);
-        close(fds[1]);
-        return tl::unexpected(events[0].error());
-    }
-
-    if (!events[1]) {
-        close(fds[0]);
-        close(fds[1]);
-        return tl::unexpected(events[1].error());
-    }
+    EXPECT(events[0]);
+    EXPECT(events[1]);
 
     return std::array{
-        Pipe{fds[0], std::move(*events[0])},
-        Pipe{fds[1], std::move(*events[1])}
+        Pipe{std::exchange(fds[0], -1), {std::move(*events[0]), std::nullopt}},
+        Pipe{std::exchange(fds[1], -1), {std::nullopt, std::move(*events[1])}}
     };
 #endif
 }

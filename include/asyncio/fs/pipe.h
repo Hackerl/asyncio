@@ -10,7 +10,7 @@ namespace asyncio::fs {
 #ifdef _WIN32
         explicit Pipe(FileDescriptor fd);
 #else
-        Pipe(FileDescriptor fd, ev::Event event);
+        Pipe(FileDescriptor fd, std::array<std::optional<ev::Event>, 2> events);
 #endif
 
         Pipe(Pipe &&rhs) noexcept;
@@ -27,7 +27,7 @@ namespace asyncio::fs {
     private:
         FileDescriptor mFD;
 #ifndef _WIN32
-        ev::Event mEvent;
+        std::array<std::optional<ev::Event>, 2> mEvents;
 #endif
     };
 
