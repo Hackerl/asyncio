@@ -24,6 +24,7 @@ add_library(
         src/io.cpp
         src/error.cpp
         src/worker.cpp
+        src/channel.cpp
         src/event_loop.cpp
         src/sync/mutex.cpp
         src/sync/event.cpp

@@ -10,6 +10,11 @@
 #include <zero/expect.h>
 #endif
 
+#ifndef _WIN32
+constexpr auto READ_INDEX = 0;
+constexpr auto WRITE_INDEX = 1;
+#endif
+
 #ifdef _WIN32
 asyncio::fs::Pipe::Pipe(const FileDescriptor fd): mFD(fd) {
 }
@@ -103,7 +108,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
         return ec;
     });
 #else
-    if (!mEvents[0])
+    if (!mEvents[READ_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_not_supported));
 
     tl::expected<size_t, std::error_code> result;
@@ -126,7 +131,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
             break;
         }
 
-        const auto what = co_await mEvents[0]->on();
+        const auto what = co_await mEvents[READ_INDEX]->on();
 
         if (!what) {
             result = tl::unexpected(what.error());
@@ -176,7 +181,7 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
         return ec;
     });
 #else
-    if (!mEvents[1])
+    if (!mEvents[WRITE_INDEX])
         co_return tl::unexpected(make_error_code(std::errc::operation_not_supported));
 
     tl::expected<size_t, std::error_code> result;
@@ -202,7 +207,7 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
             continue;
         }
 
-        const auto what = co_await mEvents[1]->on();
+        const auto what = co_await mEvents[WRITE_INDEX]->on();
 
         if (!what) {
             result = tl::unexpected(what.error());

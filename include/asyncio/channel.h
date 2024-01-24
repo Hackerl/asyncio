@@ -1,13 +1,35 @@
 #ifndef ASYNCIO_CHANNEL_H
 #define ASYNCIO_CHANNEL_H
 
-#include "error.h"
 #include "event_loop.h"
 #include <chrono>
 #include <zero/interface.h>
 #include <zero/async/coroutine.h>
 #include <zero/atomic/event.h>
 #include <zero/atomic/circular_buffer.h>
+
+namespace asyncio {
+    enum ChannelError {
+        CHANNEL_EOF = 1,
+        BROKEN_CHANNEL,
+        EMPTY,
+        FULL
+    };
+
+    class ChannelErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    const std::error_category &channelErrorCategory();
+    std::error_code make_error_code(ChannelError e);
+}
+
+template<>
+struct std::is_error_code_enum<asyncio::ChannelError> : std::true_type {
+};
 
 namespace asyncio {
     template<typename T>
@@ -45,11 +67,16 @@ namespace asyncio {
         explicit Channel(std::size_t capacity) : mClosed(false), mEventLoop(getEventLoop()), mBuffer(capacity) {
         }
 
+        ~Channel() override {
+            assert(mPending[SENDER].empty());
+            assert(mPending[RECEIVER].empty());
+        }
+
     private:
         tl::expected<void, std::error_code>
         sendSyncImpl(T &&element, const std::optional<std::chrono::milliseconds> timeout) {
             if (mClosed)
-                return tl::unexpected(make_error_code(std::errc::broken_pipe));
+                return tl::unexpected(BROKEN_CHANNEL);
 
             tl::expected<void, std::error_code> result;
 
@@ -61,7 +88,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected(make_error_code(std::errc::broken_pipe));
+                        result = tl::unexpected<std::error_code>(BROKEN_CHANNEL);
                         break;
                     }
 
@@ -103,7 +130,7 @@ namespace asyncio {
         zero::async::coroutine::Task<void, std::error_code>
         sendImpl(T element, const std::optional<std::chrono::milliseconds> timeout) {
             if (mClosed)
-                co_return tl::unexpected(make_error_code(std::errc::broken_pipe));
+                co_return tl::unexpected(BROKEN_CHANNEL);
 
             tl::expected<void, std::error_code> result;
 
@@ -115,7 +142,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected(make_error_code(std::errc::broken_pipe));
+                        result = tl::unexpected<std::error_code>(BROKEN_CHANNEL);
                         break;
                     }
 
@@ -174,7 +201,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(IO_EOF);
+                        result = tl::unexpected<std::error_code>(CHANNEL_EOF);
                         break;
                     }
 
@@ -225,7 +252,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(IO_EOF);
+                        result = tl::unexpected<std::error_code>(CHANNEL_EOF);
                         break;
                     }
 
@@ -304,12 +331,12 @@ namespace asyncio {
     public:
         tl::expected<void, std::error_code> trySend(T element) override {
             if (mClosed)
-                return tl::unexpected(make_error_code(std::errc::broken_pipe));
+                return tl::unexpected(BROKEN_CHANNEL);
 
             const auto index = mBuffer.reserve();
 
             if (!index)
-                return tl::unexpected(make_error_code(std::errc::operation_would_block));
+                return tl::unexpected(FULL);
 
             mBuffer[*index] = std::move(element);
             mBuffer.commit(*index);
@@ -336,6 +363,8 @@ namespace asyncio {
         }
 
         void close() override {
+            assert(!mClosed);
+
             {
                 std::lock_guard guard(mMutex);
 
@@ -345,8 +374,8 @@ namespace asyncio {
                 mClosed = true;
             }
 
-            trigger<SENDER>(make_error_code(std::errc::broken_pipe));
-            trigger<RECEIVER>(IO_EOF);
+            trigger<SENDER>(BROKEN_CHANNEL);
+            trigger<RECEIVER>(CHANNEL_EOF);
         }
 
         tl::expected<T, std::error_code> tryReceive() override {
@@ -354,7 +383,7 @@ namespace asyncio {
 
             if (!index)
                 return tl::unexpected(
-                    mClosed ? make_error_code(IO_EOF) : make_error_code(std::errc::operation_would_block)
+                    mClosed ? CHANNEL_EOF : EMPTY
                 );
 
             T element = std::move(mBuffer[*index]);
@@ -380,6 +409,26 @@ namespace asyncio {
             return receiveImpl(timeout);
         }
 
+        [[nodiscard]] std::size_t size() const {
+            return mBuffer.size();
+        }
+
+        [[nodiscard]] std::size_t capacity() const {
+            return mBuffer.capacity();
+        }
+
+        [[nodiscard]] bool empty() const {
+            return mBuffer.empty();
+        }
+
+        [[nodiscard]] bool full() const {
+            return mBuffer.full();
+        }
+
+        [[nodiscard]] bool closed() const {
+            return mClosed;
+        }
+
     private:
         std::mutex mMutex;
         std::atomic<bool> mClosed;
@@ -387,6 +436,20 @@ namespace asyncio {
         zero::atomic::CircularBuffer<T> mBuffer;
         std::array<std::list<zero::async::promise::PromisePtr<void, std::error_code>>, 2> mPending;
     };
+
+    template<typename T>
+    using SenderPtr = std::shared_ptr<ISender<T>>;
+
+    template<typename T>
+    using ReceiverPtr = std::shared_ptr<IReceiver<T>>;
+
+    template<typename T>
+    using ChannelPtr = std::shared_ptr<Channel<T>>;
+
+    template<typename T>
+    ChannelPtr<T> makeChannel(const std::size_t capacity) {
+        return std::make_shared<Channel<T>>(capacity);
+    }
 }
 
 #endif //ASYNCIO_CHANNEL_H
