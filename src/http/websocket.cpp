@@ -363,7 +363,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
 
 zero::async::coroutine::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::sendBinary(std::span<const std::byte> data) const {
-    co_return co_await writeMessage({TEXT, std::vector<std::byte>{data.begin(), data.end()}});
+    co_return co_await writeMessage({BINARY, std::vector<std::byte>{data.begin(), data.end()}});
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
