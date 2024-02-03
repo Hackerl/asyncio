@@ -4,6 +4,7 @@
 #include <variant>
 #include <asyncio/ev/buffer.h>
 #include <asyncio/http/url.h>
+#include <asyncio/sync/mutex.h>
 
 namespace asyncio::http::ws {
     enum Error {
@@ -119,6 +120,7 @@ namespace asyncio::http::ws {
 
     private:
         State mState;
+        std::unique_ptr<sync::Mutex> mMutex;
         std::unique_ptr<IBuffer> mBuffer;
     };
 

@@ -3,6 +3,7 @@
 #include <asyncio/binary.h>
 #include <zero/encoding/base64.h>
 #include <zero/expect.h>
+#include <zero/defer.h>
 #include <cassert>
 #include <random>
 #include <map>
@@ -198,7 +199,7 @@ void asyncio::http::ws::Header::mask(bool mask) {
 }
 
 asyncio::http::ws::WebSocket::WebSocket(std::unique_ptr<IBuffer> buffer)
-    : mState(CONNECTED), mBuffer(std::move(buffer)) {
+    : mState(CONNECTED), mMutex(std::make_unique<sync::Mutex>()), mBuffer(std::move(buffer)) {
 }
 
 zero::async::coroutine::Task<asyncio::http::ws::Frame, std::error_code>
@@ -253,6 +254,9 @@ asyncio::http::ws::WebSocket::readInternalMessage() const {
 
 zero::async::coroutine::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) const {
+    CO_EXPECT(co_await mMutex->lock());
+    DEFER(mMutex->unlock());
+
     Header header;
 
     header.opcode(message.opcode);
