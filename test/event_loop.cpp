@@ -40,4 +40,54 @@ TEST_CASE("asyncio event loop", "[event loop]") {
             }
         }
     });
+
+    SECTION("with error") {
+        SECTION("success") {
+            const auto result = asyncio::run([]() -> zero::async::coroutine::Task<int, std::error_code> {
+                co_await asyncio::sleep(10ms);
+                co_return 1024;
+            });
+            REQUIRE(result);
+            REQUIRE(*result);
+            REQUIRE(**result == 1024);
+        }
+
+        SECTION("failure") {
+            const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void, std::error_code> {
+                co_await asyncio::sleep(10ms);
+                co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+            });
+            REQUIRE(result);
+            REQUIRE(!*result);
+            REQUIRE(result->error() == std::errc::invalid_argument);
+        }
+    }
+
+    SECTION("with exception") {
+        SECTION("success") {
+            const auto result = asyncio::run([]() -> zero::async::coroutine::Task<int> {
+                co_await asyncio::sleep(10ms);
+                co_return 1024;
+            });
+            REQUIRE(result);
+            REQUIRE(*result);
+            REQUIRE(**result == 1024);
+        }
+
+        SECTION("failure") {
+            const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+                co_await asyncio::sleep(10ms);
+                throw std::system_error(make_error_code(std::errc::invalid_argument));
+            });
+            REQUIRE(result);
+            REQUIRE(!*result);
+
+            try {
+                std::rethrow_exception(result->error());
+            }
+            catch (const std::system_error &error) {
+                REQUIRE(error.code() == std::errc::invalid_argument);
+            }
+        }
+    }
 }

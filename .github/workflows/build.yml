@@ -24,6 +24,9 @@ jobs:
           LDFLAGS: -fsanitize=address
       - name: Test
         run: ctest --output-on-failure --test-dir build
+        env:
+          # https://github.com/llvm/llvm-project/issues/59432
+          ASAN_OPTIONS: alloc_dealloc_mismatch=0
 
   linux-static-amd64:
     runs-on: ubuntu-latest

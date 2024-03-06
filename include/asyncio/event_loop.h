@@ -136,21 +136,23 @@ namespace asyncio {
         co_return tl::expected<tl::expected<T, E>, std::error_code>{tl::in_place, std::move(task.result())};
     }
 
-    template<typename F>
-    tl::expected<void, std::error_code> run(F &&f) {
+    template<typename F, typename T = std::invoke_result_t<F>>
+        requires zero::detail::is_specialization<T, zero::async::coroutine::Task>
+    tl::expected<tl::expected<typename T::value_type, typename T::error_type>, std::error_code> run(F &&f) {
         const auto eventLoop = createEventLoop().transform([](EventLoop &&e) {
             return std::make_shared<EventLoop>(std::move(e));
         });
         EXPECT(eventLoop);
 
         setEventLoop(*eventLoop);
+        const auto promise = f().promise();
 
-        f().promise()->finally([&] {
+        promise->finally([&] {
             eventLoop.value()->loopExit();
         });
 
         eventLoop.value()->dispatch();
-        return {};
+        return {tl::in_place, std::move(promise->result())};
     }
 }
 
