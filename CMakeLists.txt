@@ -86,6 +86,9 @@ target_link_libraries(
         $<$<NOT:$<PLATFORM_ID:Windows>>:libevent::pthreads>
 )
 
+add_library(asyncio-main STATIC src/main.cpp)
+target_link_libraries(asyncio-main PUBLIC asyncio)
+
 install(
         DIRECTORY
         include/
@@ -95,6 +98,12 @@ install(
 
 install(
         TARGETS asyncio
+        EXPORT ${PROJECT_NAME}Targets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(
+        TARGETS asyncio-main
         EXPORT ${PROJECT_NAME}Targets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

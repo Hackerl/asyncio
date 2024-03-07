@@ -1,18 +1,11 @@
+#include <asyncio/error.h>
 #include <asyncio/net/ssl.h>
 #include <asyncio/event_loop.h>
-#include <zero/log.h>
 #include <zero/cmdline.h>
-#include <fmt/std.h>
-
-#if __unix__ || __APPLE__
-#include <csignal>
-#endif
 
 using namespace std::chrono_literals;
 
-int main(int argc, char *argv[]) {
-    INIT_CONSOLE_LOG(zero::INFO_LEVEL);
-
+zero::async::coroutine::Task<void, std::error_code> amain(int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");
@@ -34,71 +27,42 @@ int main(int argc, char *argv[]) {
 
     bool insecure = cmdline.exist("insecure");
 
-#ifdef _WIN32
-    WSADATA wsaData;
+    asyncio::net::ssl::Config config = {
+        .insecure = insecure,
+        .server = false
+    };
 
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        LOG_ERROR("WSAStartup failed");
-        return -1;
+    if (ca)
+        config.ca = *ca;
+
+    if (cert)
+        config.cert = *cert;
+
+    if (privateKey)
+        config.privateKey = *privateKey;
+
+    const auto context = newContext(config);
+    CO_EXPECT(context);
+
+    auto buffer = co_await asyncio::net::ssl::stream::connect(*context, host, port);
+    CO_EXPECT(buffer);
+
+    while (true) {
+        constexpr std::string_view message = "hello world\r\n";
+        CO_EXPECT(co_await buffer->writeAll(std::as_bytes(std::span{message})));
+
+        const auto line = co_await buffer->readLine();
+
+        if (!line) {
+            if (line.error() != asyncio::Error::IO_EOF)
+                co_return tl::unexpected(line.error());
+
+            break;
+        }
+
+        fmt::print("receive message[{}]\n", *line);
+        co_await asyncio::sleep(1s);
     }
-#endif
 
-#if __unix__ || __APPLE__
-    signal(SIGPIPE, SIG_IGN);
-#endif
-
-    asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-        asyncio::net::ssl::Config config = {
-            .insecure = insecure,
-            .server = false
-        };
-
-        if (ca)
-            config.ca = *ca;
-
-        if (cert)
-            config.cert = *cert;
-
-        if (privateKey)
-            config.privateKey = *privateKey;
-
-        const auto context = newContext(config);
-
-        if (!context) {
-            LOG_ERROR("create ssl context failed[{}]", context.error());
-            co_return;
-        }
-
-        auto buffer = co_await asyncio::net::ssl::stream::connect(*context, host, port);
-
-        if (!buffer) {
-            LOG_ERROR("stream buffer connect failed[{}]", buffer.error());
-            co_return;
-        }
-
-        while (true) {
-            std::string message = "hello world\r\n";
-
-            if (const auto result = co_await buffer->writeAll(std::as_bytes(std::span{message})); !result) {
-                LOG_ERROR("stream buffer drain failed[{}]", result.error());
-                break;
-            }
-
-            const auto line = co_await buffer->readLine();
-
-            if (!line) {
-                LOG_ERROR("stream buffer read line failed[{}]", line.error());
-                break;
-            }
-
-            LOG_INFO("receive message[{}]", *line);
-            co_await asyncio::sleep(1s);
-        }
-    });
-
-#ifdef _WIN32
-    WSACleanup();
-#endif
-
-    return 0;
+    co_return tl::expected<void, std::error_code>{};
 }

@@ -1,28 +1,19 @@
 #include <asyncio/ev/signal.h>
 #include <asyncio/net/stream.h>
-#include <asyncio/event_loop.h>
-#include <zero/log.h>
 #include <zero/cmdline.h>
+#include <zero/formatter.h>
 #include <csignal>
-#include <fmt/std.h>
 
-zero::async::coroutine::Task<void> handle(asyncio::net::stream::Buffer buffer) {
-    LOG_INFO("new connection[{}]", fmt::to_string(*buffer.remoteAddress()));
+zero::async::coroutine::Task<void, std::error_code> handle(asyncio::net::stream::Buffer buffer) {
+    fmt::print("new connection[{}]\n", fmt::to_string(*buffer.remoteAddress()));
 
     while (true) {
-        const auto line = co_await buffer.readLine();
+        auto line = co_await buffer.readLine();
+        CO_EXPECT(line);
 
-        if (!line) {
-            LOG_ERROR("stream buffer read line failed[{}]", line.error());
-            break;
-        }
-
-        LOG_INFO("receive message[{}]", *line);
-
-        if (const auto result = co_await buffer.writeAll(std::as_bytes(std::span{*line})); !result) {
-            LOG_ERROR("stream buffer drain failed[{}]", result.error());
-            break;
-        }
+        fmt::print("receive message[{}]\n", *line);
+        line->append("\r\n");
+        CO_EXPECT(co_await buffer.writeAll(std::as_bytes(std::span{*line})));
     }
 }
 
@@ -37,15 +28,15 @@ zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::stream::
             break;
         }
 
-        handle(std::move(*buffer));
+        handle(std::move(*buffer)).promise()->fail([](const std::error_code &ec) {
+            fmt::print(stderr, "unhandled error: {}\n", ec.message());
+        });
     }
 
     co_return result;
 }
 
-int main(const int argc, char *argv[]) {
-    INIT_CONSOLE_LOG(zero::INFO_LEVEL);
-
+zero::async::coroutine::Task<void, std::error_code> amain(int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");
@@ -56,40 +47,12 @@ int main(const int argc, char *argv[]) {
     const auto host = cmdline.get<std::string>("host");
     const auto port = cmdline.get<unsigned short>("port");
 
-#ifdef _WIN32
-    WSADATA wsaData;
+    auto listener = asyncio::net::stream::listen(host, port);
+    CO_EXPECT(listener);
 
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        LOG_ERROR("WSAStartup failed");
-        return -1;
-    }
-#endif
+    auto signal = asyncio::ev::makeSignal(SIGINT);
+    CO_EXPECT(signal);
 
-#if __unix__ || __APPLE__
-    signal(SIGPIPE, SIG_IGN);
-#endif
-
-    asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-        auto listener = asyncio::net::stream::listen(host, port);
-
-        if (!listener) {
-            LOG_ERROR("listen failed[{}]", listener.error());
-            co_return;
-        }
-
-        auto signal = asyncio::ev::makeSignal(SIGINT);
-
-        if (!signal) {
-            LOG_ERROR("make signal failed[{}]", signal.error());
-            co_return;
-        }
-
-        co_await race(signal->on(), serve(std::move(*listener)));
-    });
-
-#ifdef _WIN32
-    WSACleanup();
-#endif
-
-    return 0;
+    co_await race(signal->on(), serve(std::move(*listener)));
+    co_return tl::expected<void, std::error_code>{};
 }

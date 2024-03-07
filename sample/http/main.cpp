@@ -1,18 +1,7 @@
 #include <asyncio/http/request.h>
-#include <asyncio/event_loop.h>
-#include <zero/log.h>
 #include <zero/cmdline.h>
-#include <fmt/std.h>
 
-#if __unix__ || __APPLE__
-#include <csignal>
-#endif
-
-using namespace std::chrono_literals;
-
-int main(int argc, char *argv[]) {
-    INIT_CONSOLE_LOG(zero::INFO_LEVEL);
-
+zero::async::coroutine::Task<void, std::error_code> amain(int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<asyncio::http::URL>("url", "http request url");
@@ -36,97 +25,60 @@ int main(int argc, char *argv[]) {
     const auto json = cmdline.exist("json");
     const auto form = cmdline.exist("form");
 
-#ifdef _WIN32
-    WSADATA wsaData;
+    asyncio::http::Options options;
 
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        LOG_ERROR("WSAStartup failed");
-        return -1;
+    if (headers) {
+        for (const auto &header: *headers) {
+            const auto tokens = zero::strings::split(header, "=");
+
+            if (tokens.size() != 2) {
+                fmt::print(stderr, "invalid header[{}]\n", header);
+                continue;
+            }
+
+            options.headers[tokens[0]] = tokens[1];
+        }
     }
-#endif
 
-#if __unix__ || __APPLE__
-    signal(SIGPIPE, SIG_IGN);
-#endif
+    const auto result = makeRequests(options);
+    CO_EXPECT(result);
 
-    asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-        asyncio::http::Options options;
+    const auto response = co_await [&, requests = *result] {
+        if (!body)
+            return requests->request(*method, url, options);
 
-        if (headers) {
-            for (const auto &header: *headers) {
-                const auto tokens = zero::strings::split(header, "=");
+        if (json)
+            return requests->request(*method, url, options, nlohmann::json::parse(*body));
 
-                if (tokens.size() != 2) {
-                    LOG_WARNING("invalid header[{}]", header);
+        if (form) {
+            std::map<std::string, std::variant<std::string, std::filesystem::path>> data;
+
+            for (const auto &part: zero::strings::split(*body, ",")) {
+                const auto tokens = zero::strings::split(part, "=");
+
+                if (tokens.size() != 2)
                     continue;
-                }
 
-                options.headers[tokens[0]] = tokens[1];
-            }
-        }
-
-        const auto result = makeRequests(options);
-
-        if (!result) {
-            LOG_ERROR("make result failed[{}]", result.error());
-            co_return;
-        }
-
-        const auto response = co_await [&, requests = *result] {
-            if (!body)
-                return requests->request(*method, url, options);
-
-            if (json)
-                requests->request(*method, url, options, nlohmann::json::parse(*body));
-
-            if (form) {
-                std::map<std::string, std::variant<std::string, std::filesystem::path>> data;
-
-                for (const auto &part: zero::strings::split(*body, ",")) {
-                    const auto tokens = zero::strings::split(part, "=");
-
-                    if (tokens.size() != 2)
-                        continue;
-
-                    if (tokens[1].starts_with("@"))
-                        data[tokens[0]] = std::filesystem::path(tokens[1].substr(1));
-                    else
-                        data[tokens[0]] = tokens[1];
-                }
-
-                requests->request(*method, url, options, data);
+                if (tokens[1].starts_with("@"))
+                    data[tokens[0]] = std::filesystem::path(tokens[1].substr(1));
+                else
+                    data[tokens[0]] = tokens[1];
             }
 
-            return requests->request(*method, url, options, *body);
-        }();
-
-        if (!response) {
-            LOG_ERROR("request failed[{}]", response.error());
-            co_return;
+            return requests->request(*method, url, options, data);
         }
 
-        if (output) {
-            if (const auto res = co_await response->output(*output); !res) {
-                LOG_ERROR("output to {} failed[{}]", *output, res.error());
-                co_return;
-            }
+        return requests->request(*method, url, options, *body);
+    }();
+    CO_EXPECT(response);
 
-            co_return;
-        }
+    if (output) {
+        CO_EXPECT(co_await response->output(*output));
+    }
 
-        const auto content = co_await response->string();
+    const auto content = co_await response->string();
+    CO_EXPECT(content);
 
-        if (!content) {
-            LOG_ERROR("get response content failed[{}]", content.error());
-            co_return;
-        }
-
-        fmt::print("{}", *content);
-    });
-
-#ifdef _WIN32
-    WSACleanup();
-#endif
-
-    return 0;
+    fmt::print("{}", *content);
+    co_return tl::expected<void, std::error_code>{};
 }
