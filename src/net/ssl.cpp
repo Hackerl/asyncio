@@ -113,9 +113,8 @@ asyncio::net::ssl::newContext(const Config &config) {
     if (!SSL_CTX_set_max_proto_version(ctx.get(), config.minVersion.value_or(TLS_VERSION_1_3)))
         return tl::unexpected(static_cast<Error>(ERR_get_error()));
 
-    switch (config.ca.index()) {
-    case 1: {
-        const auto cert = readCertificate(std::get<1>(config.ca));
+    if (std::holds_alternative<std::string>(config.ca)) {
+        const auto cert = readCertificate(std::get<std::string>(config.ca));
 
         if (!cert)
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
@@ -127,46 +126,36 @@ asyncio::net::ssl::newContext(const Config &config) {
 
         if (!X509_STORE_add_cert(store, cert.get()))
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
-
-        break;
     }
-
-    case 2:
-        if (!SSL_CTX_load_verify_locations(ctx.get(), std::get<2>(config.ca).string().c_str(), nullptr))
+    else if (std::holds_alternative<std::filesystem::path>(config.ca)) {
+        if (!SSL_CTX_load_verify_locations(
+            ctx.get(),
+            std::get<std::filesystem::path>(config.ca).string().c_str(),
+            nullptr
+        ))
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
-
-        break;
-
-    default:
-        break;
     }
 
-    switch (config.cert.index()) {
-    case 1: {
-        const auto cert = readCertificate(std::get<1>(config.cert));
+    if (std::holds_alternative<std::string>(config.cert)) {
+        const auto cert = readCertificate(std::get<std::string>(config.cert));
 
         if (!cert)
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
 
         if (!SSL_CTX_use_certificate(ctx.get(), cert.get()))
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
-
-        break;
     }
-
-    case 2:
-        if (!SSL_CTX_use_certificate_file(ctx.get(), std::get<2>(config.cert).string().c_str(), SSL_FILETYPE_PEM))
+    else if (std::holds_alternative<std::filesystem::path>(config.cert)) {
+        if (!SSL_CTX_use_certificate_file(
+            ctx.get(),
+            std::get<std::filesystem::path>(config.cert).string().c_str(),
+            SSL_FILETYPE_PEM
+        ))
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
-
-        break;
-
-    default:
-        break;
     }
 
-    switch (config.privateKey.index()) {
-    case 1: {
-        const auto key = readPrivateKey(std::get<1>(config.privateKey));
+    if (std::holds_alternative<std::string>(config.privateKey)) {
+        const auto key = readPrivateKey(std::get<std::string>(config.privateKey));
 
         if (!key)
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
@@ -176,28 +165,20 @@ asyncio::net::ssl::newContext(const Config &config) {
 
         if (!SSL_CTX_check_private_key(ctx.get()))
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
-
-        break;
     }
-
-    case 2:
+    else if (std::holds_alternative<std::filesystem::path>(config.privateKey)) {
         if (!SSL_CTX_use_PrivateKey_file(
             ctx.get(),
-            std::get<2>(config.privateKey).string().c_str(),
+            std::get<std::filesystem::path>(config.privateKey).string().c_str(),
             SSL_FILETYPE_PEM
         ))
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
 
         if (!SSL_CTX_check_private_key(ctx.get()))
             return tl::unexpected(static_cast<Error>(ERR_get_error()));
-
-        break;
-
-    default:
-        break;
     }
 
-    if (!config.insecure && config.ca.index() == 0 && !config.server) {
+    if (!config.insecure && std::holds_alternative<std::monostate>(config.ca) && !config.server) {
 #ifdef ASYNCIO_EMBED_CA_CERT
         EXPECT(loadEmbeddedCA(ctx.get()));
 #else
@@ -354,11 +335,11 @@ asyncio::net::ssl::stream::connect(std::string host, const unsigned short port) 
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, const Address address) {
-    if (const std::size_t index = address.index(); index == 0) {
+    if (std::holds_alternative<IPv4Address>(address)) {
         const auto [port, ip] = std::get<IPv4Address>(address);
         co_return co_await connect(std::move(context), zero::os::net::stringify(ip), port);
     }
-    else if (index == 1) {
+    else if (std::holds_alternative<IPv6Address>(address)) {
         const auto &[port, ip, zone] = std::get<IPv6Address>(address);
         co_return co_await connect(std::move(context), zero::os::net::stringify(ip), port);
     }

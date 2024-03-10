@@ -6,9 +6,13 @@
 #include <zero/os/net.h>
 
 namespace asyncio::net {
+    using IPv4 = std::array<std::byte, 4>;
+    using IPv6 = std::array<std::byte, 16>;
+    using IP = std::variant<IPv4, IPv6>;
+
     struct IPv4Address {
         unsigned short port;
-        std::array<std::byte, 4> ip;
+        IPv4 ip;
 
         bool operator==(const IPv4Address &) const = default;
         static tl::expected<IPv4Address, std::error_code> from(const std::string &ip, unsigned short port);
@@ -16,7 +20,7 @@ namespace asyncio::net {
 
     struct IPv6Address {
         unsigned short port;
-        std::array<std::byte, 16> ip;
+        IPv6 ip;
         std::optional<std::string> zone;
 
         bool operator==(const IPv6Address &) const = default;
@@ -32,18 +36,19 @@ namespace asyncio::net {
     };
 
     using Address = std::variant<IPv4Address, IPv6Address, UnixAddress>;
+    using SocketAddress = std::unique_ptr<sockaddr, decltype(free) *>;
 
     template<typename T>
         requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address> || std::is_same_v<T, UnixAddress>)
     bool operator==(const Address &lhs, const T &rhs) {
         if constexpr (std::is_same_v<T, IPv4Address>) {
-            return lhs.index() == 0 && std::get<IPv4Address>(lhs) == rhs;
+            return std::holds_alternative<IPv4Address>(lhs) && std::get<IPv4Address>(lhs) == rhs;
         }
         else if constexpr (std::is_same_v<T, IPv6Address>) {
-            return lhs.index() == 1 && std::get<IPv6Address>(lhs) == rhs;
+            return std::holds_alternative<IPv6Address>(lhs) && std::get<IPv6Address>(lhs) == rhs;
         }
         else {
-            return lhs.index() == 2 && std::get<UnixAddress>(lhs) == rhs;
+            return std::holds_alternative<UnixAddress>(lhs) && std::get<UnixAddress>(lhs) == rhs;
         }
     }
 
@@ -51,8 +56,7 @@ namespace asyncio::net {
     tl::expected<Address, std::error_code> addressFrom(FileDescriptor fd, bool peer);
     tl::expected<Address, std::error_code> addressFrom(const sockaddr *addr, socklen_t length);
 
-    tl::expected<std::pair<std::unique_ptr<sockaddr, decltype(free) *>, socklen_t>, std::error_code>
-    socketAddressFrom(const Address &address);
+    tl::expected<std::pair<SocketAddress, socklen_t>, std::error_code> socketAddressFrom(const Address &address);
 
     class IEndpoint : public virtual zero::Interface {
     public:

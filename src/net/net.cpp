@@ -16,7 +16,7 @@
 
 tl::expected<asyncio::net::IPv4Address, std::error_code>
 asyncio::net::IPv4Address::from(const std::string &ip, const unsigned short port) {
-    std::array<std::byte, 4> ipv4 = {};
+    IPv4 ipv4 = {};
 
     if (evutil_inet_pton(AF_INET, ip.c_str(), ipv4.data()) != 1)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
@@ -39,7 +39,7 @@ asyncio::net::IPv6Address asyncio::net::IPv6Address::from(const IPv4Address &ipv
 tl::expected<asyncio::net::IPv6Address, std::error_code>
 asyncio::net::IPv6Address::from(const std::string &ip, const unsigned short port) {
     unsigned int index = 0;
-    std::array<std::byte, 16> ipv6 = {};
+    IPv6 ipv6 = {};
 
     if (evutil_inet_pton_scope(AF_INET6, ip.c_str(), ipv6.data(), &index) != 1)
         return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
@@ -161,86 +161,73 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
     return result;
 }
 
-tl::expected<std::pair<std::unique_ptr<sockaddr, decltype(free) *>, socklen_t>, std::error_code>
+tl::expected<std::pair<asyncio::net::SocketAddress, socklen_t>, std::error_code>
 asyncio::net::socketAddressFrom(const Address &address) {
-    void *storage = malloc(sizeof(sockaddr_storage));
+    return std::visit(
+        []<typename T>(const T &arg) -> tl::expected<std::pair<SocketAddress, socklen_t>, std::error_code> {
+            void *storage = malloc(sizeof(sockaddr_storage));
 
-    if (!storage)
-        return tl::unexpected(std::error_code(errno, std::system_category()));
+            if (!storage)
+                return tl::unexpected(std::error_code(errno, std::system_category()));
 
-    memset(storage, 0, sizeof(sockaddr_storage));
+            memset(storage, 0, sizeof(sockaddr_storage));
 
-    tl::expected<std::pair<std::unique_ptr<sockaddr, decltype(free) *>, socklen_t>, std::error_code> result(
-        tl::in_place,
-        std::unique_ptr<sockaddr, decltype(free) *>{static_cast<sockaddr *>(storage), free},
-        0
-    );
+            std::pair result = {SocketAddress{static_cast<sockaddr *>(storage), free}, socklen_t{0}};
 
-    switch (address.index()) {
-    case 0: {
-        const auto [port, ip] = std::get<IPv4Address>(address);
-        const auto ptr = static_cast<sockaddr_in *>(storage);
+            if constexpr (std::is_same_v<T, IPv4Address>) {
+                const auto ptr = static_cast<sockaddr_in *>(storage);
 
-        ptr->sin_family = AF_INET;
-        ptr->sin_port = htons(port);
-        memcpy(&ptr->sin_addr, ip.data(), sizeof(in_addr));
+                ptr->sin_family = AF_INET;
+                ptr->sin_port = htons(arg.port);
+                memcpy(&ptr->sin_addr, arg.ip.data(), sizeof(in_addr));
 
-        result->second = sizeof(sockaddr_in);
-        break;
-    }
+                result.second = sizeof(sockaddr_in);
+                return result;
+            }
+            else if constexpr (std::is_same_v<T, IPv6Address>) {
+                const auto ptr = static_cast<sockaddr_in6 *>(storage);
 
-    case 1: {
-        const auto &[port, ip, zone] = std::get<IPv6Address>(address);
-        const auto ptr = static_cast<sockaddr_in6 *>(storage);
+                ptr->sin6_family = AF_INET6;
+                ptr->sin6_port = htons(arg.port);
+                memcpy(&ptr->sin6_addr, arg.ip.data(), sizeof(in6_addr));
 
-        ptr->sin6_family = AF_INET6;
-        ptr->sin6_port = htons(port);
-        memcpy(&ptr->sin6_addr, ip.data(), sizeof(in6_addr));
+                result.second = sizeof(sockaddr_in6);
 
-        result->second = sizeof(sockaddr_in6);
+                if (!arg.zone)
+                    return result;
 
-        if (!zone)
-            break;
+                const unsigned int index = if_nametoindex(arg.zone->c_str());
 
-        const unsigned int index = if_nametoindex(zone->c_str());
+                if (!index)
+                    return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
-        if (!index) {
-            result = tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-            break;
-        }
-
-        ptr->sin6_scope_id = index;
-        break;
-    }
-
+                ptr->sin6_scope_id = index;
+                return result;
+            }
 #if __unix__ || __APPLE__
-    case 2: {
-        const auto ptr = static_cast<sockaddr_un *>(storage);
-        const auto &path = std::get<UnixAddress>(address).path;
+            else if constexpr (std::is_same_v<T, UnixAddress>) {
+                const auto ptr = static_cast<sockaddr_un *>(storage);
+                const auto &path = arg.path;
 
-        if (path.empty() || path.length() - (path.front() == '@' ? 1 : 0) >= sizeof(sockaddr_un::sun_path)) {
-            result = tl::unexpected(make_error_code(std::errc::invalid_argument));
-            break;
-        }
+                if (path.empty() || path.length() - (path.front() == '@' ? 1 : 0) >= sizeof(sockaddr_un::sun_path))
+                    return tl::unexpected(make_error_code(std::errc::invalid_argument));
 
-        ptr->sun_family = AF_UNIX;
-        memcpy(ptr->sun_path, path.c_str(), path.length());
+                ptr->sun_family = AF_UNIX;
+                memcpy(ptr->sun_path, path.c_str(), path.length());
 
-        result->second = sizeof(sa_family_t) + path.length() + 1;
+                result.second = sizeof(sa_family_t) + path.length() + 1;
 
-        if (path.front() == '@') {
-            result->second--;
-            ptr->sun_path[0] = '\0';
-        }
+                if (path.front() == '@') {
+                    result.second--;
+                    ptr->sun_path[0] = '\0';
+                }
 
-        break;
-    }
+                return result;
+            }
 #endif
-
-    default:
-        result = tl::unexpected(make_error_code(std::errc::address_family_not_supported));
-        break;
-    }
-
-    return result;
+            else
+                return tl::unexpected(make_error_code(std::errc::address_family_not_supported));
+        },
+        address
+    );
 }

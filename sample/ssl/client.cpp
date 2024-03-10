@@ -25,7 +25,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(int argc, char *argv[]
     const auto cert = cmdline.getOptional<std::filesystem::path>("cert");
     const auto privateKey = cmdline.getOptional<std::filesystem::path>("key");
 
-    bool insecure = cmdline.exist("insecure");
+    const bool insecure = cmdline.exist("insecure");
 
     asyncio::net::ssl::Config config = {
         .insecure = insecure,

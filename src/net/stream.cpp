@@ -164,16 +164,16 @@ asyncio::net::stream::listen(const std::string &ip, const unsigned short port) {
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(const Address address) {
-    if (const std::size_t index = address.index(); index == 0) {
+    if (std::holds_alternative<IPv4Address>(address)) {
         const auto [port, ip] = std::get<IPv4Address>(address);
         co_return co_await connect(zero::os::net::stringify(ip), port);
     }
-    else if (index == 1) {
+    else if (std::holds_alternative<IPv6Address>(address)) {
         const auto &[port, ip, zone] = std::get<IPv6Address>(address);
         co_return co_await connect(zero::os::net::stringify(ip), port);
     }
 #if __unix__ || __APPLE__
-    else if (index == 2) {
+    else if (std::holds_alternative<UnixAddress>(address)) {
         co_return co_await connect(std::get<UnixAddress>(address).path);
     }
 #endif

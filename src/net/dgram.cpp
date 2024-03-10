@@ -342,7 +342,7 @@ asyncio::FileDescriptor asyncio::net::dgram::Socket::fd() const {
 }
 
 tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::bind(const Address &address) {
-    auto socket = makeSocket(address.index() == 0 ? AF_INET : AF_INET6);
+    auto socket = makeSocket(std::holds_alternative<IPv4Address>(address) ? AF_INET : AF_INET6);
     EXPECT(socket);
     EXPECT(socket->bind(address));
     return std::move(*socket);
@@ -375,7 +375,7 @@ asyncio::net::dgram::bind(const std::string &ip, const unsigned short port) {
 
 zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
 asyncio::net::dgram::connect(const Address address) {
-    auto socket = makeSocket(address.index() == 0 ? AF_INET : AF_INET6);
+    auto socket = makeSocket(std::holds_alternative<IPv4Address>(address) ? AF_INET : AF_INET6);
     CO_EXPECT(socket);
     CO_EXPECT(co_await socket->connect(address));
     co_return std::move(*socket);

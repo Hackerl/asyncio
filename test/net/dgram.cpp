@@ -23,7 +23,7 @@ TEST_CASE("datagram network connection", "[net]") {
                     const auto &[num, from] = *result;
                     REQUIRE(num);
                     REQUIRE(num == MESSAGE.size());
-                    REQUIRE(from.index() == 0);
+                    REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
                     REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30001)");
                     REQUIRE(memcmp(data, MESSAGE.data(), MESSAGE.size()) == 0);
 
@@ -49,7 +49,7 @@ TEST_CASE("datagram network connection", "[net]") {
                     const auto &[num, from] = *result;
                     REQUIRE(num);
                     REQUIRE(num == MESSAGE.size());
-                    REQUIRE(from.index() == 0);
+                    REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
                     REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
                     REQUIRE(memcmp(data, MESSAGE.data(), MESSAGE.size()) == 0);
                 }()
@@ -66,7 +66,7 @@ TEST_CASE("datagram network connection", "[net]") {
                     const auto &[num, from] = *result;
                     REQUIRE(num);
                     REQUIRE(num == MESSAGE.size());
-                    REQUIRE(from.index() == 0);
+                    REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
                     REQUIRE(fmt::to_string(from).find("127.0.0.1") != std::string::npos);
                     REQUIRE(memcmp(data, MESSAGE.data(), MESSAGE.size()) == 0);
 
@@ -89,7 +89,7 @@ TEST_CASE("datagram network connection", "[net]") {
                     const auto &[num, from] = *result;
                     REQUIRE(num);
                     REQUIRE(num == MESSAGE.size());
-                    REQUIRE(from.index() == 0);
+                    REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
                     REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
                     REQUIRE(memcmp(data, MESSAGE.data(), MESSAGE.size()) == 0);
                 }()

@@ -558,7 +558,7 @@ asyncio::http::Requests::request(
         curl_mimepart *field = curl_mime_addpart(form);
         curl_mime_name(field, k.c_str());
 
-        if (v.index() == 0) {
+        if (std::holds_alternative<std::string>(v)) {
             curl_mime_data(field, std::get<std::string>(v).c_str(), CURL_ZERO_TERMINATED);
             continue;
         }

@@ -75,13 +75,8 @@ asyncio::net::dns::getAddressInfo(
     };
 }
 
-zero::async::coroutine::Task<
-    std::vector<std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>>>,
-    std::error_code
->
+zero::async::coroutine::Task<std::vector<asyncio::net::IP>, std::error_code>
 asyncio::net::dns::lookupIP(std::string host) {
-    using IPAddress = std::variant<std::array<std::byte, 4>, std::array<std::byte, 16>>;
-
     AddressInfo hints = {};
 
     hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
@@ -92,19 +87,19 @@ asyncio::net::dns::lookupIP(std::string host) {
         .transform([](std::span<const Address> addresses) {
             const auto v = addresses
                 | std::views::transform(
-                    [](const Address &address) -> IPAddress {
-                        if (address.index() == 0)
+                    [](const Address &address) -> IP {
+                        if (std::holds_alternative<IPv4Address>(address))
                             return std::get<IPv4Address>(address).ip;
 
                         return std::get<IPv6Address>(address).ip;
                     }
                 );
 
-            return std::vector<IPAddress>{v.begin(), v.end()};
+            return std::vector<IP>{v.begin(), v.end()};
         });
 }
 
-zero::async::coroutine::Task<std::vector<std::array<std::byte, 4>>, std::error_code>
+zero::async::coroutine::Task<std::vector<asyncio::net::IPv4>, std::error_code>
 asyncio::net::dns::lookupIPv4(std::string host) {
     AddressInfo hints = {};
 
@@ -121,11 +116,11 @@ asyncio::net::dns::lookupIPv4(std::string host) {
                     }
                 );
 
-            return std::vector<std::array<std::byte, 4>>{v.begin(), v.end()};
+            return std::vector<IPv4>{v.begin(), v.end()};
         });
 }
 
-zero::async::coroutine::Task<std::vector<std::array<std::byte, 16>>, std::error_code>
+zero::async::coroutine::Task<std::vector<asyncio::net::IPv6>, std::error_code>
 asyncio::net::dns::lookupIPv6(std::string host) {
     AddressInfo hints = {};
 
@@ -142,6 +137,6 @@ asyncio::net::dns::lookupIPv6(std::string host) {
                     }
                 );
 
-            return std::vector<std::array<std::byte, 16>>{v.begin(), v.end()};
+            return std::vector<IPv6>{v.begin(), v.end()};
         });
 }

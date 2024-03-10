@@ -19,7 +19,7 @@ TEST_CASE("DNS query", "[net]") {
                     result->begin(),
                     result->end(),
                     [](const auto &address) {
-                        if (address.index() == 0)
+                        if (std::holds_alternative<asyncio::net::IPv4Address>(address))
                             return std::get<asyncio::net::IPv4Address>(address).port == 80;
 
                         return std::get<asyncio::net::IPv6Address>(address).port == 80;
@@ -37,10 +37,10 @@ TEST_CASE("DNS query", "[net]") {
                     result->begin(),
                     result->end(),
                     [](const auto &ip) {
-                        if (ip.index() == 0)
-                            return zero::os::net::stringify(std::get<0>(ip)) == "127.0.0.1";
+                        if (std::holds_alternative<asyncio::net::IPv4>(ip))
+                            return zero::os::net::stringify(std::get<asyncio::net::IPv4>(ip)) == "127.0.0.1";
 
-                        return zero::os::net::stringify(std::get<1>(ip)) == "::1";
+                        return zero::os::net::stringify(std::get<asyncio::net::IPv6>(ip)) == "::1";
                     }
                 )
             );
