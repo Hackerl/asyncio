@@ -34,7 +34,7 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::R
             break;
         }
 
-        result->insert(result->end(), data, data + *n);
+        std::copy_n(data, *n, std::back_inserter(*result));
     }
 
     co_return result;

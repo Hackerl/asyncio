@@ -3,6 +3,7 @@ find_package(Catch2 CONFIG REQUIRED)
 add_executable(
         asyncio_test
         io.cpp
+        buffer.cpp
         binary.cpp
         future.cpp
         event_loop.cpp

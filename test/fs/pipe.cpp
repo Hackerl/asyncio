@@ -34,10 +34,10 @@ TEST_CASE("pipe", "[fs]") {
                     }(std::move(pipes->at(0))),
                     [](auto pipe) -> zero::async::coroutine::Task<void> {
                         constexpr std::string_view message = "hello world";
-                        const auto n = co_await pipe.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(n);
+                        auto result = co_await pipe.writeAll(std::as_bytes(std::span{message}));
+                        REQUIRE(result);
 
-                        const auto result = co_await pipe.close();
+                        result = co_await pipe.close();
                         REQUIRE(result);
                     }(std::move(pipes->at(1)))
                 );
@@ -56,13 +56,13 @@ TEST_CASE("pipe", "[fs]") {
                     }(std::move(pipes->at(0))),
                     [](auto pipe) -> zero::async::coroutine::Task<void> {
                         constexpr std::string_view message = "hello world";
-                        auto n = co_await pipe.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(n);
+                        auto result = co_await pipe.writeAll(std::as_bytes(std::span{message}));
+                        REQUIRE(result);
 
                         co_await asyncio::sleep(10ms);
-                        n = co_await pipe.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(!n);
-                        REQUIRE(n.error() == std::errc::broken_pipe);
+                        result = co_await pipe.writeAll(std::as_bytes(std::span{message}));
+                        REQUIRE(!result);
+                        REQUIRE(result.error() == std::errc::broken_pipe);
                     }(std::move(pipes->at(1)))
                 );
             }
@@ -110,10 +110,10 @@ TEST_CASE("pipe", "[fs]") {
                 }(std::move(*reader)),
                 [](auto pipe) -> zero::async::coroutine::Task<void> {
                     constexpr std::string_view message = "hello world";
-                    const auto n = co_await pipe.writeAll(std::as_bytes(std::span{message}));
-                    REQUIRE(n);
+                    auto result = co_await pipe.writeAll(std::as_bytes(std::span{message}));
+                    REQUIRE(result);
 
-                    const auto result = co_await pipe.close();
+                    result = co_await pipe.close();
                     REQUIRE(result);
                 }(std::move(*writer))
             );

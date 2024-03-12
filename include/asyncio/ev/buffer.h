@@ -1,5 +1,5 @@
-#ifndef ASYNCIO_BUFFER_H
-#define ASYNCIO_BUFFER_H
+#ifndef ASYNCIO_EV_BUFFER_H
+#define ASYNCIO_EV_BUFFER_H
 
 #include <event.h>
 #include <asyncio/io.h>
@@ -55,4 +55,4 @@ namespace asyncio::ev {
     makeBuffer(FileDescriptor fd, std::size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
 }
 
-#endif //ASYNCIO_BUFFER_H
+#endif //ASYNCIO_EV_BUFFER_H
