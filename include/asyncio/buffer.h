@@ -12,7 +12,7 @@ namespace asyncio {
             std::convertible_to<T, std::unique_ptr<IReader>> ||
             std::convertible_to<T, std::shared_ptr<IReader>>
         )
-    class BufReader : public IBufReader, public Reader {
+    class BufReader final : public IBufReader, public Reader {
     public:
         explicit BufReader(T reader, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY):
             mReader(std::move(reader)), mCapacity(capacity), mHead(0), mTail(0),
@@ -124,6 +124,100 @@ namespace asyncio {
         std::size_t mCapacity;
         std::size_t mHead;
         std::size_t mTail;
+        std::unique_ptr<std::byte[]> mBuffer;
+    };
+
+    template<typename T>
+        requires (
+            std::derived_from<T, IWriter> ||
+            std::convertible_to<T, std::unique_ptr<IWriter>> ||
+            std::convertible_to<T, std::shared_ptr<IWriter>>
+        )
+    class BufWriter final : public IBufWriter, public Writer {
+    public:
+        explicit BufWriter(T writer, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY):
+            mWriter(std::move(writer)), mCapacity(capacity), mPending(0),
+            mBuffer(std::make_unique<std::byte[]>(capacity)) {
+        }
+
+    private:
+        zero::async::coroutine::Task<std::size_t, std::error_code> rawWrite(std::span<const std::byte> data) {
+            if constexpr (std::derived_from<T, IWriter>) {
+                return mWriter.write(data);
+            }
+            else {
+                return mWriter->write(data);
+            }
+        }
+
+    public:
+        zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override {
+            tl::expected<std::size_t, std::error_code> result;
+
+            while (*result < data.size()) {
+                assert(mPending <= mCapacity);
+
+                if (mPending == mCapacity) {
+                    if (const auto res = co_await flush(); !res) {
+                        if (*result > 0)
+                            break;
+
+                        result = tl::unexpected(res.error());
+                        break;
+                    }
+
+                    continue;
+                }
+
+                const std::size_t n = (std::min)(mCapacity - mPending, data.size() - *result);
+                std::copy_n(data.data() + *result, n, mBuffer.get() + mPending);
+
+                mPending += n;
+                *result += n;
+            }
+
+            co_return result;
+        }
+
+        [[nodiscard]] std::size_t capacity() const override {
+            return mCapacity;
+        }
+
+        [[nodiscard]] std::size_t pending() const override {
+            return mPending;
+        }
+
+        zero::async::coroutine::Task<void, std::error_code> flush() override {
+            tl::expected<void, std::error_code> result;
+            std::size_t offset = 0;
+
+            while (offset < mPending) {
+                if (CO_CANCELLED()) {
+                    result = tl::unexpected(make_error_code(std::errc::operation_canceled));
+                    break;
+                }
+
+                const auto n = co_await rawWrite({mBuffer.get() + offset, mPending - offset});
+
+                if (!n) {
+                    result = tl::unexpected(n.error());
+                    break;
+                }
+
+                offset += *n;
+            }
+
+            if (offset > 0 && offset < mPending)
+                std::copy(mBuffer.get() + offset, mBuffer.get() + mPending, mBuffer.get());
+
+            mPending -= offset;
+            co_return result;
+        }
+
+    private:
+        T mWriter;
+        std::size_t mCapacity;
+        std::size_t mPending;
         std::unique_ptr<std::byte[]> mBuffer;
     };
 }
