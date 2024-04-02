@@ -1,8 +1,8 @@
 #include <asyncio/http/request.h>
 #include <asyncio/event_loop.h>
 #include <asyncio/net/stream.h>
+#include <zero/filesystem/file.h>
 #include <catch2/catch_test_macros.hpp>
-#include <fstream>
 
 constexpr auto URL = "http://localhost:30000/object?id=0";
 
@@ -54,7 +54,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::makeRequests();
+                        const auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const auto response = co_await requests.value()->get(*url);
@@ -115,7 +115,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::makeRequests();
+                        const auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const auto response = co_await requests.value()->get(*url);
@@ -160,7 +160,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::makeRequests();
+                        const auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const auto response = co_await requests.value()->get(*url);
@@ -225,7 +225,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::makeRequests();
+                        const auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const std::map<std::string, std::string> payload = {{"name", "jack"}};
@@ -285,16 +285,12 @@ TEST_CASE("http requests", "[http]") {
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
-                        std::ofstream stream(path);
-                        REQUIRE(stream.is_open());
-
-                        stream << "hello world";
-                        stream.close();
+                        REQUIRE(zero::filesystem::writeString(path, "hello world"));
 
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::makeRequests();
+                        const auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const std::map<std::string, std::filesystem::path> payload = {{"file", path}};
@@ -356,16 +352,12 @@ TEST_CASE("http requests", "[http]") {
                     }(std::move(*listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
-                        std::ofstream stream(path);
-                        REQUIRE(stream.is_open());
-
-                        stream << "hello world";
-                        stream.close();
+                        REQUIRE(zero::filesystem::writeString(path, "hello world"));
 
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::makeRequests();
+                        const auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const std::map<std::string, std::variant<std::string, std::filesystem::path>> payload = {
@@ -441,7 +433,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::makeRequests();
+                        const auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const auto response = co_await requests.value()->post(*url, People{"jack", 18});
@@ -487,7 +479,7 @@ TEST_CASE("http requests", "[http]") {
                     const auto url = asyncio::http::URL::from(URL);
                     REQUIRE(url);
 
-                    const auto requests = asyncio::http::makeRequests();
+                    const auto requests = asyncio::http::Requests::make();
                     REQUIRE(requests);
 
                     const auto response = co_await requests.value()->get(*url);
@@ -497,14 +489,10 @@ TEST_CASE("http requests", "[http]") {
                     const auto result = co_await response->output(path);
                     REQUIRE(result);
 
-                    std::ifstream stream(path);
-                    REQUIRE(stream.is_open());
-                    REQUIRE(
-                        std::string{std::istreambuf_iterator(stream), std::istreambuf_iterator<char>()}
-                        == "hello world"
-                    );
+                    const auto content = zero::filesystem::readString(path);
+                    REQUIRE(content);
+                    REQUIRE(*content == "hello world");
 
-                    stream.close();
                     REQUIRE(std::filesystem::remove(path));
                 }()
             );

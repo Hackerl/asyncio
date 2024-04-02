@@ -56,18 +56,18 @@ namespace asyncio::net::ssl {
         public:
             Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
 
+            static tl::expected<Buffer, std::error_code>
+            make(
+                FileDescriptor fd,
+                const std::shared_ptr<Context> &context,
+                State state,
+                std::size_t capacity = DEFAULT_BUFFER_CAPACITY,
+                bool own = true
+            );
+
         private:
             [[nodiscard]] std::error_code getError() const override;
         };
-
-        tl::expected<Buffer, std::error_code>
-        makeBuffer(
-            FileDescriptor fd,
-            const std::shared_ptr<Context> &context,
-            State state,
-            std::size_t capacity = DEFAULT_BUFFER_CAPACITY,
-            bool own = true
-        );
 
         class Listener : public net::stream::Acceptor {
         public:

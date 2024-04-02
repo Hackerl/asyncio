@@ -105,13 +105,9 @@ TEST_CASE("datagram network connection", "[net]") {
             REQUIRE(result.error() == std::errc::timed_out);
         }
 
-        SECTION("cancel") {
+        SECTION("timeout") {
             std::byte data[1024];
-            const auto task = server->readFrom(data);
-            const auto result = co_await asyncio::timeout(task, 50ms);
-
-            REQUIRE(task.done());
-            REQUIRE(task.result().error() == std::errc::operation_canceled);
+            const auto result = co_await asyncio::timeout(server->readFrom(data), 50ms);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         }

@@ -14,6 +14,7 @@ namespace asyncio::fs {
 #endif
 
         Pipe(Pipe &&rhs) noexcept;
+        Pipe &operator=(Pipe &&rhs) noexcept;
         ~Pipe() override;
 
         static tl::expected<Pipe, std::error_code> from(FileDescriptor fd);

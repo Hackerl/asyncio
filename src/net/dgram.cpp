@@ -18,11 +18,55 @@ asyncio::net::dgram::Socket::Socket(Socket &&rhs) noexcept
     assert(!mEvents[WRITE_INDEX].pending());
 }
 
+asyncio::net::dgram::Socket &asyncio::net::dgram::Socket::operator=(Socket &&rhs) noexcept {
+    assert(!rhs.mEvents[READ_INDEX].pending());
+    assert(!rhs.mEvents[WRITE_INDEX].pending());
+
+    mFD = std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR);
+    mEvents = std::move(rhs.mEvents);
+    mTimeouts = rhs.mTimeouts;
+
+    return *this;
+}
+
 asyncio::net::dgram::Socket::~Socket() {
     if (mFD == INVALID_FILE_DESCRIPTOR)
         return;
 
     evutil_closesocket(mFD);
+}
+
+tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::Socket::make(const int family) {
+#ifdef _WIN32
+    const auto fd = static_cast<FileDescriptor>(socket(family, SOCK_DGRAM, 0));
+#else
+    const auto fd = socket(family, SOCK_DGRAM, 0);
+#endif
+
+    if (fd == INVALID_FILE_DESCRIPTOR)
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+
+    if (evutil_make_socket_nonblocking(fd) == -1) {
+        evutil_closesocket(fd);
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+    }
+
+    auto events = std::array{
+        ev::Event::make(fd, ev::What::READ),
+        ev::Event::make(fd, ev::What::WRITE)
+    };
+
+    if (!events[0]) {
+        evutil_closesocket(fd);
+        return tl::unexpected(events[0].error());
+    }
+
+    if (!events[1]) {
+        evutil_closesocket(fd);
+        return tl::unexpected(events[1].error());
+    }
+
+    return Socket{fd, {std::move(*events[0]), std::move(*events[1])}};
 }
 
 zero::async::coroutine::Task<std::size_t, std::error_code>
@@ -42,12 +86,12 @@ asyncio::net::dgram::Socket::read(std::span<std::byte> data) {
         const int num = recv(mFD, reinterpret_cast<char *>(data.data()), static_cast<int>(data.size()), 0);
 
         if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
-            co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 #else
         const ssize_t num = recv(mFD, data.data(), data.size(), 0);
 
         if (num == -1 && errno != EWOULDBLOCK) {
-            result = tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            result = tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
             break;
         }
 #endif
@@ -95,12 +139,12 @@ asyncio::net::dgram::Socket::write(std::span<const std::byte> data) {
         const int num = send(mFD, reinterpret_cast<const char *>(data.data()), static_cast<int>(data.size()), 0);
 
         if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
-            co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 #else
         const ssize_t num = send(mFD, data.data(), data.size(), 0);
 
         if (num == -1 && errno != EWOULDBLOCK) {
-            result = tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            result = tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
             break;
         }
 #endif
@@ -135,7 +179,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket:
     assert(!mEvents[WRITE_INDEX].pending());
 
     if (evutil_closesocket(std::exchange(mFD, INVALID_FILE_DESCRIPTOR)) != 0)
-        co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
     co_return tl::expected<void, std::error_code>{};
 }
@@ -167,12 +211,12 @@ asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
         );
 
         if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
-            co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 #else
         const ssize_t num = recvfrom(mFD, data.data(), data.size(), 0, reinterpret_cast<sockaddr *>(&storage), &length);
 
         if (num == -1 && errno != EWOULDBLOCK) {
-            result = tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            result = tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
             break;
         }
 #endif
@@ -241,7 +285,7 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
         );
 
         if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
-            co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 #else
         const ssize_t num = sendto(
             mFD,
@@ -253,7 +297,7 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
         );
 
         if (num == -1 && errno != EWOULDBLOCK) {
-            result = tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            result = tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
             break;
         }
 #endif
@@ -303,7 +347,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket
 tl::expected<void, std::error_code> asyncio::net::dgram::Socket::bind(const Address &address) {
     return socketAddressFrom(address).and_then([this](const auto &addr) -> tl::expected<void, std::error_code> {
         if (::bind(mFD, addr.first.get(), addr.second) != 0)
-            return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
         return {};
     });
@@ -312,7 +356,7 @@ tl::expected<void, std::error_code> asyncio::net::dgram::Socket::bind(const Addr
 zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket::connect(const Address address) {
     co_return socketAddressFrom(address).and_then([this](const auto &addr) -> tl::expected<void, std::error_code> {
         if (::connect(mFD, addr.first.get(), addr.second) != 0)
-            return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
         return {};
     });
@@ -342,7 +386,7 @@ asyncio::FileDescriptor asyncio::net::dgram::Socket::fd() const {
 }
 
 tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::bind(const Address &address) {
-    auto socket = makeSocket(std::holds_alternative<IPv4Address>(address) ? AF_INET : AF_INET6);
+    auto socket = Socket::make(std::holds_alternative<IPv4Address>(address) ? AF_INET : AF_INET6);
     EXPECT(socket);
     EXPECT(socket->bind(address));
     return std::move(*socket);
@@ -375,7 +419,7 @@ asyncio::net::dgram::bind(const std::string &ip, const unsigned short port) {
 
 zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
 asyncio::net::dgram::connect(const Address address) {
-    auto socket = makeSocket(std::holds_alternative<IPv4Address>(address) ? AF_INET : AF_INET6);
+    auto socket = Socket::make(std::holds_alternative<IPv4Address>(address) ? AF_INET : AF_INET6);
     CO_EXPECT(socket);
     CO_EXPECT(co_await socket->connect(address));
     co_return std::move(*socket);
@@ -410,37 +454,4 @@ asyncio::net::dgram::connect(const std::string host, const unsigned short port) 
     CO_EXPECT(result);
 
     co_return co_await connect(*result);
-}
-
-tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::makeSocket(const int family) {
-#ifdef _WIN32
-    const auto fd = static_cast<FileDescriptor>(socket(family, SOCK_DGRAM, 0));
-#else
-    const auto fd = socket(family, SOCK_DGRAM, 0);
-#endif
-
-    if (fd == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-
-    if (evutil_make_socket_nonblocking(fd) == -1) {
-        evutil_closesocket(fd);
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-    }
-
-    auto events = std::array{
-        makeEvent(fd, ev::What::READ),
-        makeEvent(fd, ev::What::WRITE)
-    };
-
-    if (!events[0]) {
-        evutil_closesocket(fd);
-        return tl::unexpected(events[0].error());
-    }
-
-    if (!events[1]) {
-        evutil_closesocket(fd);
-        return tl::unexpected(events[1].error());
-    }
-
-    return Socket{fd, {std::move(*events[0]), std::move(*events[1])}};
 }

@@ -1,6 +1,6 @@
 #include <asyncio/net/ssl.h>
 #include <asyncio/net/dns.h>
-#include <asyncio/event_loop.h>
+#include <asyncio/promise.h>
 #include <zero/defer.h>
 #include <zero/os/net.h>
 #include <openssl/err.h>
@@ -199,20 +199,11 @@ asyncio::net::ssl::newContext(const Config &config) {
 asyncio::net::ssl::stream::Buffer::Buffer(
     std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev,
     const std::size_t capacity
-): net::stream::Buffer(std::move(bev), capacity) {
-}
-
-std::error_code asyncio::net::ssl::stream::Buffer::getError() const {
-    unsigned long e = bufferevent_get_openssl_error(mBev.get());
-
-    if (!e)
-        return {EVUTIL_SOCKET_ERROR(), std::system_category()};
-
-    return static_cast<Error>(e);
+) : net::stream::Buffer(std::move(bev), capacity) {
 }
 
 tl::expected<asyncio::net::ssl::stream::Buffer, std::error_code>
-asyncio::net::ssl::stream::makeBuffer(
+asyncio::net::ssl::stream::Buffer::make(
     const FileDescriptor fd,
     const std::shared_ptr<Context> &context,
     State state,
@@ -228,7 +219,7 @@ asyncio::net::ssl::stream::makeBuffer(
     );
 
     if (!bev)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
     return Buffer{
         {
@@ -244,6 +235,15 @@ asyncio::net::ssl::stream::makeBuffer(
     };
 }
 
+std::error_code asyncio::net::ssl::stream::Buffer::getError() const {
+    unsigned long e = bufferevent_get_openssl_error(mBev.get());
+
+    if (!e)
+        return {EVUTIL_SOCKET_ERROR(), std::system_category()};
+
+    return static_cast<Error>(e);
+}
+
 asyncio::net::ssl::stream::Listener::Listener(std::shared_ptr<Context> context, evconnlistener *listener)
     : Acceptor(listener), mContext(std::move(context)) {
 }
@@ -252,7 +252,7 @@ zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::Listener::accept() {
     const auto result = co_await fd();
     CO_EXPECT(result);
-    co_return makeBuffer(*result, mContext, ACCEPTING);
+    co_return Buffer::make(*result, mContext, ACCEPTING);
 }
 
 tl::expected<asyncio::net::ssl::stream::Listener, std::error_code>
@@ -275,7 +275,7 @@ asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const
     );
 
     if (!listener)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
     return Listener{context, listener};
 }
@@ -371,86 +371,89 @@ asyncio::net::ssl::stream::connect(
     const std::string host,
     const unsigned short port
 ) {
+    const auto dnsBase = getEventLoop()->makeDNSBase();
+    CO_EXPECT(dnsBase);
+
     SSL *ssl = SSL_new(context.get());
 
     if (!ssl)
         co_return tl::unexpected(static_cast<Error>(ERR_get_error()));
 
+    DEFER(
+        if (ssl)
+            SSL_free(ssl);
+    );
+
     SSL_set_tlsext_host_name(ssl, host.c_str());
     SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
-    if (!SSL_set1_host(ssl, host.c_str())) {
-        SSL_free(ssl);
+    if (!SSL_set1_host(ssl, host.c_str()))
         co_return tl::unexpected(static_cast<Error>(ERR_get_error()));
-    }
 
     bufferevent *bev = bufferevent_openssl_socket_new(
         getEventLoop()->base(),
         -1,
-        ssl,
+        std::exchange(ssl, nullptr),
         BUFFEREVENT_SSL_CONNECTING,
         BEV_OPT_CLOSE_ON_FREE
     );
 
     if (!bev)
-        co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
-    const auto promise = zero::async::promise::make<void, std::error_code>();
-    const auto ctx = new std::decay_t<decltype(promise)>(promise);
+    DEFER(
+        if (bev)
+            bufferevent_free(bev);
+    );
+
+    Promise<void, std::error_code> promise;
 
     bufferevent_setcb(
         bev,
         nullptr,
         nullptr,
         [](bufferevent *b, const short what, void *arg) {
-            const auto p = static_cast<zero::async::promise::PromisePtr<void, std::error_code> *>(arg);
+            const auto p = static_cast<Promise<void, std::error_code> *>(arg);
+            assert(!p->isFulfilled());
 
             if ((what & BEV_EVENT_CONNECTED) == 0) {
                 if (const int e = bufferevent_socket_get_dns_error(b)) {
-                    p->get()->reject(static_cast<dns::Error>(e));
-                    delete p;
+                    p->reject(static_cast<dns::Error>(e));
                     return;
                 }
 
                 if (const unsigned long e = bufferevent_get_openssl_error(b)) {
-                    p->get()->reject(static_cast<Error>(e));
-                    delete p;
+                    p->reject(static_cast<Error>(e));
                     return;
                 }
 
-                p->get()->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-                delete p;
+                p->reject(EVUTIL_SOCKET_ERROR(), std::system_category());
                 return;
             }
 
-            p->get()->resolve();
-            delete p;
+            p->resolve();
         },
-        ctx
+        &promise
     );
 
-    if (bufferevent_socket_connect_hostname(bev, getEventLoop()->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
-        delete ctx;
-        bufferevent_free(bev);
+    if (bufferevent_socket_connect_hostname(bev, dnsBase->get(), AF_UNSPEC, host.c_str(), port) < 0)
         co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
-    }
 
-    if (const auto result = co_await zero::async::coroutine::Cancellable{
-        promise,
-        [=]() -> tl::expected<void, std::error_code> {
-            bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
-            promise->reject(make_error_code(std::errc::operation_canceled));
-            delete ctx;
+    CO_EXPECT(co_await zero::async::coroutine::Cancellable{
+        promise.getFuture(),
+        [&]() -> tl::expected<void, std::error_code> {
+            if (promise.isFulfilled())
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
+            bufferevent_free(std::exchange(bev, nullptr));
+            promise.reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
-    }; !result) {
-        bufferevent_free(bev);
-        co_return tl::unexpected(result.error());
-    }
+    });
 
     co_return Buffer{
         {
-            bev,
+            std::exchange(bev, nullptr),
             [](bufferevent *b) {
                 SSL *s = bufferevent_openssl_get_ssl(b);
                 SSL_set_shutdown(s, SSL_RECEIVED_SHUTDOWN);

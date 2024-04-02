@@ -48,7 +48,7 @@ namespace asyncio::http {
 
         std::array<ev::PairedBuffer, 2> buffers;
         std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy;
-        zero::async::promise::PromisePtr<void, std::error_code> promise;
+        Promise<void, std::error_code> promise;
         std::list<std::function<void()>> defers;
         std::optional<std::error_code> error;
         Status status;
@@ -56,7 +56,7 @@ namespace asyncio::http {
 
     class Requests;
 
-    class Response: public IBufReader, public Reader {
+    class Response final : public IBufReader, public Reader {
     public:
         Response(std::shared_ptr<Requests> requests, std::unique_ptr<Connection> connection);
         Response(Response &&) = default;
@@ -111,6 +111,8 @@ namespace asyncio::http {
         Requests(CURLM *multi, ev::Timer timer);
         Requests(CURLM *multi, ev::Timer timer, Options options);
         ~Requests();
+
+        static tl::expected<std::shared_ptr<Requests>, std::error_code> make(const Options &options = {});
 
     private:
         void onCURLTimer(long timeout);
@@ -226,8 +228,6 @@ namespace asyncio::http {
 
         friend class Response;
     };
-
-    tl::expected<std::shared_ptr<Requests>, std::error_code> makeRequests(const Options &options = {});
 }
 
 template<>

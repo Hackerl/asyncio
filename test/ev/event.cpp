@@ -20,8 +20,8 @@ TEST_CASE("async event notification", "[ev]") {
 
     asyncio::run([&]() -> zero::async::coroutine::Task<void> {
         std::array events = {
-            makeEvent(fds[0], asyncio::ev::What::READ),
-            makeEvent(fds[1], asyncio::ev::What::WRITE)
+            asyncio::ev::Event::make(fds[0], asyncio::ev::What::READ),
+            asyncio::ev::Event::make(fds[1], asyncio::ev::What::WRITE)
         };
 
         REQUIRE(events[0]);
@@ -59,11 +59,8 @@ TEST_CASE("async event notification", "[ev]") {
             REQUIRE(*result & asyncio::ev::What::TIMEOUT);
         }
 
-        SECTION("cancel") {
-            const auto task = events[0]->on();
-            const auto result = co_await asyncio::timeout(task, 10ms);
-            REQUIRE(task.done());
-            REQUIRE(task.result().error() == std::errc::operation_canceled);
+        SECTION("timeout") {
+            const auto result = co_await asyncio::timeout(events[0]->on(), 10ms);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         }

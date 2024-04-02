@@ -2,13 +2,15 @@
 #define ASYNCIO_MUTEX_H
 
 #include <atomic>
-#include <asyncio/future.h>
+#include <asyncio/promise.h>
 
 namespace asyncio::sync {
     class Mutex {
+        void wakeup()const;
+
     public:
         zero::async::coroutine::Task<void, std::error_code>
-        lock(std::optional<std::chrono::milliseconds> ms = std::nullopt);
+        lock(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
 
         void unlock();
 
@@ -16,7 +18,7 @@ namespace asyncio::sync {
 
     private:
         std::atomic<bool> mLocked;
-        std::list<FuturePtr<void>> mPending;
+        std::list<std::shared_ptr<Promise<void, std::error_code>>> mPending;
     };
 }
 

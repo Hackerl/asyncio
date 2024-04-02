@@ -1,19 +1,31 @@
 #include <asyncio/sync/event.h>
 
 zero::async::coroutine::Task<void, std::error_code>
-asyncio::sync::Event::wait(const std::optional<std::chrono::milliseconds> ms) {
+asyncio::sync::Event::wait(const std::optional<std::chrono::milliseconds> timeout) {
     if (mValue)
         co_return tl::expected<void, std::error_code>{};
 
-    const auto future = makeFuture<void>();
-    mPending.push_back(future);
+    const auto promise = std::make_shared<Promise<void, std::error_code>>();
+    mPending.push_back(promise);
 
-    if (const auto result = co_await future->get(ms); !result) {
-        mPending.remove(future);
-        co_return tl::unexpected(result.error());
-    }
+    co_return co_await asyncio::timeout(
+        from(zero::async::coroutine::Cancellable{
+            promise->getFuture(),
+            [=, this]() -> tl::expected<void, std::error_code> {
+                if (mPending.remove(promise) == 0)
+                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
 
-    co_return tl::expected<void, std::error_code>{};
+                promise->reject(make_error_code(std::errc::operation_canceled));
+                return {};
+            }
+        }),
+        timeout.value_or(std::chrono::milliseconds{0})
+    ).andThen([](const auto &res) -> tl::expected<void, std::error_code> {
+        if (!res)
+            return tl::unexpected(res.error());
+
+        return {};
+    });
 }
 
 void asyncio::sync::Event::set() {
@@ -22,11 +34,11 @@ void asyncio::sync::Event::set() {
 
     mValue = true;
 
-    for (const auto &future: std::exchange(mPending, {}))
-        future->set();
+    for (const auto &promise: std::exchange(mPending, {}))
+        promise->resolve();
 }
 
-void asyncio::sync::Event::clear() {
+void asyncio::sync::Event::reset() {
     mValue = false;
 }
 

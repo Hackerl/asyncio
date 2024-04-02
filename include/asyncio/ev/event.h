@@ -4,6 +4,7 @@
 #include <optional>
 #include <event.h>
 #include <asyncio/io.h>
+#include <asyncio/promise.h>
 #include <zero/async/coroutine.h>
 
 namespace asyncio::ev {
@@ -16,9 +17,12 @@ namespace asyncio::ev {
 
     class Event {
     public:
-        explicit Event(event *e);
+        explicit Event(std::unique_ptr<event, decltype(event_free) *> event);
         Event(Event &&rhs) noexcept;
+        Event &operator=(Event &&rhs) noexcept;
         ~Event();
+
+        static tl::expected<Event, std::error_code> make(FileDescriptor fd, short events);
 
         [[nodiscard]] FileDescriptor fd() const;
 
@@ -30,10 +34,8 @@ namespace asyncio::ev {
 
     private:
         std::unique_ptr<event, decltype(event_free) *> mEvent;
-        zero::async::promise::PromisePtr<short, std::error_code> mPromise;
+        std::optional<Promise<short, std::error_code>> mPromise;
     };
-
-    tl::expected<Event, std::error_code> makeEvent(FileDescriptor fd, short events);
 }
 
 #endif //ASYNCIO_EVENT_H

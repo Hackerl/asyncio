@@ -20,9 +20,7 @@ std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_
 
     if (connection->status == asyncio::http::Connection::NOT_STARTED) {
         connection->status = asyncio::http::Connection::TRANSFERRING;
-        asyncio::getEventLoop()->post([promise = connection->promise] {
-            promise->resolve();
-        });
+        connection->promise.resolve();
     }
     else if (connection->status == asyncio::http::Connection::PAUSED) {
         connection->status = asyncio::http::Connection::TRANSFERRING;
@@ -31,7 +29,7 @@ std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_
 
     if (auto task = connection->buffers[0].writeAll(std::as_bytes(std::span{buffer, size * n})); !task.done()) {
         connection->status = asyncio::http::Connection::PAUSED;
-        task.promise()->then([=] {
+        task.future().then([=] {
             curl_easy_pause(connection->easy.get(), CURLPAUSE_CONT);
         });
         return CURL_WRITEFUNC_PAUSE;
@@ -237,6 +235,32 @@ asyncio::http::Requests::~Requests() {
     assert(mRunning == 0);
 }
 
+tl::expected<std::shared_ptr<asyncio::http::Requests>, std::error_code>
+asyncio::http::Requests::make(const Options &options) {
+    static std::once_flag flag;
+
+    std::call_once(flag, [] {
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+        std::atexit([] {
+            curl_global_cleanup();
+        });
+    });
+
+    CURLM *multi = curl_multi_init();
+
+    if (!multi)
+        return tl::unexpected(make_error_code(std::errc::not_enough_memory));
+
+    auto timer = ev::Timer::make();
+
+    if (!timer) {
+        curl_multi_cleanup(multi);
+        return tl::unexpected(timer.error());
+    }
+
+    return std::make_shared<Requests>(multi, std::move(*timer), options);
+}
+
 void asyncio::http::Requests::onCURLTimer(const long timeout) {
     if (timeout == -1) {
         mTimer.cancel();
@@ -246,7 +270,7 @@ void asyncio::http::Requests::onCURLTimer(const long timeout) {
     if (mTimer.pending())
         mTimer.cancel();
 
-    mTimer.after(std::chrono::milliseconds{timeout}).promise()->then([this] {
+    mTimer.after(std::chrono::milliseconds{timeout}).future().then([this] {
         curl_multi_socket_action(mMulti.get(), CURL_SOCKET_TIMEOUT, 0, &mRunning);
         recycle();
     });
@@ -322,18 +346,14 @@ void asyncio::http::Requests::recycle() const {
             if (connection->status != Connection::NOT_STARTED)
                 continue;
 
-            getEventLoop()->post([error = msg->data.result, promise = connection->promise] {
-                promise->reject(static_cast<CURLError>(error));
-            });
+            connection->promise.reject(static_cast<CURLError>(msg->data.result));
             continue;
         }
 
         if (connection->status != Connection::NOT_STARTED)
             continue;
 
-        getEventLoop()->post([promise = connection->promise] {
-            promise->resolve();
-        });
+        connection->promise.resolve();
     }
 }
 
@@ -355,14 +375,8 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     EXPECT(buffers);
 
     const auto [proxy, headers, cookies, timeout, connectTimeout, userAgent] = options.value_or(mOptions);
-    const auto promise = zero::async::promise::make<void, std::error_code>();
 
-    auto connection = std::make_unique<Connection>(
-        std::move(*buffers),
-        std::move(easy),
-        promise
-    );
-
+    auto connection = std::make_unique<Connection>(std::move(*buffers), std::move(easy));
     method = zero::strings::toupper(method);
 
     if (method == "HEAD")
@@ -450,12 +464,15 @@ asyncio::http::Requests::perform(std::unique_ptr<Connection> connection) {
         co_return tl::unexpected(static_cast<CURLMError>(code));
 
     if (const auto result = co_await zero::async::coroutine::Cancellable{
-        connection->promise,
+        connection->promise.getFuture(),
         [connection = connection.get(), multi = mMulti.get()]() -> tl::expected<void, std::error_code> {
+            if (connection->promise.isFulfilled())
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
             if (const CURLMcode code = curl_multi_remove_handle(multi, connection->easy.get()); code != CURLM_OK)
                 return tl::unexpected(static_cast<CURLMError>(code));
 
-            connection->promise->reject(make_error_code(std::errc::operation_canceled));
+            connection->promise.reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
     }; !result) {
@@ -601,30 +618,4 @@ asyncio::http::Requests::request(
     );
 
     co_return co_await perform(std::move(*connection));
-}
-
-tl::expected<std::shared_ptr<asyncio::http::Requests>, std::error_code>
-asyncio::http::makeRequests(const Options &options) {
-    static std::once_flag flag;
-
-    std::call_once(flag, [] {
-        curl_global_init(CURL_GLOBAL_DEFAULT);
-        std::atexit([] {
-            curl_global_cleanup();
-        });
-    });
-
-    CURLM *multi = curl_multi_init();
-
-    if (!multi)
-        return tl::unexpected(make_error_code(std::errc::not_enough_memory));
-
-    auto timer = ev::makeTimer();
-
-    if (!timer) {
-        curl_multi_cleanup(multi);
-        return tl::unexpected(timer.error());
-    }
-
-    return std::make_shared<Requests>(multi, std::move(*timer), options);
 }

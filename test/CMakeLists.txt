@@ -5,7 +5,7 @@ add_executable(
         io.cpp
         buffer.cpp
         binary.cpp
-        future.cpp
+        promise.cpp
         event_loop.cpp
         thread.cpp
         channel.cpp

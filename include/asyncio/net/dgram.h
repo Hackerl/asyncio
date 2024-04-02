@@ -9,7 +9,10 @@ namespace asyncio::net::dgram {
     public:
         Socket(FileDescriptor fd, std::array<ev::Event, 2> events);
         Socket(Socket &&rhs) noexcept;
+        Socket &operator=(Socket &&rhs) noexcept;
         ~Socket() override;
+
+        static tl::expected<Socket, std::error_code> make(int family);
 
         zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
@@ -45,7 +48,5 @@ namespace asyncio::net::dgram {
     zero::async::coroutine::Task<Socket, std::error_code> connect(Address address);
     zero::async::coroutine::Task<Socket, std::error_code> connect(std::span<const Address> addresses);
     zero::async::coroutine::Task<Socket, std::error_code> connect(std::string host, unsigned short port);
-
-    tl::expected<Socket, std::error_code> makeSocket(int family);
 }
 #endif //ASYNCIO_DGRAM_H

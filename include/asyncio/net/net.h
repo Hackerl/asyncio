@@ -6,9 +6,9 @@
 #include <zero/os/net.h>
 
 namespace asyncio::net {
-    using IPv4 = std::array<std::byte, 4>;
-    using IPv6 = std::array<std::byte, 16>;
-    using IP = std::variant<IPv4, IPv6>;
+    using IPv4 = zero::os::net::IPv4;
+    using IPv6 = zero::os::net::IPv6;
+    using IP = zero::os::net::IP;
 
     struct IPv4Address {
         unsigned short port;

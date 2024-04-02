@@ -19,7 +19,7 @@ asyncio::net::IPv4Address::from(const std::string &ip, const unsigned short port
     IPv4 ipv4 = {};
 
     if (evutil_inet_pton(AF_INET, ip.c_str(), ipv4.data()) != 1)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected(make_error_code(std::errc::invalid_argument));
 
     return IPv4Address{port, ipv4};
 }
@@ -42,7 +42,7 @@ asyncio::net::IPv6Address::from(const std::string &ip, const unsigned short port
     IPv6 ipv6 = {};
 
     if (evutil_inet_pton_scope(AF_INET6, ip.c_str(), ipv6.data(), &index) != 1)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected(make_error_code(std::errc::invalid_argument));
 
     if (!index)
         return IPv6Address{port, ipv6};
@@ -50,7 +50,7 @@ asyncio::net::IPv6Address::from(const std::string &ip, const unsigned short port
     char name[IF_NAMESIZE];
 
     if (!if_indextoname(index, name))
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
     return IPv6Address{port, ipv6, name};
 }
@@ -69,7 +69,7 @@ asyncio::net::addressFrom(const FileDescriptor fd, const bool peer) {
     socklen_t length = sizeof(sockaddr_storage);
 
     if ((peer ? getpeername : getsockname)(fd, reinterpret_cast<sockaddr *>(&storage), &length) < 0)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
     return addressFrom(reinterpret_cast<const sockaddr *>(&storage), length);
 }
@@ -117,7 +117,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
         char name[IF_NAMESIZE];
 
         if (!if_indextoname(address->sin6_scope_id, name)) {
-            result = tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+            result = tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
             break;
         }
 
@@ -168,7 +168,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
             void *storage = malloc(sizeof(sockaddr_storage));
 
             if (!storage)
-                return tl::unexpected(std::error_code(errno, std::system_category()));
+                return tl::unexpected<std::error_code>(errno, std::system_category());
 
             memset(storage, 0, sizeof(sockaddr_storage));
 
@@ -199,7 +199,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
                 const unsigned int index = if_nametoindex(arg.zone->c_str());
 
                 if (!index)
-                    return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+                    return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
                 ptr->sin6_scope_id = index;
                 return result;

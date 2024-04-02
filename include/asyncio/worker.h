@@ -25,8 +25,8 @@ namespace asyncio {
         }
 
     private:
+        bool mExit;
         std::mutex mMutex;
-        std::atomic<bool> mExit;
         std::function<void()> mTask;
         std::condition_variable mCond;
         std::thread mThread;

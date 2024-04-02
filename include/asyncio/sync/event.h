@@ -2,22 +2,22 @@
 #define ASYNCIO_SYNC_EVENT_H
 
 #include <atomic>
-#include <asyncio/future.h>
+#include <asyncio/promise.h>
 
 namespace asyncio::sync {
     class Event {
     public:
         zero::async::coroutine::Task<void, std::error_code>
-        wait(std::optional<std::chrono::milliseconds> ms = std::nullopt);
+        wait(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
 
         void set();
-        void clear();
+        void reset();
 
         [[nodiscard]] bool isSet() const;
 
     private:
         std::atomic<bool> mValue;
-        std::list<FuturePtr<void>> mPending;
+        std::list<std::shared_ptr<Promise<void, std::error_code>>> mPending;
     };
 }
 

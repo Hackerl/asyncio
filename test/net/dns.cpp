@@ -57,5 +57,20 @@ TEST_CASE("DNS query", "[net]") {
             const auto result = co_await asyncio::net::dns::lookupIPv6("localhost");
             REQUIRE((!result || result->empty() || zero::os::net::stringify(result->front()) == "::1"));
         }
+
+        SECTION("cancel") {
+            asyncio::net::dns::AddressInfo hints = {};
+
+            hints.ai_family = AF_UNSPEC;
+            hints.ai_socktype = SOCK_STREAM;
+
+            auto task = asyncio::net::dns::getAddressInfo("www.google.com", "http", hints);
+            REQUIRE(!task.done());
+            REQUIRE(task.cancel());
+
+            const auto result = co_await task;
+            REQUIRE(!result);
+            REQUIRE(result.error() == std::errc::operation_canceled);
+        }
     });
 }

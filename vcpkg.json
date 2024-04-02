@@ -22,18 +22,6 @@
     "tests"
   ],
   "features": {
-    "legacy": {
-      "description": "Compatible with older Windows",
-      "supports": "windows",
-      "dependencies": [
-        {
-          "name": "zero",
-          "features": [
-            "legacy"
-          ]
-        }
-      ]
-    },
     "tests": {
       "description": "Build Tests",
       "dependencies": [

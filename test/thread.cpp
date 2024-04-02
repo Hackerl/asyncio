@@ -50,7 +50,7 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
             }
         }
 
-        SECTION("cancel") {
+        SECTION("timeout") {
             const auto stop = std::make_shared<bool>();
 
             auto task = asyncio::toThread(
@@ -70,10 +70,9 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
             REQUIRE(!task.done());
 
             task.cancel();
-            co_await task;
-
-            REQUIRE(task.done());
-            REQUIRE(task.result().error() == std::errc::operation_canceled);
+            const auto result = co_await task;
+            REQUIRE(!result);
+            REQUIRE(result.error() == std::errc::operation_canceled);
         }
     });
 }
