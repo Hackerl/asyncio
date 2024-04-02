@@ -11,6 +11,7 @@ namespace asyncio::fs {
     public:
         File(std::shared_ptr<EventLoop> eventLoop, FileDescriptor fd, bool append);
         File(File &&rhs) noexcept;
+        File &operator=(File &&rhs) noexcept;
         ~File() override;
 
         static tl::expected<File, std::error_code> from(FileDescriptor fd, bool append = false);

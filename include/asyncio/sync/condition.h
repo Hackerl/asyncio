@@ -7,14 +7,14 @@ namespace asyncio::sync {
     class Condition {
     public:
         zero::async::coroutine::Task<void, std::error_code>
-        wait(Mutex &mutex, std::optional<std::chrono::milliseconds> ms = std::nullopt);
+        wait(Mutex &mutex, std::optional<std::chrono::milliseconds> timeout = std::nullopt);
 
         template<typename F>
             requires std::is_invocable_v<F>
         zero::async::coroutine::Task<void, std::error_code>
-        wait(Mutex &mutex, F predicate, const std::optional<std::chrono::milliseconds> ms = std::nullopt) {
+        wait(Mutex &mutex, F predicate, const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
             while (!predicate()) {
-                CO_EXPECT(co_await wait(mutex, ms));
+                CO_EXPECT(co_await wait(mutex, timeout));
             }
 
             co_return tl::expected<void, std::error_code>{};
@@ -24,7 +24,8 @@ namespace asyncio::sync {
         void broadcast();
 
     private:
-        std::list<FuturePtr<void>> mPending;
+        std::atomic<int> mCounter;
+        std::list<std::shared_ptr<Promise<void, std::error_code>>> mPending;
     };
 }
 

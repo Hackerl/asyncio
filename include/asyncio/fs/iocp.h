@@ -9,10 +9,13 @@ namespace asyncio::fs {
     public:
         explicit IOCP(HANDLE handle);
         IOCP(IOCP &&rhs) noexcept;
+        IOCP &operator=(IOCP &&rhs) noexcept;
         ~IOCP() override;
 
+        static tl::expected<IOCP, std::error_code> make();
+
     private:
-        void dispatch() const;
+        static void dispatch(HANDLE handle);
 
     public:
         tl::expected<void, std::error_code> associate(FileDescriptor fd) override;
@@ -37,8 +40,6 @@ namespace asyncio::fs {
         HANDLE mHandle;
         std::thread mThread;
     };
-
-    tl::expected<IOCP, std::error_code> makeIOCP();
 }
 
 #endif //ASYNCIO_IOCP_H

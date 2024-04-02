@@ -10,7 +10,10 @@ namespace asyncio::fs {
     public:
         explicit AIO(aio_context_t context, int efd, std::unique_ptr<event, decltype(event_free) *> event);
         AIO(AIO &&rhs) noexcept;
+        AIO &operator=(AIO &&rhs) noexcept;
         ~AIO() override;
+
+        static tl::expected<AIO, std::error_code> make(event_base *base);
 
     private:
         void onEvent() const;
@@ -39,8 +42,6 @@ namespace asyncio::fs {
         aio_context_t mContext;
         std::unique_ptr<event, decltype(event_free) *> mEvent;
     };
-
-    tl::expected<AIO, std::error_code> makeAIO(event_base *base);
 }
 
 #endif //ASYNCIO_AIO_H

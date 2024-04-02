@@ -13,6 +13,7 @@ namespace asyncio::net::dns {
     public:
         [[nodiscard]] const char *name() const noexcept override;
         [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
     };
 
     const std::error_category &errorCategory();

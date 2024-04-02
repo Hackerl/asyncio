@@ -16,10 +16,15 @@ constexpr auto WRITE_INDEX = 1;
 #endif
 
 #ifdef _WIN32
-asyncio::fs::Pipe::Pipe(const FileDescriptor fd): mFD(fd) {
+asyncio::fs::Pipe::Pipe(const FileDescriptor fd) : mFD(fd) {
 }
 
 asyncio::fs::Pipe::Pipe(Pipe &&rhs) noexcept: mFD(std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR)) {
+}
+
+asyncio::fs::Pipe &asyncio::fs::Pipe::operator=(Pipe &&rhs) noexcept {
+    mFD = std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR);
+    return *this;
 }
 #else
 asyncio::fs::Pipe::Pipe(const FileDescriptor fd, std::array<std::optional<ev::Event>, 2> events)
@@ -28,6 +33,12 @@ asyncio::fs::Pipe::Pipe(const FileDescriptor fd, std::array<std::optional<ev::Ev
 
 asyncio::fs::Pipe::Pipe(Pipe &&rhs) noexcept
     : mFD(std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR)), mEvents(std::move(rhs.mEvents)) {
+}
+
+asyncio::fs::Pipe &asyncio::fs::Pipe::operator=(Pipe &&rhs) noexcept {
+    mFD = std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR);
+    mEvents = std::move(rhs.mEvents);
+    return *this;
 }
 #endif
 
@@ -50,11 +61,11 @@ tl::expected<asyncio::fs::Pipe, std::error_code> asyncio::fs::Pipe::from(const F
     return Pipe{fd};
 #else
     if (evutil_make_socket_nonblocking(fd) == -1)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
     auto events = std::array{
-        makeEvent(fd, ev::What::READ),
-        makeEvent(fd, ev::What::WRITE)
+        ev::Event::make(fd, ev::What::READ),
+        ev::Event::make(fd, ev::What::WRITE)
     };
 
     EXPECT(events[0]);
@@ -70,12 +81,12 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::fs::Pipe::close() {
 
 #ifdef _WIN32
     if (!CloseHandle(reinterpret_cast<HANDLE>(std::exchange(mFD, INVALID_FILE_DESCRIPTOR))))
-        co_return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+        co_return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
 #else
     assert(std::ranges::all_of(mEvents, [](const auto &event) {return !event || !event->pending();}));
 
     if (::close(std::exchange(mFD, INVALID_FILE_DESCRIPTOR)) != 0)
-        co_return tl::unexpected(std::error_code(errno, std::system_category()));
+        co_return tl::unexpected<std::error_code>(errno, std::system_category());
 #endif
 
     co_return tl::expected<void, std::error_code>{};
@@ -87,17 +98,17 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
 
 #ifdef _WIN32
     co_return co_await toThread(
-        [=]() -> tl::expected<std::size_t, std::error_code> {
+        [=, this]() -> tl::expected<std::size_t, std::error_code> {
             DWORD n;
 
             if (!ReadFile(reinterpret_cast<HANDLE>(mFD), data.data(), data.size(), &n, nullptr))
-                return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+                return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
 
             return n;
         },
         [this](std::thread::native_handle_type) -> tl::expected<void, std::error_code> {
             if (!CancelIoEx(reinterpret_cast<HANDLE>(mFD), nullptr))
-                return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+                return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
 
             return {};
         }
@@ -117,7 +128,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
         const ssize_t n = ::read(mFD, data.data(), data.size());
 
         if (n == -1 && errno != EWOULDBLOCK) {
-            result = tl::unexpected(std::error_code(errno, std::system_category()));
+            result = tl::unexpected<std::error_code>(errno, std::system_category());
             break;
         }
 
@@ -152,14 +163,14 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
 
 #ifdef _WIN32
     co_return co_await toThread(
-        [=]() -> tl::expected<std::size_t, std::error_code> {
+        [=, this]() -> tl::expected<std::size_t, std::error_code> {
             tl::expected<size_t, std::error_code> result;
 
             while (*result < data.size()) {
                 DWORD n;
 
                 if (!WriteFile(reinterpret_cast<HANDLE>(mFD), data.data(), data.size(), &n, nullptr)) {
-                    result = tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+                    result = tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
                     break;
                 }
 
@@ -170,7 +181,7 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
         },
         [this](std::thread::native_handle_type) -> tl::expected<void, std::error_code> {
             if (!CancelIoEx(reinterpret_cast<HANDLE>(mFD), nullptr))
-                return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+                return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
 
             return {};
         }
@@ -193,7 +204,7 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
             if (*result > 0)
                 break;
 
-            result = tl::unexpected(std::error_code(errno, std::system_category()));
+            result = tl::unexpected<std::error_code>(errno, std::system_category());
             break;
         }
 
@@ -230,7 +241,7 @@ tl::expected<std::array<asyncio::fs::Pipe, 2>, std::error_code> asyncio::fs::pip
     HANDLE readPipe, writePipe;
 
     if (!CreatePipe(&readPipe, &writePipe, nullptr, 0))
-        return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+        return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
 
     return std::array{
         Pipe{reinterpret_cast<FileDescriptor>(readPipe)},
@@ -250,14 +261,14 @@ tl::expected<std::array<asyncio::fs::Pipe, 2>, std::error_code> asyncio::fs::pip
     );
 
     if (::pipe(fds) < 0)
-        return tl::unexpected(std::error_code(errno, std::system_category()));
+        return tl::unexpected<std::error_code>(errno, std::system_category());
 
     if (evutil_make_socket_nonblocking(fds[0]) == -1 || evutil_make_socket_nonblocking(fds[1]) == -1)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
     auto events = std::array{
-        makeEvent(fds[0], ev::What::READ),
-        makeEvent(fds[1], ev::What::WRITE)
+        ev::Event::make(fds[0], ev::What::READ),
+        ev::Event::make(fds[1], ev::What::WRITE)
     };
 
     EXPECT(events[0]);

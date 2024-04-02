@@ -6,9 +6,12 @@
 namespace asyncio::ev {
     class Signal {
     public:
-        Signal(event *e, std::size_t capacity);
+        Signal(std::unique_ptr<event, decltype(event_free) *> event, std::size_t capacity);
         Signal(Signal &&rhs) noexcept;
+        Signal &operator=(Signal &&rhs) noexcept;
         ~Signal();
+
+        static tl::expected<Signal, std::error_code> make(int sig, std::size_t capacity = 64);
 
         [[nodiscard]] int sig() const;
         [[nodiscard]] zero::async::coroutine::Task<int, std::error_code> on() const;
@@ -17,8 +20,6 @@ namespace asyncio::ev {
         std::unique_ptr<Channel<int>> mChannel;
         std::unique_ptr<event, decltype(event_free) *> mEvent;
     };
-
-    tl::expected<Signal, std::error_code> makeSignal(int sig, std::size_t capacity = 64);
 }
 
 #endif //ASYNCIO_SIGNAL_H

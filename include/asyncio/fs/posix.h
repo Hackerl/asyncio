@@ -4,21 +4,21 @@
 #include "framework.h"
 #include <event.h>
 #include <aio.h>
+#include <asyncio/promise.h>
 
 namespace asyncio::fs {
     class PosixAIO final : public IFramework {
         struct Request {
             aiocb *cb;
-            std::shared_ptr<EventLoop> eventLoop;
-            zero::async::promise::PromisePtr<std::size_t, std::error_code> promise;
-
-            bool operator==(const Request &rhs) const;
+            Promise<std::size_t, std::error_code> promise;
         };
 
     public:
         explicit PosixAIO(std::unique_ptr<event, decltype(event_free) *> event);
         PosixAIO(PosixAIO && rhs) noexcept;
         ~PosixAIO() override;
+
+        static tl::expected<PosixAIO, std::error_code> make(event_base *base);
 
     private:
         void onSignal();
@@ -43,11 +43,9 @@ namespace asyncio::fs {
         ) override;
 
     private:
-        std::list<Request> mPending;
+        std::list<Request *> mPending;
         std::unique_ptr<event, decltype(event_free) *> mEvent;
     };
-
-    tl::expected<PosixAIO, std::error_code> makePosixAIO(event_base *base);
 }
 
 #endif //ASYNCIO_POSIX_H

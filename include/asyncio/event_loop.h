@@ -7,16 +7,20 @@
 #include <zero/expect.h>
 #include "worker.h"
 #include "fs/framework.h"
+#include "net/net.h"
 
 namespace asyncio {
+    constexpr auto DEFAULT_MAX_WORKER_NUMBER = 16;
+
     enum EventLoopError {
-        NAMESERVER_ADD_FAILED = 1
+        INVALID_NAMESERVER = 1
     };
 
     class EventLoopErrorCategory final : public std::error_category {
     public:
         [[nodiscard]] const char *name() const noexcept override;
         [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
     };
 
     const std::error_category &eventLoopErrorCategory();
@@ -26,16 +30,20 @@ namespace asyncio {
     public:
         EventLoop(
             std::unique_ptr<event_base, decltype(event_base_free) *> base,
-            std::unique_ptr<evdns_base, void (*)(evdns_base *)> dnsBase,
             std::unique_ptr<fs::IFramework> framework,
             std::size_t maxWorkers
         );
 
-        [[nodiscard]] event_base *base() const;
-        [[nodiscard]] evdns_base *dnsBase() const;
-        [[nodiscard]] fs::IFramework *framework() const;
+        event_base *base();
+        [[nodiscard]] const event_base *base() const;
 
-        tl::expected<void, std::error_code> addNameserver(const char *ip) const;
+        fs::IFramework &framework();
+        [[nodiscard]] const fs::IFramework &framework() const;
+
+        tl::expected<void, std::error_code> addNameserver(const char *ip);
+
+        [[nodiscard]] tl::expected<std::unique_ptr<evdns_base, void (*)(evdns_base *)>, std::error_code>
+        makeDNSBase() const;
 
         void dispatch() const;
         void loopBreak() const;
@@ -51,7 +59,7 @@ namespace asyncio {
                     static_cast<decltype(timeval::tv_usec)>(ms->count() % 1000 * 1000)
                 };
 
-            auto ctx = new std::decay_t<F>(std::forward<F>(f));
+            const auto ctx = new std::decay_t<F>(std::forward<F>(f));
 
             event_base_once(
                 mBase.get(),
@@ -72,8 +80,8 @@ namespace asyncio {
         std::size_t mMaxWorkers;
         std::queue<std::unique_ptr<Worker>> mWorkers;
         std::unique_ptr<event_base, decltype(event_base_free) *> mBase;
-        std::unique_ptr<evdns_base, void (*)(evdns_base *)> mDnsBase;
         std::unique_ptr<fs::IFramework> mFramework;
+        std::list<net::Address> mNameservers;
 
         template<typename F>
         friend zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>
@@ -87,53 +95,34 @@ namespace asyncio {
     std::shared_ptr<EventLoop> getEventLoop();
     void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
 
-    tl::expected<EventLoop, std::error_code> createEventLoop(std::size_t maxWorkers = 16);
+    tl::expected<EventLoop, std::error_code> createEventLoop(std::size_t maxWorkers = DEFAULT_MAX_WORKER_NUMBER);
     zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
     template<typename T, typename E>
+        requires (!std::is_same_v<E, std::exception_ptr>)
     zero::async::coroutine::Task<tl::expected<T, E>, std::error_code>
     timeout(zero::async::coroutine::Task<T, E> task, const std::chrono::milliseconds ms) {
-        if (ms == std::chrono::milliseconds::zero()) {
-            co_await task;
-            co_return tl::expected<tl::expected<T, E>, std::error_code>{tl::in_place, std::move(task.result())};
-        }
+        if (ms == std::chrono::milliseconds::zero())
+            co_return tl::expected<tl::expected<T, E>, std::error_code>{co_await task};
 
-        const auto timer = std::make_shared<zero::async::coroutine::Task<void, std::error_code>>(sleep(ms));
+        auto timer = sleep(ms);
+        const auto taskPtr = std::make_shared<zero::async::coroutine::Task<T, E>>(std::move(task));
 
-        if constexpr (std::is_void_v<T>) {
-            task.promise()->then(
-                [=] {
-                    timer->cancel();
-                },
-                [=](const E &) {
-                    timer->cancel();
-                }
-            );
-        }
-        else {
-            task.promise()->then(
-                [=](const T &) {
-                    timer->cancel();
-                },
-                [=](const E &) {
-                    timer->cancel();
-                }
-            );
-        }
+        const auto future = timer.future().then([=] {
+            return taskPtr->cancel();
+        });
 
-        auto result = co_await *timer;
+        auto result = co_await *taskPtr;
 
-        if (result) {
-            task.cancel();
+        if (future.isReady()) {
+            if (!future.result())
+                co_return tl::expected<tl::expected<T, E>, std::error_code>{std::move(result)};
+
             co_return tl::unexpected(make_error_code(std::errc::timed_out));
         }
 
-        if (!task.done()) {
-            task.cancel();
-            co_return tl::unexpected(result.error());
-        }
-
-        co_return tl::expected<tl::expected<T, E>, std::error_code>{tl::in_place, std::move(task.result())};
+        timer.cancel();
+        co_return tl::expected<tl::expected<T, E>, std::error_code>{std::move(result)};
     }
 
     template<typename F, typename T = std::invoke_result_t<F>>
@@ -145,14 +134,14 @@ namespace asyncio {
         EXPECT(eventLoop);
 
         setEventLoop(*eventLoop);
-        const auto promise = f().promise();
 
-        promise->finally([&] {
+        auto future = f().future().finally([&] {
             eventLoop.value()->loopExit();
         });
 
         eventLoop.value()->dispatch();
-        return {tl::in_place, std::move(promise->result())};
+        assert(future.isReady());
+        return {std::move(future).result()};
     }
 }
 

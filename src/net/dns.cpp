@@ -1,5 +1,5 @@
 #include <asyncio/net/dns.h>
-#include <asyncio/event_loop.h>
+#include <asyncio/promise.h>
 #include <ranges>
 
 const char *asyncio::net::dns::ErrorCategory::name() const noexcept {
@@ -8,6 +8,44 @@ const char *asyncio::net::dns::ErrorCategory::name() const noexcept {
 
 std::string asyncio::net::dns::ErrorCategory::message(const int value) const {
     return evutil_gai_strerror(value);
+}
+
+std::error_condition asyncio::net::dns::ErrorCategory::default_error_condition(int value) const noexcept {
+    std::error_condition condition;
+
+    switch (value) {
+    case EVUTIL_EAI_CANCEL:
+        condition = std::errc::operation_canceled;
+        break;
+
+    case EVUTIL_EAI_ADDRFAMILY:
+        condition = std::errc::address_family_not_supported;
+        break;
+
+    case EVUTIL_EAI_AGAIN:
+        condition = std::errc::resource_unavailable_try_again;
+        break;
+
+    case EVUTIL_EAI_BADFLAGS:
+        condition = std::errc::invalid_argument;
+        break;
+
+    case EVUTIL_EAI_MEMORY:
+        condition = std::errc::not_enough_memory;
+        break;
+
+    case EVUTIL_EAI_FAMILY:
+    case EVUTIL_EAI_SERVICE:
+    case EVUTIL_EAI_SOCKTYPE:
+        condition = std::errc::not_supported;
+        break;
+
+    default:
+        condition = error_category::default_error_condition(value);
+        break;
+    }
+
+    return condition;
 }
 
 const std::error_category &asyncio::net::dns::errorCategory() {
@@ -25,19 +63,21 @@ asyncio::net::dns::getAddressInfo(
     const std::optional<std::string> service,
     const std::optional<AddressInfo> hints
 ) {
-    const auto promise = zero::async::promise::make<std::vector<Address>, Error>();
+    const auto dnsBase = getEventLoop()->makeDNSBase();
+    CO_EXPECT(dnsBase);
+
+    Promise<std::vector<Address>, Error> promise;
 
     evdns_getaddrinfo_request *request = evdns_getaddrinfo(
-        getEventLoop()->dnsBase(),
+        dnsBase->get(),
         node.c_str(),
         service ? service->c_str() : nullptr,
         hints ? &*hints : nullptr,
         [](int result, evutil_addrinfo *res, void *arg) {
-            const auto p = static_cast<zero::async::promise::PromisePtr<std::vector<Address>, Error> *>(arg);
+            const auto p = static_cast<Promise<std::vector<Address>, Error> *>(arg);
 
             if (result != 0) {
-                p->get()->reject(static_cast<Error>(result));
-                delete p;
+                p->reject(static_cast<Error>(result));
                 return;
             }
 
@@ -57,17 +97,16 @@ asyncio::net::dns::getAddressInfo(
             }
 
             evutil_freeaddrinfo(res);
-            p->get()->resolve(std::move(addresses));
-            delete p;
+            p->resolve(std::move(addresses));
         },
-        new std::decay_t<decltype(promise)>(promise)
+        &promise
     );
 
     if (!request)
-        co_return co_await promise;
+        co_return co_await promise.getFuture();
 
     co_return co_await zero::async::coroutine::Cancellable{
-        promise,
+        promise.getFuture(),
         [=]() -> tl::expected<void, std::error_code> {
             evdns_getaddrinfo_cancel(request);
             return {};

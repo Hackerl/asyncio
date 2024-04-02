@@ -3,6 +3,7 @@
 
 #include <event.h>
 #include <asyncio/io.h>
+#include <asyncio/promise.h>
 
 namespace asyncio::ev {
     class Buffer : public virtual IBuffer, public IDeadline, public IFileDescriptor, public Reader, public Writer {
@@ -11,10 +12,13 @@ namespace asyncio::ev {
         static constexpr auto WRITE_INDEX = 1;
 
     public:
-        explicit Buffer(bufferevent *bev, std::size_t capacity);
         explicit Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
         Buffer(Buffer &&rhs) noexcept;
+        Buffer &operator=(Buffer &&rhs) noexcept;
         ~Buffer() override;
+
+        static tl::expected<Buffer, std::error_code>
+        make(FileDescriptor fd, std::size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
 
     private:
         void onEvent(short what);
@@ -48,11 +52,8 @@ namespace asyncio::ev {
         std::size_t mCapacity;
         std::error_code mLastError;
         std::unique_ptr<bufferevent, void (*)(bufferevent *)> mBev;
-        std::array<zero::async::promise::PromisePtr<void, std::error_code>, 2> mPromises;
+        std::array<std::optional<Promise<void, std::error_code>>, 2> mPromises;
     };
-
-    tl::expected<Buffer, std::error_code>
-    makeBuffer(FileDescriptor fd, std::size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
 }
 
 #endif //ASYNCIO_EV_BUFFER_H

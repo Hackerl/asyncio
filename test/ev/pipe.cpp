@@ -90,14 +90,9 @@ TEST_CASE("buffer pipe", "[ev]") {
             REQUIRE(result.error() == std::errc::timed_out);
         }
 
-        SECTION("cancel") {
+        SECTION("timeout") {
             std::byte data[10240];
-            const auto task = buffers->at(0).read(data);
-            REQUIRE(!task.done());
-
-            const auto result = co_await asyncio::timeout(task, 20ms);
-            REQUIRE(task.done());
-            REQUIRE(task.result().error() == std::errc::operation_canceled);
+            const auto result = co_await asyncio::timeout(buffers->at(0).read(data), 20ms);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         }

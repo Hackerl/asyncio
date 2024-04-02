@@ -2,14 +2,16 @@
 #include <asyncio/event_loop.h>
 #include <cassert>
 
-asyncio::ev::Event::Event(event *e) : mEvent(e, event_free) {
+asyncio::ev::Event::Event(std::unique_ptr<event, decltype(event_free) *> event) : mEvent(std::move(event)) {
+    const auto e = mEvent.get();
+
     event_assign(
         e,
         event_get_base(e),
         event_get_fd(e),
         event_get_events(e),
         [](evutil_socket_t, short what, void *arg) {
-            std::exchange(static_cast<Event *>(arg)->mPromise, nullptr)->resolve(what);
+            std::exchange(static_cast<Event *>(arg)->mPromise, std::nullopt)->resolve(what);
         },
         this
     );
@@ -29,8 +31,34 @@ asyncio::ev::Event::Event(Event &&rhs) noexcept: mEvent(std::move(rhs.mEvent)) {
     );
 }
 
+asyncio::ev::Event &asyncio::ev::Event::operator=(Event &&rhs) noexcept {
+    assert(!rhs.mPromise);
+    mEvent = std::move(rhs.mEvent);
+    const auto e = mEvent.get();
+
+    event_assign(
+        e,
+        event_get_base(e),
+        event_get_fd(e),
+        event_get_events(e),
+        event_get_callback(e),
+        this
+    );
+
+    return *this;
+}
+
 asyncio::ev::Event::~Event() {
     assert(!mEvent || !mPromise);
+}
+
+tl::expected<asyncio::ev::Event, std::error_code> asyncio::ev::Event::make(const FileDescriptor fd, const short events) {
+    event *e = event_new(getEventLoop()->base(), fd, events, nullptr, nullptr);
+
+    if (!e)
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+
+    return Event{{e, event_free}};
 }
 
 asyncio::FileDescriptor asyncio::ev::Event::fd() const {
@@ -42,7 +70,7 @@ bool asyncio::ev::Event::cancel() {
         return false;
 
     event_del(mEvent.get());
-    std::exchange(mPromise, nullptr)->reject(make_error_code(std::errc::operation_canceled));
+    std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
 
     return true;
 }
@@ -57,8 +85,8 @@ asyncio::ev::Event::on(const std::optional<std::chrono::milliseconds> timeout) {
         co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
     co_return co_await zero::async::coroutine::Cancellable{
-        zero::async::promise::chain<short, std::error_code>([&](const auto &promise) {
-            mPromise = promise;
+        zero::async::promise::chain<short, std::error_code>([&](auto promise) {
+            mPromise.emplace(std::move(promise));
 
             if (!timeout) {
                 event_add(mEvent.get(), nullptr);
@@ -73,18 +101,12 @@ asyncio::ev::Event::on(const std::optional<std::chrono::milliseconds> timeout) {
             event_add(mEvent.get(), &tv);
         }),
         [this]() -> tl::expected<void, std::error_code> {
+            if (!mPromise)
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
             event_del(mEvent.get());
-            std::exchange(mPromise, nullptr)->reject(make_error_code(std::errc::operation_canceled));
+            std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
     };
-}
-
-tl::expected<asyncio::ev::Event, std::error_code> asyncio::ev::makeEvent(const FileDescriptor fd, const short events) {
-    event *e = event_new(getEventLoop()->base(), fd, events, nullptr, nullptr);
-
-    if (!e)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-
-    return Event{e};
 }

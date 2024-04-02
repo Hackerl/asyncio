@@ -7,7 +7,7 @@
 namespace asyncio::ev {
     class PairedBuffer final : public Buffer {
     public:
-        PairedBuffer(bufferevent *bev, std::size_t capacity);
+        PairedBuffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
         PairedBuffer(PairedBuffer &&) = default;
         ~PairedBuffer() override;
 

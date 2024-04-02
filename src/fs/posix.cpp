@@ -3,11 +3,7 @@
 #include <csignal>
 #include <cassert>
 
-bool asyncio::fs::PosixAIO::Request::operator==(const Request &rhs) const {
-    return cb == rhs.cb && eventLoop == rhs.eventLoop && promise == rhs.promise;
-}
-
-asyncio::fs::PosixAIO::PosixAIO(std::unique_ptr<event, decltype(event_free) *> event): mEvent(std::move(event)) {
+asyncio::fs::PosixAIO::PosixAIO(std::unique_ptr<event, decltype(event_free) *> event) : mEvent(std::move(event)) {
     const auto e = mEvent.get();
 
     evsignal_assign(
@@ -41,41 +37,41 @@ asyncio::fs::PosixAIO::~PosixAIO() {
     evsignal_del(mEvent.get());
 }
 
+tl::expected<asyncio::fs::PosixAIO, std::error_code> asyncio::fs::PosixAIO::make(event_base *base) {
+    event *e = evsignal_new(base, -1, nullptr, nullptr);
+
+    if (!e)
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+
+    return PosixAIO{{e, event_free}};
+}
+
 void asyncio::fs::PosixAIO::onSignal() {
     auto it = mPending.begin();
 
     while (it != mPending.end()) {
-        assert(it->promise->status() == zero::async::promise::State::PENDING);
+        assert(!(*it)->promise.isFulfilled());
 
-        if (const int error = aio_error(it->cb); error > 0) {
+        if (const int error = aio_error((*it)->cb); error > 0) {
             if (error == EINPROGRESS) {
                 ++it;
                 continue;
             }
 
-            it->eventLoop->post([=, promise = std::move(it->promise)] {
-                promise->reject(std::error_code(error, std::system_category()));
-            });
-
+            (*it)->promise.reject(error, std::system_category());
             it = mPending.erase(it);
             continue;
         }
 
-        const ssize_t size = aio_return(it->cb);
+        const ssize_t size = aio_return((*it)->cb);
 
         if (size == -1) {
-            it->eventLoop->post([error = errno, promise = std::move(it->promise)] {
-                promise->reject(std::error_code(error, std::system_category()));
-            });
-
+            (*it)->promise.reject(errno, std::system_category());
             it = mPending.erase(it);
             continue;
         }
 
-        it->eventLoop->post([=, promise = std::move(it->promise)] {
-            promise->resolve(size);
-        });
-
+        (*it)->promise.resolve(size);
         it = mPending.erase(it);
     }
 }
@@ -101,23 +97,24 @@ asyncio::fs::PosixAIO::read(
     cb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
     cb.aio_sigevent.sigev_signo = SIGIO;
 
-    const auto promise = zero::async::promise::make<std::size_t, std::error_code>();
-    const auto pending = Request{&cb, std::move(eventLoop), promise};
-
-    mPending.push_back(pending);
+    auto pending = Request{&cb, Promise<std::size_t, std::error_code>{std::move(eventLoop)}};
+    mPending.push_back(&pending);
 
     if (aio_read(&cb) < 0) {
-        mPending.remove(pending);
-        co_return tl::unexpected(std::error_code(errno, std::system_category()));
+        mPending.remove(&pending);
+        co_return tl::unexpected<std::error_code>(errno, std::system_category());
     }
 
     co_return co_await zero::async::coroutine::Cancellable{
-        promise,
-        [=, this]() -> tl::expected<void, std::error_code> {
+        pending.promise.getFuture(),
+        [&, this]() -> tl::expected<void, std::error_code> {
+            if (pending.promise.isFulfilled())
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
             const int result = aio_cancel(fd, pending.cb);
 
             if (result == -1)
-                return tl::unexpected(std::error_code(errno, std::system_category()));
+                return tl::unexpected<std::error_code>(errno, std::system_category());
 
             if (result == AIO_ALLDONE)
                 return tl::unexpected(make_error_code(std::errc::operation_not_supported));
@@ -125,10 +122,8 @@ asyncio::fs::PosixAIO::read(
             if (result == AIO_NOTCANCELED)
                 return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-            mPending.remove(pending);
-            pending.eventLoop->post([promise = pending.promise] {
-                promise->reject(make_error_code(std::errc::operation_canceled));
-            });
+            mPending.remove(&pending);
+            pending.promise.reject(make_error_code(std::errc::operation_canceled));
 
             return {};
         }
@@ -152,23 +147,24 @@ asyncio::fs::PosixAIO::write(
     cb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
     cb.aio_sigevent.sigev_signo = SIGIO;
 
-    const auto promise = zero::async::promise::make<std::size_t, std::error_code>();
-    const auto pending = Request{&cb, std::move(eventLoop), promise};
-
-    mPending.push_back(pending);
+    auto pending = Request{&cb, Promise<std::size_t, std::error_code>{std::move(eventLoop)}};
+    mPending.push_back(&pending);
 
     if (aio_write(&cb) < 0) {
-        mPending.remove(pending);
-        co_return tl::unexpected(std::error_code(errno, std::system_category()));
+        mPending.remove(&pending);
+        co_return tl::unexpected<std::error_code>(errno, std::system_category());
     }
 
     co_return co_await zero::async::coroutine::Cancellable{
-        promise,
-        [=, this]() -> tl::expected<void, std::error_code> {
+        pending.promise.getFuture(),
+        [&, this]() -> tl::expected<void, std::error_code> {
+            if (pending.promise.isFulfilled())
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
             const int result = aio_cancel(fd, pending.cb);
 
             if (result == -1)
-                return tl::unexpected(std::error_code(errno, std::system_category()));
+                return tl::unexpected<std::error_code>(errno, std::system_category());
 
             if (result == AIO_ALLDONE)
                 return tl::unexpected(make_error_code(std::errc::operation_not_supported));
@@ -176,21 +172,10 @@ asyncio::fs::PosixAIO::write(
             if (result == AIO_NOTCANCELED)
                 return tl::unexpected(make_error_code(std::errc::operation_in_progress));
 
-            mPending.remove(pending);
-            pending.eventLoop->post([promise = pending.promise] {
-                promise->reject(make_error_code(std::errc::operation_canceled));
-            });
+            mPending.remove(&pending);
+            pending.promise.reject(make_error_code(std::errc::operation_canceled));
 
             return {};
         }
     };
-}
-
-tl::expected<asyncio::fs::PosixAIO, std::error_code> asyncio::fs::makePosixAIO(event_base *base) {
-    event *e = evsignal_new(base, -1, nullptr, nullptr);
-
-    if (!e)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-
-    return PosixAIO{{e, event_free}};
 }

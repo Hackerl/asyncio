@@ -10,12 +10,12 @@ TEST_CASE("linux aio", "[fs]") {
         const auto eventLoop = asyncio::getEventLoop();
         REQUIRE(eventLoop);
 
-        auto framework = asyncio::fs::makeAIO(eventLoop->base());
+        auto framework = asyncio::fs::AIO::make(eventLoop->base());
         REQUIRE(framework);
 
         const auto path = std::filesystem::temp_directory_path() / "asyncio-fs-aio";
         const int fd = open(path.string().c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-        REQUIRE(fd > 0);
+        REQUIRE(fd != -1);
 
         constexpr std::string_view content = "hello";
         auto n = co_await framework->write(eventLoop, fd, 0, std::as_bytes(std::span{content}));

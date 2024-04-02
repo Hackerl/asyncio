@@ -1,18 +1,15 @@
 #include <asyncio/fs/file.h>
 #include <asyncio/error.h>
+#include <zero/filesystem/file.h>
 #include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
-#include <fstream>
 #include <fcntl.h>
 
 constexpr std::string_view CONTENT = "hello world";
 const auto path = std::filesystem::temp_directory_path() / "asyncio-fs";
 
 TEST_CASE("asynchronous filesystem", "[fs]") {
-    std::ofstream stream(path);
-    REQUIRE(stream.is_open());
-    stream << CONTENT;
-    stream.close();
+    REQUIRE(zero::filesystem::writeString(path, CONTENT));
 
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("read only") {
@@ -70,9 +67,9 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
                 REQUIRE(n);
                 REQUIRE(*n == replace.size());
 
-                std::ifstream s(path);
-                REQUIRE(s.is_open());
-                REQUIRE(std::string{std::istreambuf_iterator(s), std::istreambuf_iterator<char>()} == replace);
+                const auto content = zero::filesystem::readString(path);
+                REQUIRE(content);
+                REQUIRE(content == replace);
             }
         }
 
@@ -90,9 +87,9 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
             REQUIRE(n);
             REQUIRE(*n == CONTENT.size());
 
-            std::ifstream s(path);
-            REQUIRE(s.is_open());
-            REQUIRE(std::string{std::istreambuf_iterator(s), std::istreambuf_iterator<char>()} == "hello hello world");
+            const auto content = zero::filesystem::readString(path);
+            REQUIRE(content);
+            REQUIRE(content == "hello hello world");
         }
 
         SECTION("seek") {

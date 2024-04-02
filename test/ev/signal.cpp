@@ -12,7 +12,7 @@ using namespace std::chrono_literals;
 TEST_CASE("signal handler", "[ev]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
         SECTION("normal") {
-            auto signal = asyncio::ev::makeSignal(SIGINT);
+            auto signal = asyncio::ev::Signal::make(SIGINT);
             REQUIRE(signal);
 
 #ifdef __APPLE__
@@ -26,7 +26,7 @@ TEST_CASE("signal handler", "[ev]") {
 
             thread.join();
 #else
-            const auto task = signal->on();
+            auto task = signal->on();
             raise(SIGINT);
 
             const auto result = co_await task;
@@ -34,15 +34,11 @@ TEST_CASE("signal handler", "[ev]") {
 #endif
         }
 
-        SECTION("cancel") {
-            auto signal = asyncio::ev::makeSignal(SIGINT);
+        SECTION("timeout") {
+            auto signal = asyncio::ev::Signal::make(SIGINT);
             REQUIRE(signal);
 
-            const auto task = signal->on();
-            const auto result = co_await asyncio::timeout(task, 10ms);
-
-            REQUIRE(task.done());
-            REQUIRE(task.result().error() == std::errc::operation_canceled);
+            const auto result = co_await asyncio::timeout(signal->on(), 10ms);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         }

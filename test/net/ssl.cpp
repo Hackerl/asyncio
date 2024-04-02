@@ -144,65 +144,90 @@ TEST_CASE("ssl stream network connection", "[net]") {
             auto listener = asyncio::net::ssl::stream::listen(*context, "127.0.0.1", 30000);
             REQUIRE(listener);
 
-            co_await allSettled(
-                [](auto l) -> zero::async::coroutine::Task<void> {
-                    auto buffer = co_await l.accept();
-                    REQUIRE(buffer);
+            SECTION("normal") {
+                co_await allSettled(
+                    [](auto l) -> zero::async::coroutine::Task<void> {
+                        auto buffer = co_await l.accept();
+                        REQUIRE(buffer);
 
-                    const auto localAddress = buffer->localAddress();
-                    REQUIRE(localAddress);
-                    REQUIRE(fmt::to_string(*localAddress) == "variant(127.0.0.1:30000)");
+                        const auto localAddress = buffer->localAddress();
+                        REQUIRE(localAddress);
+                        REQUIRE(fmt::to_string(*localAddress) == "variant(127.0.0.1:30000)");
 
-                    const auto remoteAddress = buffer->remoteAddress();
-                    REQUIRE(remoteAddress);
-                    REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
+                        const auto remoteAddress = buffer->remoteAddress();
+                        REQUIRE(remoteAddress);
+                        REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(result);
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
+                        REQUIRE(result);
 
-                    result = co_await buffer->flush();
-                    REQUIRE(result);
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
 
-                    const auto line = co_await buffer->readLine();
-                    REQUIRE(line);
-                    REQUIRE(*line == zero::strings::trim(MESSAGE));
-                }(std::move(*listener)),
-                []() -> zero::async::coroutine::Task<void> {
-                    const auto ctx = asyncio::net::ssl::newContext(
-                        {
-                            .ca = std::string{CA_CERT},
-                            .cert = std::string{CLIENT_CERT},
-                            .privateKey = std::string{CLIENT_KEY}
-                        }
-                    );
-                    REQUIRE(ctx);
+                        const auto line = co_await buffer->readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == zero::strings::trim(MESSAGE));
+                    }(std::move(*listener)),
+                    []() -> zero::async::coroutine::Task<void> {
+                        const auto ctx = asyncio::net::ssl::newContext(
+                            {
+                                .ca = std::string{CA_CERT},
+                                .cert = std::string{CLIENT_CERT},
+                                .privateKey = std::string{CLIENT_KEY}
+                            }
+                        );
+                        REQUIRE(ctx);
 
-                    auto buffer = co_await asyncio::net::ssl::stream::connect(
-                        *ctx,
-                        "localhost",
-                        30000
-                    );
-                    REQUIRE(buffer);
+                        auto buffer = co_await asyncio::net::ssl::stream::connect(
+                            *ctx,
+                            "localhost",
+                            30000
+                        );
+                        REQUIRE(buffer);
 
-                    const auto localAddress = buffer->localAddress();
-                    REQUIRE(localAddress);
-                    REQUIRE(fmt::to_string(*localAddress).find("127.0.0.1") != std::string::npos);
+                        const auto localAddress = buffer->localAddress();
+                        REQUIRE(localAddress);
+                        REQUIRE(fmt::to_string(*localAddress).find("127.0.0.1") != std::string::npos);
 
-                    const auto remoteAddress = buffer->remoteAddress();
-                    REQUIRE(remoteAddress);
-                    REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
+                        const auto remoteAddress = buffer->remoteAddress();
+                        REQUIRE(remoteAddress);
+                        REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
 
-                    const auto line = co_await buffer->readLine();
-                    REQUIRE(line);
-                    REQUIRE(*line == zero::strings::trim(MESSAGE));
+                        const auto line = co_await buffer->readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == zero::strings::trim(MESSAGE));
 
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(result);
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
+                        REQUIRE(result);
 
-                    result = co_await buffer->flush();
-                    REQUIRE(result);
-                }()
-            );
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
+                    }()
+                );
+            }
+
+            SECTION("cancel") {
+                const auto ctx = asyncio::net::ssl::newContext(
+                    {
+                        .ca = std::string{CA_CERT},
+                        .cert = std::string{CLIENT_CERT},
+                        .privateKey = std::string{CLIENT_KEY}
+                    }
+                );
+                REQUIRE(ctx);
+
+                auto task = asyncio::net::ssl::stream::connect(
+                    *ctx,
+                    "localhost",
+                    30000
+                );
+                REQUIRE(!task.done());
+                REQUIRE(task.cancel());
+
+                const auto result = co_await task;
+                REQUIRE(!result);
+                REQUIRE(result.error() == std::errc::operation_canceled);
+            }
         }
 
         SECTION("verify server") {
@@ -220,59 +245,78 @@ TEST_CASE("ssl stream network connection", "[net]") {
             auto listener = asyncio::net::ssl::stream::listen(*context, "127.0.0.1", 30000);
             REQUIRE(listener);
 
-            co_await allSettled(
-                [](auto l) -> zero::async::coroutine::Task<void> {
-                    auto buffer = co_await l.accept();
-                    REQUIRE(buffer);
+            SECTION("normal") {
+                co_await allSettled(
+                    [](auto l) -> zero::async::coroutine::Task<void> {
+                        auto buffer = co_await l.accept();
+                        REQUIRE(buffer);
 
-                    const auto localAddress = buffer->localAddress();
-                    REQUIRE(localAddress);
-                    REQUIRE(fmt::to_string(*localAddress) == "variant(127.0.0.1:30000)");
+                        const auto localAddress = buffer->localAddress();
+                        REQUIRE(localAddress);
+                        REQUIRE(fmt::to_string(*localAddress) == "variant(127.0.0.1:30000)");
 
-                    const auto remoteAddress = buffer->remoteAddress();
-                    REQUIRE(remoteAddress);
-                    REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
+                        const auto remoteAddress = buffer->remoteAddress();
+                        REQUIRE(remoteAddress);
+                        REQUIRE(fmt::to_string(*remoteAddress).find("127.0.0.1") != std::string::npos);
 
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(result);
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
+                        REQUIRE(result);
 
-                    result = co_await buffer->flush();
-                    REQUIRE(result);
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
 
-                    const auto line = co_await buffer->readLine();
-                    REQUIRE(line);
-                    REQUIRE(*line == zero::strings::trim(MESSAGE));
-                }(std::move(*listener)),
-                []() -> zero::async::coroutine::Task<void> {
-                    const auto ctx = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
-                    REQUIRE(ctx);
+                        const auto line = co_await buffer->readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == zero::strings::trim(MESSAGE));
+                    }(std::move(*listener)),
+                    []() -> zero::async::coroutine::Task<void> {
+                        const auto ctx = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
+                        REQUIRE(ctx);
 
-                    auto buffer = co_await asyncio::net::ssl::stream::connect(
-                        *ctx,
-                        "localhost",
-                        30000
-                    );
-                    REQUIRE(buffer);
+                        auto buffer = co_await asyncio::net::ssl::stream::connect(
+                            *ctx,
+                            "localhost",
+                            30000
+                        );
+                        REQUIRE(buffer);
 
-                    const auto localAddress = buffer->localAddress();
-                    REQUIRE(localAddress);
-                    REQUIRE(fmt::to_string(*localAddress).find("127.0.0.1") != std::string::npos);
+                        const auto localAddress = buffer->localAddress();
+                        REQUIRE(localAddress);
+                        REQUIRE(fmt::to_string(*localAddress).find("127.0.0.1") != std::string::npos);
 
-                    const auto remoteAddress = buffer->remoteAddress();
-                    REQUIRE(remoteAddress);
-                    REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
+                        const auto remoteAddress = buffer->remoteAddress();
+                        REQUIRE(remoteAddress);
+                        REQUIRE(fmt::to_string(*remoteAddress) == "variant(127.0.0.1:30000)");
 
-                    const auto line = co_await buffer->readLine();
-                    REQUIRE(line);
-                    REQUIRE(*line == zero::strings::trim(MESSAGE));
+                        const auto line = co_await buffer->readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == zero::strings::trim(MESSAGE));
 
-                    auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(result);
+                        auto result = co_await buffer->writeAll(std::as_bytes(std::span{MESSAGE}));
+                        REQUIRE(result);
 
-                    result = co_await buffer->flush();
-                    REQUIRE(result);
-                }()
-            );
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
+                    }()
+                );
+            }
+
+            SECTION("cancel") {
+                const auto ctx = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
+                REQUIRE(ctx);
+
+                auto task = asyncio::net::ssl::stream::connect(
+                    *ctx,
+                    "localhost",
+                    30000
+                );
+                REQUIRE(!task.done());
+                REQUIRE(task.cancel());
+
+                const auto result = co_await task;
+                REQUIRE(!result);
+                REQUIRE(result.error() == std::errc::operation_canceled);
+            }
         }
     });
 }

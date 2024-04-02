@@ -8,7 +8,7 @@ TEST_CASE("IOCP", "[fs]") {
         const auto eventLoop = asyncio::getEventLoop();
         REQUIRE(eventLoop);
 
-        auto framework = asyncio::fs::makeIOCP();
+        auto framework = asyncio::fs::IOCP::make();
         REQUIRE(framework);
 
         SECTION("normal") {
@@ -73,9 +73,7 @@ TEST_CASE("IOCP", "[fs]") {
             auto task = framework->read(eventLoop, fd, 0, data);
 
             task.cancel();
-            co_await task;
-            const auto n = task.result();
-
+            const auto n = co_await task;
             REQUIRE(!n);
             REQUIRE(n.error() == std::errc::operation_canceled);
 

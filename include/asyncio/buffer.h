@@ -14,9 +14,9 @@ namespace asyncio {
         )
     class BufReader final : public IBufReader, public Reader {
     public:
-        explicit BufReader(T reader, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY):
-            mReader(std::move(reader)), mCapacity(capacity), mHead(0), mTail(0),
-            mBuffer(std::make_unique<std::byte[]>(capacity)) {
+        explicit BufReader(T reader, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY)
+            : mReader(std::move(reader)), mCapacity(capacity), mHead(0), mTail(0),
+              mBuffer(std::make_unique<std::byte[]>(capacity)) {
         }
 
     private:
@@ -135,9 +135,9 @@ namespace asyncio {
         )
     class BufWriter final : public IBufWriter, public Writer {
     public:
-        explicit BufWriter(T writer, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY):
-            mWriter(std::move(writer)), mCapacity(capacity), mPending(0),
-            mBuffer(std::make_unique<std::byte[]>(capacity)) {
+        explicit BufWriter(T writer, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY)
+            : mWriter(std::move(writer)), mCapacity(capacity), mPending(0),
+              mBuffer(std::make_unique<std::byte[]>(capacity)) {
         }
 
     private:
@@ -192,7 +192,7 @@ namespace asyncio {
             std::size_t offset = 0;
 
             while (offset < mPending) {
-                if (CO_CANCELLED()) {
+                if (co_await zero::async::coroutine::cancelled) {
                     result = tl::unexpected(make_error_code(std::errc::operation_canceled));
                     break;
                 }

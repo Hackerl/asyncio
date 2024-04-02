@@ -1,7 +1,7 @@
 #ifndef ASYNCIO_CHANNEL_H
 #define ASYNCIO_CHANNEL_H
 
-#include "event_loop.h"
+#include "promise.h"
 #include <chrono>
 #include <zero/interface.h>
 #include <zero/async/coroutine.h>
@@ -98,10 +98,10 @@ namespace asyncio {
                     }
 
                     const auto event = std::make_shared<zero::atomic::Event>();
-                    const auto promise = zero::async::promise::make<void, std::error_code>();
+                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mEventLoop);
 
-                    promise->finally([=] {
-                        event->notify();
+                    promise->getFuture().finally([=] {
+                        event->set();
                     });
 
                     mPending[SENDER].push_back(promise);
@@ -151,15 +151,18 @@ namespace asyncio {
                         continue;
                     }
 
-                    const auto promise = zero::async::promise::make<void, std::error_code>();
+                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mEventLoop);
 
                     mPending[SENDER].push_back(promise);
                     mMutex.unlock();
 
                     if (const auto res = co_await asyncio::timeout(
                         zero::async::coroutine::from(zero::async::coroutine::Cancellable{
-                            promise,
+                            promise->getFuture(),
                             [=]() -> tl::expected<void, std::error_code> {
+                                if (promise->isFulfilled())
+                                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
                                 promise->reject(make_error_code(std::errc::operation_canceled));
                                 return {};
                             }
@@ -211,10 +214,10 @@ namespace asyncio {
                     }
 
                     const auto event = std::make_shared<zero::atomic::Event>();
-                    const auto promise = zero::async::promise::make<void, std::error_code>();
+                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mEventLoop);
 
-                    promise->finally([=] {
-                        event->notify();
+                    promise->getFuture().finally([=] {
+                        event->set();
                     });
 
                     mPending[RECEIVER].push_back(promise);
@@ -261,15 +264,18 @@ namespace asyncio {
                         continue;
                     }
 
-                    const auto promise = zero::async::promise::make<void, std::error_code>();
+                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mEventLoop);
 
                     mPending[RECEIVER].push_back(promise);
                     mMutex.unlock();
 
                     if (const auto res = co_await asyncio::timeout(
                         zero::async::coroutine::from(zero::async::coroutine::Cancellable{
-                            promise,
+                            promise->getFuture(),
                             [=]() -> tl::expected<void, std::error_code> {
+                                if (promise->isFulfilled())
+                                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
                                 promise->reject(make_error_code(std::errc::operation_canceled));
                                 return {};
                             }
@@ -309,10 +315,12 @@ namespace asyncio {
             if (mPending[Index].empty())
                 return;
 
-            mEventLoop->post([pending = std::exchange(mPending[Index], {})] {
-                for (const auto &promise: pending)
-                    promise->resolve();
-            });
+            for (const auto &promise: std::exchange(mPending[Index], {})) {
+                if (promise->isFulfilled())
+                    continue;
+
+                promise->resolve();
+            }
         }
 
         template<int Index>
@@ -322,10 +330,12 @@ namespace asyncio {
             if (mPending[Index].empty())
                 return;
 
-            mEventLoop->post([=, pending = std::exchange(mPending[Index], {})] {
-                for (const auto &promise: pending)
-                    promise->reject(ec);
-            });
+            for (const auto &promise: std::exchange(mPending[Index], {})) {
+                if (promise->isFulfilled())
+                    continue;
+
+                promise->reject(ec);
+            }
         }
 
     public:
@@ -434,7 +444,7 @@ namespace asyncio {
         std::atomic<bool> mClosed;
         std::shared_ptr<EventLoop> mEventLoop;
         zero::atomic::CircularBuffer<T> mBuffer;
-        std::array<std::list<zero::async::promise::PromisePtr<void, std::error_code>>, 2> mPending;
+        std::array<std::list<std::shared_ptr<Promise<void, std::error_code>>>, 2> mPending;
     };
 
     template<typename T>

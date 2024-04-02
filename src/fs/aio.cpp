@@ -1,4 +1,4 @@
-#include <asyncio/event_loop.h>
+#include <asyncio/promise.h>
 #include <asyncio/fs/aio.h>
 #include <sys/eventfd.h>
 #include <syscall.h>
@@ -23,11 +23,6 @@ int io_submit(const aio_context_t ctx_id, const long nr, iocb **iocbpp) {
 int io_cancel(const aio_context_t ctx_id, iocb *iocb, io_event *result) {
     return static_cast<int>(syscall(SYS_io_cancel, ctx_id, iocb, result));
 }
-
-struct Request {
-    std::shared_ptr<asyncio::EventLoop> eventLoop;
-    zero::async::promise::PromisePtr<std::size_t, std::error_code> promise;
-};
 
 asyncio::fs::AIO::AIO(const aio_context_t context, const int efd, std::unique_ptr<event, decltype(event_free) *> event)
     : mEventFD(efd), mContext(context), mEvent(std::move(event)) {
@@ -58,6 +53,20 @@ asyncio::fs::AIO::AIO(AIO &&rhs) noexcept
     event_add(e, nullptr);
 }
 
+asyncio::fs::AIO &asyncio::fs::AIO::operator=(AIO &&rhs) noexcept {
+    mEventFD = std::exchange(rhs.mEventFD, -1);
+    mContext = std::exchange(rhs.mContext, 0);
+    mEvent = std::move(rhs.mEvent);
+
+    const auto e = mEvent.get();
+
+    event_del(e);
+    event_assign(e, event_get_base(e), event_get_fd(e), EV_READ | EV_PERSIST, event_get_callback(e), this);
+    event_add(e, nullptr);
+
+    return *this;
+}
+
 asyncio::fs::AIO::~AIO() {
     if (!mEvent)
         return;
@@ -65,6 +74,30 @@ asyncio::fs::AIO::~AIO() {
     event_del(mEvent.get());
     io_destroy(mContext);
     close(mEventFD);
+}
+
+tl::expected<asyncio::fs::AIO, std::error_code> asyncio::fs::AIO::make(event_base *base) {
+    aio_context_t ctx = {};
+
+    if (io_setup(128, &ctx) != 0)
+        return tl::unexpected<std::error_code>(errno, std::system_category());
+
+    const int efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+
+    if (efd < 0) {
+        io_destroy(ctx);
+        return tl::unexpected<std::error_code>(errno, std::system_category());
+    }
+
+    event *e = event_new(base, -1, EV_READ | EV_PERSIST, nullptr, nullptr);
+
+    if (!e) {
+        close(efd);
+        io_destroy(ctx);
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+    }
+
+    return AIO{ctx, efd, {e, event_free}};
 }
 
 void asyncio::fs::AIO::onEvent() const {
@@ -76,16 +109,12 @@ void asyncio::fs::AIO::onEvent() const {
     assert(n > 0);
 
     for (io_event *event = events; event < events + n; event++) {
-        auto &[eventLoop, promise] = *reinterpret_cast<Request *>(event->data);
+        const auto promise = reinterpret_cast<Promise<std::size_t, std::error_code> *>(event->data);
 
         if (event->res < 0)
-            eventLoop->post([error = -event->res, promise = std::move(promise)] {
-                promise->reject(std::error_code(static_cast<int>(error), std::system_category()));
-            });
+            promise->reject(static_cast<int>(-event->res), std::system_category());
         else
-            eventLoop->post([result = event->res, promise = std::move(promise)] {
-                promise->resolve(result);
-            });
+            promise->resolve(event->res);
     }
 }
 
@@ -101,12 +130,9 @@ asyncio::fs::AIO::read(
     std::span<std::byte> data
 ) {
     iocb cb = {};
-    Request request = {
-        std::move(eventLoop),
-        zero::async::promise::make<std::size_t, std::error_code>()
-    };
+    Promise<std::size_t, std::error_code> promise(std::move(eventLoop));
 
-    cb.aio_data = reinterpret_cast<__u64>(&request);
+    cb.aio_data = reinterpret_cast<__u64>(&promise);
     cb.aio_lio_opcode = IOCB_CMD_PREAD;
     cb.aio_fildes = fd;
     cb.aio_buf = reinterpret_cast<__u64>(data.data());
@@ -115,23 +141,21 @@ asyncio::fs::AIO::read(
     cb.aio_flags |= IOCB_FLAG_RESFD;
     cb.aio_resfd = mEventFD;
 
-    iocb *cbs[1] = {&cb};
-
-    if (io_submit(mContext, 1, cbs) != 1)
-        co_return tl::unexpected(std::error_code(errno, std::system_category()));
+    if (iocb *cbs[1] = {&cb}; io_submit(mContext, 1, cbs) != 1)
+        co_return tl::unexpected<std::error_code>(errno, std::system_category());
 
     co_return co_await zero::async::coroutine::Cancellable{
-        request.promise,
-        [=, this]() -> tl::expected<void, std::error_code> {
+        promise.getFuture(),
+        [&, this]() -> tl::expected<void, std::error_code> {
+            if (promise.isFulfilled())
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
             io_event result = {};
 
-            if (io_cancel(mContext, *cbs, &result) != 0)
-                return tl::unexpected(std::error_code(errno, std::system_category()));
+            if (io_cancel(mContext, &cb, &result) != 0)
+                return tl::unexpected<std::error_code>(errno, std::system_category());
 
-            request.eventLoop->post([promise = request.promise] {
-                promise->reject(make_error_code(std::errc::operation_canceled));
-            });
-
+            promise.reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
     };
@@ -145,12 +169,9 @@ asyncio::fs::AIO::write(
     std::span<const std::byte> data
 ) {
     iocb cb = {};
-    Request request = {
-        std::move(eventLoop),
-        zero::async::promise::make<std::size_t, std::error_code>()
-    };
+    Promise<std::size_t, std::error_code> promise(std::move(eventLoop));
 
-    cb.aio_data = reinterpret_cast<__u64>(&request);
+    cb.aio_data = reinterpret_cast<__u64>(&promise);
     cb.aio_lio_opcode = IOCB_CMD_PWRITE;
     cb.aio_fildes = fd;
     cb.aio_buf = reinterpret_cast<__u64>(data.data());
@@ -159,48 +180,22 @@ asyncio::fs::AIO::write(
     cb.aio_flags |= IOCB_FLAG_RESFD;
     cb.aio_resfd = mEventFD;
 
-    iocb *cbs[1] = {&cb};
-
-    if (io_submit(mContext, 1, cbs) != 1)
-        co_return tl::unexpected(std::error_code(errno, std::system_category()));
+    if (iocb *cbs[1] = {&cb}; io_submit(mContext, 1, cbs) != 1)
+        co_return tl::unexpected<std::error_code>(errno, std::system_category());
 
     co_return co_await zero::async::coroutine::Cancellable{
-        request.promise,
-        [=, this]() -> tl::expected<void, std::error_code> {
+        promise.getFuture(),
+        [&, this]() -> tl::expected<void, std::error_code> {
+            if (promise.isFulfilled())
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
             io_event result = {};
 
-            if (io_cancel(mContext, *cbs, &result) != 0)
-                return tl::unexpected(std::error_code(errno, std::system_category()));
+            if (io_cancel(mContext, &cb, &result) != 0)
+                return tl::unexpected<std::error_code>(errno, std::system_category());
 
-            request.eventLoop->post([promise = request.promise] {
-                promise->reject(make_error_code(std::errc::operation_canceled));
-            });
-
+            promise.reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
     };
-}
-
-tl::expected<asyncio::fs::AIO, std::error_code> asyncio::fs::makeAIO(event_base *base) {
-    aio_context_t ctx = {};
-
-    if (io_setup(128, &ctx) != 0)
-        return tl::unexpected(std::error_code(errno, std::system_category()));
-
-    const int efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-
-    if (efd < 0) {
-        io_destroy(ctx);
-        return tl::unexpected(std::error_code(errno, std::system_category()));
-    }
-
-    event *e = event_new(base, -1, EV_READ | EV_PERSIST, nullptr, nullptr);
-
-    if (!e) {
-        close(efd);
-        io_destroy(ctx);
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-    }
-
-    return AIO{ctx, efd, {e, event_free}};
 }

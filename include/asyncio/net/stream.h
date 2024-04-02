@@ -11,20 +11,20 @@ namespace asyncio::net::stream {
 
     class Buffer : public ev::Buffer, public IBuffer {
     public:
-        Buffer(bufferevent *bev, std::size_t capacity);
         Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
+
+        static tl::expected<Buffer, std::error_code>
+        make(FileDescriptor fd, std::size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
 
         [[nodiscard]] tl::expected<Address, std::error_code> localAddress() const override;
         [[nodiscard]] tl::expected<Address, std::error_code> remoteAddress() const override;
     };
 
-    tl::expected<Buffer, std::error_code>
-    makeBuffer(FileDescriptor fd, std::size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
-
     class Acceptor {
     public:
         explicit Acceptor(evconnlistener *listener);
         Acceptor(Acceptor &&rhs) noexcept;
+        Acceptor &operator=(Acceptor &&rhs) noexcept;
         ~Acceptor();
 
     protected:
@@ -35,7 +35,7 @@ namespace asyncio::net::stream {
 
     protected:
         std::unique_ptr<evconnlistener, decltype(evconnlistener_free) *> mListener;
-        zero::async::promise::PromisePtr<FileDescriptor, std::error_code> mPromise;
+        std::optional<Promise<FileDescriptor, std::error_code>> mPromise;
     };
 
     class Listener : public Acceptor {

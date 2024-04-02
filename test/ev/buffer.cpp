@@ -22,8 +22,8 @@ TEST_CASE("async stream buffer", "[ev]") {
 
     asyncio::run([&]() -> zero::async::coroutine::Task<void> {
         std::array buffers = {
-            asyncio::ev::makeBuffer(fds[0], 1024),
-            asyncio::ev::makeBuffer(fds[1], 1024)
+            asyncio::ev::Buffer::make(fds[0], 1024),
+            asyncio::ev::Buffer::make(fds[1], 1024)
         };
 
         REQUIRE(buffers[0]);
@@ -108,14 +108,9 @@ TEST_CASE("async stream buffer", "[ev]") {
             REQUIRE(result.error() == std::errc::timed_out);
         }
 
-        SECTION("cancel") {
+        SECTION("timeout") {
             std::byte data[10240];
-            const auto task = buffers[0]->read(data);
-            REQUIRE(!task.done());
-
-            const auto result = co_await asyncio::timeout(task, 20ms);
-            REQUIRE(task.done());
-            REQUIRE(task.result().error() == std::errc::operation_canceled);
+            const auto result = co_await asyncio::timeout(buffers[0]->read(data), 20ms);
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::timed_out);
         }

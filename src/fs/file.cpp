@@ -17,6 +17,14 @@ asyncio::fs::File::File(File &&rhs) noexcept
       mEventLoop(std::move(rhs.mEventLoop)) {
 }
 
+asyncio::fs::File &asyncio::fs::File::operator=(File &&rhs) noexcept {
+    mAppend = rhs.mAppend;
+    mFD = std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR);
+    mOffset = rhs.mOffset;
+    mEventLoop = std::move(rhs.mEventLoop);
+    return *this;
+}
+
 asyncio::fs::File::~File() {
     if (mFD == INVALID_FILE_DESCRIPTOR)
         return;
@@ -31,9 +39,8 @@ asyncio::fs::File::~File() {
 tl::expected<asyncio::fs::File, std::error_code> asyncio::fs::File::from(const FileDescriptor fd, const bool append) {
     auto eventLoop = getEventLoop();
     assert(eventLoop);
-    assert(eventLoop->framework());
 
-    const auto result = eventLoop->framework()->associate(fd);
+    const auto result = eventLoop->framework().associate(fd);
     EXPECT(result);
 
     return File{std::move(eventLoop), fd, append};
@@ -45,10 +52,10 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::fs::File::close() {
 
 #ifdef _WIN32
     if (!CloseHandle(reinterpret_cast<HANDLE>(std::exchange(mFD, INVALID_FILE_DESCRIPTOR))))
-        co_return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+        co_return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
 #else
     if (::close(std::exchange(mFD, INVALID_FILE_DESCRIPTOR)) != 0)
-        co_return tl::unexpected(std::error_code(errno, std::system_category()));
+        co_return tl::unexpected<std::error_code>(errno, std::system_category());
 #endif
 
     co_return tl::expected<void, std::error_code>{};
@@ -61,7 +68,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::File::re
 #ifdef _WIN32
     const auto result = co_await mEventLoop
                                  ->framework()
-                                 ->read(mEventLoop, mFD, mOffset, data)
+                                 .read(mEventLoop, mFD, mOffset, data)
                                  .transformError([](const auto &ec) -> std::error_code {
                                      if (ec == std::error_code{ERROR_HANDLE_EOF, std::system_category()})
                                          return IO_EOF;
@@ -70,7 +77,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::File::re
                                  });
     CO_EXPECT(result);
 #else
-    const auto result = co_await mEventLoop->framework()->read(mEventLoop, mFD, mOffset, data);
+    const auto result = co_await mEventLoop->framework().read(mEventLoop, mFD, mOffset, data);
     CO_EXPECT(result);
 
     if (*result == 0)
@@ -90,7 +97,7 @@ asyncio::fs::File::write(const std::span<const std::byte> data) {
         CO_EXPECT(seek(0, END));
     }
 
-    const auto result = co_await mEventLoop->framework()->write(mEventLoop, mFD, mOffset, data);
+    const auto result = co_await mEventLoop->framework().write(mEventLoop, mFD, mOffset, data);
     CO_EXPECT(result);
 
     mOffset += *result;
@@ -127,7 +134,7 @@ tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::seek(const std::
         LARGE_INTEGER pos;
 
         if (!SetFilePointerEx(reinterpret_cast<HANDLE>(mFD), LARGE_INTEGER{.QuadPart = offset}, &pos, FILE_END)) {
-            result = tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+            result = tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
             break;
         }
 
@@ -141,7 +148,7 @@ tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::seek(const std::
 #endif
 
         if (pos == -1) {
-            result = tl::unexpected(std::error_code(errno, std::system_category()));
+            result = tl::unexpected<std::error_code>(errno, std::system_category());
             break;
         }
 
@@ -169,7 +176,7 @@ tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::length() const {
     LARGE_INTEGER pos;
 
     if (!SetFilePointerEx(reinterpret_cast<HANDLE>(mFD), LARGE_INTEGER{.QuadPart = 0}, &pos, FILE_END))
-        return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+        return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
 
     return pos.QuadPart;
 #else
@@ -180,7 +187,7 @@ tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::length() const {
 #endif
 
     if (pos == -1)
-        return tl::unexpected(std::error_code(errno, std::system_category()));
+        return tl::unexpected<std::error_code>(errno, std::system_category());
 
     return pos;
 #endif
@@ -256,21 +263,20 @@ tl::expected<asyncio::fs::File, std::error_code> asyncio::fs::open(const std::fi
     );
 
     if (handle == INVALID_HANDLE_VALUE)
-        return tl::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+        return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
 
     const auto fd = reinterpret_cast<FileDescriptor>(handle);
 #else
     const int fd = ::open(path.string().c_str(), flags, 0644);
 
     if (fd < 0)
-        return tl::unexpected(std::error_code(errno, std::system_category()));
+        return tl::unexpected<std::error_code>(errno, std::system_category());
 #endif
 
     auto eventLoop = getEventLoop();
     assert(eventLoop);
-    assert(eventLoop->framework());
 
-    if (const auto result = eventLoop->framework()->associate(fd); !result) {
+    if (const auto result = eventLoop->framework().associate(fd); !result) {
 #ifdef _WIN32
         CloseHandle(handle);
 #else

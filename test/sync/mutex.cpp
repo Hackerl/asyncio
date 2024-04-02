@@ -34,6 +34,25 @@ TEST_CASE("asyncio mutex", "[sync]") {
                     m->unlock();
                 }(mutex)
             );
+            REQUIRE(!mutex->locked());
+        }
+
+        SECTION("fair scheduling") {
+            auto task1 = mutex->lock();
+            REQUIRE(!task1.done());
+
+            mutex->unlock();
+            REQUIRE(!task1.done());
+
+            auto task2 = mutex->lock();
+            REQUIRE(!task2.done());
+
+            auto res = co_await task1;
+            REQUIRE(res);
+
+            mutex->unlock();
+            res = co_await task2;
+            REQUIRE(res);
         }
 
         SECTION("timeout") {
@@ -58,6 +77,7 @@ TEST_CASE("asyncio mutex", "[sync]") {
                     m->unlock();
                 }(mutex)
             );
+            REQUIRE(!mutex->locked());
         }
 
         SECTION("cancel") {
@@ -81,6 +101,48 @@ TEST_CASE("asyncio mutex", "[sync]") {
 
             task.cancel();
             co_await task;
+            REQUIRE(mutex->locked());
+        }
+
+        SECTION("cancel after unlock") {
+            auto task1 = mutex->lock();
+            REQUIRE(!task1.done());
+
+            mutex->unlock();
+
+            REQUIRE(!task1.cancel());
+            auto task2 = mutex->lock();
+            REQUIRE(!task2.done());
+
+            auto res = co_await task1;
+            REQUIRE(res);
+            REQUIRE(mutex->locked());
+
+            mutex->unlock();
+
+            res = co_await task2;
+            REQUIRE(res);
+            REQUIRE(mutex->locked());
+        }
+
+        SECTION("unlock after cancel") {
+            auto task1 = mutex->lock();
+            REQUIRE(!task1.done());
+            REQUIRE(task1.cancel());
+            REQUIRE(!task1.done());
+
+            mutex->unlock();
+
+            auto task2 = mutex->lock();
+            REQUIRE(!task2.done());
+
+            auto res = co_await task1;
+            REQUIRE(!res);
+            REQUIRE(res.error() == std::errc::operation_canceled);
+
+            res = co_await task2;
+            REQUIRE(res);
+            REQUIRE(mutex->locked());
         }
     });
 }

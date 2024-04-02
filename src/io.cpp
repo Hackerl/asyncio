@@ -45,7 +45,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::Writer::writeAll(co
     std::size_t offset = 0;
 
     while (offset < data.size()) {
-        if (CO_CANCELLED()) {
+        if (co_await zero::async::coroutine::cancelled) {
             result = tl::unexpected(make_error_code(std::errc::operation_canceled));
             break;
         }
@@ -67,7 +67,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reade
     tl::expected<void, std::error_code> result;
 
     while (true) {
-        if (CO_CANCELLED()) {
+        if (co_await zero::async::coroutine::cancelled) {
             result = tl::unexpected(make_error_code(std::errc::operation_canceled));
             break;
         }

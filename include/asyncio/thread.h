@@ -1,7 +1,7 @@
 #ifndef ASYNCIO_THREAD_H
 #define ASYNCIO_THREAD_H
 
-#include "event_loop.h"
+#include "promise.h"
 
 namespace asyncio {
     template<typename F>
@@ -10,7 +10,7 @@ namespace asyncio {
         using T = std::invoke_result_t<F>;
 
         const auto eventLoop = getEventLoop();
-        const auto promise = zero::async::promise::make<void, std::error_code>();
+        Promise<void, std::error_code> promise(eventLoop);
 
         std::unique_ptr<Worker> worker;
 
@@ -24,14 +24,12 @@ namespace asyncio {
 
         T result;
 
-        worker->execute([=, &result, f = std::move(f)] {
+        worker->execute([&, f = std::move(f)] {
             result = f();
-            eventLoop->post([=] {
-                promise->resolve();
-            });
+            promise.resolve();
         });
 
-        co_await promise;
+        co_await promise.getFuture();
 
         if (eventLoop->mWorkers.size() < eventLoop->mMaxWorkers)
             eventLoop->mWorkers.push(std::move(worker));
@@ -45,7 +43,7 @@ namespace asyncio {
         using T = std::invoke_result_t<F>;
 
         const auto eventLoop = getEventLoop();
-        const auto promise = zero::async::promise::make<void, std::error_code>();
+        Promise<void, std::error_code> promise(eventLoop);
 
         std::unique_ptr<Worker> worker;
 
@@ -59,15 +57,13 @@ namespace asyncio {
 
         T result;
 
-        worker->execute([=, &result, f = std::move(f)] {
+        worker->execute([&, f = std::move(f)] {
             result = f();
-            eventLoop->post([=] {
-                promise->resolve();
-            });
+            promise.resolve();
         });
 
         co_await zero::async::coroutine::Cancellable{
-            promise,
+            promise.getFuture(),
             [handle = worker->mThread.native_handle(), cancel = std::move(cancel)] {
                 return cancel(handle);
             }

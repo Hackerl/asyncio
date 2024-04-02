@@ -1,21 +1,27 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/dns.h>
-#include <asyncio/event_loop.h>
-#include <asyncio/error.h>
-#include <zero/os/net.h>
+#include <asyncio/promise.h>
+#include <zero/defer.h>
 #include <cassert>
 
 #if __unix__ || __APPLE__
 #include <sys/un.h>
 #endif
 
-asyncio::net::stream::Buffer::Buffer(bufferevent *bev, const std::size_t capacity) : ev::Buffer(bev, capacity) {
-}
-
 asyncio::net::stream::Buffer::Buffer(
     std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev,
     const std::size_t capacity
 ) : ev::Buffer(std::move(bev), capacity) {
+}
+
+tl::expected<asyncio::net::stream::Buffer, std::error_code>
+asyncio::net::stream::Buffer::make(const FileDescriptor fd, const std::size_t capacity, const bool own) {
+    bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), fd, own ? BEV_OPT_CLOSE_ON_FREE : 0);
+
+    if (!bev)
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+
+    return Buffer{{bev, bufferevent_free}, capacity};
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::localAddress() const {
@@ -36,21 +42,11 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffe
     return addressFrom(fd, true);
 }
 
-tl::expected<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::makeBuffer(const FileDescriptor fd, const std::size_t capacity, const bool own) {
-    bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), fd, own ? BEV_OPT_CLOSE_ON_FREE : 0);
-
-    if (!bev)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-
-    return Buffer{bev, capacity};
-}
-
 asyncio::net::stream::Acceptor::Acceptor(evconnlistener *listener) : mListener(listener, evconnlistener_free) {
     evconnlistener_set_cb(
         mListener.get(),
         [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
-            std::exchange(static_cast<Acceptor *>(arg)->mPromise, nullptr)->resolve(fd);
+            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
         },
         this
     );
@@ -61,10 +57,25 @@ asyncio::net::stream::Acceptor::Acceptor(Acceptor &&rhs) noexcept : mListener(st
     evconnlistener_set_cb(
         mListener.get(),
         [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
-            std::exchange(static_cast<Acceptor *>(arg)->mPromise, nullptr)->resolve(fd);
+            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
         },
         this
     );
+}
+
+asyncio::net::stream::Acceptor &asyncio::net::stream::Acceptor::operator=(Acceptor &&rhs) noexcept {
+    assert(!rhs.mPromise);
+    mListener = std::move(rhs.mListener);
+
+    evconnlistener_set_cb(
+        mListener.get(),
+        [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
+            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
+        },
+        this
+    );
+
+    return *this;
 }
 
 asyncio::net::stream::Acceptor::~Acceptor() {
@@ -80,13 +91,16 @@ zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::
 
     co_return co_await zero::async::coroutine::Cancellable{
         zero::async::promise::chain<FileDescriptor, std::error_code>([this](auto promise) {
-            mPromise = promise;
+            mPromise.emplace(std::move(promise));
             evconnlistener_enable(mListener.get());
-        })->finally([this] {
+        }).finally([this] {
             evconnlistener_disable(mListener.get());
         }),
         [this]() -> tl::expected<void, std::error_code> {
-            std::exchange(mPromise, nullptr)->reject(make_error_code(std::errc::operation_canceled));
+            if (!mPromise)
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
+            std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
     };
@@ -96,7 +110,7 @@ tl::expected<void, std::error_code> asyncio::net::stream::Acceptor::close() {
     if (!mListener)
         return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
 
-    if (auto promise = std::exchange(mPromise, nullptr); promise)
+    if (auto promise = std::exchange(mPromise, std::nullopt); promise)
         promise->reject(make_error_code(std::errc::bad_file_descriptor));
 
     mListener.reset();
@@ -110,7 +124,7 @@ zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::Listener::accept() {
     const auto result = co_await fd();
     CO_EXPECT(result);
-    co_return makeBuffer(*result);
+    co_return Buffer::make(*result);
 }
 
 tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const Address &address) {
@@ -132,7 +146,7 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
     );
 
     if (!listener)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
     return Listener{listener};
 }
@@ -201,59 +215,60 @@ asyncio::net::stream::connect(std::span<const Address> addresses) {
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(const std::string host, const unsigned short port) {
+    const auto dnsBase = getEventLoop()->makeDNSBase();
+    CO_EXPECT(dnsBase);
+
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
-        co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
-    const auto promise = zero::async::promise::make<void, std::error_code>();
-    const auto ctx = new std::decay_t<decltype(promise)>(promise);
+    DEFER(
+        if (bev)
+            bufferevent_free(bev);
+    );
+
+    Promise<void, std::error_code> promise;
 
     bufferevent_setcb(
         bev,
         nullptr,
         nullptr,
         [](bufferevent *b, const short what, void *arg) {
-            const auto p = static_cast<zero::async::promise::PromisePtr<void, std::error_code> *>(arg);
+            const auto p = static_cast<Promise<void, std::error_code> *>(arg);
+            assert(!p->isFulfilled());
 
             if ((what & BEV_EVENT_CONNECTED) == 0) {
                 if (const int e = bufferevent_socket_get_dns_error(b)) {
-                    p->get()->reject(static_cast<dns::Error>(e));
-                    delete p;
+                    p->reject(static_cast<dns::Error>(e));
                     return;
                 }
 
-                p->get()->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-                delete p;
+                p->reject(EVUTIL_SOCKET_ERROR(), std::system_category());
                 return;
             }
 
-            p->get()->resolve();
-            delete p;
+            p->resolve();
         },
-        ctx
+        &promise
     );
 
-    if (bufferevent_socket_connect_hostname(bev, getEventLoop()->dnsBase(), AF_UNSPEC, host.c_str(), port) < 0) {
-        delete ctx;
-        bufferevent_free(bev);
+    if (bufferevent_socket_connect_hostname(bev, dnsBase->get(), AF_UNSPEC, host.c_str(), port) < 0)
         co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
-    }
 
-    if (const auto result = co_await zero::async::coroutine::Cancellable{
-        promise,
-        [=]() -> tl::expected<void, std::error_code> {
-            bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
-            promise->reject(make_error_code(std::errc::operation_canceled));
-            delete ctx;
+    CO_EXPECT(co_await zero::async::coroutine::Cancellable{
+        promise.getFuture(),
+        [&]() -> tl::expected<void, std::error_code> {
+            if (promise.isFulfilled())
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
+            bufferevent_free(std::exchange(bev, nullptr));
+            promise.reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
-    }; !result) {
-        bufferevent_free(bev);
-        co_return tl::unexpected(result.error());
-    }
+    });
 
-    co_return Buffer{bev, DEFAULT_BUFFER_CAPACITY};
+    co_return Buffer{{std::exchange(bev, nullptr), bufferevent_free}, DEFAULT_BUFFER_CAPACITY};
 }
 
 #if __unix__ || __APPLE__
@@ -283,7 +298,7 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
     );
 
     if (!listener)
-        return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
     return Listener{listener};
 }
@@ -307,49 +322,51 @@ asyncio::net::stream::connect(const std::string path) {
     bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), -1, BEV_OPT_CLOSE_ON_FREE);
 
     if (!bev)
-        co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
+        co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
-    const auto promise = zero::async::promise::make<void, std::error_code>();
-    const auto ctx = new std::decay_t<decltype(promise)>(promise);
+    DEFER(
+        if (bev)
+            bufferevent_free(bev);
+    );
+
+    Promise<void, std::error_code> promise;
 
     bufferevent_setcb(
         bev,
         nullptr,
         nullptr,
         [](bufferevent *, const short what, void *arg) {
-            const auto p = static_cast<zero::async::promise::PromisePtr<void, std::error_code> *>(arg);
+            const auto p = static_cast<Promise<void, std::error_code> *>(arg);
+            assert(!p->isFulfilled());
+
+            if (p->isFulfilled())
+                return;
 
             if ((what & BEV_EVENT_CONNECTED) == 0) {
-                p->get()->reject(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-                delete p;
+                p->reject(EVUTIL_SOCKET_ERROR(), std::system_category());
                 return;
             }
 
-            p->get()->resolve();
-            delete p;
+            p->resolve();
         },
-        ctx
+        &promise
     );
 
-    if (bufferevent_socket_connect(bev, reinterpret_cast<const sockaddr *>(&sa), static_cast<int>(length)) < 0) {
-        delete ctx;
-        bufferevent_free(bev);
-        co_return tl::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
-    }
+    if (bufferevent_socket_connect(bev, reinterpret_cast<const sockaddr *>(&sa), static_cast<int>(length)) < 0)
+        co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
-    if (const auto result = co_await zero::async::coroutine::Cancellable{
-        promise,
-        [=]() -> tl::expected<void, std::error_code> {
-            bufferevent_setcb(bev, nullptr, nullptr, nullptr, nullptr);
-            promise->reject(make_error_code(std::errc::operation_canceled));
-            delete ctx;
+    CO_EXPECT(co_await zero::async::coroutine::Cancellable{
+        promise.getFuture(),
+        [&]() -> tl::expected<void, std::error_code> {
+            if (promise.isFulfilled())
+                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+
+            bufferevent_free(std::exchange(bev, nullptr));
+            promise.reject(make_error_code(std::errc::operation_canceled));
             return {};
         }
-    }; !result) {
-        bufferevent_free(bev);
-        co_return tl::unexpected(result.error());
-    }
+    });
 
-    co_return Buffer{bev, DEFAULT_BUFFER_CAPACITY};
+    co_return Buffer{{std::exchange(bev, nullptr), bufferevent_free}, DEFAULT_BUFFER_CAPACITY};
 }
 #endif

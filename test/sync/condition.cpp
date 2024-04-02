@@ -176,5 +176,63 @@ TEST_CASE("asyncio condition variable", "[sync]") {
             task.cancel();
             co_await task;
         }
+
+        SECTION("cancel after notify") {
+            auto result = co_await mutex->lock();
+            REQUIRE(result);
+            REQUIRE(mutex->locked());
+
+            auto task = condition->wait(*mutex);
+            REQUIRE(!task.done());
+
+            result = co_await mutex->lock();
+            REQUIRE(result);
+            REQUIRE(mutex->locked());
+
+            condition->notify();
+
+            result = task.cancel();
+            REQUIRE(!result);
+            REQUIRE(result.error() == std::errc::operation_not_supported);
+
+            mutex->unlock();
+            REQUIRE(!mutex->locked());
+
+            result = co_await task;
+            REQUIRE(result);
+            REQUIRE(mutex->locked());
+        }
+
+        SECTION("notify after cancel") {
+            auto result = co_await mutex->lock();
+            REQUIRE(result);
+            REQUIRE(mutex->locked());
+
+            auto task1 = condition->wait(*mutex);
+            REQUIRE(!task1.done());
+            REQUIRE(task1.cancel());
+            REQUIRE(!task1.done());
+
+            result = co_await mutex->lock();
+            REQUIRE(result);
+            REQUIRE(mutex->locked());
+
+            condition->notify();
+
+            auto task2 = condition->wait(*mutex);
+            REQUIRE(!task2.done());
+
+            result = co_await task1;
+            REQUIRE(!result);
+            REQUIRE(result.error() == std::errc::operation_canceled);
+            REQUIRE(mutex->locked());
+
+            mutex->unlock();
+            REQUIRE(!mutex->locked());
+
+            result = co_await task2;
+            REQUIRE(result);
+            REQUIRE(mutex->locked());
+        }
     });
 }

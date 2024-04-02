@@ -4,14 +4,18 @@
 #include <chrono>
 #include <optional>
 #include <event.h>
+#include <asyncio/promise.h>
 #include <zero/async/coroutine.h>
 
 namespace asyncio::ev {
     class Timer {
     public:
-        explicit Timer(event *e);
+        explicit Timer(std::unique_ptr<event, decltype(event_free) *> event);
         Timer(Timer &&rhs) noexcept;
+        Timer &operator=(Timer &&rhs) noexcept;
         ~Timer();
+
+        static tl::expected<Timer, std::error_code> make();
 
         bool cancel();
         [[nodiscard]] bool pending() const;
@@ -20,10 +24,8 @@ namespace asyncio::ev {
 
     private:
         std::unique_ptr<event, decltype(event_free) *> mEvent;
-        zero::async::promise::PromisePtr<void, std::error_code> mPromise;
+        std::optional<Promise<void, std::error_code>> mPromise;
     };
-
-    tl::expected<Timer, std::error_code> makeTimer();
 }
 
 #endif //ASYNCIO_TIMER_H
