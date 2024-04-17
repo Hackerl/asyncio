@@ -597,25 +597,3 @@ asyncio::http::Requests::request(
 
     co_return co_await perform(std::move(*connection));
 }
-
-zero::async::coroutine::Task<asyncio::http::Response, std::error_code>
-asyncio::http::Requests::request(
-    std::string method,
-    const URL url,
-    const std::optional<Options> options,
-    const nlohmann::json payload
-) {
-    Options opt = options.value_or(mOptions);
-    opt.headers["Content-Type"] = "application/json";
-
-    auto connection = prepare(std::move(method), url, opt);
-    CO_EXPECT(connection);
-
-    curl_easy_setopt(
-        connection->get()->easy.get(),
-        CURLOPT_COPYPOSTFIELDS,
-        payload.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
-    );
-
-    co_return co_await perform(std::move(*connection));
-}

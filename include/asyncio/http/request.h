@@ -157,15 +157,13 @@ namespace asyncio::http {
             std::map<std::string, std::variant<std::string, std::filesystem::path>> payload
         );
 
-        zero::async::coroutine::Task<Response, std::error_code> request(
-            std::string method,
-            URL url,
-            std::optional<Options> options,
-            nlohmann::json payload
-        );
-
         template<typename T>
-            requires nlohmann::detail::has_to_json<nlohmann::json, T>::value
+            requires (
+                std::is_same_v<T, nlohmann::json> ||
+                requires(T obj, nlohmann::json &j) {
+                    { to_json(j, obj) } -> std::same_as<void>;
+                }
+            )
         zero::async::coroutine::Task<Response, std::error_code> request(
             std::string method,
             const URL url,
@@ -178,10 +176,19 @@ namespace asyncio::http {
             auto connection = prepare(std::move(method), url, std::move(opt));
             CO_EXPECT(connection);
 
+            std::string body;
+
+            if constexpr (std::is_same_v<T, nlohmann::json>) {
+                body = payload.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+            }
+            else {
+                body = nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+            }
+
             curl_easy_setopt(
                 connection->get()->easy.get(),
                 CURLOPT_COPYPOSTFIELDS,
-                nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str()
+                body.c_str()
             );
 
             co_return co_await perform(std::move(*connection));

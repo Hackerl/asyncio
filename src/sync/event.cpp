@@ -20,9 +20,9 @@ asyncio::sync::Event::wait(const std::optional<std::chrono::milliseconds> timeou
             }
         }),
         timeout.value_or(std::chrono::milliseconds{0})
-    ).andThen([](const auto &res) -> tl::expected<void, std::error_code> {
-        if (!res)
-            return tl::unexpected(res.error());
+    ).andThen([](const auto &result) -> tl::expected<void, std::error_code> {
+        if (!result)
+            return tl::unexpected(result.error());
 
         return {};
     });

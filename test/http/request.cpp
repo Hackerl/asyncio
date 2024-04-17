@@ -176,6 +176,68 @@ TEST_CASE("http requests", "[http]") {
         }
 
         SECTION("post") {
+            SECTION("post string") {
+                co_await allSettled(
+                    [](auto l) -> zero::async::coroutine::Task<void> {
+                        auto buffer = co_await l.accept();
+                        REQUIRE(buffer);
+
+                        auto line = co_await buffer->readLine();
+                        REQUIRE(line);
+                        REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
+
+                        std::map<std::string, std::string> headers;
+
+                        while (true) {
+                            line = co_await buffer->readLine();
+                            REQUIRE(line);
+
+                            if (line->empty())
+                                break;
+
+                            const auto tokens = zero::strings::split(*line, ":", 1);
+                            REQUIRE(tokens.size() == 2);
+                            headers[tokens[0]] = zero::strings::trim(tokens[1]);
+                        }
+
+                        const auto it = headers.find("Content-Length");
+                        REQUIRE(it != headers.end());
+
+                        const auto length = zero::strings::toNumber<size_t>(it->second);
+                        REQUIRE(length);
+
+                        std::vector<std::byte> data(*length);
+                        auto result = co_await buffer->readExactly(data);
+                        REQUIRE(result);
+                        REQUIRE(memcmp(data.data(), "hello world", 11) == 0);
+
+                        constexpr std::string_view response = "HTTP/1.1 200 OK\r\n"
+                            "Content-Length: 11\r\n\r\n"
+                            "hello world";
+
+                        result = co_await buffer->writeAll(std::as_bytes(std::span{response}));
+                        REQUIRE(result);
+
+                        result = co_await buffer->flush();
+                        REQUIRE(result);
+                    }(std::move(*listener)),
+                    []() -> zero::async::coroutine::Task<void> {
+                        const auto url = asyncio::http::URL::from(URL);
+                        REQUIRE(url);
+
+                        const auto requests = asyncio::http::Requests::make();
+                        REQUIRE(requests);
+
+                        const auto response = co_await requests.value()->post(*url, "hello world");
+                        REQUIRE(response);
+
+                        const auto content = co_await response->string();
+                        REQUIRE(content);
+                        REQUIRE(*content == "hello world");
+                    }()
+                );
+            }
+
             SECTION("post form") {
                 co_await allSettled(
                     [](auto l) -> zero::async::coroutine::Task<void> {
