@@ -142,7 +142,8 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::http::Respon
     co_return std::string{reinterpret_cast<const char *>(data->data()), data->size()};
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::http::Response::output(std::filesystem::path path) const {
+zero::async::coroutine::Task<void, std::error_code>
+asyncio::http::Response::output(const std::filesystem::path path) const {
     auto file = fs::open(path, O_WRONLY | O_CREAT | O_TRUNC);
     CO_EXPECT(file);
 
@@ -160,7 +161,7 @@ zero::async::coroutine::Task<nlohmann::json, std::error_code> asyncio::http::Res
     CO_EXPECT(content);
 
     try {
-        co_return nlohmann::json::parse(std::move(*content));
+        co_return nlohmann::json::parse(*std::move(content));
     }
     catch (const nlohmann::json::exception &) {
         co_return tl::unexpected(make_error_code(std::errc::bad_message));
@@ -258,7 +259,7 @@ asyncio::http::Requests::make(const Options &options) {
         return tl::unexpected(timer.error());
     }
 
-    return std::make_shared<Requests>(multi, std::move(*timer), options);
+    return std::make_shared<Requests>(multi, *std::move(timer), options);
 }
 
 void asyncio::http::Requests::onCURLTimer(const long timeout) {
@@ -376,7 +377,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
 
     const auto [proxy, headers, cookies, timeout, connectTimeout, userAgent] = options.value_or(mOptions);
 
-    auto connection = std::make_unique<Connection>(std::move(*buffers), std::move(easy));
+    auto connection = std::make_unique<Connection>(*std::move(buffers), std::move(easy));
     method = zero::strings::toupper(method);
 
     if (method == "HEAD")
@@ -487,7 +488,7 @@ zero::async::coroutine::Task<asyncio::http::Response, std::error_code>
 asyncio::http::Requests::request(std::string method, const URL url, const std::optional<Options> options) {
     auto connection = prepare(std::move(method), url, options);
     CO_EXPECT(connection);
-    co_return co_await perform(std::move(*connection));
+    co_return co_await perform(*std::move(connection));
 }
 
 zero::async::coroutine::Task<asyncio::http::Response, std::error_code>
@@ -503,7 +504,7 @@ asyncio::http::Requests::request(
     curl_easy_setopt(connection->get()->easy.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(payload.length()));
     curl_easy_setopt(connection->get()->easy.get(), CURLOPT_COPYPOSTFIELDS, payload.c_str());
 
-    co_return co_await perform(std::move(*connection));
+    co_return co_await perform(*std::move(connection));
 }
 
 zero::async::coroutine::Task<asyncio::http::Response, std::error_code>
@@ -525,7 +526,7 @@ asyncio::http::Requests::request(
         )).c_str()
     );
 
-    co_return co_await perform(std::move(*connection));
+    co_return co_await perform(*std::move(connection));
 }
 
 zero::async::coroutine::Task<asyncio::http::Response, std::error_code>
@@ -556,7 +557,7 @@ asyncio::http::Requests::request(
         curl_mime_free(form);
     });
 
-    co_return co_await perform(std::move(*connection));
+    co_return co_await perform(*std::move(connection));
 }
 
 zero::async::coroutine::Task<asyncio::http::Response, std::error_code>
@@ -595,5 +596,5 @@ asyncio::http::Requests::request(
         curl_mime_free(form);
     });
 
-    co_return co_await perform(std::move(*connection));
+    co_return co_await perform(*std::move(connection));
 }

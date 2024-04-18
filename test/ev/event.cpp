@@ -42,14 +42,14 @@ TEST_CASE("async event notification", "[ev]") {
                     char buffer[1024] = {};
                     REQUIRE(recv(fd, buffer, sizeof(buffer), 0) == 11);
                     REQUIRE(buffer == MESSAGE);
-                }(std::move(*events[0])),
+                }(*std::move(events[0])),
                 [](auto event) -> zero::async::coroutine::Task<void> {
                     const auto fd = event.fd();
                     const auto result = co_await event.on();
                     REQUIRE(result);
                     REQUIRE(*result & asyncio::ev::What::WRITE);
                     REQUIRE(send(event.fd(), MESSAGE.data(), MESSAGE.size(), 0) == MESSAGE.size());
-                }(std::move(*events[1]))
+                }(*std::move(events[1]))
             );
         }
 

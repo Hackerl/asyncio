@@ -47,7 +47,7 @@ TEST_CASE("async stream buffer", "[ev]") {
                     line = co_await buffer.readLine();
                     REQUIRE(!line);
                     REQUIRE(line.error() == asyncio::Error::IO_EOF);
-                }(std::move(*buffers[0])),
+                }(*std::move(buffers[0])),
                 [](auto buffer) -> zero::async::coroutine::Task<void> {
                     const auto line = co_await buffer.readLine();
                     REQUIRE(line);
@@ -61,7 +61,7 @@ TEST_CASE("async stream buffer", "[ev]") {
 
                     result = co_await buffer.close();
                     REQUIRE(result);
-                }(std::move(*buffers[1]))
+                }(*std::move(buffers[1]))
             );
         }
 
@@ -76,7 +76,7 @@ TEST_CASE("async stream buffer", "[ev]") {
 
                     result = co_await buffer.close();
                     REQUIRE(result);
-                }(std::move(*buffers[0])),
+                }(*std::move(buffers[0])),
                 [](auto buffer) -> zero::async::coroutine::Task<void> {
                     const auto line = co_await buffer.readLine();
                     REQUIRE(line);
@@ -86,7 +86,7 @@ TEST_CASE("async stream buffer", "[ev]") {
                     const auto result = co_await buffer.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(!result);
                     REQUIRE(result.error() == std::errc::broken_pipe);
-                }(std::move(*buffers[1]))
+                }(*std::move(buffers[1]))
             );
         }
 

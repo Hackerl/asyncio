@@ -162,7 +162,7 @@ asyncio::net::stream::listen(std::span<const Address> addresses) {
         auto result = listen(*it);
 
         if (result)
-            return std::move(*result);
+            return *std::move(result);
 
         if (++it == addresses.end())
             return tl::unexpected(result.error());
@@ -182,7 +182,8 @@ asyncio::net::stream::connect(const Address address) {
         const auto [port, ip] = std::get<IPv4Address>(address);
         co_return co_await connect(zero::os::net::stringify(ip), port);
     }
-    else if (std::holds_alternative<IPv6Address>(address)) {
+
+    if (std::holds_alternative<IPv6Address>(address)) {
         const auto &[port, ip, zone] = std::get<IPv6Address>(address);
         co_return co_await connect(zero::os::net::stringify(ip), port);
     }
@@ -206,7 +207,7 @@ asyncio::net::stream::connect(std::span<const Address> addresses) {
         auto result = co_await connect(*it);
 
         if (result)
-            co_return std::move(*result);
+            co_return *std::move(result);
 
         if (++it == addresses.end())
             co_return tl::unexpected(result.error());

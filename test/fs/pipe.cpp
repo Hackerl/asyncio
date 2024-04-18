@@ -107,7 +107,7 @@ TEST_CASE("pipe", "[fs]") {
                     const auto n = co_await pipe.read(data);
                     REQUIRE(!n);
                     REQUIRE(n.error() == asyncio::Error::IO_EOF);
-                }(std::move(*reader)),
+                }(*std::move(reader)),
                 [](auto pipe) -> zero::async::coroutine::Task<void> {
                     constexpr std::string_view message = "hello world";
                     auto result = co_await pipe.writeAll(std::as_bytes(std::span{message}));
@@ -115,7 +115,7 @@ TEST_CASE("pipe", "[fs]") {
 
                     result = co_await pipe.close();
                     REQUIRE(result);
-                }(std::move(*writer))
+                }(*std::move(writer))
             );
         }
     });

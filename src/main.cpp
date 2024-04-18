@@ -1,5 +1,4 @@
 #include <asyncio/event_loop.h>
-#include <fmt/std.h>
 
 #if __unix__ || __APPLE__
 #include <csignal>
@@ -19,7 +18,7 @@ int main(const int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-    const auto result = asyncio::run([=]() {
+    const auto result = asyncio::run([=] {
         return amain(argc, argv);
     });
 

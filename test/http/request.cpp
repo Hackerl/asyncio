@@ -49,7 +49,7 @@ TEST_CASE("http requests", "[http]") {
 
                         result = co_await buffer->flush();
                         REQUIRE(result);
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
@@ -110,7 +110,7 @@ TEST_CASE("http requests", "[http]") {
 
                         result = co_await buffer->flush();
                         REQUIRE(result);
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
@@ -155,7 +155,7 @@ TEST_CASE("http requests", "[http]") {
 
                         result = co_await buffer->flush();
                         REQUIRE(result);
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
@@ -220,7 +220,7 @@ TEST_CASE("http requests", "[http]") {
 
                         result = co_await buffer->flush();
                         REQUIRE(result);
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
@@ -282,7 +282,7 @@ TEST_CASE("http requests", "[http]") {
 
                         result = co_await buffer->flush();
                         REQUIRE(result);
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
@@ -344,7 +344,7 @@ TEST_CASE("http requests", "[http]") {
 
                         result = co_await buffer->flush();
                         REQUIRE(result);
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
                         REQUIRE(zero::filesystem::writeString(path, "hello world"));
@@ -411,7 +411,7 @@ TEST_CASE("http requests", "[http]") {
 
                         result = co_await buffer->flush();
                         REQUIRE(result);
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
                         REQUIRE(zero::filesystem::writeString(path, "hello world"));
@@ -490,7 +490,7 @@ TEST_CASE("http requests", "[http]") {
 
                         result = co_await buffer->flush();
                         REQUIRE(result);
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
@@ -536,7 +536,7 @@ TEST_CASE("http requests", "[http]") {
 
                     result = co_await buffer->flush();
                     REQUIRE(result);
-                }(std::move(*listener)),
+                }(*std::move(listener)),
                 []() -> zero::async::coroutine::Task<void> {
                     const auto url = asyncio::http::URL::from(URL);
                     REQUIRE(url);

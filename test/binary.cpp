@@ -38,27 +38,27 @@ TEST_CASE("binary transfer", "[binary]") {
         REQUIRE(buffers);
 
         SECTION("int16_t") {
-            co_await transfer<std::int16_t>(std::move(*buffers));
+            co_await transfer<std::int16_t>(*std::move(buffers));
         }
 
         SECTION("uint16_t") {
-            co_await transfer<std::uint16_t>(std::move(*buffers));
+            co_await transfer<std::uint16_t>(*std::move(buffers));
         }
 
         SECTION("int32_t") {
-            co_await transfer<std::int32_t>(std::move(*buffers));
+            co_await transfer<std::int32_t>(*std::move(buffers));
         }
 
         SECTION("uint32_t") {
-            co_await transfer<std::uint32_t>(std::move(*buffers));
+            co_await transfer<std::uint32_t>(*std::move(buffers));
         }
 
         SECTION("int64_t") {
-            co_await transfer<std::int64_t>(std::move(*buffers));
+            co_await transfer<std::int64_t>(*std::move(buffers));
         }
 
         SECTION("uint64_t") {
-            co_await transfer<std::uint64_t>(std::move(*buffers));
+            co_await transfer<std::uint64_t>(*std::move(buffers));
         }
     });
 }

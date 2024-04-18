@@ -65,7 +65,7 @@ const event_base *asyncio::EventLoop::base() const {
 tl::expected<void, std::error_code> asyncio::EventLoop::addNameserver(const char *ip) {
     auto address = net::addressFrom(ip, 0);
     EXPECT(address);
-    mNameservers.push_back(std::move(*address));
+    mNameservers.push_back(*std::move(address));
     return {};
 }
 
@@ -210,7 +210,7 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(const
 #endif
     EXPECT(framework);
 
-    return EventLoop{std::move(base), std::move(*framework), maxWorkers};
+    return EventLoop{std::move(base), *std::move(framework), maxWorkers};
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {

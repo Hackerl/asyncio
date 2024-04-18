@@ -66,7 +66,7 @@ tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::
         return tl::unexpected(events[1].error());
     }
 
-    return Socket{fd, {std::move(*events[0]), std::move(*events[1])}};
+    return Socket{fd, {*std::move(events[0]), *std::move(events[1])}};
 }
 
 zero::async::coroutine::Task<std::size_t, std::error_code>
@@ -389,7 +389,7 @@ tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::
     auto socket = Socket::make(std::holds_alternative<IPv4Address>(address) ? AF_INET : AF_INET6);
     EXPECT(socket);
     EXPECT(socket->bind(address));
-    return std::move(*socket);
+    return *std::move(socket);
 }
 
 tl::expected<asyncio::net::dgram::Socket, std::error_code>
@@ -403,7 +403,7 @@ asyncio::net::dgram::bind(std::span<const Address> addresses) {
         auto result = dgram::bind(*it);
 
         if (result)
-            return std::move(*result);
+            return *std::move(result);
 
         if (++it == addresses.end())
             return tl::unexpected(result.error());
@@ -422,7 +422,7 @@ asyncio::net::dgram::connect(const Address address) {
     auto socket = Socket::make(std::holds_alternative<IPv4Address>(address) ? AF_INET : AF_INET6);
     CO_EXPECT(socket);
     CO_EXPECT(co_await socket->connect(address));
-    co_return std::move(*socket);
+    co_return *std::move(socket);
 }
 
 zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
@@ -436,7 +436,7 @@ asyncio::net::dgram::connect(std::span<const Address> addresses) {
         auto result = co_await connect(*it);
 
         if (result)
-            co_return std::move(*result);
+            co_return *std::move(result);
 
         if (++it == addresses.end())
             co_return tl::unexpected(result.error());

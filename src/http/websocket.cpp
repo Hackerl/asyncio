@@ -71,7 +71,7 @@ const std::error_category &asyncio::http::ws::errorCategory() {
     return instance;
 }
 
-std::error_code asyncio::http::ws::make_error_code(Error e) {
+std::error_code asyncio::http::ws::make_error_code(const Error e) {
     return {static_cast<int>(e), errorCategory()};
 }
 
@@ -152,7 +152,7 @@ const std::error_category &asyncio::http::ws::closeCodeCategory() {
     return instance;
 }
 
-std::error_code asyncio::http::ws::make_error_code(CloseCode e) {
+std::error_code asyncio::http::ws::make_error_code(const CloseCode e) {
     return {static_cast<int>(e), closeCodeCategory()};
 }
 
@@ -189,7 +189,7 @@ void asyncio::http::ws::Header::length(std::size_t length) {
     mBytes[1] |= static_cast<std::byte>(length) & LENGTH_MASK;
 }
 
-void asyncio::http::ws::Header::mask(bool mask) {
+void asyncio::http::ws::Header::mask(const bool mask) {
     if (!mask) {
         mBytes[1] &= ~MASK_BIT;
         return;
@@ -412,14 +412,14 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
             return std::make_unique<net::stream::Buffer>(std::move(b));
         });
         CO_EXPECT(buf);
-        buffer = std::move(*buf);
+        buffer = *std::move(buf);
     }
     else if (*scheme == WS_SECURE_SCHEME) {
         auto buf = co_await net::ssl::stream::connect(*host, *port).transform([](net::ssl::stream::Buffer &&b) {
             return std::make_unique<net::ssl::stream::Buffer>(std::move(b));
         });
         CO_EXPECT(buf);
-        buffer = std::move(*buf);
+        buffer = *std::move(buf);
     }
     else {
         co_return tl::unexpected(UNSUPPORTED_WEBSOCKET_SCHEME);

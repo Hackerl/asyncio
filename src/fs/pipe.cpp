@@ -71,7 +71,7 @@ tl::expected<asyncio::fs::Pipe, std::error_code> asyncio::fs::Pipe::from(const F
     EXPECT(events[0]);
     EXPECT(events[1]);
 
-    return Pipe{fd, {std::move(*events[0]), std::move(*events[1])}};
+    return Pipe{fd, {*std::move(events[0]), *std::move(events[1])}};
 #endif
 }
 
@@ -275,8 +275,8 @@ tl::expected<std::array<asyncio::fs::Pipe, 2>, std::error_code> asyncio::fs::pip
     EXPECT(events[1]);
 
     return std::array{
-        Pipe{std::exchange(fds[0], -1), {std::move(*events[0]), std::nullopt}},
-        Pipe{std::exchange(fds[1], -1), {std::nullopt, std::move(*events[1])}}
+        Pipe{std::exchange(fds[0], -1), {*std::move(events[0]), std::nullopt}},
+        Pipe{std::exchange(fds[1], -1), {std::nullopt, *std::move(events[1])}}
     };
 #endif
 }

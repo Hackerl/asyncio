@@ -30,7 +30,7 @@ TEST_CASE("datagram network connection", "[net]") {
                     const auto n = co_await s.writeTo({data, num}, from);
                     REQUIRE(n);
                     REQUIRE(*n == num);
-                }(std::move(*server)),
+                }(*std::move(server)),
                 []() -> zero::async::coroutine::Task<void> {
                     auto client = asyncio::net::dgram::bind("127.0.0.1", 30001);
                     REQUIRE(client);
@@ -73,7 +73,7 @@ TEST_CASE("datagram network connection", "[net]") {
                     const auto n = co_await s.writeTo({data, num}, from);
                     REQUIRE(n);
                     REQUIRE(*n == num);
-                }(std::move(*server)),
+                }(*std::move(server)),
                 []() -> zero::async::coroutine::Task<void> {
                     auto client = co_await asyncio::net::dgram::connect("127.0.0.1", 30000);
                     REQUIRE(client);

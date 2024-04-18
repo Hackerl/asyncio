@@ -339,7 +339,8 @@ asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, const Addre
         const auto [port, ip] = std::get<IPv4Address>(address);
         co_return co_await connect(std::move(context), zero::os::net::stringify(ip), port);
     }
-    else if (std::holds_alternative<IPv6Address>(address)) {
+
+    if (std::holds_alternative<IPv6Address>(address)) {
         const auto &[port, ip, zone] = std::get<IPv6Address>(address);
         co_return co_await connect(std::move(context), zero::os::net::stringify(ip), port);
     }
@@ -358,7 +359,7 @@ asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> context, std::
         auto result = co_await connect(context, *it);
 
         if (result)
-            co_return std::move(*result);
+            co_return *std::move(result);
 
         if (++it == addresses.end())
             co_return tl::unexpected(result.error());

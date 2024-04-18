@@ -28,7 +28,7 @@ zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::stream::
             break;
         }
 
-        handle(std::move(*buffer)).future().fail([](const std::error_code &ec) {
+        handle(*std::move(buffer)).future().fail([](const std::error_code &ec) {
             fmt::print(stderr, "unhandled error: {}\n", ec.message());
         });
     }
@@ -53,6 +53,6 @@ zero::async::coroutine::Task<void, std::error_code> amain(int argc, char *argv[]
     auto signal = asyncio::ev::Signal::make(SIGINT);
     CO_EXPECT(signal);
 
-    co_await race(signal->on(), serve(std::move(*listener)));
+    co_await race(signal->on(), serve(*std::move(listener)));
     co_return tl::expected<void, std::error_code>{};
 }

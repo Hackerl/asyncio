@@ -167,7 +167,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                         const auto line = co_await buffer->readLine();
                         REQUIRE(line);
                         REQUIRE(*line == zero::strings::trim(MESSAGE));
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto ctx = asyncio::net::ssl::newContext(
                             {
@@ -268,7 +268,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                         const auto line = co_await buffer->readLine();
                         REQUIRE(line);
                         REQUIRE(*line == zero::strings::trim(MESSAGE));
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         const auto ctx = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
                         REQUIRE(ctx);

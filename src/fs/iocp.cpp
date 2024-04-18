@@ -1,6 +1,5 @@
 #include <asyncio/fs/iocp.h>
 #include <asyncio/promise.h>
-#include <zero/defer.h>
 #include <cassert>
 
 struct Request {

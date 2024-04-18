@@ -37,7 +37,7 @@ TEST_CASE("stream network connection", "[net]") {
                         const auto line = co_await buffer->readLine();
                         REQUIRE(line);
                         REQUIRE(*line == zero::strings::trim(MESSAGE));
-                    }(std::move(*listener)),
+                    }(*std::move(listener)),
                     []() -> zero::async::coroutine::Task<void> {
                         auto buffer = co_await asyncio::net::stream::connect("127.0.0.1", 30000);
                         REQUIRE(buffer);
@@ -100,7 +100,7 @@ TEST_CASE("stream network connection", "[net]") {
                             const auto line = co_await buffer->readLine();
                             REQUIRE(line);
                             REQUIRE(*line == zero::strings::trim(MESSAGE));
-                        }(std::move(*listener)),
+                        }(*std::move(listener)),
                         [](auto p) -> zero::async::coroutine::Task<void> {
                             auto buffer = co_await asyncio::net::stream::connect(p.string());
                             REQUIRE(buffer);
@@ -159,7 +159,7 @@ TEST_CASE("stream network connection", "[net]") {
                             const auto line = co_await buffer->readLine();
                             REQUIRE(line);
                             REQUIRE(*line == zero::strings::trim(MESSAGE));
-                        }(std::move(*listener)),
+                        }(*std::move(listener)),
                         []() -> zero::async::coroutine::Task<void> {
                             auto buffer = co_await asyncio::net::stream::connect("@asyncio-test.sock");
                             REQUIRE(buffer);

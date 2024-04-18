@@ -191,7 +191,7 @@ namespace asyncio::http {
                 body.c_str()
             );
 
-            co_return co_await perform(std::move(*connection));
+            co_return co_await perform(*std::move(connection));
         }
 
         zero::async::coroutine::Task<Response, std::error_code>

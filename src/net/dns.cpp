@@ -10,7 +10,7 @@ std::string asyncio::net::dns::ErrorCategory::message(const int value) const {
     return evutil_gai_strerror(value);
 }
 
-std::error_condition asyncio::net::dns::ErrorCategory::default_error_condition(int value) const noexcept {
+std::error_condition asyncio::net::dns::ErrorCategory::default_error_condition(const int value) const noexcept {
     std::error_condition condition;
 
     switch (value) {
@@ -93,7 +93,7 @@ asyncio::net::dns::getAddressInfo(
                 if (!address)
                     continue;
 
-                addresses.push_back(std::move(*address));
+                addresses.push_back(*std::move(address));
             }
 
             evutil_freeaddrinfo(res);
