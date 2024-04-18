@@ -188,7 +188,7 @@ asyncio::net::stream::connect(const Address address) {
         co_return co_await connect(zero::os::net::stringify(ip), port);
     }
 #if __unix__ || __APPLE__
-    else if (std::holds_alternative<UnixAddress>(address)) {
+    if (std::holds_alternative<UnixAddress>(address)) {
         co_return co_await connect(std::get<UnixAddress>(address).path);
     }
 #endif

@@ -280,7 +280,7 @@ tl::expected<asyncio::fs::File, std::error_code> asyncio::fs::open(const std::fi
 #ifdef _WIN32
         CloseHandle(handle);
 #else
-        ::close(fd);
+        close(fd);
 #endif
         return tl::unexpected(result.error());
     }

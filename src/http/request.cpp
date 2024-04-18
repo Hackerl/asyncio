@@ -2,7 +2,6 @@
 #include <asyncio/event_loop.h>
 #include <asyncio/fs/file.h>
 #include <asyncio/ev/event.h>
-#include <asyncio/error.h>
 #include <fcntl.h>
 #include <mutex>
 
@@ -305,7 +304,11 @@ void asyncio::http::Requests::onCURLEvent(const curl_socket_t s, const int what,
     event_assign(
         &context->e,
         getEventLoop()->base(),
+#ifdef _WIN32
         static_cast<evutil_socket_t>(s),
+#else
+        s,
+#endif
         static_cast<short>((what & CURL_POLL_IN ? ev::READ : 0) | (what & CURL_POLL_OUT ? ev::WRITE : 0) | EV_PERSIST),
         [](const evutil_socket_t fd, const short w, void *arg) {
             const auto ctx = static_cast<Context *>(arg);

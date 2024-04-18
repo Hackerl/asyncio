@@ -80,7 +80,7 @@ const asyncio::fs::IFramework &asyncio::EventLoop::framework() const {
 tl::expected<std::unique_ptr<evdns_base, void (*)(evdns_base *)>, std::error_code>
 asyncio::EventLoop::makeDNSBase() const {
 #ifdef __ANDROID__
-    auto dnsBase = std::unique_ptr<evdns_base, void (*)(evdns_base *)>(
+    std::unique_ptr<evdns_base, void (*)(evdns_base *)> dnsBase(
         evdns_base_new(mBase.get(), 0),
         [](evdns_base *b) {
             evdns_base_free(b, 1);
@@ -98,7 +98,7 @@ asyncio::EventLoop::makeDNSBase() const {
         return tl::unexpected(INVALID_NAMESERVER);
 #endif
 #else
-    auto dnsBase = std::unique_ptr<evdns_base, void (*)(evdns_base *)>(
+    std::unique_ptr<evdns_base, void (*)(evdns_base *)> dnsBase(
         evdns_base_new(mBase.get(), EVDNS_BASE_INITIALIZE_NAMESERVERS),
         [](evdns_base *b) {
             evdns_base_free(b, 1);
@@ -176,7 +176,7 @@ tl::expected<asyncio::EventLoop, std::error_code> asyncio::createEventLoop(const
     DEFER(event_config_free(cfg));
     event_config_set_flag(cfg, EVENT_BASE_FLAG_DISALLOW_SIGNALFD);
 
-    auto base = std::unique_ptr<event_base, decltype(event_base_free) *>(
+    std::unique_ptr<event_base, decltype(event_base_free) *> base(
         event_base_new_with_config(cfg),
         event_base_free
     );

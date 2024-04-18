@@ -51,7 +51,7 @@ tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::
         return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
     }
 
-    auto events = std::array{
+    std::array events = {
         ev::Event::make(fd, ev::What::READ),
         ev::Event::make(fd, ev::What::WRITE)
     };

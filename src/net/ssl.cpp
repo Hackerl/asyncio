@@ -97,7 +97,7 @@ std::shared_ptr<X509> readCertificate(const std::string_view content) {
 
 tl::expected<std::shared_ptr<asyncio::net::ssl::Context>, std::error_code>
 asyncio::net::ssl::newContext(const Config &config) {
-    auto ctx = std::shared_ptr<Context>(
+    std::shared_ptr<Context> ctx(
         SSL_CTX_new(TLS_method()),
         [](Context *context) {
             SSL_CTX_free(context);

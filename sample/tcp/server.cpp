@@ -36,7 +36,7 @@ zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::stream::
     co_return result;
 }
 
-zero::async::coroutine::Task<void, std::error_code> amain(int argc, char *argv[]) {
+zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");

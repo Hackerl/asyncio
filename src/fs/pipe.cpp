@@ -63,7 +63,7 @@ tl::expected<asyncio::fs::Pipe, std::error_code> asyncio::fs::Pipe::from(const F
     if (evutil_make_socket_nonblocking(fd) == -1)
         return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
-    auto events = std::array{
+    std::array events = {
         ev::Event::make(fd, ev::What::READ),
         ev::Event::make(fd, ev::What::WRITE)
     };
@@ -266,7 +266,7 @@ tl::expected<std::array<asyncio::fs::Pipe, 2>, std::error_code> asyncio::fs::pip
     if (evutil_make_socket_nonblocking(fds[0]) == -1 || evutil_make_socket_nonblocking(fds[1]) == -1)
         return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
-    auto events = std::array{
+    std::array events = {
         ev::Event::make(fds[0], ev::What::READ),
         ev::Event::make(fds[1], ev::What::WRITE)
     };

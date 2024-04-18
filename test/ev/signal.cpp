@@ -3,7 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <csignal>
 
-#ifndef _WIN32
+#ifdef __APPLE__
 #include <unistd.h>
 #endif
 

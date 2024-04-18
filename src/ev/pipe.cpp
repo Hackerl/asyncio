@@ -1,6 +1,5 @@
 #include <asyncio/ev/pipe.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <cassert>
 
 asyncio::ev::PairedBuffer::PairedBuffer(
