@@ -236,7 +236,7 @@ asyncio::net::ssl::stream::Buffer::make(
 }
 
 std::error_code asyncio::net::ssl::stream::Buffer::getError() const {
-    unsigned long e = bufferevent_get_openssl_error(mBev.get());
+    const unsigned long e = bufferevent_get_openssl_error(mBev.get());
 
     if (!e)
         return {EVUTIL_SOCKET_ERROR(), std::system_category()};

@@ -168,7 +168,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
             void *storage = malloc(sizeof(sockaddr_storage));
 
             if (!storage)
-                return tl::unexpected<std::error_code>(errno, std::system_category());
+                return tl::unexpected<std::error_code>(errno, std::generic_category());
 
             memset(storage, 0, sizeof(sockaddr_storage));
 

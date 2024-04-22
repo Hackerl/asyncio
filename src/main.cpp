@@ -1,6 +1,8 @@
 #include <asyncio/event_loop.h>
 
-#if __unix__ || __APPLE__
+#ifdef _WIN32
+#include <zero/defer.h>
+#elif __unix__ || __APPLE__
 #include <csignal>
 #endif
 
@@ -12,20 +14,18 @@ int main(const int argc, char *argv[]) {
 
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
         throw std::system_error(WSAGetLastError(), std::system_category());
-#endif
 
-#if __unix__ || __APPLE__
+    DEFER(
+        if (WSACleanup() != 0)
+            throw std::system_error(WSAGetLastError(), std::system_category())
+    );
+#elif __unix__ || __APPLE__
     signal(SIGPIPE, SIG_IGN);
 #endif
 
     const auto result = asyncio::run([=] {
         return amain(argc, argv);
     });
-
-#ifdef _WIN32
-    if (WSACleanup() != 0)
-        throw std::system_error(WSAGetLastError(), std::system_category());
-#endif
 
     if (!result)
         throw std::system_error(result.error());
