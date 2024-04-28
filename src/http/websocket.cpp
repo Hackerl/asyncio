@@ -2,6 +2,7 @@
 #include <asyncio/net/ssl.h>
 #include <asyncio/binary.h>
 #include <zero/encoding/base64.h>
+#include <zero/singleton.h>
 #include <zero/expect.h>
 #include <zero/defer.h>
 #include <cassert>
@@ -30,11 +31,53 @@ constexpr auto WS_SCHEME = "http";
 constexpr auto WS_SECURE_SCHEME = "https";
 constexpr auto WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-const char *asyncio::http::ws::ErrorCategory::name() const noexcept {
-    return "asyncio::http::ws";
+asyncio::http::ws::Opcode asyncio::http::ws::Header::opcode() const {
+    return static_cast<Opcode>(mBytes[0] & OPCODE_MASK);
 }
 
-std::string asyncio::http::ws::ErrorCategory::message(const int value) const {
+bool asyncio::http::ws::Header::final() const {
+    return std::to_integer<int>(mBytes[0] & FINAL_BIT);
+}
+
+std::size_t asyncio::http::ws::Header::length() const {
+    return std::to_integer<int>(mBytes[1] & LENGTH_MASK);
+}
+
+bool asyncio::http::ws::Header::mask() const {
+    return std::to_integer<int>(mBytes[1] & MASK_BIT);
+}
+
+void asyncio::http::ws::Header::opcode(const Opcode opcode) {
+    mBytes[0] |= static_cast<std::byte>(opcode) & OPCODE_MASK;
+}
+
+void asyncio::http::ws::Header::final(const bool final) {
+    if (!final) {
+        mBytes[0] &= ~FINAL_BIT;
+        return;
+    }
+
+    mBytes[0] |= FINAL_BIT;
+}
+
+void asyncio::http::ws::Header::length(const std::size_t length) {
+    mBytes[1] |= static_cast<std::byte>(length) & LENGTH_MASK;
+}
+
+void asyncio::http::ws::Header::mask(const bool mask) {
+    if (!mask) {
+        mBytes[1] &= ~MASK_BIT;
+        return;
+    }
+
+    mBytes[1] |= MASK_BIT;
+}
+
+const char *asyncio::http::ws::WebSocket::ErrorCategory::name() const noexcept {
+    return "asyncio::http::ws::WebSocket";
+}
+
+std::string asyncio::http::ws::WebSocket::ErrorCategory::message(const int value) const {
     std::string msg;
 
     switch (value) {
@@ -46,16 +89,8 @@ std::string asyncio::http::ws::ErrorCategory::message(const int value) const {
         msg = "unsupported opcode";
         break;
 
-    case UNSUPPORTED_WEBSOCKET_SCHEME:
-        msg = "unsupported websocket scheme";
-        break;
-
-    case WEBSOCKET_NOT_CONNECTED:
+    case NOT_CONNECTED:
         msg = "websocket not connected";
-        break;
-
-    case WEBSOCKET_HANDSHAKE_FAILED:
-        msg = "websocket handshake failed";
         break;
 
     default:
@@ -66,20 +101,11 @@ std::string asyncio::http::ws::ErrorCategory::message(const int value) const {
     return msg;
 }
 
-const std::error_category &asyncio::http::ws::errorCategory() {
-    static ErrorCategory instance;
-    return instance;
+const char *asyncio::http::ws::WebSocket::CloseCodeCategory::name() const noexcept {
+    return "asyncio::http::ws::WebSocket::close";
 }
 
-std::error_code asyncio::http::ws::make_error_code(const Error e) {
-    return {static_cast<int>(e), errorCategory()};
-}
-
-const char *asyncio::http::ws::CloseCodeCategory::name() const noexcept {
-    return "asyncio::http::ws::close";
-}
-
-std::string asyncio::http::ws::CloseCodeCategory::message(const int value) const {
+std::string asyncio::http::ws::WebSocket::CloseCodeCategory::message(const int value) const {
     std::string msg;
 
     switch (value) {
@@ -145,57 +171,6 @@ std::string asyncio::http::ws::CloseCodeCategory::message(const int value) const
     }
 
     return msg;
-}
-
-const std::error_category &asyncio::http::ws::closeCodeCategory() {
-    static CloseCodeCategory instance;
-    return instance;
-}
-
-std::error_code asyncio::http::ws::make_error_code(const CloseCode e) {
-    return {static_cast<int>(e), closeCodeCategory()};
-}
-
-asyncio::http::ws::Opcode asyncio::http::ws::Header::opcode() const {
-    return static_cast<Opcode>(mBytes[0] & OPCODE_MASK);
-}
-
-bool asyncio::http::ws::Header::final() const {
-    return std::to_integer<int>(mBytes[0] & FINAL_BIT);
-}
-
-std::size_t asyncio::http::ws::Header::length() const {
-    return std::to_integer<int>(mBytes[1] & LENGTH_MASK);
-}
-
-bool asyncio::http::ws::Header::mask() const {
-    return std::to_integer<int>(mBytes[1] & MASK_BIT);
-}
-
-void asyncio::http::ws::Header::opcode(Opcode opcode) {
-    mBytes[0] |= static_cast<std::byte>(opcode) & OPCODE_MASK;
-}
-
-void asyncio::http::ws::Header::final(const bool final) {
-    if (!final) {
-        mBytes[0] &= ~FINAL_BIT;
-        return;
-    }
-
-    mBytes[0] |= FINAL_BIT;
-}
-
-void asyncio::http::ws::Header::length(std::size_t length) {
-    mBytes[1] |= static_cast<std::byte>(length) & LENGTH_MASK;
-}
-
-void asyncio::http::ws::Header::mask(const bool mask) {
-    if (!mask) {
-        mBytes[1] &= ~MASK_BIT;
-        return;
-    }
-
-    mBytes[1] |= MASK_BIT;
 }
 
 asyncio::http::ws::WebSocket::WebSocket(std::unique_ptr<IBuffer> buffer)
@@ -366,13 +341,13 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
 }
 
 zero::async::coroutine::Task<void, std::error_code>
-asyncio::http::ws::WebSocket::sendBinary(std::span<const std::byte> data) const {
+asyncio::http::ws::WebSocket::sendBinary(const std::span<const std::byte> data) const {
     co_return co_await writeMessage({BINARY, std::vector<std::byte>{data.begin(), data.end()}});
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
     if (mState != CONNECTED)
-        co_return tl::unexpected(WEBSOCKET_NOT_CONNECTED);
+        co_return tl::unexpected(NOT_CONNECTED);
 
     mState = CLOSING;
     const auto c = htons(code);
@@ -396,7 +371,59 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
     co_return tl::expected<void, std::error_code>{};
 }
 
-zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::connect(URL url) {
+std::error_code asyncio::http::ws::make_error_code(const WebSocket::Error e) {
+    return {static_cast<int>(e), zero::Singleton<WebSocket::ErrorCategory>::getInstance()};
+}
+
+std::error_code asyncio::http::ws::make_error_code(const WebSocket::CloseCode e) {
+    return {static_cast<int>(e), zero::Singleton<WebSocket::CloseCodeCategory>::getInstance()};
+}
+
+const char *asyncio::http::ws::HandshakeErrorCategory::name() const noexcept {
+    return "asyncio::http::ws::handshake";
+}
+
+std::string asyncio::http::ws::HandshakeErrorCategory::message(const int value) const {
+    std::string msg;
+
+    switch (value) {
+    case UNSUPPORTED_SCHEME:
+        msg = "unsupported websocket scheme";
+        break;
+
+    case INVALID_RESPONSE:
+        msg = "invalid http response";
+        break;
+
+    case UNEXPECTED_STATUS_CODE:
+        msg = "unexpected http response status code";
+        break;
+
+    case INVALID_HTTP_HEADER:
+        msg = "invalid http header";
+        break;
+
+    case NO_ACCEPT_HEADER:
+        msg = "no websocket accept header";
+        break;
+
+    case HASH_MISMATCH:
+        msg = "hash mismatch";
+        break;
+
+    default:
+        msg = "unknown";
+        break;
+    }
+
+    return msg;
+}
+
+std::error_code asyncio::http::ws::make_error_code(const HandshakeError e) {
+    return {e, zero::Singleton<HandshakeErrorCategory>::getInstance()};
+}
+
+zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::connect(const URL url) {
     const auto scheme = url.scheme();
     const auto host = url.host();
     const auto port = url.port();
@@ -422,7 +449,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
         buffer = *std::move(buf);
     }
     else {
-        co_return tl::unexpected(UNSUPPORTED_WEBSOCKET_SCHEME);
+        co_return tl::unexpected(UNSUPPORTED_SCHEME);
     }
 
     std::random_device rd;
@@ -460,13 +487,13 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     auto tokens = zero::strings::split(*line);
 
     if (tokens.size() < 2)
-        co_return tl::unexpected(WEBSOCKET_HANDSHAKE_FAILED);
+        co_return tl::unexpected(INVALID_RESPONSE);
 
     const auto code = zero::strings::toNumber<int>(tokens[1]);
     CO_EXPECT(code);
 
     if (code != SWITCHING_PROTOCOLS_STATUS)
-        co_return tl::unexpected(WEBSOCKET_HANDSHAKE_FAILED);
+        co_return tl::unexpected(UNEXPECTED_STATUS_CODE);
 
     std::map<std::string, std::string> headers;
 
@@ -480,7 +507,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
         tokens = zero::strings::split(*line, ":", 1);
 
         if (tokens.size() != 2)
-            co_return tl::unexpected(WEBSOCKET_HANDSHAKE_FAILED);
+            co_return tl::unexpected(INVALID_HTTP_HEADER);
 
         headers[tokens[0]] = zero::strings::trim(tokens[1]);
     }
@@ -488,7 +515,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     const auto it = headers.find("Sec-WebSocket-Accept");
 
     if (it == headers.end())
-        co_return tl::unexpected(WEBSOCKET_HANDSHAKE_FAILED);
+        co_return tl::unexpected(NO_ACCEPT_HEADER);
 
     std::byte digest[SHA_DIGEST_LENGTH];
     const std::string data = key + WS_MAGIC;
@@ -496,7 +523,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     SHA1(reinterpret_cast<const unsigned char *>(data.data()), data.size(), reinterpret_cast<unsigned char *>(digest));
 
     if (it->second != zero::encoding::base64::encode(digest))
-        co_return tl::unexpected(WEBSOCKET_HANDSHAKE_FAILED);
+        co_return tl::unexpected(HASH_MISMATCH);
 
     co_return WebSocket{std::move(buffer)};
 }

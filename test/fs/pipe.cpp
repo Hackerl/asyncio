@@ -1,6 +1,5 @@
 #include <asyncio/fs/pipe.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <catch2/catch_test_macros.hpp>
 
 #if __unix__ || __APPLE__
@@ -29,8 +28,8 @@ TEST_CASE("pipe", "[fs]") {
                         REQUIRE(memcmp(data, "hello world", 11) == 0);
 
                         const auto n = co_await pipe.read(data);
-                        REQUIRE(!n);
-                        REQUIRE(n.error() == asyncio::Error::IO_EOF);
+                        REQUIRE(n);
+                        REQUIRE(*n == 0);
                     }(std::move(pipes->at(0))),
                     [](auto pipe) -> zero::async::coroutine::Task<void> {
                         constexpr std::string_view message = "hello world";
@@ -71,7 +70,7 @@ TEST_CASE("pipe", "[fs]") {
                 std::byte data[11];
                 const auto result = co_await asyncio::timeout(pipes->at(0).read(data), 10ms);
                 REQUIRE(!result);
-                REQUIRE(result.error() == std::errc::timed_out);
+                REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
             }
         }
 
@@ -105,8 +104,8 @@ TEST_CASE("pipe", "[fs]") {
                     REQUIRE(memcmp(data, "hello world", 11) == 0);
 
                     const auto n = co_await pipe.read(data);
-                    REQUIRE(!n);
-                    REQUIRE(n.error() == asyncio::Error::IO_EOF);
+                    REQUIRE(n);
+                    REQUIRE(*n == 0);
                 }(*std::move(reader)),
                 [](auto pipe) -> zero::async::coroutine::Task<void> {
                     constexpr std::string_view message = "hello world";

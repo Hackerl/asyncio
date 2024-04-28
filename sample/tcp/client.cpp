@@ -1,4 +1,3 @@
-#include <asyncio/error.h>
 #include <asyncio/net/stream.h>
 #include <asyncio/event_loop.h>
 #include <zero/cmdline.h>
@@ -26,7 +25,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
         const auto line = co_await buffer->readLine();
 
         if (!line) {
-            if (line.error() != asyncio::Error::IO_EOF)
+            if (line.error() != asyncio::IOError::UNEXPECTED_EOF)
                 co_return tl::unexpected(line.error());
 
             break;

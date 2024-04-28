@@ -59,7 +59,7 @@ TEST_CASE("async channel buffer", "[channel]") {
 
     asyncio::run([&]() -> zero::async::coroutine::Task<void> {
         SECTION("async sender/async receiver") {
-            const auto channel = asyncio::makeChannel<int>(100);
+            const auto channel = asyncio::Channel<int>::make(100);
 
             co_await allSettled(
                 [](auto ch, auto ct) -> zero::async::coroutine::Task<void> {
@@ -81,7 +81,7 @@ TEST_CASE("async channel buffer", "[channel]") {
 
         SECTION("sync sender/async receiver") {
             SECTION("normal") {
-                const auto channel = asyncio::makeChannel<int>(100);
+                const auto channel = asyncio::Channel<int>::make(100);
 
                 co_await allSettled(
                     [](auto ch, auto ct) -> zero::async::coroutine::Task<void> {
@@ -107,7 +107,7 @@ TEST_CASE("async channel buffer", "[channel]") {
             }
 
             SECTION("send timeout") {
-                const auto channel = asyncio::makeChannel<int>(2);
+                const auto channel = asyncio::Channel<int>::make(2);
 
                 co_await asyncio::toThread([=]() -> tl::expected<void, std::error_code> {
                     auto result = channel->sendSync(0, 20ms);
@@ -132,7 +132,7 @@ TEST_CASE("async channel buffer", "[channel]") {
 
         SECTION("async sender/sync receiver") {
             SECTION("normal") {
-                const auto channel = asyncio::makeChannel<int>(100);
+                const auto channel = asyncio::Channel<int>::make(100);
 
                 co_await allSettled(
                     [](auto ch, auto ct) -> zero::async::coroutine::Task<void> {
@@ -165,7 +165,7 @@ TEST_CASE("async channel buffer", "[channel]") {
             }
 
             SECTION("receive timeout") {
-                const auto channel = asyncio::makeChannel<int>(2);
+                const auto channel = asyncio::Channel<int>::make(2);
 
                 co_await asyncio::toThread([=]() -> tl::expected<void, std::error_code> {
                     const auto result = channel->receiveSync(20ms);

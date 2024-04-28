@@ -17,7 +17,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
         auto message = co_await ws->readMessage();
 
         if (!message) {
-            if (message.error() != asyncio::http::ws::CloseCode::NORMAL_CLOSURE)
+            if (message.error() != asyncio::http::ws::WebSocket::CloseCode::NORMAL_CLOSURE)
                 co_return tl::unexpected(message.error());
 
             break;

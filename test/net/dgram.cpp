@@ -1,6 +1,5 @@
 #include <asyncio/net/dgram.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/std.h>
 
@@ -109,7 +108,7 @@ TEST_CASE("datagram network connection", "[net]") {
             std::byte data[1024];
             const auto result = co_await asyncio::timeout(server->readFrom(data), 50ms);
             REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::timed_out);
+            REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
         }
     });
 }

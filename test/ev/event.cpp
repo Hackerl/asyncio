@@ -62,7 +62,7 @@ TEST_CASE("async event notification", "[ev]") {
         SECTION("timeout") {
             const auto result = co_await asyncio::timeout(events[0]->on(), 10ms);
             REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::timed_out);
+            REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
         }
     });
 

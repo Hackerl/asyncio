@@ -32,8 +32,10 @@ namespace asyncio::net::dgram {
 
         [[nodiscard]] FileDescriptor fd() const override;
 
-        void setTimeout(std::chrono::milliseconds timeout) override;
-        void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
+        tl::expected<void, std::error_code> setTimeout(std::chrono::milliseconds timeout) override;
+
+        tl::expected<void, std::error_code>
+        setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     private:
         FileDescriptor mFD;

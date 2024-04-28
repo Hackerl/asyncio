@@ -1,5 +1,4 @@
 #include <asyncio/fs/file.h>
-#include <asyncio/error.h>
 #include <zero/filesystem/file.h>
 #include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
@@ -29,8 +28,8 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
                 REQUIRE(memcmp(data, "world", 5) == 0);
 
                 n = co_await file->read(data);
-                REQUIRE(!n);
-                REQUIRE(n.error() == asyncio::Error::IO_EOF);
+                REQUIRE(n);
+                REQUIRE(*n == 0);
             }
 
             SECTION("read all") {
@@ -40,9 +39,9 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
                 REQUIRE(memcmp(result->data(), CONTENT.data(), CONTENT.size()) == 0);
 
                 std::byte data[1024];
-                const auto res = co_await file->read(data);
-                REQUIRE(!res);
-                REQUIRE(res.error() == asyncio::Error::IO_EOF);
+                const auto n = co_await file->read(data);
+                REQUIRE(n);
+                REQUIRE(*n == 0);
             }
 
             SECTION("write") {
@@ -225,8 +224,8 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
             REQUIRE(*pos == CONTENT.size() * 2);
 
             n = co_await file->read(data);
-            REQUIRE(!n);
-            REQUIRE(n.error() == asyncio::Error::IO_EOF);
+            REQUIRE(n);
+            REQUIRE(*n == 0);
             REQUIRE(file->rewind());
 
             n = co_await file->read(data);
@@ -350,8 +349,8 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
             REQUIRE(memcmp(data, "world", 5) == 0);
 
             n = co_await file->read(data);
-            REQUIRE(!n);
-            REQUIRE(n.error() == asyncio::Error::IO_EOF);
+            REQUIRE(n);
+            REQUIRE(*n == 0);
         }
     });
 

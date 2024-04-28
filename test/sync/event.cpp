@@ -37,9 +37,9 @@ TEST_CASE("asyncio event", "[sync]") {
         SECTION("timeout") {
             co_await allSettled(
                 [](auto e) -> zero::async::coroutine::Task<void> {
-                    const auto result = co_await e->wait(10ms);
+                    const auto result = co_await asyncio::timeout(e->wait(), 10ms);
                     REQUIRE(!result);
-                    REQUIRE(result.error() == std::errc::timed_out);
+                    REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
                     REQUIRE(!e->isSet());
                 }(event),
                 [](auto e) -> zero::async::coroutine::Task<void> {
@@ -83,7 +83,7 @@ TEST_CASE("asyncio event", "[sync]") {
                 }(event)
             );
 
-            task.cancel();
+            REQUIRE(task.cancel());
             co_await task;
         }
     });

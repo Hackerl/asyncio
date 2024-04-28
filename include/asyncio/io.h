@@ -8,6 +8,29 @@
 #include <zero/async/coroutine.h>
 
 namespace asyncio {
+    enum IOError {
+        BROKEN_PIPE = 1,
+        INVALID_ARGUMENT,
+        TIMED_OUT,
+        DEVICE_OR_RESOURCE_BUSY,
+        NOT_SUPPORTED,
+        OPERATION_NOT_SUPPORTED,
+        FUNCTION_NOT_SUPPORTED,
+        UNEXPECTED_EOF,
+        BAD_FILE_DESCRIPTOR,
+        NOT_ENOUGH_MEMORY,
+        ADDRESS_FAMILY_NOT_SUPPORTED
+    };
+
+    class IOErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    std::error_code make_error_code(IOError e);
+
     constexpr auto INVALID_FILE_DESCRIPTOR = -1;
     constexpr auto DEFAULT_BUFFER_CAPACITY = 1024 * 1024;
 
@@ -38,8 +61,10 @@ namespace asyncio {
 
     class IDeadline : public virtual zero::Interface {
     public:
-        virtual void setTimeout(std::chrono::milliseconds timeout) = 0;
-        virtual void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
+        virtual tl::expected<void, std::error_code> setTimeout(std::chrono::milliseconds timeout) = 0;
+
+        virtual tl::expected<void, std::error_code>
+        setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
     };
 
     class ISeekable : public virtual zero::Interface {
@@ -114,5 +139,9 @@ namespace asyncio {
         );
     }
 }
+
+template<>
+struct std::is_error_code_enum<asyncio::IOError> : std::true_type {
+};
 
 #endif //ASYNCIO_IO_H

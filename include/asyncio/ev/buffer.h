@@ -23,6 +23,8 @@ namespace asyncio::ev {
     private:
         void onEvent(short what);
         void onClose(const std::error_code &ec);
+        void controlReadEvent(bool enable);
+        void controlWriteEvent(bool enable);
 
         [[nodiscard]] virtual std::error_code getError() const;
 
@@ -44,8 +46,10 @@ namespace asyncio::ev {
         [[nodiscard]] std::size_t capacity() const override;
         [[nodiscard]] FileDescriptor fd() const override;
 
-        void setTimeout(std::chrono::milliseconds timeout) override;
-        void setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
+        tl::expected<void, std::error_code> setTimeout(std::chrono::milliseconds timeout) override;
+
+        tl::expected<void, std::error_code>
+        setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     protected:
         bool mClosed;

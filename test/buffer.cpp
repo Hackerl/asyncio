@@ -1,7 +1,6 @@
 #include <asyncio/buffer.h>
 #include <asyncio/event_loop.h>
 #include <asyncio/fs/pipe.h>
-#include <asyncio/error.h>
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("asyncio buffer", "[buffer]") {
@@ -31,8 +30,8 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                             REQUIRE(r.available() == 0);
 
                             n = co_await r.read(data);
-                            REQUIRE(!n);
-                            REQUIRE(n.error() == asyncio::Error::IO_EOF);
+                            REQUIRE(n);
+                            REQUIRE(*n == 0);
                         }(std::move(reader)),
                         [](auto pipe) -> zero::async::coroutine::Task<void> {
                             constexpr std::string_view message = "hello world";
@@ -55,7 +54,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
 
                             line = co_await r.readLine();
                             REQUIRE(!line);
-                            REQUIRE(line.error() == asyncio::Error::IO_EOF);
+                            REQUIRE(line.error() == asyncio::IOError::UNEXPECTED_EOF);
                         }(std::move(reader)),
                         [](auto pipe) -> zero::async::coroutine::Task<void> {
                             constexpr std::string_view message = "hello world hello world\r\nhello ";
@@ -81,7 +80,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
 
                             result = co_await r.readUntil(std::byte{'\1'});
                             REQUIRE(!result);
-                            REQUIRE(result.error() == asyncio::Error::IO_EOF);
+                            REQUIRE(result.error() == asyncio::IOError::UNEXPECTED_EOF);
                         }(std::move(reader)),
                         [](auto pipe) -> zero::async::coroutine::Task<void> {
                             constexpr std::string_view message = "hello world hello world\1hello ";
@@ -145,8 +144,8 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(r.available() == 0);
 
                         n = co_await r.read(data);
-                        REQUIRE(!n);
-                        REQUIRE(n.error() == asyncio::Error::IO_EOF);
+                        REQUIRE(n);
+                        REQUIRE(*n == 0);
                     }(std::move(reader)),
                     [](auto pipe) -> zero::async::coroutine::Task<void> {
                         constexpr std::string_view message = "hello world";
@@ -175,8 +174,8 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(r.available() == 0);
 
                         n = co_await r.read(data);
-                        REQUIRE(!n);
-                        REQUIRE(n.error() == asyncio::Error::IO_EOF);
+                        REQUIRE(n);
+                        REQUIRE(*n == 0);
                     }(std::move(reader)),
                     [](auto pipe) -> zero::async::coroutine::Task<void> {
                         constexpr std::string_view message = "hello world";
@@ -204,8 +203,8 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(memcmp(data, "hello world", 11) == 0);
 
                         const auto n = co_await pipe.read(data);
-                        REQUIRE(!n);
-                        REQUIRE(n.error() == asyncio::Error::IO_EOF);
+                        REQUIRE(n);
+                        REQUIRE(*n == 0);
                     }(std::move(pipes->at(0))),
                     [](auto w) -> zero::async::coroutine::Task<void> {
                         constexpr std::string_view message = "hello world";
@@ -239,8 +238,8 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(memcmp(data, "hello world", 11) == 0);
 
                         const auto n = co_await pipe.read(data);
-                        REQUIRE(!n);
-                        REQUIRE(n.error() == asyncio::Error::IO_EOF);
+                        REQUIRE(n);
+                        REQUIRE(*n == 0);
                     }(std::move(pipes->at(0))),
                     [](auto w) -> zero::async::coroutine::Task<void> {
                         constexpr std::string_view message = "hello world";
@@ -274,8 +273,8 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(memcmp(data, "hello world", 11) == 0);
 
                         const auto n = co_await pipe.read(data);
-                        REQUIRE(!n);
-                        REQUIRE(n.error() == asyncio::Error::IO_EOF);
+                        REQUIRE(n);
+                        REQUIRE(*n == 0);
                     }(std::move(pipes->at(0))),
                     [](auto w) -> zero::async::coroutine::Task<void> {
                         constexpr std::string_view message = "hello world";

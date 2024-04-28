@@ -303,7 +303,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 
   ```cpp
   asyncio::run([]() -> zero::async::coroutine::Task<void> {
-      auto channel = asyncio::makeChannel<int>(100);
+      auto channel = asyncio::Channel<int>::make(100);
 
       co_await zero::async::coroutine::allSettled(
               [](auto channel) -> zero::async::coroutine::Task<void, std::error_code> {
@@ -346,7 +346,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 
   ```cpp
   asyncio::run([]() -> zero::async::coroutine::Task<void> {
-      auto channel = asyncio::makeChannel<int>(100);
+      auto channel = asyncio::Channel<int>::make(100);
 
       co_await zero::async::coroutine::allSettled(
               [](auto channel) -> zero::async::coroutine::Task<void, std::error_code> {

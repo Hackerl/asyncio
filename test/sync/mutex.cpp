@@ -58,9 +58,9 @@ TEST_CASE("asyncio mutex", "[sync]") {
         SECTION("timeout") {
             co_await allSettled(
                 [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await m->lock(10ms);
+                    const auto res = co_await asyncio::timeout(m->lock(), 10ms);
                     REQUIRE(!res);
-                    REQUIRE(res.error() == std::errc::timed_out);
+                    REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
                 }(mutex),
                 [](auto m) -> zero::async::coroutine::Task<void> {
                     const auto res = co_await m->lock();
@@ -99,7 +99,7 @@ TEST_CASE("asyncio mutex", "[sync]") {
                 }(mutex)
             );
 
-            task.cancel();
+            REQUIRE(task.cancel());
             co_await task;
             REQUIRE(mutex->locked());
         }

@@ -118,7 +118,7 @@ void asyncio::fs::AIO::onEvent() const {
     }
 }
 
-tl::expected<void, std::error_code> asyncio::fs::AIO::associate(FileDescriptor fd) {
+tl::expected<void, std::error_code> asyncio::fs::AIO::associate(const FileDescriptor) {
     return {};
 }
 
@@ -127,7 +127,7 @@ asyncio::fs::AIO::read(
     std::shared_ptr<EventLoop> eventLoop,
     const FileDescriptor fd,
     const std::uint64_t offset,
-    std::span<std::byte> data
+    const std::span<std::byte> data
 ) {
     iocb cb = {};
     Promise<std::size_t, std::error_code> promise(std::move(eventLoop));
@@ -146,16 +146,16 @@ asyncio::fs::AIO::read(
 
     co_return co_await zero::async::coroutine::Cancellable{
         promise.getFuture(),
-        [&, this]() -> tl::expected<void, std::error_code> {
+        [&]() -> tl::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             io_event result = {};
 
             if (io_cancel(mContext, &cb, &result) != 0)
                 return tl::unexpected<std::error_code>(errno, std::system_category());
 
-            promise.reject(make_error_code(std::errc::operation_canceled));
+            promise.reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     };
@@ -166,7 +166,7 @@ asyncio::fs::AIO::write(
     std::shared_ptr<EventLoop> eventLoop,
     const FileDescriptor fd,
     const std::uint64_t offset,
-    std::span<const std::byte> data
+    const std::span<const std::byte> data
 ) {
     iocb cb = {};
     Promise<std::size_t, std::error_code> promise(std::move(eventLoop));
@@ -185,16 +185,16 @@ asyncio::fs::AIO::write(
 
     co_return co_await zero::async::coroutine::Cancellable{
         promise.getFuture(),
-        [&, this]() -> tl::expected<void, std::error_code> {
+        [&]() -> tl::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             io_event result = {};
 
             if (io_cancel(mContext, &cb, &result) != 0)
                 return tl::unexpected<std::error_code>(errno, std::system_category());
 
-            promise.reject(make_error_code(std::errc::operation_canceled));
+            promise.reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     };

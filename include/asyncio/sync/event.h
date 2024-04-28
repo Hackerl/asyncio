@@ -7,8 +7,7 @@
 namespace asyncio::sync {
     class Event {
     public:
-        zero::async::coroutine::Task<void, std::error_code>
-        wait(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
+        zero::async::coroutine::Task<void, std::error_code> wait();
 
         void set();
         void reset();

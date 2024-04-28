@@ -6,15 +6,13 @@
 namespace asyncio::sync {
     class Condition {
     public:
-        zero::async::coroutine::Task<void, std::error_code>
-        wait(Mutex &mutex, std::optional<std::chrono::milliseconds> timeout = std::nullopt);
+        zero::async::coroutine::Task<void, std::error_code> wait(Mutex &mutex);
 
         template<typename F>
             requires std::is_invocable_v<F>
-        zero::async::coroutine::Task<void, std::error_code>
-        wait(Mutex &mutex, F predicate, const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
+        zero::async::coroutine::Task<void, std::error_code> wait(Mutex &mutex, F predicate) {
             while (!predicate()) {
-                CO_EXPECT(co_await wait(mutex, timeout));
+                CO_EXPECT(co_await wait(mutex));
             }
 
             co_return tl::expected<void, std::error_code>{};

@@ -1,7 +1,32 @@
 #include <asyncio/fs/posix.h>
 #include <asyncio/event_loop.h>
+#include <zero/singleton.h>
 #include <csignal>
 #include <cassert>
+
+const char *asyncio::fs::PosixAIO::ErrorCategory::name() const noexcept {
+    return "asyncio::fs::PosixAIO";
+}
+
+std::string asyncio::fs::PosixAIO::ErrorCategory::message(const int value) const {
+    std::string msg;
+
+    switch (value) {
+    case ALL_DONE:
+        msg = "all requests had already been completed before the call";
+        break;
+
+    case NOT_CANCELED:
+        msg = "at least one of the requests specified was not canceled because it was in progress";
+        break;
+
+    default:
+        msg = "unknown";
+        break;
+    }
+
+    return msg;
+}
 
 asyncio::fs::PosixAIO::PosixAIO(std::unique_ptr<event, decltype(event_free) *> event) : mEvent(std::move(event)) {
     const auto e = mEvent.get();
@@ -76,7 +101,7 @@ void asyncio::fs::PosixAIO::onSignal() {
     }
 }
 
-tl::expected<void, std::error_code> asyncio::fs::PosixAIO::associate(FileDescriptor fd) {
+tl::expected<void, std::error_code> asyncio::fs::PosixAIO::associate(const FileDescriptor) {
     return {};
 }
 
@@ -85,7 +110,7 @@ asyncio::fs::PosixAIO::read(
     std::shared_ptr<EventLoop> eventLoop,
     const FileDescriptor fd,
     const std::uint64_t offset,
-    std::span<std::byte> data
+    const std::span<std::byte> data
 ) {
     aiocb cb = {};
 
@@ -107,9 +132,9 @@ asyncio::fs::PosixAIO::read(
 
     co_return co_await zero::async::coroutine::Cancellable{
         pending.promise.getFuture(),
-        [&, this]() -> tl::expected<void, std::error_code> {
+        [&]() -> tl::expected<void, std::error_code> {
             if (pending.promise.isFulfilled())
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             const int result = aio_cancel(fd, pending.cb);
 
@@ -117,13 +142,13 @@ asyncio::fs::PosixAIO::read(
                 return tl::unexpected<std::error_code>(errno, std::system_category());
 
             if (result == AIO_ALLDONE)
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(ALL_DONE);
 
             if (result == AIO_NOTCANCELED)
-                return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+                return tl::unexpected(NOT_CANCELED);
 
             mPending.remove(&pending);
-            pending.promise.reject(make_error_code(std::errc::operation_canceled));
+            pending.promise.reject(zero::async::coroutine::Error::CANCELLED);
 
             return {};
         }
@@ -135,7 +160,7 @@ asyncio::fs::PosixAIO::write(
     std::shared_ptr<EventLoop> eventLoop,
     const FileDescriptor fd,
     const std::uint64_t offset,
-    std::span<const std::byte> data
+    const std::span<const std::byte> data
 ) {
     aiocb cb = {};
 
@@ -157,9 +182,9 @@ asyncio::fs::PosixAIO::write(
 
     co_return co_await zero::async::coroutine::Cancellable{
         pending.promise.getFuture(),
-        [&, this]() -> tl::expected<void, std::error_code> {
+        [&]() -> tl::expected<void, std::error_code> {
             if (pending.promise.isFulfilled())
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             const int result = aio_cancel(fd, pending.cb);
 
@@ -167,15 +192,19 @@ asyncio::fs::PosixAIO::write(
                 return tl::unexpected<std::error_code>(errno, std::system_category());
 
             if (result == AIO_ALLDONE)
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(ALL_DONE);
 
             if (result == AIO_NOTCANCELED)
-                return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+                return tl::unexpected(NOT_CANCELED);
 
             mPending.remove(&pending);
-            pending.promise.reject(make_error_code(std::errc::operation_canceled));
+            pending.promise.reject(zero::async::coroutine::Error::CANCELLED);
 
             return {};
         }
     };
+}
+
+std::error_code asyncio::fs::make_error_code(const PosixAIO::Error e) {
+    return {e, zero::Singleton<PosixAIO::ErrorCategory>::getInstance()};
 }

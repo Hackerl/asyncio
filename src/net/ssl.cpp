@@ -3,6 +3,7 @@
 #include <asyncio/promise.h>
 #include <zero/defer.h>
 #include <zero/os/net.h>
+#include <zero/singleton.h>
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
@@ -23,17 +24,12 @@ std::string asyncio::net::ssl::ErrorCategory::message(const int value) const {
     return buffer;
 }
 
-const std::error_category &asyncio::net::ssl::errorCategory() {
-    static ErrorCategory instance;
-    return instance;
-}
-
 std::error_code asyncio::net::ssl::make_error_code(const Error e) {
-    return {static_cast<int>(e), errorCategory()};
+    return {static_cast<int>(e), zero::Singleton<ErrorCategory>::getInstance()};
 }
 
 #ifdef ASYNCIO_EMBED_CA_CERT
-tl::expected<void, std::error_code> asyncio::net::ssl::loadEmbeddedCA(const Context *ctx) {
+tl::expected<void, asyncio::net::ssl::Error> asyncio::net::ssl::loadEmbeddedCA(const Context *ctx) {
     BIO *bio = BIO_new_mem_buf(CA_CERT, sizeof(CA_CERT));
 
     if (!bio)
@@ -95,7 +91,7 @@ std::shared_ptr<X509> readCertificate(const std::string_view content) {
     return {cert, X509_free};
 }
 
-tl::expected<std::shared_ptr<asyncio::net::ssl::Context>, std::error_code>
+tl::expected<std::shared_ptr<asyncio::net::ssl::Context>, asyncio::net::ssl::Error>
 asyncio::net::ssl::newContext(const Config &config) {
     std::shared_ptr<Context> ctx(
         SSL_CTX_new(TLS_method()),
@@ -206,7 +202,7 @@ tl::expected<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::Buffer::make(
     const FileDescriptor fd,
     const std::shared_ptr<Context> &context,
-    State state,
+    const State state,
     const std::size_t capacity,
     const bool own
 ) {
@@ -281,9 +277,9 @@ asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const
 }
 
 tl::expected<asyncio::net::ssl::stream::Listener, std::error_code>
-asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, std::span<const Address> addresses) {
+asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const std::span<const Address> addresses) {
     if (addresses.empty())
-        return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        return tl::unexpected(INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -345,13 +341,13 @@ asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, const Addre
         co_return co_await connect(std::move(context), zero::os::net::stringify(ip), port);
     }
 
-    co_return tl::unexpected(make_error_code(std::errc::address_family_not_supported));
+    co_return tl::unexpected(ADDRESS_FAMILY_NOT_SUPPORTED);
 }
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
-asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> context, std::span<const Address> addresses) {
+asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> context, const std::span<const Address> addresses) {
     if (addresses.empty())
-        co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        co_return tl::unexpected(INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -438,16 +434,16 @@ asyncio::net::ssl::stream::connect(
     );
 
     if (bufferevent_socket_connect_hostname(bev, dnsBase->get(), AF_UNSPEC, host.c_str(), port) < 0)
-        co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        co_return tl::unexpected(INVALID_ARGUMENT);
 
     CO_EXPECT(co_await zero::async::coroutine::Cancellable{
         promise.getFuture(),
         [&]() -> tl::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             bufferevent_free(std::exchange(bev, nullptr));
-            promise.reject(make_error_code(std::errc::operation_canceled));
+            promise.reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     });

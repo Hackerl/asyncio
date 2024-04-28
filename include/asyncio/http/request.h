@@ -10,30 +10,6 @@
 #include <nlohmann/json.hpp>
 
 namespace asyncio::http {
-    enum CURLError {
-    };
-
-    class CURLErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-    };
-
-    const std::error_category &curlErrorCategory();
-    std::error_code make_error_code(CURLError e);
-
-    enum CURLMError {
-    };
-
-    class CURLMErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-    };
-
-    const std::error_category &curlMErrorCategory();
-    std::error_code make_error_code(CURLMError e);
-
     struct Connection {
         enum Status {
             NOT_STARTED,
@@ -58,6 +34,16 @@ namespace asyncio::http {
 
     class Response final : public IBufReader, public Reader {
     public:
+        enum Error {
+            INVALID_JSON = 1
+        };
+
+        class ErrorCategory final : public std::error_category {
+        public:
+            [[nodiscard]] const char *name() const noexcept override;
+            [[nodiscard]] std::string message(int value) const override;
+        };
+
         Response(std::shared_ptr<Requests> requests, std::unique_ptr<Connection> connection);
         Response(Response &&) = default;
         ~Response() override;
@@ -81,7 +67,7 @@ namespace asyncio::http {
                 co_return j->template get<T>();
             }
             catch (const nlohmann::json::exception &) {
-                co_return tl::unexpected(make_error_code(std::errc::bad_message));
+                co_return tl::unexpected(INVALID_JSON);
             }
         }
 
@@ -97,6 +83,8 @@ namespace asyncio::http {
         std::unique_ptr<Connection> mConnection;
     };
 
+    std::error_code make_error_code(Response::Error e);
+
     struct Options {
         std::optional<std::string> proxy;
         std::map<std::string, std::string> headers;
@@ -108,14 +96,33 @@ namespace asyncio::http {
 
     class Requests : public std::enable_shared_from_this<Requests> {
     public:
-        Requests(CURLM *multi, ev::Timer timer);
-        Requests(CURLM *multi, ev::Timer timer, Options options);
+        enum CURLError {
+        };
+
+        class CURLErrorCategory final : public std::error_category {
+        public:
+            [[nodiscard]] const char *name() const noexcept override;
+            [[nodiscard]] std::string message(int value) const override;
+        };
+
+        enum CURLMError {
+        };
+
+        class CURLMErrorCategory final : public std::error_category {
+        public:
+            [[nodiscard]] const char *name() const noexcept override;
+            [[nodiscard]] std::string message(int value) const override;
+        };
+
+        Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer);
+        Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer, Options options);
         ~Requests();
 
         static tl::expected<std::shared_ptr<Requests>, std::error_code> make(const Options &options = {});
 
     private:
-        void onCURLTimer(long timeout);
+        void onTimer();
+        void onCURLTimer(long timeout) const;
         void onCURLEvent(curl_socket_t s, int what, void *data);
         void recycle() const;
 
@@ -230,19 +237,26 @@ namespace asyncio::http {
     private:
         int mRunning;
         Options mOptions;
-        ev::Timer mTimer;
+        std::unique_ptr<event, decltype(event_free) *> mTimer;
         std::unique_ptr<CURLM, decltype(curl_multi_cleanup) *> mMulti;
 
         friend class Response;
     };
+
+    std::error_code make_error_code(Requests::CURLError e);
+    std::error_code make_error_code(Requests::CURLMError e);
 }
 
 template<>
-struct std::is_error_code_enum<asyncio::http::CURLError> : std::true_type {
+struct std::is_error_code_enum<asyncio::http::Response::Error> : std::true_type {
 };
 
 template<>
-struct std::is_error_code_enum<asyncio::http::CURLMError> : std::true_type {
+struct std::is_error_code_enum<asyncio::http::Requests::CURLError> : std::true_type {
+};
+
+template<>
+struct std::is_error_code_enum<asyncio::http::Requests::CURLMError> : std::true_type {
 };
 
 #endif //ASYNCIO_REQUEST_H

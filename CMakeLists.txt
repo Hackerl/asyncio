@@ -22,7 +22,6 @@ add_library(
         asyncio
         STATIC
         src/io.cpp
-        src/error.cpp
         src/worker.cpp
         src/channel.cpp
         src/event_loop.cpp

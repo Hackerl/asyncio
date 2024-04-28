@@ -1,7 +1,6 @@
 #include <asyncio/io.h>
 #include <asyncio/ev/pipe.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
 
@@ -35,7 +34,7 @@ TEST_CASE("asynchronous io", "[io]") {
 
                     line = co_await buffer.readLine();
                     REQUIRE(!line);
-                    REQUIRE(line.error() == asyncio::Error::IO_EOF);
+                    REQUIRE(line.error() == asyncio::IOError::UNEXPECTED_EOF);
                 }(std::move(buffers2->at(1)))
             );
         }
@@ -65,7 +64,7 @@ TEST_CASE("asynchronous io", "[io]") {
 
                     line = co_await buffer.readLine();
                     REQUIRE(!line);
-                    REQUIRE(line.error() == asyncio::Error::IO_EOF);
+                    REQUIRE(line.error() == asyncio::IOError::UNEXPECTED_EOF);
                 }(std::move(buffers1->at(0))),
                 [](auto buffer) -> zero::async::coroutine::Task<void> {
                     auto line = co_await buffer.readLine();
@@ -167,7 +166,7 @@ TEST_CASE("asynchronous io", "[io]") {
                         std::byte data[MESSAGE.size() * 3];
                         const auto result = co_await buffer.readExactly(data);
                         REQUIRE(!result);
-                        REQUIRE(result.error() == asyncio::Error::IO_EOF);
+                        REQUIRE(result.error() == asyncio::IOError::UNEXPECTED_EOF);
                     }(std::move(buffers->at(1)))
                 );
             }

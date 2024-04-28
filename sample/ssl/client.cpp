@@ -1,11 +1,10 @@
-#include <asyncio/error.h>
 #include <asyncio/net/ssl.h>
 #include <asyncio/event_loop.h>
 #include <zero/cmdline.h>
 
 using namespace std::chrono_literals;
 
-zero::async::coroutine::Task<void, std::error_code> amain(int argc, char *argv[]) {
+zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");
@@ -54,7 +53,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(int argc, char *argv[]
         const auto line = co_await buffer->readLine();
 
         if (!line) {
-            if (line.error() != asyncio::Error::IO_EOF)
+            if (line.error() != asyncio::IOError::UNEXPECTED_EOF)
                 co_return tl::unexpected(line.error());
 
             break;

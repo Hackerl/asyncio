@@ -10,20 +10,17 @@
 #include <zero/cmdline.h>
 
 namespace asyncio::http {
-    enum URLError {
-    };
-
-    class URLErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-    };
-
-    const std::error_category &urlErrorCategory();
-    std::error_code make_error_code(URLError e);
-
     class URL {
     public:
+        enum Error {
+        };
+
+        class ErrorCategory final : public std::error_category {
+        public:
+            [[nodiscard]] const char *name() const noexcept override;
+            [[nodiscard]] std::string message(int value) const override;
+        };
+
         URL();
         explicit URL(CURLU *url);
         URL(const URL &rhs);
@@ -77,13 +74,15 @@ namespace asyncio::http {
     private:
         std::unique_ptr<CURLU, decltype(curl_url_cleanup) *> mURL;
     };
+
+    std::error_code make_error_code(URL::Error e);
 }
 
 template<>
 tl::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input);
 
 template<>
-struct std::is_error_code_enum<asyncio::http::URLError> : std::true_type {
+struct std::is_error_code_enum<asyncio::http::URL::Error> : std::true_type {
 };
 
 #endif //ASYNCIO_URL_H

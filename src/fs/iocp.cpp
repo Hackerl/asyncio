@@ -81,7 +81,7 @@ asyncio::fs::IOCP::read(
     std::shared_ptr<EventLoop> eventLoop,
     const FileDescriptor fd,
     const std::uint64_t offset,
-    std::span<std::byte> data
+    const std::span<std::byte> data
 ) {
     Request request = {
         .overlapped = {

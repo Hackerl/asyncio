@@ -9,9 +9,7 @@ namespace asyncio::sync {
         void wakeup()const;
 
     public:
-        zero::async::coroutine::Task<void, std::error_code>
-        lock(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
-
+        zero::async::coroutine::Task<void, std::error_code> lock();
         void unlock();
 
         [[nodiscard]] bool locked() const;

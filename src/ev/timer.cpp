@@ -44,23 +44,9 @@ tl::expected<asyncio::ev::Timer, std::error_code> asyncio::ev::Timer::make() {
     return Timer{{e, event_free}};
 }
 
-bool asyncio::ev::Timer::cancel() {
-    if (!pending())
-        return false;
-
-    evtimer_del(mEvent.get());
-    std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
-
-    return true;
-}
-
-bool asyncio::ev::Timer::pending() const {
-    return mPromise.operator bool();
-}
-
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Timer::after(const std::chrono::milliseconds delay) {
     if (mPromise)
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     co_return co_await zero::async::coroutine::Cancellable{
         zero::async::promise::chain<void, std::error_code>([&](auto promise) {
@@ -75,10 +61,10 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Timer::after(co
         }),
         [this]() -> tl::expected<void, std::error_code> {
             if (!mPromise)
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             evtimer_del(mEvent.get());
-            std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+            std::exchange(mPromise, std::nullopt)->reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     };

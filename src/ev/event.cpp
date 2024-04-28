@@ -65,16 +65,6 @@ asyncio::FileDescriptor asyncio::ev::Event::fd() const {
     return event_get_fd(mEvent.get());
 }
 
-bool asyncio::ev::Event::cancel() {
-    if (!pending())
-        return false;
-
-    event_del(mEvent.get());
-    std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
-
-    return true;
-}
-
 bool asyncio::ev::Event::pending() const {
     return mPromise.operator bool();
 }
@@ -82,7 +72,7 @@ bool asyncio::ev::Event::pending() const {
 zero::async::coroutine::Task<short, std::error_code>
 asyncio::ev::Event::on(const std::optional<std::chrono::milliseconds> timeout) {
     if (mPromise)
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     co_return co_await zero::async::coroutine::Cancellable{
         zero::async::promise::chain<short, std::error_code>([&](auto promise) {
@@ -102,10 +92,10 @@ asyncio::ev::Event::on(const std::optional<std::chrono::milliseconds> timeout) {
         }),
         [this]() -> tl::expected<void, std::error_code> {
             if (!mPromise)
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             event_del(mEvent.get());
-            std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+            std::exchange(mPromise, std::nullopt)->reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     };

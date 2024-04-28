@@ -21,7 +21,7 @@ TEST_CASE("timer", "[ev]") {
 
             const auto result = co_await asyncio::timeout(timer->after(50ms), 20ms);
             REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::timed_out);
+            REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
         }
     });
 }

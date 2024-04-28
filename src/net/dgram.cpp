@@ -1,6 +1,5 @@
 #include <asyncio/net/dgram.h>
 #include <asyncio/net/dns.h>
-#include <asyncio/error.h>
 #include <zero/expect.h>
 #include <cassert>
 
@@ -70,39 +69,33 @@ tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::
 }
 
 zero::async::coroutine::Task<std::size_t, std::error_code>
-asyncio::net::dgram::Socket::read(std::span<std::byte> data) {
+asyncio::net::dgram::Socket::read(const std::span<std::byte> data) {
     assert(!data.empty());
 
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mEvents[READ_INDEX].pending())
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     tl::expected<std::size_t, std::error_code> result;
 
     while (true) {
 #ifdef _WIN32
-        const int num = recv(mFD, reinterpret_cast<char *>(data.data()), static_cast<int>(data.size()), 0);
+        const int n = recv(mFD, reinterpret_cast<char *>(data.data()), static_cast<int>(data.size()), 0);
 
-        if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
+        if (n == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
             co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 #else
-        const ssize_t num = recv(mFD, data.data(), data.size(), 0);
+        const ssize_t n = recv(mFD, data.data(), data.size(), 0);
 
-        if (num == -1 && errno != EWOULDBLOCK) {
+        if (n == -1 && errno != EWOULDBLOCK) {
             result = tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
             break;
         }
 #endif
-
-        if (num == 0) {
-            result = tl::unexpected<std::error_code>(IO_EOF);
-            break;
-        }
-
-        if (num > 0) {
-            *result = num;
+        if (n >= 0) {
+            *result = n;
             break;
         }
 
@@ -114,7 +107,7 @@ asyncio::net::dgram::Socket::read(std::span<std::byte> data) {
         }
 
         if (*what & ev::What::TIMEOUT) {
-            result = tl::unexpected(make_error_code(std::errc::timed_out));
+            result = tl::unexpected<std::error_code>(TIMED_OUT);
             break;
         }
     }
@@ -123,35 +116,35 @@ asyncio::net::dgram::Socket::read(std::span<std::byte> data) {
 }
 
 zero::async::coroutine::Task<std::size_t, std::error_code>
-asyncio::net::dgram::Socket::write(std::span<const std::byte> data) {
+asyncio::net::dgram::Socket::write(const std::span<const std::byte> data) {
     assert(!data.empty());
 
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mEvents[WRITE_INDEX].pending())
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     tl::expected<std::size_t, std::error_code> result;
 
     while (true) {
 #ifdef _WIN32
-        const int num = send(mFD, reinterpret_cast<const char *>(data.data()), static_cast<int>(data.size()), 0);
+        const int n = send(mFD, reinterpret_cast<const char *>(data.data()), static_cast<int>(data.size()), 0);
 
-        if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
+        if (n == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
             co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 #else
-        const ssize_t num = send(mFD, data.data(), data.size(), 0);
+        const ssize_t n = send(mFD, data.data(), data.size(), 0);
 
-        if (num == -1 && errno != EWOULDBLOCK) {
+        if (n == -1 && errno != EWOULDBLOCK) {
             result = tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
             break;
         }
 #endif
-        assert(num != 0);
+        assert(n != 0);
 
-        if (num > 0) {
-            *result = num;
+        if (n > 0) {
+            *result = n;
             break;
         }
 
@@ -163,7 +156,7 @@ asyncio::net::dgram::Socket::write(std::span<const std::byte> data) {
         }
 
         if (*what & ev::What::TIMEOUT) {
-            result = tl::unexpected(make_error_code(std::errc::timed_out));
+            result = tl::unexpected<std::error_code>(TIMED_OUT);
             break;
         }
     }
@@ -173,7 +166,7 @@ asyncio::net::dgram::Socket::write(std::span<const std::byte> data) {
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket::close() {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     assert(!mEvents[READ_INDEX].pending());
     assert(!mEvents[WRITE_INDEX].pending());
@@ -185,14 +178,14 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket:
 }
 
 zero::async::coroutine::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
-asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
+asyncio::net::dgram::Socket::readFrom(const std::span<std::byte> data) {
     assert(!data.empty());
 
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mEvents[READ_INDEX].pending())
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     tl::expected<std::pair<std::size_t, Address>, std::error_code> result;
 
@@ -201,7 +194,7 @@ asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
         socklen_t length = sizeof(sockaddr_storage);
 
 #ifdef _WIN32
-        const int num = recvfrom(
+        const int n = recvfrom(
             mFD,
             reinterpret_cast<char *>(data.data()),
             static_cast<int>(data.size()),
@@ -210,23 +203,20 @@ asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
             &length
         );
 
-        if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
+        if (n == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
             co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 #else
-        const ssize_t num = recvfrom(mFD, data.data(), data.size(), 0, reinterpret_cast<sockaddr *>(&storage), &length);
+        const ssize_t n = recvfrom(mFD, data.data(), data.size(), 0, reinterpret_cast<sockaddr *>(&storage), &length);
 
-        if (num == -1 && errno != EWOULDBLOCK) {
+        if (n == -1 && errno != EWOULDBLOCK) {
             result = tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
             break;
         }
 #endif
-
-        if (num == 0) {
-            result = tl::unexpected<std::error_code>(IO_EOF);
+        if (n == 0)
             break;
-        }
 
-        if (num > 0) {
+        if (n > 0) {
             const auto address = addressFrom(reinterpret_cast<sockaddr *>(&storage), length);
 
             if (!address) {
@@ -234,7 +224,7 @@ asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
                 break;
             }
 
-            result = {num, *address};
+            result = {n, *address};
             break;
         }
 
@@ -246,7 +236,7 @@ asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
         }
 
         if (*what & ev::What::TIMEOUT) {
-            result = tl::unexpected(make_error_code(std::errc::timed_out));
+            result = tl::unexpected<std::error_code>(TIMED_OUT);
             break;
         }
     }
@@ -255,14 +245,14 @@ asyncio::net::dgram::Socket::readFrom(std::span<std::byte> data) {
 }
 
 zero::async::coroutine::Task<std::size_t, std::error_code>
-asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Address address) {
+asyncio::net::dgram::Socket::writeTo(const std::span<const std::byte> data, const Address address) {
     assert(!data.empty());
 
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mEvents[WRITE_INDEX].pending())
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     const auto socketAddress = socketAddressFrom(address);
     CO_EXPECT(socketAddress);
@@ -271,7 +261,7 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
 
     while (true) {
 #ifdef _WIN32
-        const int num = sendto(
+        const int n = sendto(
             mFD,
             reinterpret_cast<const char *>(data.data()),
             static_cast<int>(data.size()),
@@ -284,10 +274,10 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
 #endif
         );
 
-        if (num == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
+        if (n == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK)
             co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 #else
-        const ssize_t num = sendto(
+        const ssize_t n = sendto(
             mFD,
             data.data(),
             data.size(),
@@ -296,15 +286,15 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
             socketAddress->second
         );
 
-        if (num == -1 && errno != EWOULDBLOCK) {
+        if (n == -1 && errno != EWOULDBLOCK) {
             result = tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
             break;
         }
 #endif
-        assert(num != 0);
+        assert(n != 0);
 
-        if (num > 0) {
-            *result = num;
+        if (n > 0) {
+            *result = n;
             break;
         }
 
@@ -315,13 +305,8 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
             break;
         }
 
-        if (*what & ev::What::CLOSED) {
-            result = tl::unexpected<std::error_code>(IO_EOF);
-            break;
-        }
-
         if (*what & ev::What::TIMEOUT) {
-            result = tl::unexpected(make_error_code(std::errc::timed_out));
+            result = tl::unexpected<std::error_code>(TIMED_OUT);
             break;
         }
     }
@@ -331,14 +316,14 @@ asyncio::net::dgram::Socket::writeTo(std::span<const std::byte> data, const Addr
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::localAddress() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     return addressFrom(mFD, false);
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::remoteAddress() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     return addressFrom(mFD, true);
 }
@@ -362,14 +347,18 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket:
     });
 }
 
-void asyncio::net::dgram::Socket::setTimeout(const std::chrono::milliseconds timeout) {
-    setTimeout(timeout, timeout);
+tl::expected<void, std::error_code> asyncio::net::dgram::Socket::setTimeout(const std::chrono::milliseconds timeout) {
+    return setTimeout(timeout, timeout);
 }
 
-void asyncio::net::dgram::Socket::setTimeout(
-    std::chrono::milliseconds readTimeout,
-    std::chrono::milliseconds writeTimeout
+tl::expected<void, std::error_code>
+asyncio::net::dgram::Socket::setTimeout(
+    const std::chrono::milliseconds readTimeout,
+    const std::chrono::milliseconds writeTimeout
 ) {
+    if (mFD == INVALID_FILE_DESCRIPTOR)
+        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+
     if (readTimeout != std::chrono::milliseconds::zero())
         mTimeouts[READ_INDEX] = readTimeout;
     else
@@ -379,6 +368,8 @@ void asyncio::net::dgram::Socket::setTimeout(
         mTimeouts[WRITE_INDEX] = writeTimeout;
     else
         mTimeouts[WRITE_INDEX].reset();
+
+    return {};
 }
 
 asyncio::FileDescriptor asyncio::net::dgram::Socket::fd() const {
@@ -393,9 +384,9 @@ tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::
 }
 
 tl::expected<asyncio::net::dgram::Socket, std::error_code>
-asyncio::net::dgram::bind(std::span<const Address> addresses) {
+asyncio::net::dgram::bind(const std::span<const Address> addresses) {
     if (addresses.empty())
-        return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        return tl::unexpected(INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -426,9 +417,9 @@ asyncio::net::dgram::connect(const Address address) {
 }
 
 zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
-asyncio::net::dgram::connect(std::span<const Address> addresses) {
+asyncio::net::dgram::connect(const std::span<const Address> addresses) {
     if (addresses.empty())
-        co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        co_return tl::unexpected(INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 

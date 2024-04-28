@@ -16,7 +16,6 @@ namespace asyncio::net::dns {
         [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
     };
 
-    const std::error_category &errorCategory();
     std::error_code make_error_code(Error e);
 
     zero::async::coroutine::Task<std::vector<Address>, std::error_code>

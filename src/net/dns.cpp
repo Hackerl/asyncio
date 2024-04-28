@@ -1,5 +1,6 @@
 #include <asyncio/net/dns.h>
 #include <asyncio/promise.h>
+#include <zero/singleton.h>
 #include <ranges>
 
 const char *asyncio::net::dns::ErrorCategory::name() const noexcept {
@@ -48,13 +49,8 @@ std::error_condition asyncio::net::dns::ErrorCategory::default_error_condition(c
     return condition;
 }
 
-const std::error_category &asyncio::net::dns::errorCategory() {
-    static ErrorCategory instance;
-    return instance;
-}
-
 std::error_code asyncio::net::dns::make_error_code(const Error e) {
-    return {static_cast<int>(e), errorCategory()};
+    return {static_cast<int>(e), zero::Singleton<ErrorCategory>::getInstance()};
 }
 
 zero::async::coroutine::Task<std::vector<asyncio::net::Address>, std::error_code>

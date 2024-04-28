@@ -1,6 +1,5 @@
 #include <asyncio/ev/pipe.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
 
@@ -28,7 +27,7 @@ TEST_CASE("buffer pipe", "[ev]") {
 
                     line = co_await buffer.readLine();
                     REQUIRE(!line);
-                    REQUIRE(line.error() == asyncio::Error::IO_EOF);
+                    REQUIRE(line.error() == asyncio::IOError::UNEXPECTED_EOF);
                 }(std::move(buffers->at(0))),
                 [](auto buffer) -> zero::async::coroutine::Task<void> {
                     const auto line = co_await buffer.readLine();
@@ -94,7 +93,7 @@ TEST_CASE("buffer pipe", "[ev]") {
             std::byte data[10240];
             const auto result = co_await asyncio::timeout(buffers->at(0).read(data), 20ms);
             REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::timed_out);
+            REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
         }
     });
 }

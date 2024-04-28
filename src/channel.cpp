@@ -1,4 +1,5 @@
 #include <asyncio/channel.h>
+#include <zero/singleton.h>
 
 const char *asyncio::ChannelErrorCategory::name() const noexcept {
     return "asyncio::channel";
@@ -14,6 +15,14 @@ std::string asyncio::ChannelErrorCategory::message(const int value) const {
 
     case BROKEN_CHANNEL:
         msg = "broken channel";
+        break;
+
+    case SEND_TIMEOUT:
+        msg = "channel send timeout";
+        break;
+
+    case RECEIVE_TIMEOUT:
+        msg = "channel receive timeout";
         break;
 
     case EMPTY:
@@ -40,6 +49,11 @@ std::error_condition asyncio::ChannelErrorCategory::default_error_condition(cons
         condition = std::errc::broken_pipe;
         break;
 
+    case SEND_TIMEOUT:
+    case RECEIVE_TIMEOUT:
+        condition = std::errc::timed_out;
+        break;
+
     case EMPTY:
     case FULL:
         condition = std::errc::operation_would_block;
@@ -53,11 +67,6 @@ std::error_condition asyncio::ChannelErrorCategory::default_error_condition(cons
     return condition;
 }
 
-const std::error_category &asyncio::channelErrorCategory() {
-    static ChannelErrorCategory instance;
-    return instance;
-}
-
 std::error_code asyncio::make_error_code(const ChannelError e) {
-    return {static_cast<int>(e), channelErrorCategory()};
+    return {static_cast<int>(e), zero::Singleton<ChannelErrorCategory>::getInstance()};
 }

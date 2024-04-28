@@ -1,29 +1,16 @@
 #include <asyncio/ev/buffer.h>
 #include <asyncio/event_loop.h>
-#include <asyncio/error.h>
 #include <optional>
 #include <cassert>
 
 asyncio::ev::Buffer::Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, const std::size_t capacity)
     : mClosed(false), mCapacity(capacity), mBev(std::move(bev)) {
+    assert(mCapacity > 0);
+
     bufferevent_setcb(
         mBev.get(),
-        [](bufferevent *, void *arg) {
-            auto promise = std::exchange(static_cast<Buffer *>(arg)->mPromises[READ_INDEX], std::nullopt);
-
-            if (!promise)
-                return;
-
-            promise->resolve();
-        },
-        [](bufferevent *, void *arg) {
-            auto promise = std::exchange(static_cast<Buffer *>(arg)->mPromises[WRITE_INDEX], std::nullopt);
-
-            if (!promise)
-                return;
-
-            promise->resolve();
-        },
+        nullptr,
+        nullptr,
         [](bufferevent *, const short what, void *arg) {
             static_cast<Buffer *>(arg)->onEvent(what);
         },
@@ -40,11 +27,10 @@ asyncio::ev::Buffer::Buffer(Buffer &&rhs) noexcept
     assert(!rhs.mPromises[READ_INDEX]);
     assert(!rhs.mPromises[WRITE_INDEX]);
 
-    bufferevent_data_cb rcb, wcb;
     bufferevent_event_cb ecb;
 
-    bufferevent_getcb(mBev.get(), &rcb, &wcb, &ecb, nullptr);
-    bufferevent_setcb(mBev.get(), rcb, wcb, ecb, this);
+    bufferevent_getcb(mBev.get(), nullptr, nullptr, &ecb, nullptr);
+    bufferevent_setcb(mBev.get(), nullptr, nullptr, ecb, this);
 }
 
 asyncio::ev::Buffer &asyncio::ev::Buffer::operator=(Buffer &&rhs) noexcept {
@@ -81,6 +67,7 @@ asyncio::ev::Buffer::make(const FileDescriptor fd, const std::size_t capacity, c
 }
 
 void asyncio::ev::Buffer::resize(const std::size_t capacity) {
+    assert(capacity > 0);
     assert(!mPromises[READ_INDEX]);
     assert(!mPromises[WRITE_INDEX]);
 
@@ -91,7 +78,7 @@ void asyncio::ev::Buffer::resize(const std::size_t capacity) {
 
 void asyncio::ev::Buffer::onEvent(const short what) {
     if (what & BEV_EVENT_EOF) {
-        onClose(IO_EOF);
+        onClose(UNEXPECTED_EOF);
     }
     else if (what & BEV_EVENT_ERROR) {
         onClose(getError());
@@ -103,7 +90,7 @@ void asyncio::ev::Buffer::onEvent(const short what) {
             if (!promise)
                 return;
 
-            promise->reject(make_error_code(std::errc::timed_out));
+            promise->reject(TIMED_OUT);
         }
         else {
             auto promise = std::exchange(mPromises[WRITE_INDEX], std::nullopt);
@@ -111,7 +98,7 @@ void asyncio::ev::Buffer::onEvent(const short what) {
             if (!promise)
                 return;
 
-            promise->reject(make_error_code(std::errc::timed_out));
+            promise->reject(TIMED_OUT);
         }
     }
 }
@@ -129,13 +116,67 @@ void asyncio::ev::Buffer::onClose(const std::error_code &ec) {
     }
 }
 
+void asyncio::ev::Buffer::controlReadEvent(const bool enable) {
+    bufferevent_data_cb wcb;
+    bufferevent_event_cb ecb;
+
+    bufferevent_getcb(mBev.get(), nullptr, &wcb, &ecb, nullptr);
+
+    if (!enable) {
+        bufferevent_setcb(mBev.get(), nullptr, wcb, ecb, this);
+        return;
+    }
+
+    bufferevent_setcb(
+        mBev.get(),
+        [](bufferevent *, void *arg) {
+            auto p = std::exchange(static_cast<Buffer *>(arg)->mPromises[READ_INDEX], std::nullopt);
+
+            if (!p)
+                return;
+
+            p->resolve();
+        },
+        wcb,
+        ecb,
+        this
+    );
+}
+
+void asyncio::ev::Buffer::controlWriteEvent(const bool enable) {
+    bufferevent_data_cb rcb;
+    bufferevent_event_cb ecb;
+
+    bufferevent_getcb(mBev.get(), &rcb, nullptr, &ecb, nullptr);
+
+    if (!enable) {
+        bufferevent_setcb(mBev.get(), rcb, nullptr, ecb, this);
+        return;
+    }
+
+    bufferevent_setcb(
+        mBev.get(),
+        rcb,
+        [](bufferevent *, void *arg) {
+            auto p = std::exchange(static_cast<Buffer *>(arg)->mPromises[WRITE_INDEX], std::nullopt);
+
+            if (!p)
+                return;
+
+            p->resolve();
+        },
+        ecb,
+        this
+    );
+}
+
 std::error_code asyncio::ev::Buffer::getError() const {
     return {EVUTIL_SOCKET_ERROR(), std::system_category()};
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::close() {
     if (!mBev)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     assert(!mPromises[READ_INDEX]);
     assert(!mPromises[WRITE_INDEX]);
@@ -147,12 +188,12 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::close()
     co_return tl::expected<void, std::error_code>{};
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::read(std::span<std::byte> data) {
+zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::read(const std::span<std::byte> data) {
     if (!mBev)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mPromises[READ_INDEX])
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     evbuffer *input = bufferevent_get_input(mBev.get());
     std::size_t length = evbuffer_get_length(input);
@@ -163,28 +204,40 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::
         co_return n;
     }
 
-    if (mClosed)
+    if (mClosed) {
+        if (mLastError == UNEXPECTED_EOF)
+            co_return 0;
+
         co_return tl::unexpected(mLastError);
+    }
 
     if (const auto result = co_await zero::async::coroutine::Cancellable{
-        zero::async::promise::chain<void, std::error_code>([&](auto promise) {
+        zero::async::promise::chain<void, std::error_code>([this](auto promise) {
             mPromises[READ_INDEX].emplace(std::move(promise));
+
+            controlReadEvent(true);
             bufferevent_enable(mBev.get(), EV_READ);
+        }).finally([this] {
+            controlReadEvent(false);
         }),
         [this]() -> tl::expected<void, std::error_code> {
             if (!mPromises[READ_INDEX])
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
-                make_error_code(std::errc::operation_canceled)
+                zero::async::coroutine::Error::CANCELLED
             );
             return {};
         }
-    }; !result)
+    }; !result) {
+        if (result.error() == UNEXPECTED_EOF)
+            co_return 0;
+
         co_return tl::unexpected(result.error());
+    }
 
     length = evbuffer_get_length(input);
-    std::size_t n = (std::min)(length, data.size());
+    const std::size_t n = (std::min)(length, data.size());
 
     evbuffer_remove(input, data.data(), n);
     co_return n;
@@ -199,10 +252,10 @@ std::size_t asyncio::ev::Buffer::available() const {
 
 zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::readLine() {
     if (!mBev)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mPromises[READ_INDEX])
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     evbuffer *input = bufferevent_get_input(mBev.get());
     tl::expected<std::string, std::error_code> result;
@@ -221,17 +274,20 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::
         if (const auto res = co_await zero::async::coroutine::Cancellable{
             zero::async::promise::chain<void, std::error_code>([this](auto promise) {
                 mPromises[READ_INDEX].emplace(std::move(promise));
-                bufferevent_enable(mBev.get(), EV_READ);
+
                 bufferevent_setwatermark(mBev.get(), EV_READ, 0, 0);
+                controlReadEvent(true);
+                bufferevent_enable(mBev.get(), EV_READ);
             }).finally([this] {
+                controlReadEvent(false);
                 bufferevent_setwatermark(mBev.get(), EV_READ, 0, mCapacity);
             }),
             [this]() -> tl::expected<void, std::error_code> {
                 if (!mPromises[READ_INDEX])
-                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                    return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
                 std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
-                    make_error_code(std::errc::operation_canceled)
+                    zero::async::coroutine::Error::CANCELLED
                 );
                 return {};
             }
@@ -244,19 +300,20 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::
     co_return result;
 }
 
-zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::ev::Buffer::readUntil(std::byte byte) {
-    co_return tl::unexpected(make_error_code(std::errc::function_not_supported));
+zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
+asyncio::ev::Buffer::readUntil(const std::byte byte) {
+    co_return tl::unexpected(FUNCTION_NOT_SUPPORTED);
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(std::span<std::byte> data) {
+zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(const std::span<std::byte> data) {
     if (!mBev)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mPromises[READ_INDEX])
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     if (data.size() > mCapacity)
-        co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        co_return tl::unexpected(INVALID_ARGUMENT);
 
     evbuffer *input = bufferevent_get_input(mBev.get());
 
@@ -272,16 +329,18 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(st
         zero::async::promise::chain<void, std::error_code>([&](auto promise) {
             mPromises[READ_INDEX].emplace(std::move(promise));
             bufferevent_setwatermark(mBev.get(), EV_READ, data.size(), mCapacity);
+            controlReadEvent(true);
             bufferevent_enable(mBev.get(), EV_READ);
         }).finally([this] {
+            controlReadEvent(false);
             bufferevent_setwatermark(mBev.get(), EV_READ, 0, mCapacity);
         }),
         [this]() -> tl::expected<void, std::error_code> {
             if (!mPromises[READ_INDEX])
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             std::exchange(mPromises[READ_INDEX], std::nullopt)->reject(
-                make_error_code(std::errc::operation_canceled)
+                zero::async::coroutine::Error::CANCELLED
             );
             return {};
         }
@@ -295,13 +354,13 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(st
 zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::ev::Buffer::write(const std::span<const std::byte> data) {
     if (!mBev)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mClosed)
-        co_return tl::unexpected(make_error_code(std::errc::broken_pipe));
+        co_return tl::unexpected(BROKEN_PIPE);
 
     if (mPromises[WRITE_INDEX])
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     evbuffer *output = bufferevent_get_output(mBev.get());
     tl::expected<std::size_t, std::error_code> result;
@@ -311,16 +370,19 @@ asyncio::ev::Buffer::write(const std::span<const std::byte> data) {
 
         if (length >= mCapacity) {
             if (const auto res = co_await zero::async::coroutine::Cancellable{
-                zero::async::promise::chain<void, std::error_code>([=, this](auto promise) {
+                zero::async::promise::chain<void, std::error_code>([this](auto promise) {
                     mPromises[WRITE_INDEX].emplace(std::move(promise));
+                    controlWriteEvent(true);
                     bufferevent_enable(mBev.get(), EV_WRITE);
+                }).finally([this] {
+                    controlWriteEvent(false);
                 }),
                 [this]() -> tl::expected<void, std::error_code> {
                     if (!mPromises[WRITE_INDEX])
-                        return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                        return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
                     std::exchange(mPromises[WRITE_INDEX], std::nullopt)->reject(
-                        make_error_code(std::errc::operation_canceled)
+                        zero::async::coroutine::Error::CANCELLED
                     );
                     return {};
                 }
@@ -353,13 +415,13 @@ std::size_t asyncio::ev::Buffer::pending() const {
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::flush() {
     if (!mBev)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mClosed)
-        co_return tl::unexpected(make_error_code(std::errc::broken_pipe));
+        co_return tl::unexpected(BROKEN_PIPE);
 
     if (mPromises[WRITE_INDEX])
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     if (evbuffer_get_length(bufferevent_get_output(mBev.get())) == 0)
         co_return tl::expected<void, std::error_code>{};
@@ -368,15 +430,18 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::flush()
         zero::async::promise::chain<void, std::error_code>([this](auto promise) {
             mPromises[WRITE_INDEX].emplace(std::move(promise));
             bufferevent_setwatermark(mBev.get(), EV_WRITE, 0, 0);
+            controlWriteEvent(true);
+            bufferevent_enable(mBev.get(), EV_WRITE);
         }).finally([this] {
+            controlWriteEvent(false);
             bufferevent_setwatermark(mBev.get(), EV_WRITE, mCapacity, 0);
         }),
         [this]() -> tl::expected<void, std::error_code> {
             if (!mPromises[WRITE_INDEX])
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             std::exchange(mPromises[WRITE_INDEX], std::nullopt)->reject(
-                make_error_code(std::errc::operation_canceled)
+                zero::async::coroutine::Error::CANCELLED
             );
             return {};
         }
@@ -390,16 +455,17 @@ asyncio::FileDescriptor asyncio::ev::Buffer::fd() const {
     return bufferevent_getfd(mBev.get());
 }
 
-void asyncio::ev::Buffer::setTimeout(const std::chrono::milliseconds timeout) {
-    setTimeout(timeout, timeout);
+tl::expected<void, std::error_code> asyncio::ev::Buffer::setTimeout(const std::chrono::milliseconds timeout) {
+    return setTimeout(timeout, timeout);
 }
 
-void asyncio::ev::Buffer::setTimeout(
+tl::expected<void, std::error_code>
+asyncio::ev::Buffer::setTimeout(
     const std::chrono::milliseconds readTimeout,
     const std::chrono::milliseconds writeTimeout
 ) {
     if (!mBev)
-        return;
+        return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     std::optional<timeval> rtv, wtv;
 
@@ -420,6 +486,8 @@ void asyncio::ev::Buffer::setTimeout(
         rtv ? &*rtv : nullptr,
         wtv ? &*wtv : nullptr
     );
+
+    return {};
 }
 
 std::size_t asyncio::ev::Buffer::capacity() const {

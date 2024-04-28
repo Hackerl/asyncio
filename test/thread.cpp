@@ -58,7 +58,7 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
                     while (!*stop)
                         std::this_thread::sleep_for(10ms);
 
-                    return tl::unexpected(make_error_code(std::errc::operation_canceled));
+                    return tl::unexpected(zero::async::coroutine::Error::CANCELLED);
                 },
                 [=](std::thread::native_handle_type) -> tl::expected<void, std::error_code> {
                     *stop = true;
@@ -68,8 +68,8 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
 
             co_await asyncio::sleep(10ms);
             REQUIRE(!task.done());
+            REQUIRE(task.cancel());
 
-            task.cancel();
             const auto result = co_await task;
             REQUIRE(!result);
             REQUIRE(result.error() == std::errc::operation_canceled);

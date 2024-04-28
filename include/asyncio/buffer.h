@@ -20,7 +20,7 @@ namespace asyncio {
         }
 
     private:
-        zero::async::coroutine::Task<std::size_t, std::error_code> rawRead(std::span<std::byte> data) {
+        zero::async::coroutine::Task<std::size_t, std::error_code> rawRead(const std::span<std::byte> data) {
             if constexpr (std::derived_from<T, IReader>) {
                 return mReader.read(data);
             }
@@ -30,7 +30,7 @@ namespace asyncio {
         }
 
     public:
-        zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override {
+        zero::async::coroutine::Task<std::size_t, std::error_code> read(const std::span<std::byte> data) override {
             if (available() == 0) {
                 if (data.size() >= mCapacity)
                     co_return co_await rawRead(data);
@@ -40,6 +40,10 @@ namespace asyncio {
 
                 const auto n = co_await rawRead({mBuffer.get(), mCapacity});
                 CO_EXPECT(n);
+
+                if (*n == 0)
+                    co_return 0;
+
                 mTail = *n;
             }
 
@@ -90,15 +94,20 @@ namespace asyncio {
                 const auto n = co_await rawRead({mBuffer.get(), mCapacity});
                 CO_EXPECT(n);
 
+                if (*n == 0) {
+                    result = tl::unexpected<std::error_code>(UNEXPECTED_EOF);
+                    break;
+                }
+
                 mTail = *n;
             }
 
             co_return result;
         }
 
-        zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) override {
+        zero::async::coroutine::Task<void, std::error_code> peek(const std::span<std::byte> data) override {
             if (data.size() > mCapacity)
-                co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+                co_return tl::unexpected(INVALID_ARGUMENT);
 
             if (const std::size_t available = this->available(); available < data.size()) {
                 if (mHead > 0) {
@@ -110,6 +119,10 @@ namespace asyncio {
                 while (mTail < data.size()) {
                     const auto n = co_await rawRead({mBuffer.get() + mTail, mCapacity - mTail});
                     CO_EXPECT(n);
+
+                    if (*n == 0)
+                        co_return tl::unexpected<std::error_code>(UNEXPECTED_EOF);
+
                     mTail += *n;
                 }
             }
@@ -141,7 +154,7 @@ namespace asyncio {
         }
 
     private:
-        zero::async::coroutine::Task<std::size_t, std::error_code> rawWrite(std::span<const std::byte> data) {
+        zero::async::coroutine::Task<std::size_t, std::error_code> rawWrite(const std::span<const std::byte> data) {
             if constexpr (std::derived_from<T, IWriter>) {
                 return mWriter.write(data);
             }
@@ -151,7 +164,8 @@ namespace asyncio {
         }
 
     public:
-        zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override {
+        zero::async::coroutine::Task<std::size_t, std::error_code>
+        write(const std::span<const std::byte> data) override {
             tl::expected<std::size_t, std::error_code> result;
 
             while (*result < data.size()) {
@@ -193,7 +207,7 @@ namespace asyncio {
 
             while (offset < mPending) {
                 if (co_await zero::async::coroutine::cancelled) {
-                    result = tl::unexpected(make_error_code(std::errc::operation_canceled));
+                    result = tl::unexpected<std::error_code>(zero::async::coroutine::Error::CANCELLED);
                     break;
                 }
 

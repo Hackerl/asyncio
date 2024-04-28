@@ -72,7 +72,7 @@ TEST_CASE("IOCP", "[fs]") {
             std::byte data[5];
             auto task = framework->read(eventLoop, fd, 0, data);
 
-            task.cancel();
+            REQUIRE(task.cancel());
             const auto n = co_await task;
             REQUIRE(!n);
             REQUIRE(n.error() == std::errc::operation_canceled);

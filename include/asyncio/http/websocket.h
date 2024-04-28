@@ -2,54 +2,10 @@
 #define ASYNCIO_WEBSOCKET_H
 
 #include <variant>
-#include <asyncio/ev/buffer.h>
 #include <asyncio/http/url.h>
 #include <asyncio/sync/mutex.h>
 
 namespace asyncio::http::ws {
-    enum Error {
-        UNSUPPORTED_MASKED_FRAME = 1,
-        UNSUPPORTED_OPCODE,
-        UNSUPPORTED_WEBSOCKET_SCHEME,
-        WEBSOCKET_NOT_CONNECTED,
-        WEBSOCKET_HANDSHAKE_FAILED
-    };
-
-    class ErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-    };
-
-    const std::error_category &errorCategory();
-    std::error_code make_error_code(Error e);
-
-    enum CloseCode {
-        NORMAL_CLOSURE = 1000,
-        GOING_AWAY = 1001,
-        PROTOCOL_ERROR = 1002,
-        UNSUPPORTED_DATA = 1003,
-        NO_STATUS_RCVD = 1005,
-        ABNORMAL_CLOSURE = 1006,
-        INVALID_TEXT = 1007,
-        POLICY_VIOLATION = 1008,
-        MESSAGE_TOO_BIG = 1009,
-        MANDATORY_EXTENSION = 1010,
-        INTERNAL_ERROR = 1011,
-        SERVICE_RESTART = 1012,
-        TRY_AGAIN_LATER = 1013,
-        BAD_GATEWAY = 1014
-    };
-
-    class CloseCodeCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-    };
-
-    const std::error_category &closeCodeCategory();
-    std::error_code make_error_code(CloseCode e);
-
     enum State {
         CONNECTED,
         CLOSING,
@@ -98,6 +54,41 @@ namespace asyncio::http::ws {
 
     class WebSocket {
     public:
+        enum Error {
+            UNSUPPORTED_MASKED_FRAME = 1,
+            UNSUPPORTED_OPCODE,
+            NOT_CONNECTED
+        };
+
+        class ErrorCategory final : public std::error_category {
+        public:
+            [[nodiscard]] const char *name() const noexcept override;
+            [[nodiscard]] std::string message(int value) const override;
+        };
+
+        enum CloseCode {
+            NORMAL_CLOSURE = 1000,
+            GOING_AWAY = 1001,
+            PROTOCOL_ERROR = 1002,
+            UNSUPPORTED_DATA = 1003,
+            NO_STATUS_RCVD = 1005,
+            ABNORMAL_CLOSURE = 1006,
+            INVALID_TEXT = 1007,
+            POLICY_VIOLATION = 1008,
+            MESSAGE_TOO_BIG = 1009,
+            MANDATORY_EXTENSION = 1010,
+            INTERNAL_ERROR = 1011,
+            SERVICE_RESTART = 1012,
+            TRY_AGAIN_LATER = 1013,
+            BAD_GATEWAY = 1014
+        };
+
+        class CloseCodeCategory final : public std::error_category {
+        public:
+            [[nodiscard]] const char *name() const noexcept override;
+            [[nodiscard]] std::string message(int value) const override;
+        };
+
         explicit WebSocket(std::unique_ptr<IBuffer> buffer);
 
     private:
@@ -124,15 +115,39 @@ namespace asyncio::http::ws {
         std::unique_ptr<IBuffer> mBuffer;
     };
 
+    std::error_code make_error_code(WebSocket::Error e);
+    std::error_code make_error_code(WebSocket::CloseCode e);
+
+    enum HandshakeError {
+        UNSUPPORTED_SCHEME,
+        INVALID_RESPONSE,
+        UNEXPECTED_STATUS_CODE,
+        INVALID_HTTP_HEADER,
+        NO_ACCEPT_HEADER,
+        HASH_MISMATCH
+    };
+
+    class HandshakeErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+    };
+
+    std::error_code make_error_code(HandshakeError e);
+
     zero::async::coroutine::Task<WebSocket, std::error_code> connect(URL url);
 }
 
 template<>
-struct std::is_error_code_enum<asyncio::http::ws::Error> : std::true_type {
+struct std::is_error_code_enum<asyncio::http::ws::WebSocket::Error> : std::true_type {
 };
 
 template<>
-struct std::is_error_code_enum<asyncio::http::ws::CloseCode> : std::true_type {
+struct std::is_error_code_enum<asyncio::http::ws::WebSocket::CloseCode> : std::true_type {
+};
+
+template<>
+struct std::is_error_code_enum<asyncio::http::ws::HandshakeError> : std::true_type {
 };
 
 #endif //ASYNCIO_WEBSOCKET_H

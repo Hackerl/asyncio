@@ -2,6 +2,7 @@
 #include <asyncio/event_loop.h>
 #include <asyncio/fs/file.h>
 #include <asyncio/ev/event.h>
+#include <zero/singleton.h>
 #include <fcntl.h>
 #include <mutex>
 
@@ -35,40 +36,6 @@ std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_
     }
 
     return size * n;
-}
-
-const char *asyncio::http::CURLErrorCategory::name() const noexcept {
-    return "asyncio::http::curl::easy";
-}
-
-std::string asyncio::http::CURLErrorCategory::message(int value) const {
-    return curl_easy_strerror(static_cast<CURLcode>(value));
-}
-
-const std::error_category &asyncio::http::curlErrorCategory() {
-    static CURLErrorCategory instance;
-    return instance;
-}
-
-std::error_code asyncio::http::make_error_code(const CURLError e) {
-    return {static_cast<int>(e), curlErrorCategory()};
-}
-
-const char *asyncio::http::CURLMErrorCategory::name() const noexcept {
-    return "asyncio::http::curl::multi";
-}
-
-std::string asyncio::http::CURLMErrorCategory::message(int value) const {
-    return curl_multi_strerror(static_cast<CURLMcode>(value));
-}
-
-const std::error_category &asyncio::http::curlMErrorCategory() {
-    static CURLMErrorCategory instance;
-    return instance;
-}
-
-std::error_code asyncio::http::make_error_code(const CURLMError e) {
-    return {static_cast<int>(e), curlMErrorCategory()};
 }
 
 asyncio::http::Response::Response(std::shared_ptr<Requests> requests, std::unique_ptr<Connection> connection)
@@ -163,7 +130,7 @@ zero::async::coroutine::Task<nlohmann::json, std::error_code> asyncio::http::Res
         co_return nlohmann::json::parse(*std::move(content));
     }
     catch (const nlohmann::json::exception &) {
-        co_return tl::unexpected(make_error_code(std::errc::bad_message));
+        co_return tl::unexpected(INVALID_JSON);
     }
 }
 
@@ -201,11 +168,52 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::Response::pee
     });
 }
 
-asyncio::http::Requests::Requests(CURLM *multi, ev::Timer timer) : Requests(multi, std::move(timer), {}) {
+const char *asyncio::http::Response::ErrorCategory::name() const noexcept {
+    return "asyncio::http::Response";
 }
 
-asyncio::http::Requests::Requests(CURLM *multi, ev::Timer timer, Options options)
+std::string asyncio::http::Response::ErrorCategory::message(const int value) const {
+    if (value == INVALID_JSON)
+        return "invalid json message";
+
+    return "unknown";
+}
+
+std::error_code asyncio::http::make_error_code(const Response::Error e) {
+    return {e, zero::Singleton<Response::ErrorCategory>::getInstance()};
+}
+
+const char *asyncio::http::Requests::CURLErrorCategory::name() const noexcept {
+    return "asyncio::http::Requests::curl";
+}
+
+std::string asyncio::http::Requests::CURLErrorCategory::message(const int value) const {
+    return curl_easy_strerror(static_cast<CURLcode>(value));
+}
+
+const char *asyncio::http::Requests::CURLMErrorCategory::name() const noexcept {
+    return "asyncio::http::Requests::curl::multi";
+}
+
+std::string asyncio::http::Requests::CURLMErrorCategory::message(const int value) const {
+    return curl_multi_strerror(static_cast<CURLMcode>(value));
+}
+
+asyncio::http::Requests::Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer)
+    : Requests(multi, std::move(timer), {}) {
+}
+
+asyncio::http::Requests::Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer, Options options)
     : mRunning(0), mOptions(std::move(options)), mTimer(std::move(timer)), mMulti(multi, curl_multi_cleanup) {
+    evtimer_assign(
+        mTimer.get(),
+        event_get_base(mTimer.get()),
+        [](evutil_socket_t, short, void *arg) {
+            static_cast<Requests *>(arg)->onTimer();
+        },
+        this
+    );
+
     curl_multi_setopt(
         mMulti.get(),
         CURLMOPT_SOCKETFUNCTION,
@@ -249,31 +257,38 @@ asyncio::http::Requests::make(const Options &options) {
     CURLM *multi = curl_multi_init();
 
     if (!multi)
-        return tl::unexpected(make_error_code(std::errc::not_enough_memory));
+        return tl::unexpected(NOT_ENOUGH_MEMORY);
 
-    auto timer = ev::Timer::make();
+    auto timer = std::unique_ptr<event, decltype(event_free) *>(
+        evtimer_new(getEventLoop()->base(), nullptr, nullptr),
+        event_free
+    );
 
     if (!timer) {
         curl_multi_cleanup(multi);
-        return tl::unexpected(timer.error());
+        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
     }
 
-    return std::make_shared<Requests>(multi, *std::move(timer), options);
+    return std::make_shared<Requests>(multi, std::move(timer), options);
 }
 
-void asyncio::http::Requests::onCURLTimer(const long timeout) {
+void asyncio::http::Requests::onTimer() {
+    curl_multi_socket_action(mMulti.get(), CURL_SOCKET_TIMEOUT, 0, &mRunning);
+    recycle();
+}
+
+void asyncio::http::Requests::onCURLTimer(const long timeout) const {
     if (timeout == -1) {
-        mTimer.cancel();
+        evtimer_del(mTimer.get());
         return;
     }
 
-    if (mTimer.pending())
-        mTimer.cancel();
+    const timeval tv = {
+        timeout / 1000,
+        timeout % 1000 * 1000
+    };
 
-    mTimer.after(std::chrono::milliseconds{timeout}).future().then([this] {
-        curl_multi_socket_action(mMulti.get(), CURL_SOCKET_TIMEOUT, 0, &mRunning);
-        recycle();
-    });
+    evtimer_add(mTimer.get(), &tv);
 }
 
 void asyncio::http::Requests::onCURLEvent(const curl_socket_t s, const int what, void *data) {
@@ -323,8 +338,8 @@ void asyncio::http::Requests::onCURLEvent(const curl_socket_t s, const int what,
 
             requests->recycle();
 
-            if (requests->mRunning == 0 && requests->mTimer.pending())
-                requests->mTimer.cancel();
+            if (requests->mRunning == 0 && evtimer_pending(requests->mTimer.get(), nullptr))
+                evtimer_del(requests->mTimer.get());
         },
         context
     );
@@ -373,7 +388,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy = {curl_easy_init(), curl_easy_cleanup};
 
     if (!easy)
-        return tl::unexpected(make_error_code(std::errc::not_enough_memory));
+        return tl::unexpected(NOT_ENOUGH_MEMORY);
 
     auto buffers = ev::pipe();
     EXPECT(buffers);
@@ -471,12 +486,12 @@ asyncio::http::Requests::perform(std::unique_ptr<Connection> connection) {
         connection->promise.getFuture(),
         [connection = connection.get(), multi = mMulti.get()]() -> tl::expected<void, std::error_code> {
             if (connection->promise.isFulfilled())
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             if (const CURLMcode code = curl_multi_remove_handle(multi, connection->easy.get()); code != CURLM_OK)
                 return tl::unexpected(static_cast<CURLMError>(code));
 
-            connection->promise.reject(make_error_code(std::errc::operation_canceled));
+            connection->promise.reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     }; !result) {
@@ -600,4 +615,12 @@ asyncio::http::Requests::request(
     });
 
     co_return co_await perform(*std::move(connection));
+}
+
+std::error_code asyncio::http::make_error_code(const Requests::CURLError e) {
+    return {static_cast<int>(e), zero::Singleton<Requests::CURLErrorCategory>::getInstance()};
+}
+
+std::error_code asyncio::http::make_error_code(const Requests::CURLMError e) {
+    return {static_cast<int>(e), zero::Singleton<Requests::CURLMErrorCategory>::getInstance()};
 }

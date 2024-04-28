@@ -139,13 +139,13 @@ TEST_CASE("asyncio condition variable", "[sync]") {
         SECTION("timeout") {
             co_await allSettled(
                 [](auto c, auto m) -> zero::async::coroutine::Task<void> {
-                    auto result = co_await m->lock();
+                    const auto result = co_await m->lock();
                     REQUIRE(result);
                     REQUIRE(m->locked());
 
-                    result = co_await c->wait(*m, 10ms);
-                    REQUIRE(!result);
-                    REQUIRE(result.error() == std::errc::timed_out);
+                    const auto res = co_await asyncio::timeout(c->wait(*m), 10ms);
+                    REQUIRE(!res);
+                    REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
                     REQUIRE(m->locked());
                     m->unlock();
                 }(condition, mutex),
@@ -173,7 +173,7 @@ TEST_CASE("asyncio condition variable", "[sync]") {
                 m->unlock();
             }(condition, mutex);
 
-            task.cancel();
+            REQUIRE(task.cancel());
             co_await task;
         }
 
@@ -193,7 +193,7 @@ TEST_CASE("asyncio condition variable", "[sync]") {
 
             result = task.cancel();
             REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::operation_not_supported);
+            REQUIRE(result.error() == zero::async::coroutine::Error::WILL_BE_DONE);
 
             mutex->unlock();
             REQUIRE(!mutex->locked());

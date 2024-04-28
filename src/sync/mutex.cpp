@@ -8,8 +8,7 @@ void asyncio::sync::Mutex::wakeup() const {
         promise->resolve();
 }
 
-zero::async::coroutine::Task<void, std::error_code>
-asyncio::sync::Mutex::lock(const std::optional<std::chrono::milliseconds> timeout) {
+zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Mutex::lock() {
     if (!mLocked && mPending.empty()) {
         mLocked = true;
         co_return tl::expected<void, std::error_code>{};
@@ -18,24 +17,16 @@ asyncio::sync::Mutex::lock(const std::optional<std::chrono::milliseconds> timeou
     const auto promise = std::make_shared<Promise<void, std::error_code>>();
     mPending.push_back(promise);
 
-    const auto result = co_await asyncio::timeout(
-        from(zero::async::coroutine::Cancellable{
-            promise->getFuture(),
-            [=]() -> tl::expected<void, std::error_code> {
-                if (promise->isFulfilled())
-                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+    const auto result = co_await zero::async::coroutine::Cancellable{
+        promise->getFuture(),
+        [=]() -> tl::expected<void, std::error_code> {
+            if (promise->isFulfilled())
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
-                promise->reject(make_error_code(std::errc::operation_canceled));
-                return {};
-            }
-        }),
-        timeout.value_or(std::chrono::milliseconds{0})
-    ).andThen([](const auto &res) -> tl::expected<void, std::error_code> {
-        if (!res)
-            return tl::unexpected(res.error());
-
-        return {};
-    });
+            promise->reject(zero::async::coroutine::Error::CANCELLED);
+            return {};
+        }
+    };
 
     mPending.remove(promise);
 

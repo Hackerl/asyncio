@@ -60,7 +60,7 @@ jobs:
         run: ctest --output-on-failure --test-dir build
 
   macos-amd64:
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       - name: Install LLVM

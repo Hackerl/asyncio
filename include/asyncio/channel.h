@@ -9,29 +9,6 @@
 #include <zero/atomic/circular_buffer.h>
 
 namespace asyncio {
-    enum ChannelError {
-        CHANNEL_EOF = 1,
-        BROKEN_CHANNEL,
-        EMPTY,
-        FULL
-    };
-
-    class ChannelErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    const std::error_category &channelErrorCategory();
-    std::error_code make_error_code(ChannelError e);
-}
-
-template<>
-struct std::is_error_code_enum<asyncio::ChannelError> : std::true_type {
-};
-
-namespace asyncio {
     template<typename T>
     class ISender : public virtual zero::Interface {
     public:
@@ -58,6 +35,24 @@ namespace asyncio {
         virtual zero::async::coroutine::Task<T, std::error_code> receive(std::chrono::milliseconds timeout) = 0;
     };
 
+    enum ChannelError {
+        CHANNEL_EOF = 1,
+        BROKEN_CHANNEL,
+        SEND_TIMEOUT,
+        RECEIVE_TIMEOUT,
+        EMPTY,
+        FULL
+    };
+
+    class ChannelErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    std::error_code make_error_code(ChannelError e);
+
     template<typename T>
     class Channel final : public ISender<T>, public IReceiver<T> {
         static constexpr auto SENDER = 0;
@@ -72,11 +67,15 @@ namespace asyncio {
             assert(mPending[RECEIVER].empty());
         }
 
+        static std::shared_ptr<Channel> make(const std::size_t capacity) {
+            return std::make_shared<Channel>(capacity);
+        }
+
     private:
         tl::expected<void, std::error_code>
         sendSyncImpl(T &&element, const std::optional<std::chrono::milliseconds> timeout) {
             if (mClosed)
-                return tl::unexpected(BROKEN_CHANNEL);
+                return tl::unexpected(make_error_code(BROKEN_CHANNEL));
 
             tl::expected<void, std::error_code> result;
 
@@ -88,7 +87,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(BROKEN_CHANNEL);
+                        result = tl::unexpected(make_error_code(BROKEN_CHANNEL));
                         break;
                     }
 
@@ -142,7 +141,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(BROKEN_CHANNEL);
+                        result = tl::unexpected(make_error_code(BROKEN_CHANNEL));
                         break;
                     }
 
@@ -161,22 +160,23 @@ namespace asyncio {
                             promise->getFuture(),
                             [=]() -> tl::expected<void, std::error_code> {
                                 if (promise->isFulfilled())
-                                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                                    return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
-                                promise->reject(make_error_code(std::errc::operation_canceled));
+                                promise->reject(zero::async::coroutine::Error::CANCELLED);
                                 return {};
                             }
                         }),
                         timeout.value_or(std::chrono::milliseconds{0})
-                    ).andThen([](const auto &r) -> tl::expected<void, std::error_code> {
-                        if (!r)
-                            return tl::unexpected(r.error());
-
-                        return {};
-                    }); !res) {
+                    ); !res) {
                         std::lock_guard guard(mMutex);
                         mPending[SENDER].remove(promise);
-                        result = tl::unexpected(res.error());
+                        result = tl::unexpected(make_error_code(SEND_TIMEOUT));
+                        break;
+                    }
+                    else if (!*res) {
+                        std::lock_guard guard(mMutex);
+                        mPending[SENDER].remove(promise);
+                        result = tl::unexpected(res->error());
                         break;
                     }
 
@@ -204,7 +204,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(CHANNEL_EOF);
+                        result = tl::unexpected(make_error_code(CHANNEL_EOF));
                         break;
                     }
 
@@ -255,7 +255,7 @@ namespace asyncio {
 
                     if (mClosed) {
                         mMutex.unlock();
-                        result = tl::unexpected<std::error_code>(CHANNEL_EOF);
+                        result = tl::unexpected(make_error_code(CHANNEL_EOF));
                         break;
                     }
 
@@ -274,22 +274,23 @@ namespace asyncio {
                             promise->getFuture(),
                             [=]() -> tl::expected<void, std::error_code> {
                                 if (promise->isFulfilled())
-                                    return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                                    return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
-                                promise->reject(make_error_code(std::errc::operation_canceled));
+                                promise->reject(zero::async::coroutine::Error::CANCELLED);
                                 return {};
                             }
                         }),
                         timeout.value_or(std::chrono::milliseconds{0})
-                    ).andThen([](const auto &r) -> tl::expected<void, std::error_code> {
-                        if (!r)
-                            return tl::unexpected(r.error());
-
-                        return {};
-                    }); !res) {
+                    ); !res) {
                         std::lock_guard guard(mMutex);
                         mPending[RECEIVER].remove(promise);
-                        result = tl::unexpected(res.error());
+                        result = tl::unexpected(make_error_code(RECEIVE_TIMEOUT));
+                        break;
+                    }
+                    else if (!*res) {
+                        std::lock_guard guard(mMutex);
+                        mPending[RECEIVER].remove(promise);
+                        result = tl::unexpected(res->error());
                         break;
                     }
 
@@ -341,12 +342,12 @@ namespace asyncio {
     public:
         tl::expected<void, std::error_code> trySend(T element) override {
             if (mClosed)
-                return tl::unexpected(BROKEN_CHANNEL);
+                return tl::unexpected(make_error_code(BROKEN_CHANNEL));
 
             const auto index = mBuffer.reserve();
 
             if (!index)
-                return tl::unexpected(FULL);
+                return tl::unexpected(make_error_code(FULL));
 
             mBuffer[*index] = std::move(element);
             mBuffer.commit(*index);
@@ -384,8 +385,8 @@ namespace asyncio {
                 mClosed = true;
             }
 
-            trigger<SENDER>(BROKEN_CHANNEL);
-            trigger<RECEIVER>(CHANNEL_EOF);
+            trigger<SENDER>(make_error_code(BROKEN_CHANNEL));
+            trigger<RECEIVER>(make_error_code(CHANNEL_EOF));
         }
 
         tl::expected<T, std::error_code> tryReceive() override {
@@ -455,11 +456,10 @@ namespace asyncio {
 
     template<typename T>
     using ChannelPtr = std::shared_ptr<Channel<T>>;
-
-    template<typename T>
-    ChannelPtr<T> makeChannel(const std::size_t capacity) {
-        return std::make_shared<Channel<T>>(capacity);
-    }
 }
+
+template<>
+struct std::is_error_code_enum<asyncio::ChannelError> : std::true_type {
+};
 
 #endif //ASYNCIO_CHANNEL_H

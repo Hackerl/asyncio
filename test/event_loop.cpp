@@ -20,12 +20,12 @@ TEST_CASE("asyncio event loop", "[event loop]") {
             SECTION("timeout") {
                 const auto result = co_await asyncio::timeout(asyncio::sleep(20ms), 10ms);
                 REQUIRE(!result);
-                REQUIRE(result.error() == std::errc::timed_out);
+                REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
             }
 
             SECTION("failure") {
                 auto task = asyncio::sleep(50ms);
-                task.cancel();
+                REQUIRE(task.cancel());
                 const auto result = co_await asyncio::timeout(std::move(task), 20ms);
                 REQUIRE(result);
                 REQUIRE(result.value().error() == std::errc::operation_canceled);
@@ -33,7 +33,7 @@ TEST_CASE("asyncio event loop", "[event loop]") {
 
             SECTION("cancel") {
                 auto task = asyncio::timeout(asyncio::sleep(20ms), 20ms);
-                task.cancel();
+                REQUIRE(task.cancel());
                 const auto result = co_await task;
                 REQUIRE(result);
                 REQUIRE(!*result);
@@ -46,7 +46,7 @@ TEST_CASE("asyncio event loop", "[event loop]") {
                     from(zero::async::coroutine::Cancellable{
                         promise->getFuture(),
                         [=]() -> tl::expected<void, std::error_code> {
-                            return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                            return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
                         }
                     }),
                     20ms

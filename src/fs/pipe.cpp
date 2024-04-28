@@ -1,5 +1,4 @@
 #include <asyncio/fs/pipe.h>
-#include <asyncio/error.h>
 
 #ifdef _WIN32
 #include <asyncio/thread.h>
@@ -56,7 +55,7 @@ asyncio::fs::Pipe::~Pipe() {
 tl::expected<asyncio::fs::Pipe, std::error_code> asyncio::fs::Pipe::from(const FileDescriptor fd) {
 #ifdef _WIN32
     if (GetFileType(reinterpret_cast<HANDLE>(fd)) != FILE_TYPE_PIPE)
-        return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     return Pipe{fd};
 #else
@@ -77,7 +76,7 @@ tl::expected<asyncio::fs::Pipe, std::error_code> asyncio::fs::Pipe::from(const F
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::fs::Pipe::close() {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
 #ifdef _WIN32
     if (!CloseHandle(reinterpret_cast<HANDLE>(std::exchange(mFD, INVALID_FILE_DESCRIPTOR))))
@@ -92,9 +91,9 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::fs::Pipe::close() {
     co_return tl::expected<void, std::error_code>{};
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::read(std::span<std::byte> data) {
+zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::read(const std::span<std::byte> data) {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
 #ifdef _WIN32
     co_return co_await toThread(
@@ -112,15 +111,15 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
 
             return {};
         }
-    ).transformError([](const auto &ec) -> std::error_code {
+    ).orElse([](const auto &ec) -> tl::expected<std::size_t, std::error_code> {
         if (ec == std::errc::broken_pipe)
-            return IO_EOF;
+            return 0;
 
-        return ec;
+        return tl::unexpected(ec);
     });
 #else
     if (!mEvents[READ_INDEX])
-        co_return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+        co_return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
     tl::expected<size_t, std::error_code> result;
 
@@ -132,12 +131,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
             break;
         }
 
-        if (n == 0) {
-            result = tl::unexpected<std::error_code>(IO_EOF);
-            break;
-        }
-
-        if (n > 0) {
+        if (n >= 0) {
             result = n;
             break;
         }
@@ -159,7 +153,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
 zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
 #ifdef _WIN32
     co_return co_await toThread(
@@ -187,13 +181,13 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
         }
     ).transformError([](const auto &ec) -> std::error_code {
         if (ec == std::error_code{ERROR_NO_DATA, std::system_category()})
-            return make_error_code(std::errc::broken_pipe);
+            return BROKEN_PIPE;
 
         return ec;
     });
 #else
     if (!mEvents[WRITE_INDEX])
-        co_return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+        co_return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
     tl::expected<size_t, std::error_code> result;
 
@@ -208,10 +202,7 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
             break;
         }
 
-        if (n == 0) {
-            result = tl::unexpected<std::error_code>(IO_EOF);
-            break;
-        }
+        assert(n != 0);
 
         if (n > 0) {
             *result += n;

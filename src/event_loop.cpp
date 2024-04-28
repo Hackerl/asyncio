@@ -4,6 +4,7 @@
 #include <event2/dns.h>
 #include <event2/thread.h>
 #include <zero/defer.h>
+#include <zero/singleton.h>
 #include <mutex>
 
 #ifdef _WIN32
@@ -20,31 +21,26 @@
 
 thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 
-const char *asyncio::EventLoopErrorCategory::name() const noexcept {
-    return "asyncio::eventLoop";
+const char *asyncio::EventLoop::ErrorCategory::name() const noexcept {
+    return "asyncio::EventLoop";
 }
 
-std::string asyncio::EventLoopErrorCategory::message(const int value) const {
+std::string asyncio::EventLoop::ErrorCategory::message(const int value) const {
     if (value == INVALID_NAMESERVER)
         return "invalid nameserver";
 
     return "unknown";
 }
 
-std::error_condition asyncio::EventLoopErrorCategory::default_error_condition(const int value) const noexcept {
+std::error_condition asyncio::EventLoop::ErrorCategory::default_error_condition(const int value) const noexcept {
     if (value == INVALID_NAMESERVER)
         return std::errc::invalid_argument;
 
     return error_category::default_error_condition(value);
 }
 
-const std::error_category &asyncio::eventLoopErrorCategory() {
-    static EventLoopErrorCategory instance;
-    return instance;
-}
-
-std::error_code asyncio::make_error_code(const EventLoopError e) {
-    return {static_cast<int>(e), eventLoopErrorCategory()};
+std::error_code asyncio::make_error_code(const EventLoop::Error e) {
+    return {static_cast<int>(e), zero::Singleton<EventLoop::ErrorCategory>::getInstance()};
 }
 
 asyncio::EventLoop::EventLoop(
@@ -217,4 +213,26 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(const std::ch
     auto timer = ev::Timer::make();
     CO_EXPECT(timer);
     co_return co_await timer->after(ms);
+}
+
+const char *asyncio::TimeoutErrorCategory::name() const noexcept {
+    return "asyncio::timeout";
+}
+
+std::string asyncio::TimeoutErrorCategory::message(const int value) const {
+    if (value == ELAPSED)
+        return "deadline has elapsed";
+
+    return "unknown";
+}
+
+std::error_condition asyncio::TimeoutErrorCategory::default_error_condition(const int value) const noexcept {
+    if (value == ELAPSED)
+        return std::errc::timed_out;
+
+    return error_category::default_error_condition(value);
+}
+
+std::error_code asyncio::make_error_code(const TimeoutError e) {
+    return {static_cast<int>(e), zero::Singleton<TimeoutErrorCategory>::getInstance()};
 }

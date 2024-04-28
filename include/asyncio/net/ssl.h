@@ -16,13 +16,12 @@ namespace asyncio::net::ssl {
         [[nodiscard]] std::string message(int value) const override;
     };
 
-    const std::error_category &errorCategory();
     std::error_code make_error_code(Error e);
 
     using Context = SSL_CTX;
 
 #ifdef ASYNCIO_EMBED_CA_CERT
-    tl::expected<void, std::error_code> loadEmbeddedCA(const Context *ctx);
+    tl::expected<void, Error> loadEmbeddedCA(const Context *ctx);
 #endif
 
     enum Version {
@@ -43,7 +42,7 @@ namespace asyncio::net::ssl {
         bool server{};
     };
 
-    tl::expected<std::shared_ptr<Context>, std::error_code> newContext(const Config &config);
+    tl::expected<std::shared_ptr<Context>, Error> newContext(const Config &config);
 
     namespace stream {
         enum State {

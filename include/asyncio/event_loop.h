@@ -12,22 +12,19 @@
 namespace asyncio {
     constexpr auto DEFAULT_MAX_WORKER_NUMBER = 16;
 
-    enum EventLoopError {
-        INVALID_NAMESERVER = 1
-    };
-
-    class EventLoopErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    const std::error_category &eventLoopErrorCategory();
-    std::error_code make_error_code(EventLoopError e);
-
     class EventLoop {
     public:
+        enum Error {
+            INVALID_NAMESERVER = 1
+        };
+
+        class ErrorCategory final : public std::error_category {
+        public:
+            [[nodiscard]] const char *name() const noexcept override;
+            [[nodiscard]] std::string message(int value) const override;
+            [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+        };
+
         EventLoop(
             std::unique_ptr<event_base, decltype(event_base_free) *> base,
             std::unique_ptr<fs::IFramework> framework,
@@ -50,7 +47,7 @@ namespace asyncio {
         void loopExit(std::optional<std::chrono::milliseconds> ms = std::nullopt) const;
 
         template<typename F>
-        void post(F &&f, const std::optional<std::chrono::milliseconds> ms = std::nullopt) const {
+        void post(F &&f, const std::optional<std::chrono::milliseconds> ms = std::nullopt) {
             std::optional<timeval> tv;
 
             if (ms)
@@ -92,18 +89,33 @@ namespace asyncio {
         toThread(F f, C cancel);
     };
 
+    std::error_code make_error_code(EventLoop::Error e);
+
     std::shared_ptr<EventLoop> getEventLoop();
     void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
 
     tl::expected<EventLoop, std::error_code> createEventLoop(std::size_t maxWorkers = DEFAULT_MAX_WORKER_NUMBER);
     zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
+    enum TimeoutError {
+        ELAPSED = 1
+    };
+
+    class TimeoutErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    std::error_code make_error_code(TimeoutError e);
+
     template<typename T, typename E>
         requires (!std::is_same_v<E, std::exception_ptr>)
-    zero::async::coroutine::Task<tl::expected<T, E>, std::error_code>
+    zero::async::coroutine::Task<tl::expected<T, E>, TimeoutError>
     timeout(zero::async::coroutine::Task<T, E> task, const std::chrono::milliseconds ms) {
         if (ms == std::chrono::milliseconds::zero())
-            co_return tl::expected<tl::expected<T, E>, std::error_code>{co_await task};
+            co_return tl::expected<tl::expected<T, E>, TimeoutError>{co_await task};
 
         auto timer = sleep(ms);
         const auto taskPtr = std::make_shared<zero::async::coroutine::Task<T, E>>(std::move(task));
@@ -116,13 +128,13 @@ namespace asyncio {
 
         if (future.isReady()) {
             if (!future.result())
-                co_return tl::expected<tl::expected<T, E>, std::error_code>{std::move(result)};
+                co_return tl::expected<tl::expected<T, E>, TimeoutError>{std::move(result)};
 
-            co_return tl::unexpected(make_error_code(std::errc::timed_out));
+            co_return tl::unexpected(ELAPSED);
         }
 
         timer.cancel();
-        co_return tl::expected<tl::expected<T, E>, std::error_code>{std::move(result)};
+        co_return tl::expected<tl::expected<T, E>, TimeoutError>{std::move(result)};
     }
 
     template<typename F, typename T = std::invoke_result_t<F>>
@@ -146,7 +158,11 @@ namespace asyncio {
 }
 
 template<>
-struct std::is_error_code_enum<asyncio::EventLoopError> : std::true_type {
+struct std::is_error_code_enum<asyncio::EventLoop::Error> : std::true_type {
+};
+
+template<>
+struct std::is_error_code_enum<asyncio::TimeoutError> : std::true_type {
 };
 
 #endif //ASYNCIO_EVENT_LOOP_H

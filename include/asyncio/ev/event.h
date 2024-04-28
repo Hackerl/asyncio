@@ -25,8 +25,6 @@ namespace asyncio::ev {
         static tl::expected<Event, std::error_code> make(FileDescriptor fd, short events);
 
         [[nodiscard]] FileDescriptor fd() const;
-
-        bool cancel();
         [[nodiscard]] bool pending() const;
 
         zero::async::coroutine::Task<short, std::error_code>

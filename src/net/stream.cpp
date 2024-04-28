@@ -28,7 +28,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffe
     const FileDescriptor fd = this->fd();
 
     if (fd == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     return addressFrom(fd, false);
 }
@@ -37,7 +37,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffe
     const FileDescriptor fd = this->fd();
 
     if (fd == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     return addressFrom(fd, true);
 }
@@ -84,10 +84,10 @@ asyncio::net::stream::Acceptor::~Acceptor() {
 
 zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::net::stream::Acceptor::fd() {
     if (!mListener)
-        co_return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (mPromise)
-        co_return tl::unexpected(make_error_code(std::errc::operation_in_progress));
+        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
 
     co_return co_await zero::async::coroutine::Cancellable{
         zero::async::promise::chain<FileDescriptor, std::error_code>([this](auto promise) {
@@ -98,9 +98,9 @@ zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::
         }),
         [this]() -> tl::expected<void, std::error_code> {
             if (!mPromise)
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
-            std::exchange(mPromise, std::nullopt)->reject(make_error_code(std::errc::operation_canceled));
+            std::exchange(mPromise, std::nullopt)->reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     };
@@ -108,10 +108,10 @@ zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::
 
 tl::expected<void, std::error_code> asyncio::net::stream::Acceptor::close() {
     if (!mListener)
-        return tl::unexpected(make_error_code(std::errc::bad_file_descriptor));
+        return tl::unexpected(BAD_FILE_DESCRIPTOR);
 
     if (auto promise = std::exchange(mPromise, std::nullopt); promise)
-        promise->reject(make_error_code(std::errc::bad_file_descriptor));
+        promise->reject(BAD_FILE_DESCRIPTOR);
 
     mListener.reset();
     return {};
@@ -152,9 +152,9 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
 }
 
 tl::expected<asyncio::net::stream::Listener, std::error_code>
-asyncio::net::stream::listen(std::span<const Address> addresses) {
+asyncio::net::stream::listen(const std::span<const Address> addresses) {
     if (addresses.empty())
-        return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        return tl::unexpected(INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -193,13 +193,13 @@ asyncio::net::stream::connect(const Address address) {
     }
 #endif
 
-    co_return tl::unexpected(make_error_code(std::errc::address_family_not_supported));
+    co_return tl::unexpected(ADDRESS_FAMILY_NOT_SUPPORTED);
 }
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(std::span<const Address> addresses) {
+asyncio::net::stream::connect(const std::span<const Address> addresses) {
     if (addresses.empty())
-        co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        co_return tl::unexpected(INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -255,16 +255,16 @@ asyncio::net::stream::connect(const std::string host, const unsigned short port)
     );
 
     if (bufferevent_socket_connect_hostname(bev, dnsBase->get(), AF_UNSPEC, host.c_str(), port) < 0)
-        co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        co_return tl::unexpected(INVALID_ARGUMENT);
 
     CO_EXPECT(co_await zero::async::coroutine::Cancellable{
         promise.getFuture(),
         [&]() -> tl::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             bufferevent_free(std::exchange(bev, nullptr));
-            promise.reject(make_error_code(std::errc::operation_canceled));
+            promise.reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     });
@@ -275,7 +275,7 @@ asyncio::net::stream::connect(const std::string host, const unsigned short port)
 #if __unix__ || __APPLE__
 tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const std::string &path) {
     if (path.empty())
-        return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        return tl::unexpected(INVALID_ARGUMENT);
 
     sockaddr_un sa = {};
     socklen_t length = sizeof(sa_family_t) + path.length() + 1;
@@ -307,7 +307,7 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(const std::string path) {
     if (path.empty())
-        co_return tl::unexpected(make_error_code(std::errc::invalid_argument));
+        co_return tl::unexpected(INVALID_ARGUMENT);
 
     sockaddr_un sa = {};
     socklen_t length = sizeof(sa_family_t) + path.length() + 1;
@@ -360,10 +360,10 @@ asyncio::net::stream::connect(const std::string path) {
         promise.getFuture(),
         [&]() -> tl::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return tl::unexpected(make_error_code(std::errc::operation_not_supported));
+                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             bufferevent_free(std::exchange(bev, nullptr));
-            promise.reject(make_error_code(std::errc::operation_canceled));
+            promise.reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     });

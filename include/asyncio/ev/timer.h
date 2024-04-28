@@ -16,10 +16,6 @@ namespace asyncio::ev {
         ~Timer();
 
         static tl::expected<Timer, std::error_code> make();
-
-        bool cancel();
-        [[nodiscard]] bool pending() const;
-
         zero::async::coroutine::Task<void, std::error_code> after(std::chrono::milliseconds delay);
 
     private:

@@ -40,7 +40,7 @@ TEST_CASE("signal handler", "[ev]") {
 
             const auto result = co_await asyncio::timeout(signal->on(), 10ms);
             REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::timed_out);
+            REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
         }
     });
 }

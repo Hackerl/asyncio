@@ -35,7 +35,7 @@ namespace asyncio::binary {
 
     template<typename T>
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
-    zero::async::coroutine::Task<void, std::error_code> writeLE(IWriter &writer, T value) {
+    zero::async::coroutine::Task<void, std::error_code> writeLE(IWriter &writer, const T value) {
         std::byte data[sizeof(T)];
 
         for (std::size_t i = 0; i < sizeof(T); i++)
@@ -46,7 +46,7 @@ namespace asyncio::binary {
 
     template<typename T>
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
-    zero::async::coroutine::Task<void, std::error_code> writeBE(IWriter &writer, T value) {
+    zero::async::coroutine::Task<void, std::error_code> writeBE(IWriter &writer, const T value) {
         std::byte data[sizeof(T)];
 
         for (std::size_t i = 0; i < sizeof(T); i++)
