@@ -6,7 +6,7 @@
 #include <asyncio/promise.h>
 
 namespace asyncio::ev {
-    class Buffer : public virtual IBuffer, public IDeadline, public IFileDescriptor, public Reader, public Writer {
+    class Buffer : public virtual IBuffer, public IFileDescriptor, public Reader, public Writer {
     protected:
         static constexpr auto READ_INDEX = 0;
         static constexpr auto WRITE_INDEX = 1;
@@ -45,11 +45,6 @@ namespace asyncio::ev {
 
         [[nodiscard]] std::size_t capacity() const override;
         [[nodiscard]] FileDescriptor fd() const override;
-
-        tl::expected<void, std::error_code> setTimeout(std::chrono::milliseconds timeout) override;
-
-        tl::expected<void, std::error_code>
-        setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
 
     protected:
         bool mClosed;

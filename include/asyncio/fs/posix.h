@@ -14,7 +14,7 @@ namespace asyncio::fs {
         };
 
     public:
-        enum Error {
+        enum class Error {
             ALL_DONE = 1,
             NOT_CANCELED
         };

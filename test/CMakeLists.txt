@@ -7,7 +7,6 @@ add_executable(
         binary.cpp
         promise.cpp
         event_loop.cpp
-        thread.cpp
         channel.cpp
         sync/mutex.cpp
         sync/event.cpp

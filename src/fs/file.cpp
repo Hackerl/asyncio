@@ -47,7 +47,7 @@ tl::expected<asyncio::fs::File, std::error_code> asyncio::fs::File::from(const F
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::fs::File::close() {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
 #ifdef _WIN32
     if (!CloseHandle(reinterpret_cast<HANDLE>(std::exchange(mFD, INVALID_FILE_DESCRIPTOR))))
@@ -62,7 +62,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::fs::File::close() {
 
 zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::File::read(const std::span<std::byte> data) {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
 #ifdef _WIN32
     const auto result = co_await mEventLoop
@@ -86,10 +86,10 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::File::re
 zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::fs::File::write(const std::span<const std::byte> data) {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mAppend) {
-        CO_EXPECT(seek(0, END));
+        CO_EXPECT(seek(0, Whence::END));
     }
 
     const auto result = co_await mEventLoop->framework().write(mEventLoop, mFD, mOffset, data);
@@ -101,30 +101,30 @@ asyncio::fs::File::write(const std::span<const std::byte> data) {
 
 tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     tl::expected<std::uint64_t, std::error_code> result;
 
     switch (whence) {
-    case BEGIN:
+    case Whence::BEGIN:
         if (offset < 0) {
-            result = tl::unexpected<std::error_code>(INVALID_ARGUMENT);
+            result = tl::unexpected<std::error_code>(IOError::INVALID_ARGUMENT);
             break;
         }
 
         result = mOffset = offset;
         break;
 
-    case CURRENT:
+    case Whence::CURRENT:
         if (offset < 0 && -offset > mOffset) {
-            result = tl::unexpected<std::error_code>(INVALID_ARGUMENT);
+            result = tl::unexpected<std::error_code>(IOError::INVALID_ARGUMENT);
             break;
         }
 
         result = mOffset = mOffset + offset;
         break;
 
-    case END:
+    case Whence::END:
 #ifdef _WIN32
         LARGE_INTEGER pos;
 
@@ -157,7 +157,7 @@ tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::seek(const std::
 
 tl::expected<void, std::error_code> asyncio::fs::File::rewind() {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     mOffset = 0;
     return {};
@@ -165,7 +165,7 @@ tl::expected<void, std::error_code> asyncio::fs::File::rewind() {
 
 tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::length() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
 #ifdef _WIN32
     LARGE_INTEGER pos;
@@ -190,7 +190,7 @@ tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::length() const {
 
 tl::expected<std::uint64_t, std::error_code> asyncio::fs::File::position() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     return mOffset;
 }
@@ -208,7 +208,7 @@ tl::expected<asyncio::fs::File, std::error_code> asyncio::fs::open(const std::fi
 
 #ifdef _WIN32
     if (flags != O_RDONLY && !(flags & O_WRONLY) && !(flags & O_RDWR))
-        return tl::unexpected(INVALID_ARGUMENT);
+        return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     const bool read = flags == O_RDONLY || flags & O_RDWR;
     const bool write = flags & O_WRONLY || flags & O_RDWR;
@@ -226,7 +226,7 @@ tl::expected<asyncio::fs::File, std::error_code> asyncio::fs::open(const std::fi
     else if (read && write && append)
         access = GENERIC_READ | FILE_GENERIC_WRITE & ~FILE_WRITE_DATA;
     else
-        return tl::unexpected(INVALID_ARGUMENT);
+        return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     const bool create = flags & O_CREAT;
     const bool truncate = flags & O_TRUNC;
@@ -245,7 +245,7 @@ tl::expected<asyncio::fs::File, std::error_code> asyncio::fs::open(const std::fi
     else if (create && createNew)
         disposition = CREATE_NEW;
     else
-        return tl::unexpected(INVALID_ARGUMENT);
+        return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     const auto handle = CreateFileA(
         path.string().c_str(),

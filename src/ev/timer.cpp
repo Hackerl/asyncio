@@ -46,7 +46,7 @@ tl::expected<asyncio::ev::Timer, std::error_code> asyncio::ev::Timer::make() {
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Timer::after(const std::chrono::milliseconds delay) {
     if (mPromise)
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     co_return co_await zero::async::coroutine::Cancellable{
         zero::async::promise::chain<void, std::error_code>([&](auto promise) {

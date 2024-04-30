@@ -78,28 +78,10 @@ void asyncio::ev::Buffer::resize(const std::size_t capacity) {
 
 void asyncio::ev::Buffer::onEvent(const short what) {
     if (what & BEV_EVENT_EOF) {
-        onClose(UNEXPECTED_EOF);
+        onClose(IOError::UNEXPECTED_EOF);
     }
     else if (what & BEV_EVENT_ERROR) {
         onClose(getError());
-    }
-    else if (what & BEV_EVENT_TIMEOUT) {
-        if (what & BEV_EVENT_READING) {
-            auto promise = std::exchange(mPromises[READ_INDEX], std::nullopt);
-
-            if (!promise)
-                return;
-
-            promise->reject(TIMED_OUT);
-        }
-        else {
-            auto promise = std::exchange(mPromises[WRITE_INDEX], std::nullopt);
-
-            if (!promise)
-                return;
-
-            promise->reject(TIMED_OUT);
-        }
     }
 }
 
@@ -176,7 +158,7 @@ std::error_code asyncio::ev::Buffer::getError() const {
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::close() {
     if (!mBev)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     assert(!mPromises[READ_INDEX]);
     assert(!mPromises[WRITE_INDEX]);
@@ -190,10 +172,10 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::close()
 
 zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::read(const std::span<std::byte> data) {
     if (!mBev)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mPromises[READ_INDEX])
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     evbuffer *input = bufferevent_get_input(mBev.get());
     std::size_t length = evbuffer_get_length(input);
@@ -205,7 +187,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::
     }
 
     if (mClosed) {
-        if (mLastError == UNEXPECTED_EOF)
+        if (mLastError == IOError::UNEXPECTED_EOF)
             co_return 0;
 
         co_return tl::unexpected(mLastError);
@@ -230,7 +212,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::
             return {};
         }
     }; !result) {
-        if (result.error() == UNEXPECTED_EOF)
+        if (result.error() == IOError::UNEXPECTED_EOF)
             co_return 0;
 
         co_return tl::unexpected(result.error());
@@ -252,10 +234,10 @@ std::size_t asyncio::ev::Buffer::available() const {
 
 zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::readLine() {
     if (!mBev)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mPromises[READ_INDEX])
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     evbuffer *input = bufferevent_get_input(mBev.get());
     tl::expected<std::string, std::error_code> result;
@@ -302,18 +284,18 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::ev::Buffer::
 
 zero::async::coroutine::Task<std::vector<std::byte>, std::error_code>
 asyncio::ev::Buffer::readUntil(const std::byte byte) {
-    co_return tl::unexpected(FUNCTION_NOT_SUPPORTED);
+    co_return tl::unexpected(IOError::FUNCTION_NOT_SUPPORTED);
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(const std::span<std::byte> data) {
     if (!mBev)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mPromises[READ_INDEX])
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     if (data.size() > mCapacity)
-        co_return tl::unexpected(INVALID_ARGUMENT);
+        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     evbuffer *input = bufferevent_get_input(mBev.get());
 
@@ -354,13 +336,13 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(co
 zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::ev::Buffer::write(const std::span<const std::byte> data) {
     if (!mBev)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mClosed)
-        co_return tl::unexpected(BROKEN_PIPE);
+        co_return tl::unexpected(IOError::BROKEN_PIPE);
 
     if (mPromises[WRITE_INDEX])
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     evbuffer *output = bufferevent_get_output(mBev.get());
     tl::expected<std::size_t, std::error_code> result;
@@ -415,13 +397,13 @@ std::size_t asyncio::ev::Buffer::pending() const {
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::flush() {
     if (!mBev)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mClosed)
-        co_return tl::unexpected(BROKEN_PIPE);
+        co_return tl::unexpected(IOError::BROKEN_PIPE);
 
     if (mPromises[WRITE_INDEX])
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     if (evbuffer_get_length(bufferevent_get_output(mBev.get())) == 0)
         co_return tl::expected<void, std::error_code>{};
@@ -453,41 +435,6 @@ asyncio::FileDescriptor asyncio::ev::Buffer::fd() const {
         return INVALID_FILE_DESCRIPTOR;
 
     return bufferevent_getfd(mBev.get());
-}
-
-tl::expected<void, std::error_code> asyncio::ev::Buffer::setTimeout(const std::chrono::milliseconds timeout) {
-    return setTimeout(timeout, timeout);
-}
-
-tl::expected<void, std::error_code>
-asyncio::ev::Buffer::setTimeout(
-    const std::chrono::milliseconds readTimeout,
-    const std::chrono::milliseconds writeTimeout
-) {
-    if (!mBev)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
-
-    std::optional<timeval> rtv, wtv;
-
-    if (readTimeout != std::chrono::milliseconds::zero())
-        rtv = {
-            static_cast<decltype(timeval::tv_sec)>(readTimeout.count() / 1000),
-            static_cast<decltype(timeval::tv_usec)>(readTimeout.count() % 1000 * 1000)
-        };
-
-    if (writeTimeout != std::chrono::milliseconds::zero())
-        wtv = {
-            static_cast<decltype(timeval::tv_sec)>(writeTimeout.count() / 1000),
-            static_cast<decltype(timeval::tv_usec)>(writeTimeout.count() % 1000 * 1000)
-        };
-
-    bufferevent_set_timeouts(
-        mBev.get(),
-        rtv ? &*rtv : nullptr,
-        wtv ? &*wtv : nullptr
-    );
-
-    return {};
 }
 
 std::size_t asyncio::ev::Buffer::capacity() const {

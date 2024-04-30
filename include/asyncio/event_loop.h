@@ -12,9 +12,14 @@
 namespace asyncio {
     constexpr auto DEFAULT_MAX_WORKER_NUMBER = 16;
 
+    class EventLoop;
+
+    std::shared_ptr<EventLoop> getEventLoop();
+    void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
+
     class EventLoop {
     public:
-        enum Error {
+        enum class Error {
             INVALID_NAMESERVER = 1
         };
 
@@ -30,6 +35,8 @@ namespace asyncio {
             std::unique_ptr<fs::IFramework> framework,
             std::size_t maxWorkers
         );
+
+        static tl::expected<EventLoop, std::error_code> make(std::size_t maxWorkers = DEFAULT_MAX_WORKER_NUMBER);
 
         event_base *base();
         [[nodiscard]] const event_base *base() const;
@@ -73,31 +80,180 @@ namespace asyncio {
             );
         }
 
+        template<typename F>
+            requires zero::detail::is_specialization<std::invoke_result_t<F>, tl::expected>
+        zero::async::coroutine::Task<
+            typename std::invoke_result_t<F>::value_type,
+            typename std::invoke_result_t<F>::error_type
+        >
+        toThread(F f) {
+            using T = std::invoke_result_t<F>;
+
+            std::unique_ptr<Worker> worker;
+
+            if (mWorkers.empty()) {
+                worker = std::make_unique<Worker>();
+            }
+            else {
+                worker = std::move(mWorkers.front());
+                mWorkers.pop();
+            }
+
+            std::optional<T> result;
+            zero::async::promise::Promise<void> promise;
+
+            worker->execute([&, f = std::move(f)] {
+                result.emplace(f());
+                post([&] {
+                    promise.resolve();
+                });
+            });
+
+            co_await promise.getFuture();
+
+            if (mWorkers.size() < mMaxWorkers)
+                mWorkers.push(std::move(worker));
+
+            co_return *std::move(result);
+        }
+
+        template<typename F>
+            requires (!zero::detail::is_specialization<std::invoke_result_t<F>, tl::expected>)
+        zero::async::coroutine::Task<std::invoke_result_t<F>> toThread(F f) {
+            using T = std::invoke_result_t<F>;
+
+            std::unique_ptr<Worker> worker;
+
+            if (mWorkers.empty()) {
+                worker = std::make_unique<Worker>();
+            }
+            else {
+                worker = std::move(mWorkers.front());
+                mWorkers.pop();
+            }
+
+            std::optional<T> result;
+            zero::async::promise::Promise<void> promise;
+
+            worker->execute([&, f = std::move(f)] {
+                result.emplace(f());
+                post([&] {
+                    promise.resolve();
+                });
+            });
+
+            co_await promise.getFuture();
+
+            if (mWorkers.size() < mMaxWorkers)
+                mWorkers.push(std::move(worker));
+
+            co_return *std::move(result);
+        }
+
+        template<typename F, typename C>
+            requires zero::detail::is_specialization<std::invoke_result_t<F>, tl::expected>
+        zero::async::coroutine::Task<
+            typename std::invoke_result_t<F>::value_type,
+            typename std::invoke_result_t<F>::error_type
+        >
+        toThread(F f, C cancel) {
+            using T = std::invoke_result_t<F>;
+
+            std::unique_ptr<Worker> worker;
+
+            if (mWorkers.empty()) {
+                worker = std::make_unique<Worker>();
+            }
+            else {
+                worker = std::move(mWorkers.front());
+                mWorkers.pop();
+            }
+
+            std::optional<T> result;
+            zero::async::promise::Promise<void> promise;
+
+            worker->execute([&, f = std::move(f)] {
+                result.emplace(f());
+                post([&] {
+                    promise.resolve();
+                });
+            });
+
+            co_await zero::async::coroutine::Cancellable{
+                promise.getFuture(),
+                [handle = worker->handle(), cancel = std::move(cancel)] {
+                    return cancel(handle);
+                }
+            };
+
+            if (mWorkers.size() < mMaxWorkers)
+                mWorkers.push(std::move(worker));
+
+            co_return *std::move(result);
+        }
+
+        template<typename F, typename C>
+            requires (!zero::detail::is_specialization<std::invoke_result_t<F>, tl::expected>)
+        zero::async::coroutine::Task<std::invoke_result_t<F>>
+        toThread(F f, C cancel) {
+            using T = std::invoke_result_t<F>;
+
+            std::unique_ptr<Worker> worker;
+
+            if (mWorkers.empty()) {
+                worker = std::make_unique<Worker>();
+            }
+            else {
+                worker = std::move(mWorkers.front());
+                mWorkers.pop();
+            }
+
+            std::optional<T> result;
+            zero::async::promise::Promise<void> promise;
+
+            worker->execute([&, f = std::move(f)] {
+                result.emplace(f());
+                post([&] {
+                    promise.resolve();
+                });
+            });
+
+            co_await zero::async::coroutine::Cancellable{
+                promise.getFuture(),
+                [handle = worker->handle(), cancel = std::move(cancel)] {
+                    return cancel(handle);
+                }
+            };
+
+            if (mWorkers.size() < mMaxWorkers)
+                mWorkers.push(std::move(worker));
+
+            co_return *std::move(result);
+        }
+
     private:
         std::size_t mMaxWorkers;
         std::queue<std::unique_ptr<Worker>> mWorkers;
         std::unique_ptr<event_base, decltype(event_base_free) *> mBase;
         std::unique_ptr<fs::IFramework> mFramework;
         std::list<net::Address> mNameservers;
-
-        template<typename F>
-        friend zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>
-        toThread(F f);
-
-        template<typename F, typename C>
-        friend zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>
-        toThread(F f, C cancel);
     };
 
     std::error_code make_error_code(EventLoop::Error e);
 
-    std::shared_ptr<EventLoop> getEventLoop();
-    void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
+    template<typename F>
+    auto toThread(F &&f) {
+        return getEventLoop()->toThread(std::forward<F>(f));
+    }
 
-    tl::expected<EventLoop, std::error_code> createEventLoop(std::size_t maxWorkers = DEFAULT_MAX_WORKER_NUMBER);
+    template<typename F, typename C>
+    auto toThread(F &&f, C &&cancel) {
+        return getEventLoop()->toThread(std::forward<F>(f), std::forward<C>(cancel));
+    }
+
     zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
-    enum TimeoutError {
+    enum class TimeoutError {
         ELAPSED = 1
     };
 
@@ -130,7 +286,7 @@ namespace asyncio {
             if (!future.result())
                 co_return tl::expected<tl::expected<T, E>, TimeoutError>{std::move(result)};
 
-            co_return tl::unexpected(ELAPSED);
+            co_return tl::unexpected(TimeoutError::ELAPSED);
         }
 
         timer.cancel();
@@ -140,7 +296,7 @@ namespace asyncio {
     template<typename F, typename T = std::invoke_result_t<F>>
         requires zero::detail::is_specialization<T, zero::async::coroutine::Task>
     tl::expected<tl::expected<typename T::value_type, typename T::error_type>, std::error_code> run(F &&f) {
-        const auto eventLoop = createEventLoop().transform([](EventLoop &&e) {
+        const auto eventLoop = EventLoop::make().transform([](EventLoop &&e) {
             return std::make_shared<EventLoop>(std::move(e));
         });
         EXPECT(eventLoop);

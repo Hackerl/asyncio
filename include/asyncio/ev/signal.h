@@ -14,10 +14,10 @@ namespace asyncio::ev {
         static tl::expected<Signal, std::error_code> make(int sig, std::size_t capacity = 64);
 
         [[nodiscard]] int sig() const;
-        [[nodiscard]] zero::async::coroutine::Task<int, std::error_code> on() const;
+        zero::async::coroutine::Task<int, std::error_code> on();
 
     private:
-        std::unique_ptr<Channel<int>> mChannel;
+        Channel<int> mChannel;
         std::unique_ptr<event, decltype(event_free) *> mEvent;
     };
 }

@@ -28,7 +28,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffe
     const FileDescriptor fd = this->fd();
 
     if (fd == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     return addressFrom(fd, false);
 }
@@ -37,7 +37,7 @@ tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffe
     const FileDescriptor fd = this->fd();
 
     if (fd == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     return addressFrom(fd, true);
 }
@@ -84,10 +84,10 @@ asyncio::net::stream::Acceptor::~Acceptor() {
 
 zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::net::stream::Acceptor::fd() {
     if (!mListener)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mPromise)
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     co_return co_await zero::async::coroutine::Cancellable{
         zero::async::promise::chain<FileDescriptor, std::error_code>([this](auto promise) {
@@ -108,10 +108,10 @@ zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::
 
 tl::expected<void, std::error_code> asyncio::net::stream::Acceptor::close() {
     if (!mListener)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (auto promise = std::exchange(mPromise, std::nullopt); promise)
-        promise->reject(BAD_FILE_DESCRIPTOR);
+        promise->reject(IOError::BAD_FILE_DESCRIPTOR);
 
     mListener.reset();
     return {};
@@ -154,7 +154,7 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
 tl::expected<asyncio::net::stream::Listener, std::error_code>
 asyncio::net::stream::listen(const std::span<const Address> addresses) {
     if (addresses.empty())
-        return tl::unexpected(INVALID_ARGUMENT);
+        return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -193,13 +193,13 @@ asyncio::net::stream::connect(const Address address) {
     }
 #endif
 
-    co_return tl::unexpected(ADDRESS_FAMILY_NOT_SUPPORTED);
+    co_return tl::unexpected(IOError::ADDRESS_FAMILY_NOT_SUPPORTED);
 }
 
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(const std::span<const Address> addresses) {
     if (addresses.empty())
-        co_return tl::unexpected(INVALID_ARGUMENT);
+        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -255,7 +255,7 @@ asyncio::net::stream::connect(const std::string host, const unsigned short port)
     );
 
     if (bufferevent_socket_connect_hostname(bev, dnsBase->get(), AF_UNSPEC, host.c_str(), port) < 0)
-        co_return tl::unexpected(INVALID_ARGUMENT);
+        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     CO_EXPECT(co_await zero::async::coroutine::Cancellable{
         promise.getFuture(),
@@ -275,7 +275,7 @@ asyncio::net::stream::connect(const std::string host, const unsigned short port)
 #if __unix__ || __APPLE__
 tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const std::string &path) {
     if (path.empty())
-        return tl::unexpected(INVALID_ARGUMENT);
+        return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     sockaddr_un sa = {};
     socklen_t length = sizeof(sa_family_t) + path.length() + 1;
@@ -307,7 +307,7 @@ tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stre
 zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
 asyncio::net::stream::connect(const std::string path) {
     if (path.empty())
-        co_return tl::unexpected(INVALID_ARGUMENT);
+        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     sockaddr_un sa = {};
     socklen_t length = sizeof(sa_family_t) + path.length() + 1;

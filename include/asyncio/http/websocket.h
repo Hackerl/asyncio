@@ -6,13 +6,13 @@
 #include <asyncio/sync/mutex.h>
 
 namespace asyncio::http::ws {
-    enum State {
+    enum class State {
         CONNECTED,
         CLOSING,
         CLOSED
     };
 
-    enum Opcode {
+    enum class Opcode {
         CONTINUATION = 0,
         TEXT = 1,
         BINARY = 2,
@@ -54,7 +54,7 @@ namespace asyncio::http::ws {
 
     class WebSocket {
     public:
-        enum Error {
+        enum class Error {
             UNSUPPORTED_MASKED_FRAME = 1,
             UNSUPPORTED_OPCODE,
             NOT_CONNECTED
@@ -66,7 +66,7 @@ namespace asyncio::http::ws {
             [[nodiscard]] std::string message(int value) const override;
         };
 
-        enum CloseCode {
+        enum class CloseCode {
             NORMAL_CLOSURE = 1000,
             GOING_AWAY = 1001,
             PROTOCOL_ERROR = 1002,
@@ -118,7 +118,7 @@ namespace asyncio::http::ws {
     std::error_code make_error_code(WebSocket::Error e);
     std::error_code make_error_code(WebSocket::CloseCode e);
 
-    enum HandshakeError {
+    enum class HandshakeError {
         UNSUPPORTED_SCHEME,
         INVALID_RESPONSE,
         UNEXPECTED_STATUS_CODE,

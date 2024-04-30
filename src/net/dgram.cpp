@@ -11,8 +11,7 @@ asyncio::net::dgram::Socket::Socket(const FileDescriptor fd, std::array<ev::Even
 }
 
 asyncio::net::dgram::Socket::Socket(Socket &&rhs) noexcept
-    : mFD(std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR)),
-      mEvents(std::move(rhs.mEvents)), mTimeouts(rhs.mTimeouts) {
+    : mFD(std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR)), mEvents(std::move(rhs.mEvents)) {
     assert(!mEvents[READ_INDEX].pending());
     assert(!mEvents[WRITE_INDEX].pending());
 }
@@ -23,7 +22,6 @@ asyncio::net::dgram::Socket &asyncio::net::dgram::Socket::operator=(Socket &&rhs
 
     mFD = std::exchange(rhs.mFD, INVALID_FILE_DESCRIPTOR);
     mEvents = std::move(rhs.mEvents);
-    mTimeouts = rhs.mTimeouts;
 
     return *this;
 }
@@ -73,10 +71,10 @@ asyncio::net::dgram::Socket::read(const std::span<std::byte> data) {
     assert(!data.empty());
 
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mEvents[READ_INDEX].pending())
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     tl::expected<std::size_t, std::error_code> result;
 
@@ -99,15 +97,10 @@ asyncio::net::dgram::Socket::read(const std::span<std::byte> data) {
             break;
         }
 
-        const auto what = co_await mEvents[READ_INDEX].on(mTimeouts[READ_INDEX]);
+        const auto what = co_await mEvents[READ_INDEX].on();
 
         if (!what) {
             result = tl::unexpected(what.error());
-            break;
-        }
-
-        if (*what & ev::What::TIMEOUT) {
-            result = tl::unexpected<std::error_code>(TIMED_OUT);
             break;
         }
     }
@@ -120,10 +113,10 @@ asyncio::net::dgram::Socket::write(const std::span<const std::byte> data) {
     assert(!data.empty());
 
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mEvents[WRITE_INDEX].pending())
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     tl::expected<std::size_t, std::error_code> result;
 
@@ -148,15 +141,10 @@ asyncio::net::dgram::Socket::write(const std::span<const std::byte> data) {
             break;
         }
 
-        const auto what = co_await mEvents[WRITE_INDEX].on(mTimeouts[WRITE_INDEX]);
+        const auto what = co_await mEvents[WRITE_INDEX].on();
 
         if (!what) {
             result = tl::unexpected(what.error());
-            break;
-        }
-
-        if (*what & ev::What::TIMEOUT) {
-            result = tl::unexpected<std::error_code>(TIMED_OUT);
             break;
         }
     }
@@ -166,7 +154,7 @@ asyncio::net::dgram::Socket::write(const std::span<const std::byte> data) {
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket::close() {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     assert(!mEvents[READ_INDEX].pending());
     assert(!mEvents[WRITE_INDEX].pending());
@@ -182,10 +170,10 @@ asyncio::net::dgram::Socket::readFrom(const std::span<std::byte> data) {
     assert(!data.empty());
 
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mEvents[READ_INDEX].pending())
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     tl::expected<std::pair<std::size_t, Address>, std::error_code> result;
 
@@ -228,15 +216,10 @@ asyncio::net::dgram::Socket::readFrom(const std::span<std::byte> data) {
             break;
         }
 
-        const auto what = co_await mEvents[READ_INDEX].on(mTimeouts[READ_INDEX]);
+        const auto what = co_await mEvents[READ_INDEX].on();
 
         if (!what) {
             result = tl::unexpected(what.error());
-            break;
-        }
-
-        if (*what & ev::What::TIMEOUT) {
-            result = tl::unexpected<std::error_code>(TIMED_OUT);
             break;
         }
     }
@@ -249,10 +232,10 @@ asyncio::net::dgram::Socket::writeTo(const std::span<const std::byte> data, cons
     assert(!data.empty());
 
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     if (mEvents[WRITE_INDEX].pending())
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     const auto socketAddress = socketAddressFrom(address);
     CO_EXPECT(socketAddress);
@@ -298,15 +281,10 @@ asyncio::net::dgram::Socket::writeTo(const std::span<const std::byte> data, cons
             break;
         }
 
-        const auto what = co_await mEvents[WRITE_INDEX].on(mTimeouts[WRITE_INDEX]);
+        const auto what = co_await mEvents[WRITE_INDEX].on();
 
         if (!what) {
             result = tl::unexpected(what.error());
-            break;
-        }
-
-        if (*what & ev::What::TIMEOUT) {
-            result = tl::unexpected<std::error_code>(TIMED_OUT);
             break;
         }
     }
@@ -316,14 +294,14 @@ asyncio::net::dgram::Socket::writeTo(const std::span<const std::byte> data, cons
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::localAddress() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     return addressFrom(mFD, false);
 }
 
 tl::expected<asyncio::net::Address, std::error_code> asyncio::net::dgram::Socket::remoteAddress() const {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     return addressFrom(mFD, true);
 }
@@ -347,31 +325,6 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket:
     });
 }
 
-tl::expected<void, std::error_code> asyncio::net::dgram::Socket::setTimeout(const std::chrono::milliseconds timeout) {
-    return setTimeout(timeout, timeout);
-}
-
-tl::expected<void, std::error_code>
-asyncio::net::dgram::Socket::setTimeout(
-    const std::chrono::milliseconds readTimeout,
-    const std::chrono::milliseconds writeTimeout
-) {
-    if (mFD == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
-
-    if (readTimeout != std::chrono::milliseconds::zero())
-        mTimeouts[READ_INDEX] = readTimeout;
-    else
-        mTimeouts[READ_INDEX].reset();
-
-    if (writeTimeout != std::chrono::milliseconds::zero())
-        mTimeouts[WRITE_INDEX] = writeTimeout;
-    else
-        mTimeouts[WRITE_INDEX].reset();
-
-    return {};
-}
-
 asyncio::FileDescriptor asyncio::net::dgram::Socket::fd() const {
     return mFD;
 }
@@ -386,7 +339,7 @@ tl::expected<asyncio::net::dgram::Socket, std::error_code> asyncio::net::dgram::
 tl::expected<asyncio::net::dgram::Socket, std::error_code>
 asyncio::net::dgram::bind(const std::span<const Address> addresses) {
     if (addresses.empty())
-        return tl::unexpected(INVALID_ARGUMENT);
+        return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -419,7 +372,7 @@ asyncio::net::dgram::connect(const Address address) {
 zero::async::coroutine::Task<asyncio::net::dgram::Socket, std::error_code>
 asyncio::net::dgram::connect(const std::span<const Address> addresses) {
     if (addresses.empty())
-        co_return tl::unexpected(INVALID_ARGUMENT);
+        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 

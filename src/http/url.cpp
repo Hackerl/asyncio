@@ -47,7 +47,7 @@ tl::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(const
     CURLU *url = curl_url();
 
     if (!url)
-        return tl::unexpected(NOT_ENOUGH_MEMORY);
+        return tl::unexpected<std::error_code>(errno, std::generic_category());
 
     if (const CURLUcode code = curl_url_set(url, CURLUPART_URL, str.c_str(),CURLU_NON_SUPPORT_SCHEME);
         code != CURLUE_OK) {

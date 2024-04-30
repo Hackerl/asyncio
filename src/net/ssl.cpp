@@ -103,10 +103,16 @@ asyncio::net::ssl::newContext(const Config &config) {
     if (!ctx)
         return tl::unexpected(static_cast<Error>(ERR_get_error()));
 
-    if (!SSL_CTX_set_min_proto_version(ctx.get(), config.minVersion.value_or(TLS_VERSION_1_2)))
+    if (!SSL_CTX_set_min_proto_version(
+        ctx.get(),
+        static_cast<int>(config.minVersion.value_or(Version::TLS_VERSION_1_2))
+    ))
         return tl::unexpected(static_cast<Error>(ERR_get_error()));
 
-    if (!SSL_CTX_set_max_proto_version(ctx.get(), config.minVersion.value_or(TLS_VERSION_1_3)))
+    if (!SSL_CTX_set_max_proto_version(
+        ctx.get(),
+        static_cast<int>(config.minVersion.value_or(Version::TLS_VERSION_1_3))
+    ))
         return tl::unexpected(static_cast<Error>(ERR_get_error()));
 
     if (std::holds_alternative<std::string>(config.ca)) {
@@ -248,7 +254,7 @@ zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::Listener::accept() {
     const auto result = co_await fd();
     CO_EXPECT(result);
-    co_return Buffer::make(*result, mContext, ACCEPTING);
+    co_return Buffer::make(*result, mContext, State::ACCEPTING);
 }
 
 tl::expected<asyncio::net::ssl::stream::Listener, std::error_code>
@@ -279,7 +285,7 @@ asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const
 tl::expected<asyncio::net::ssl::stream::Listener, std::error_code>
 asyncio::net::ssl::stream::listen(const std::shared_ptr<Context> &context, const std::span<const Address> addresses) {
     if (addresses.empty())
-        return tl::unexpected(INVALID_ARGUMENT);
+        return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -341,13 +347,13 @@ asyncio::net::ssl::stream::connect(std::shared_ptr<Context> context, const Addre
         co_return co_await connect(std::move(context), zero::os::net::stringify(ip), port);
     }
 
-    co_return tl::unexpected(ADDRESS_FAMILY_NOT_SUPPORTED);
+    co_return tl::unexpected(IOError::ADDRESS_FAMILY_NOT_SUPPORTED);
 }
 
 zero::async::coroutine::Task<asyncio::net::ssl::stream::Buffer, std::error_code>
 asyncio::net::ssl::stream::connect(const std::shared_ptr<Context> context, const std::span<const Address> addresses) {
     if (addresses.empty())
-        co_return tl::unexpected(INVALID_ARGUMENT);
+        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     auto it = addresses.begin();
 
@@ -434,7 +440,7 @@ asyncio::net::ssl::stream::connect(
     );
 
     if (bufferevent_socket_connect_hostname(bev, dnsBase->get(), AF_UNSPEC, host.c_str(), port) < 0)
-        co_return tl::unexpected(INVALID_ARGUMENT);
+        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     CO_EXPECT(co_await zero::async::coroutine::Cancellable{
         promise.getFuture(),

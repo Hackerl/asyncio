@@ -6,7 +6,7 @@
 namespace asyncio::net::dns {
     using AddressInfo = evutil_addrinfo;
 
-    enum Error {
+    enum class Error {
     };
 
     class ErrorCategory final : public std::error_category {

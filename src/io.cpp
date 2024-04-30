@@ -8,48 +8,40 @@ const char *asyncio::IOErrorCategory::name() const noexcept {
 std::string asyncio::IOErrorCategory::message(const int value) const {
     std::string msg;
 
-    switch (value) {
-    case BROKEN_PIPE:
+    switch (static_cast<IOError>(value)) {
+    case IOError::BROKEN_PIPE:
         msg = "broken pipe";
         break;
 
-    case INVALID_ARGUMENT:
+    case IOError::INVALID_ARGUMENT:
         msg = "invalid argument";
         break;
 
-    case DEVICE_OR_RESOURCE_BUSY:
+    case IOError::DEVICE_OR_RESOURCE_BUSY:
         msg = "device or resource busy";
         break;
 
-    case TIMED_OUT:
-        msg = "timed out";
-        break;
-
-    case UNEXPECTED_EOF:
+    case IOError::UNEXPECTED_EOF:
         msg = "unexpected end of file";
         break;
 
-    case NOT_SUPPORTED:
+    case IOError::NOT_SUPPORTED:
         msg = "not supported";
         break;
 
-    case OPERATION_NOT_SUPPORTED:
+    case IOError::OPERATION_NOT_SUPPORTED:
         msg = "operation not supported";
         break;
 
-    case FUNCTION_NOT_SUPPORTED:
+    case IOError::FUNCTION_NOT_SUPPORTED:
         msg = "function not supported";
         break;
 
-    case BAD_FILE_DESCRIPTOR:
+    case IOError::BAD_FILE_DESCRIPTOR:
         msg = "bad file descriptor";
         break;
 
-    case NOT_ENOUGH_MEMORY:
-        msg = "not enough memory";
-        break;
-
-    case ADDRESS_FAMILY_NOT_SUPPORTED:
+    case IOError::ADDRESS_FAMILY_NOT_SUPPORTED:
         msg = "address family not supported";
         break;
 
@@ -64,44 +56,36 @@ std::string asyncio::IOErrorCategory::message(const int value) const {
 std::error_condition asyncio::IOErrorCategory::default_error_condition(const int value) const noexcept {
     std::error_condition condition;
 
-    switch (value) {
-    case BROKEN_PIPE:
+    switch (static_cast<IOError>(value)) {
+    case IOError::BROKEN_PIPE:
         condition = std::errc::broken_pipe;
         break;
 
-    case INVALID_ARGUMENT:
+    case IOError::INVALID_ARGUMENT:
         condition = std::errc::invalid_argument;
         break;
 
-    case DEVICE_OR_RESOURCE_BUSY:
+    case IOError::DEVICE_OR_RESOURCE_BUSY:
         condition = std::errc::device_or_resource_busy;
         break;
 
-    case TIMED_OUT:
-        condition = std::errc::timed_out;
-        break;
-
-    case NOT_SUPPORTED:
+    case IOError::NOT_SUPPORTED:
         condition = std::errc::not_supported;
         break;
 
-    case OPERATION_NOT_SUPPORTED:
+    case IOError::OPERATION_NOT_SUPPORTED:
         condition = std::errc::operation_not_supported;
         break;
 
-    case FUNCTION_NOT_SUPPORTED:
+    case IOError::FUNCTION_NOT_SUPPORTED:
         condition = std::errc::function_not_supported;
         break;
 
-    case BAD_FILE_DESCRIPTOR:
+    case IOError::BAD_FILE_DESCRIPTOR:
         condition = std::errc::bad_file_descriptor;
         break;
 
-    case NOT_ENOUGH_MEMORY:
-        condition = std::errc::not_enough_memory;
-        break;
-
-    case ADDRESS_FAMILY_NOT_SUPPORTED:
+    case IOError::ADDRESS_FAMILY_NOT_SUPPORTED:
         condition = std::errc::address_family_not_supported;
         break;
 
@@ -114,7 +98,7 @@ std::error_condition asyncio::IOErrorCategory::default_error_condition(const int
 }
 
 std::error_code asyncio::make_error_code(const IOError e) {
-    return {e, zero::Singleton<IOErrorCategory>::getInstance()};
+    return {static_cast<int>(e), zero::Singleton<IOErrorCategory>::getInstance()};
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::Reader::readExactly(const std::span<std::byte> data) {
@@ -130,7 +114,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::Reader::readExactly
         }
 
         if (*n == 0) {
-            result = tl::unexpected<std::error_code>(UNEXPECTED_EOF);
+            result = tl::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
             break;
         }
 

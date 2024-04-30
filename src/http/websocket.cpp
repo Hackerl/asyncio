@@ -80,16 +80,16 @@ const char *asyncio::http::ws::WebSocket::ErrorCategory::name() const noexcept {
 std::string asyncio::http::ws::WebSocket::ErrorCategory::message(const int value) const {
     std::string msg;
 
-    switch (value) {
-    case UNSUPPORTED_MASKED_FRAME:
+    switch (static_cast<Error>(value)) {
+    case Error::UNSUPPORTED_MASKED_FRAME:
         msg = "unsupported masked frame";
         break;
 
-    case UNSUPPORTED_OPCODE:
+    case Error::UNSUPPORTED_OPCODE:
         msg = "unsupported opcode";
         break;
 
-    case NOT_CONNECTED:
+    case Error::NOT_CONNECTED:
         msg = "websocket not connected";
         break;
 
@@ -108,60 +108,60 @@ const char *asyncio::http::ws::WebSocket::CloseCodeCategory::name() const noexce
 std::string asyncio::http::ws::WebSocket::CloseCodeCategory::message(const int value) const {
     std::string msg;
 
-    switch (value) {
-    case NORMAL_CLOSURE:
+    switch (static_cast<CloseCode>(value)) {
+    case CloseCode::NORMAL_CLOSURE:
         msg = "normal closure";
         break;
 
-    case GOING_AWAY:
+    case CloseCode::GOING_AWAY:
         msg = "going away";
         break;
 
-    case PROTOCOL_ERROR:
+    case CloseCode::PROTOCOL_ERROR:
         msg = "protocol error";
         break;
 
-    case UNSUPPORTED_DATA:
+    case CloseCode::UNSUPPORTED_DATA:
         msg = "unsupported data";
         break;
 
-    case NO_STATUS_RCVD:
+    case CloseCode::NO_STATUS_RCVD:
         msg = "no status rcvd";
         break;
 
-    case ABNORMAL_CLOSURE:
+    case CloseCode::ABNORMAL_CLOSURE:
         msg = "abnormal closure";
         break;
 
-    case INVALID_TEXT:
+    case CloseCode::INVALID_TEXT:
         msg = "invalid text";
         break;
 
-    case POLICY_VIOLATION:
+    case CloseCode::POLICY_VIOLATION:
         msg = "policy violation";
         break;
 
-    case MESSAGE_TOO_BIG:
+    case CloseCode::MESSAGE_TOO_BIG:
         msg = "message too big";
         break;
 
-    case MANDATORY_EXTENSION:
+    case CloseCode::MANDATORY_EXTENSION:
         msg = "mandatory extension";
         break;
 
-    case INTERNAL_ERROR:
+    case CloseCode::INTERNAL_ERROR:
         msg = "internal error";
         break;
 
-    case SERVICE_RESTART:
+    case CloseCode::SERVICE_RESTART:
         msg = "service restart";
         break;
 
-    case TRY_AGAIN_LATER:
+    case CloseCode::TRY_AGAIN_LATER:
         msg = "try again later";
         break;
 
-    case BAD_GATEWAY:
+    case CloseCode::BAD_GATEWAY:
         msg = "bad gateway";
         break;
 
@@ -174,7 +174,7 @@ std::string asyncio::http::ws::WebSocket::CloseCodeCategory::message(const int v
 }
 
 asyncio::http::ws::WebSocket::WebSocket(std::unique_ptr<IBuffer> buffer)
-    : mState(CONNECTED), mMutex(std::make_unique<sync::Mutex>()), mBuffer(std::move(buffer)) {
+    : mState(State::CONNECTED), mMutex(std::make_unique<sync::Mutex>()), mBuffer(std::move(buffer)) {
 }
 
 zero::async::coroutine::Task<asyncio::http::ws::Frame, std::error_code>
@@ -184,7 +184,7 @@ asyncio::http::ws::WebSocket::readFrame() const {
     CO_EXPECT(co_await mBuffer->readExactly({reinterpret_cast<std::byte *>(&header), sizeof(Header)}));
 
     if (header.mask())
-        co_return tl::unexpected(UNSUPPORTED_MASKED_FRAME);
+        co_return tl::unexpected(Error::UNSUPPORTED_MASKED_FRAME);
 
     std::vector<std::byte> data;
 
@@ -286,39 +286,39 @@ asyncio::http::ws::WebSocket::readMessage() const {
         auto message = co_await readInternalMessage();
         CO_EXPECT(message);
 
-        if (const auto opcode = message->opcode; opcode == TEXT) {
+        if (const auto opcode = message->opcode; opcode == Opcode::TEXT) {
             co_return Message{
                 message->opcode,
                 std::string{reinterpret_cast<const char *>(message->data.data()), message->data.size()}
             };
         }
-        else if (opcode == BINARY) {
+        else if (opcode == Opcode::BINARY) {
             co_return Message{message->opcode, std::move(message->data)};
         }
-        else if (opcode == PING) {
-            CO_EXPECT(co_await writeInternalMessage({PONG, std::move(message->data)}));
+        else if (opcode == Opcode::PING) {
+            CO_EXPECT(co_await writeInternalMessage({Opcode::PONG, std::move(message->data)}));
         }
-        else if (opcode == CLOSE) {
-            CO_EXPECT(co_await writeInternalMessage({CLOSE, message->data}));
+        else if (opcode == Opcode::CLOSE) {
+            CO_EXPECT(co_await writeInternalMessage({Opcode::CLOSE, message->data}));
             CO_EXPECT(co_await mBuffer->close());
 
             if (message->data.size() < 2)
-                co_return tl::unexpected(NO_STATUS_RCVD);
+                co_return tl::unexpected(CloseCode::NO_STATUS_RCVD);
 
             co_return tl::unexpected(
                 static_cast<CloseCode>(ntohs(*reinterpret_cast<const unsigned short *>(message->data.data())))
             );
         }
         else {
-            co_return tl::unexpected(UNSUPPORTED_OPCODE);
+            co_return tl::unexpected(Error::UNSUPPORTED_OPCODE);
         }
     }
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMessage(Message message) const {
-    assert(message.opcode == TEXT || message.opcode == BINARY);
+    assert(message.opcode == Opcode::TEXT || message.opcode == Opcode::BINARY);
 
-    if (message.opcode == TEXT) {
+    if (message.opcode == Opcode::TEXT) {
         const auto &text = std::get<std::string>(message.data);
         co_return co_await writeInternalMessage({
                 message.opcode,
@@ -337,23 +337,23 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket::sendText(std::string text) const {
-    co_return co_await writeMessage({TEXT, std::move(text)});
+    co_return co_await writeMessage({Opcode::TEXT, std::move(text)});
 }
 
 zero::async::coroutine::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::sendBinary(const std::span<const std::byte> data) const {
-    co_return co_await writeMessage({BINARY, std::vector<std::byte>{data.begin(), data.end()}});
+    co_return co_await writeMessage({Opcode::BINARY, std::vector<std::byte>{data.begin(), data.end()}});
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
-    if (mState != CONNECTED)
-        co_return tl::unexpected(NOT_CONNECTED);
+    if (mState != State::CONNECTED)
+        co_return tl::unexpected(Error::NOT_CONNECTED);
 
-    mState = CLOSING;
-    const auto c = htons(code);
+    mState = State::CLOSING;
+    const auto c = htons(static_cast<unsigned short>(code));
 
     CO_EXPECT(co_await writeInternalMessage({
-        CLOSE,
+        Opcode::CLOSE,
         {reinterpret_cast<const std::byte *>(&c), reinterpret_cast<const std::byte *>(&c) + sizeof(c)}}
     ));
 
@@ -361,8 +361,8 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
         const auto message = co_await readInternalMessage();
         CO_EXPECT(message);
 
-        if (message->opcode == CLOSE) {
-            mState = CLOSED;
+        if (message->opcode == Opcode::CLOSE) {
+            mState = State::CLOSED;
             break;
         }
     }
@@ -386,28 +386,28 @@ const char *asyncio::http::ws::HandshakeErrorCategory::name() const noexcept {
 std::string asyncio::http::ws::HandshakeErrorCategory::message(const int value) const {
     std::string msg;
 
-    switch (value) {
-    case UNSUPPORTED_SCHEME:
+    switch (static_cast<HandshakeError>(value)) {
+    case HandshakeError::UNSUPPORTED_SCHEME:
         msg = "unsupported websocket scheme";
         break;
 
-    case INVALID_RESPONSE:
+    case HandshakeError::INVALID_RESPONSE:
         msg = "invalid http response";
         break;
 
-    case UNEXPECTED_STATUS_CODE:
+    case HandshakeError::UNEXPECTED_STATUS_CODE:
         msg = "unexpected http response status code";
         break;
 
-    case INVALID_HTTP_HEADER:
+    case HandshakeError::INVALID_HTTP_HEADER:
         msg = "invalid http header";
         break;
 
-    case NO_ACCEPT_HEADER:
+    case HandshakeError::NO_ACCEPT_HEADER:
         msg = "no websocket accept header";
         break;
 
-    case HASH_MISMATCH:
+    case HandshakeError::HASH_MISMATCH:
         msg = "hash mismatch";
         break;
 
@@ -420,7 +420,7 @@ std::string asyncio::http::ws::HandshakeErrorCategory::message(const int value) 
 }
 
 std::error_code asyncio::http::ws::make_error_code(const HandshakeError e) {
-    return {e, zero::Singleton<HandshakeErrorCategory>::getInstance()};
+    return {static_cast<int>(e), zero::Singleton<HandshakeErrorCategory>::getInstance()};
 }
 
 zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::connect(const URL url) {
@@ -449,7 +449,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
         buffer = *std::move(buf);
     }
     else {
-        co_return tl::unexpected(UNSUPPORTED_SCHEME);
+        co_return tl::unexpected(HandshakeError::UNSUPPORTED_SCHEME);
     }
 
     std::random_device rd;
@@ -487,13 +487,13 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     auto tokens = zero::strings::split(*line);
 
     if (tokens.size() < 2)
-        co_return tl::unexpected(INVALID_RESPONSE);
+        co_return tl::unexpected(HandshakeError::INVALID_RESPONSE);
 
     const auto code = zero::strings::toNumber<int>(tokens[1]);
     CO_EXPECT(code);
 
     if (code != SWITCHING_PROTOCOLS_STATUS)
-        co_return tl::unexpected(UNEXPECTED_STATUS_CODE);
+        co_return tl::unexpected(HandshakeError::UNEXPECTED_STATUS_CODE);
 
     std::map<std::string, std::string> headers;
 
@@ -507,7 +507,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
         tokens = zero::strings::split(*line, ":", 1);
 
         if (tokens.size() != 2)
-            co_return tl::unexpected(INVALID_HTTP_HEADER);
+            co_return tl::unexpected(HandshakeError::INVALID_HTTP_HEADER);
 
         headers[tokens[0]] = zero::strings::trim(tokens[1]);
     }
@@ -515,7 +515,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     const auto it = headers.find("Sec-WebSocket-Accept");
 
     if (it == headers.end())
-        co_return tl::unexpected(NO_ACCEPT_HEADER);
+        co_return tl::unexpected(HandshakeError::NO_ACCEPT_HEADER);
 
     std::byte digest[SHA_DIGEST_LENGTH];
     const std::string data = key + WS_MAGIC;
@@ -523,7 +523,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     SHA1(reinterpret_cast<const unsigned char *>(data.data()), data.size(), reinterpret_cast<unsigned char *>(digest));
 
     if (it->second != zero::encoding::base64::encode(digest))
-        co_return tl::unexpected(HASH_MISMATCH);
+        co_return tl::unexpected(HandshakeError::HASH_MISMATCH);
 
     co_return WebSocket{std::move(buffer)};
 }

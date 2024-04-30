@@ -8,17 +8,15 @@
 #include <zero/async/coroutine.h>
 
 namespace asyncio {
-    enum IOError {
+    enum class IOError {
         BROKEN_PIPE = 1,
         INVALID_ARGUMENT,
-        TIMED_OUT,
         DEVICE_OR_RESOURCE_BUSY,
         NOT_SUPPORTED,
         OPERATION_NOT_SUPPORTED,
         FUNCTION_NOT_SUPPORTED,
         UNEXPECTED_EOF,
         BAD_FILE_DESCRIPTOR,
-        NOT_ENOUGH_MEMORY,
         ADDRESS_FAMILY_NOT_SUPPORTED
     };
 
@@ -59,17 +57,9 @@ namespace asyncio {
         [[nodiscard]] virtual FileDescriptor fd() const = 0;
     };
 
-    class IDeadline : public virtual zero::Interface {
-    public:
-        virtual tl::expected<void, std::error_code> setTimeout(std::chrono::milliseconds timeout) = 0;
-
-        virtual tl::expected<void, std::error_code>
-        setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) = 0;
-    };
-
     class ISeekable : public virtual zero::Interface {
     public:
-        enum Whence {
+        enum class Whence {
             BEGIN,
             CURRENT,
             END

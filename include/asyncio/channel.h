@@ -3,320 +3,34 @@
 
 #include "promise.h"
 #include <chrono>
-#include <zero/interface.h>
 #include <zero/async/coroutine.h>
 #include <zero/atomic/event.h>
 #include <zero/atomic/circular_buffer.h>
 
 namespace asyncio {
-    template<typename T>
-    class ISender : public virtual zero::Interface {
-    public:
-        virtual tl::expected<void, std::error_code> trySend(T element) = 0;
-        virtual tl::expected<void, std::error_code> sendSync(T element) = 0;
-        virtual tl::expected<void, std::error_code> sendSync(T element, std::chrono::milliseconds timeout) = 0;
-        virtual zero::async::coroutine::Task<void, std::error_code> send(T element) = 0;
-
-        virtual zero::async::coroutine::Task<void, std::error_code>
-        send(T element, std::chrono::milliseconds timeout) = 0;
-
-        virtual void close() = 0;
-    };
+    static constexpr auto SENDER = 0;
+    static constexpr auto RECEIVER = 1;
 
     template<typename T>
-    class IReceiver : public virtual zero::Interface {
-    public:
-        virtual tl::expected<T, std::error_code> tryReceive() = 0;
-
-        virtual tl::expected<T, std::error_code> receiveSync() = 0;
-        virtual tl::expected<T, std::error_code> receiveSync(std::chrono::milliseconds timeout) = 0;
-
-        virtual zero::async::coroutine::Task<T, std::error_code> receive() = 0;
-        virtual zero::async::coroutine::Task<T, std::error_code> receive(std::chrono::milliseconds timeout) = 0;
-    };
-
-    enum ChannelError {
-        CHANNEL_EOF = 1,
-        BROKEN_CHANNEL,
-        SEND_TIMEOUT,
-        RECEIVE_TIMEOUT,
-        EMPTY,
-        FULL
-    };
-
-    class ChannelErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    std::error_code make_error_code(ChannelError e);
-
-    template<typename T>
-    class Channel final : public ISender<T>, public IReceiver<T> {
-        static constexpr auto SENDER = 0;
-        static constexpr auto RECEIVER = 1;
-
-    public:
-        explicit Channel(std::size_t capacity) : mClosed(false), mEventLoop(getEventLoop()), mBuffer(capacity) {
+    struct ChannelCore {
+        explicit ChannelCore(std::shared_ptr<EventLoop> e, const std::size_t capacity)
+            : eventLoop(std::move(e)), buffer(capacity) {
         }
 
-        ~Channel() override {
-            assert(mPending[SENDER].empty());
-            assert(mPending[RECEIVER].empty());
-        }
+        std::mutex mutex;
+        std::atomic<bool> closed;
+        std::shared_ptr<EventLoop> eventLoop;
+        zero::atomic::CircularBuffer<T> buffer;
+        std::array<std::list<std::shared_ptr<Promise<void, std::error_code>>>, 2> pending;
+        std::array<std::atomic<std::size_t>, 2> counters;
 
-        static std::shared_ptr<Channel> make(const std::size_t capacity) {
-            return std::make_shared<Channel>(capacity);
-        }
+        void trigger(const std::size_t index) {
+            std::lock_guard guard(mutex);
 
-    private:
-        tl::expected<void, std::error_code>
-        sendSyncImpl(T &&element, const std::optional<std::chrono::milliseconds> timeout) {
-            if (mClosed)
-                return tl::unexpected(make_error_code(BROKEN_CHANNEL));
-
-            tl::expected<void, std::error_code> result;
-
-            while (true) {
-                const auto index = mBuffer.reserve();
-
-                if (!index) {
-                    mMutex.lock();
-
-                    if (mClosed) {
-                        mMutex.unlock();
-                        result = tl::unexpected(make_error_code(BROKEN_CHANNEL));
-                        break;
-                    }
-
-                    if (!mBuffer.full()) {
-                        mMutex.unlock();
-                        continue;
-                    }
-
-                    const auto event = std::make_shared<zero::atomic::Event>();
-                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mEventLoop);
-
-                    promise->getFuture().finally([=] {
-                        event->set();
-                    });
-
-                    mPending[SENDER].push_back(promise);
-                    mMutex.unlock();
-
-                    if (const auto res = event->wait(timeout); !res) {
-                        std::lock_guard guard(mMutex);
-                        mPending[SENDER].remove(promise);
-                        result = tl::unexpected(res.error());
-                        break;
-                    }
-
-                    continue;
-                }
-
-                mBuffer[*index] = std::move(element);
-                mBuffer.commit(*index);
-
-                trigger<RECEIVER>();
-                break;
-            }
-
-            return result;
-        }
-
-        zero::async::coroutine::Task<void, std::error_code>
-        sendImpl(T element, const std::optional<std::chrono::milliseconds> timeout) {
-            if (mClosed)
-                co_return tl::unexpected(BROKEN_CHANNEL);
-
-            tl::expected<void, std::error_code> result;
-
-            while (true) {
-                const auto index = mBuffer.reserve();
-
-                if (!index) {
-                    mMutex.lock();
-
-                    if (mClosed) {
-                        mMutex.unlock();
-                        result = tl::unexpected(make_error_code(BROKEN_CHANNEL));
-                        break;
-                    }
-
-                    if (!mBuffer.full()) {
-                        mMutex.unlock();
-                        continue;
-                    }
-
-                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mEventLoop);
-
-                    mPending[SENDER].push_back(promise);
-                    mMutex.unlock();
-
-                    if (const auto res = co_await asyncio::timeout(
-                        zero::async::coroutine::from(zero::async::coroutine::Cancellable{
-                            promise->getFuture(),
-                            [=]() -> tl::expected<void, std::error_code> {
-                                if (promise->isFulfilled())
-                                    return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
-
-                                promise->reject(zero::async::coroutine::Error::CANCELLED);
-                                return {};
-                            }
-                        }),
-                        timeout.value_or(std::chrono::milliseconds{0})
-                    ); !res) {
-                        std::lock_guard guard(mMutex);
-                        mPending[SENDER].remove(promise);
-                        result = tl::unexpected(make_error_code(SEND_TIMEOUT));
-                        break;
-                    }
-                    else if (!*res) {
-                        std::lock_guard guard(mMutex);
-                        mPending[SENDER].remove(promise);
-                        result = tl::unexpected(res->error());
-                        break;
-                    }
-
-                    continue;
-                }
-
-                mBuffer[*index] = std::move(element);
-                mBuffer.commit(*index);
-
-                trigger<RECEIVER>();
-                break;
-            }
-
-            co_return result;
-        }
-
-        tl::expected<T, std::error_code> receiveSyncImpl(const std::optional<std::chrono::milliseconds> timeout) {
-            tl::expected<T, std::error_code> result;
-
-            while (true) {
-                const auto index = mBuffer.acquire();
-
-                if (!index) {
-                    mMutex.lock();
-
-                    if (mClosed) {
-                        mMutex.unlock();
-                        result = tl::unexpected(make_error_code(CHANNEL_EOF));
-                        break;
-                    }
-
-                    if (!mBuffer.empty()) {
-                        mMutex.unlock();
-                        continue;
-                    }
-
-                    const auto event = std::make_shared<zero::atomic::Event>();
-                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mEventLoop);
-
-                    promise->getFuture().finally([=] {
-                        event->set();
-                    });
-
-                    mPending[RECEIVER].push_back(promise);
-                    mMutex.unlock();
-
-                    if (const auto res = event->wait(timeout); !res) {
-                        std::lock_guard guard(mMutex);
-                        mPending[RECEIVER].remove(promise);
-                        result = tl::unexpected(res.error());
-                        break;
-                    }
-
-                    continue;
-                }
-
-                result = std::move(mBuffer[*index]);
-                mBuffer.release(*index);
-
-                trigger<SENDER>();
-                break;
-            }
-
-            return result;
-        }
-
-        zero::async::coroutine::Task<T, std::error_code>
-        receiveImpl(const std::optional<std::chrono::milliseconds> timeout) {
-            tl::expected<T, std::error_code> result;
-
-            while (true) {
-                const auto index = mBuffer.acquire();
-
-                if (!index) {
-                    mMutex.lock();
-
-                    if (mClosed) {
-                        mMutex.unlock();
-                        result = tl::unexpected(make_error_code(CHANNEL_EOF));
-                        break;
-                    }
-
-                    if (!mBuffer.empty()) {
-                        mMutex.unlock();
-                        continue;
-                    }
-
-                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mEventLoop);
-
-                    mPending[RECEIVER].push_back(promise);
-                    mMutex.unlock();
-
-                    if (const auto res = co_await asyncio::timeout(
-                        zero::async::coroutine::from(zero::async::coroutine::Cancellable{
-                            promise->getFuture(),
-                            [=]() -> tl::expected<void, std::error_code> {
-                                if (promise->isFulfilled())
-                                    return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
-
-                                promise->reject(zero::async::coroutine::Error::CANCELLED);
-                                return {};
-                            }
-                        }),
-                        timeout.value_or(std::chrono::milliseconds{0})
-                    ); !res) {
-                        std::lock_guard guard(mMutex);
-                        mPending[RECEIVER].remove(promise);
-                        result = tl::unexpected(make_error_code(RECEIVE_TIMEOUT));
-                        break;
-                    }
-                    else if (!*res) {
-                        std::lock_guard guard(mMutex);
-                        mPending[RECEIVER].remove(promise);
-                        result = tl::unexpected(res->error());
-                        break;
-                    }
-
-                    continue;
-                }
-
-                T element = std::move(mBuffer[*index]);
-                mBuffer.release(*index);
-
-                trigger<SENDER>();
-                result = std::move(element);
-
-                break;
-            }
-
-            co_return result;
-        }
-
-        template<int Index>
-        void trigger() {
-            std::lock_guard guard(mMutex);
-
-            if (mPending[Index].empty())
+            if (pending[index].empty())
                 return;
 
-            for (const auto &promise: std::exchange(mPending[Index], {})) {
+            for (const auto &promise: std::exchange(pending[index], {})) {
                 if (promise->isFulfilled())
                     continue;
 
@@ -324,142 +38,508 @@ namespace asyncio {
             }
         }
 
-        template<int Index>
-        void trigger(const std::error_code &ec) {
-            std::lock_guard guard(mMutex);
+        void close() {
+            {
+                std::lock_guard guard(mutex);
 
-            if (mPending[Index].empty())
-                return;
+                if (closed)
+                    return;
 
-            for (const auto &promise: std::exchange(mPending[Index], {})) {
-                if (promise->isFulfilled())
-                    continue;
-
-                promise->reject(ec);
+                closed = true;
             }
+
+            trigger(SENDER);
+            trigger(RECEIVER);
+        }
+    };
+
+    enum class TrySendError {
+        DISCONNECTED = 1,
+        FULL
+    };
+
+    class TrySendErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    std::error_code make_error_code(TrySendError e);
+
+    enum class SendSyncError {
+        DISCONNECTED = 1,
+        TIMEOUT
+    };
+
+    class SendSyncErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    std::error_code make_error_code(SendSyncError e);
+
+    enum class SendError {
+        DISCONNECTED = 1,
+        CANCELLED
+    };
+
+    class SendErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    std::error_code make_error_code(SendError e);
+
+    template<typename T>
+    class Sender {
+    public:
+        explicit Sender(std::shared_ptr<ChannelCore<T>> core) : mCore(std::move(core)) {
+            ++mCore->counters[SENDER];
         }
 
-    public:
-        tl::expected<void, std::error_code> trySend(T element) override {
-            if (mClosed)
-                return tl::unexpected(make_error_code(BROKEN_CHANNEL));
+        Sender(const Sender &rhs) : mCore(rhs.mCore) {
+            ++mCore->counters[SENDER];
+        }
 
-            const auto index = mBuffer.reserve();
+        Sender(Sender &&rhs) = default;
+
+        Sender &operator=(const Sender &rhs) {
+            mCore = rhs.mCore;
+            ++mCore->counters[SENDER];
+            return *this;
+        }
+
+        Sender &operator=(Sender &&rhs) noexcept = default;
+
+        ~Sender() {
+            if (!mCore)
+                return;
+
+            if (--mCore->counters[SENDER] > 0)
+                return;
+
+            mCore->close();
+        }
+
+        template<typename U>
+        tl::expected<void, TrySendError> trySend(U &&element) {
+            if (mCore->closed)
+                return tl::unexpected(TrySendError::DISCONNECTED);
+
+            const auto index = mCore->buffer.reserve();
 
             if (!index)
-                return tl::unexpected(make_error_code(FULL));
+                return tl::unexpected(TrySendError::FULL);
 
-            mBuffer[*index] = std::move(element);
-            mBuffer.commit(*index);
+            mCore->buffer[*index] = std::forward<U>(element);
+            mCore->buffer.commit(*index);
+            mCore->trigger(RECEIVER);
 
-            trigger<RECEIVER>();
             return {};
         }
 
-        tl::expected<void, std::error_code> sendSync(T element) override {
-            return sendSyncImpl(std::move(element), std::nullopt);
-        }
+        template<typename U>
+        tl::expected<void, SendSyncError>
+        sendSync(U &&element, const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
+            if (mCore->closed)
+                return tl::unexpected(SendSyncError::DISCONNECTED);
 
-        tl::expected<void, std::error_code> sendSync(T element, std::chrono::milliseconds timeout) override {
-            return sendSyncImpl(std::move(element), timeout);
-        }
+            tl::expected<void, SendSyncError> result;
 
-        zero::async::coroutine::Task<void, std::error_code> send(T element) override {
-            return sendImpl(std::move(element), std::nullopt);
-        }
+            while (true) {
+                const auto index = mCore->buffer.reserve();
 
-        zero::async::coroutine::Task<void, std::error_code>
-        send(T element, std::chrono::milliseconds timeout) override {
-            return sendImpl(std::move(element), timeout);
-        }
+                if (!index) {
+                    mCore->mutex.lock();
 
-        void close() override {
-            assert(!mClosed);
+                    if (mCore->closed) {
+                        mCore->mutex.unlock();
+                        result = tl::unexpected(SendSyncError::DISCONNECTED);
+                        break;
+                    }
 
-            {
-                std::lock_guard guard(mMutex);
+                    if (!mCore->buffer.full()) {
+                        mCore->mutex.unlock();
+                        continue;
+                    }
 
-                if (mClosed)
-                    return;
+                    const auto event = std::make_shared<zero::atomic::Event>();
+                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
 
-                mClosed = true;
+                    promise->getFuture().finally([=] {
+                        event->set();
+                    });
+
+                    mCore->pending[SENDER].push_back(promise);
+                    mCore->mutex.unlock();
+
+                    if (const auto res = event->wait(timeout); !res) {
+                        assert(res.error() == std::errc::timed_out);
+                        std::lock_guard guard(mCore->mutex);
+                        mCore->pending[SENDER].remove(promise);
+                        result = tl::unexpected(SendSyncError::TIMEOUT);
+                        break;
+                    }
+
+                    continue;
+                }
+
+                mCore->buffer[*index] = std::forward<U>(element);
+                mCore->buffer.commit(*index);
+                mCore->trigger(RECEIVER);
+
+                break;
             }
 
-            trigger<SENDER>(make_error_code(BROKEN_CHANNEL));
-            trigger<RECEIVER>(make_error_code(CHANNEL_EOF));
+            return result;
         }
 
-        tl::expected<T, std::error_code> tryReceive() override {
-            const auto index = mBuffer.acquire();
+        zero::async::coroutine::Task<void, SendError> send(T element) {
+            if (mCore->closed)
+                co_return tl::unexpected(SendError::DISCONNECTED);
 
-            if (!index)
-                return tl::unexpected(
-                    mClosed ? CHANNEL_EOF : EMPTY
-                );
+            tl::expected<void, SendError> result;
 
-            T element = std::move(mBuffer[*index]);
-            mBuffer.release(*index);
+            while (true) {
+                const auto index = mCore->buffer.reserve();
 
-            trigger<SENDER>();
-            return element;
+                if (!index) {
+                    mCore->mutex.lock();
+
+                    if (mCore->closed) {
+                        mCore->mutex.unlock();
+                        result = tl::unexpected(SendError::DISCONNECTED);
+                        break;
+                    }
+
+                    if (!mCore->buffer.full()) {
+                        mCore->mutex.unlock();
+                        continue;
+                    }
+
+                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+
+                    mCore->pending[SENDER].push_back(promise);
+                    mCore->mutex.unlock();
+
+                    if (const auto res = co_await zero::async::coroutine::Cancellable{
+                        promise->getFuture(),
+                        [=]() -> tl::expected<void, std::error_code> {
+                            if (promise->isFulfilled())
+                                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+
+                            promise->reject(zero::async::coroutine::Error::CANCELLED);
+                            return {};
+                        }
+                    }; !res) {
+                        assert(res.error() == std::errc::operation_canceled);
+                        std::lock_guard guard(mCore->mutex);
+                        mCore->pending[SENDER].remove(promise);
+                        result = tl::unexpected(SendError::CANCELLED);
+                        break;
+                    }
+
+                    continue;
+                }
+
+                mCore->buffer[*index] = std::move(element);
+                mCore->buffer.commit(*index);
+                mCore->trigger(RECEIVER);
+
+                break;
+            }
+
+            co_return result;
         }
 
-        tl::expected<T, std::error_code> receiveSync() override {
-            return receiveSyncImpl(std::nullopt);
-        }
-
-        tl::expected<T, std::error_code> receiveSync(std::chrono::milliseconds timeout) override {
-            return receiveSyncImpl(timeout);
-        }
-
-        zero::async::coroutine::Task<T, std::error_code> receive() override {
-            return receiveImpl(std::nullopt);
-        }
-
-        zero::async::coroutine::Task<T, std::error_code> receive(std::chrono::milliseconds timeout) override {
-            return receiveImpl(timeout);
+        void close() {
+            mCore->close();
         }
 
         [[nodiscard]] std::size_t size() const {
-            return mBuffer.size();
+            return mCore->buffer.size();
         }
 
         [[nodiscard]] std::size_t capacity() const {
-            return mBuffer.capacity();
+            return mCore->buffer.capacity();
         }
 
         [[nodiscard]] bool empty() const {
-            return mBuffer.empty();
+            return mCore->buffer.empty();
         }
 
         [[nodiscard]] bool full() const {
-            return mBuffer.full();
+            return mCore->buffer.full();
         }
 
         [[nodiscard]] bool closed() const {
-            return mClosed;
+            return mCore->closed;
         }
 
     private:
-        std::mutex mMutex;
-        std::atomic<bool> mClosed;
-        std::shared_ptr<EventLoop> mEventLoop;
-        zero::atomic::CircularBuffer<T> mBuffer;
-        std::array<std::list<std::shared_ptr<Promise<void, std::error_code>>>, 2> mPending;
+        std::shared_ptr<ChannelCore<T>> mCore;
+    };
+
+    enum class TryReceiveError {
+        DISCONNECTED = 1,
+        EMPTY
+    };
+
+    class TryReceiveErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    std::error_code make_error_code(TryReceiveError e);
+
+    enum class ReceiveSyncError {
+        DISCONNECTED = 1,
+        TIMEOUT
+    };
+
+    class ReceiveSyncErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    std::error_code make_error_code(ReceiveSyncError e);
+
+    enum class ReceiveError {
+        DISCONNECTED = 1,
+        CANCELLED
+    };
+
+    class ReceiveErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
+    };
+
+    std::error_code make_error_code(ReceiveError e);
+
+    template<typename T>
+    class Receiver {
+    public:
+        explicit Receiver(std::shared_ptr<ChannelCore<T>> core) : mCore(std::move(core)) {
+            ++mCore->counters[RECEIVER];
+        }
+
+        Receiver(const Receiver &rhs) : mCore(rhs.mCore) {
+            ++mCore->counters[RECEIVER];
+        }
+
+        Receiver(Receiver &&rhs) = default;
+
+        Receiver &operator=(const Receiver &rhs) {
+            mCore = rhs.mCore;
+            ++mCore->counters[RECEIVER];
+            return *this;
+        }
+
+        Receiver &operator=(Receiver &&rhs) noexcept = default;
+
+        ~Receiver() {
+            if (!mCore)
+                return;
+
+            if (--mCore->counters[RECEIVER] > 0)
+                return;
+
+            mCore->close();
+        }
+
+        tl::expected<T, TryReceiveError> tryReceive() {
+            const auto index = mCore->buffer.acquire();
+
+            if (!index)
+                return tl::unexpected(mCore->closed ? TryReceiveError::DISCONNECTED : TryReceiveError::EMPTY);
+
+            T element = std::move(mCore->buffer[*index]);
+
+            mCore->buffer.release(*index);
+            mCore->trigger(SENDER);
+
+            return element;
+        }
+
+        tl::expected<T, ReceiveSyncError>
+        receiveSync(const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
+            tl::expected<T, ReceiveSyncError> result = tl::unexpected(ReceiveSyncError::DISCONNECTED);
+
+            while (true) {
+                const auto index = mCore->buffer.acquire();
+
+                if (!index) {
+                    mCore->mutex.lock();
+
+                    if (mCore->closed) {
+                        mCore->mutex.unlock();
+                        break;
+                    }
+
+                    if (!mCore->buffer.empty()) {
+                        mCore->mutex.unlock();
+                        continue;
+                    }
+
+                    const auto event = std::make_shared<zero::atomic::Event>();
+                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+
+                    promise->getFuture().finally([=] {
+                        event->set();
+                    });
+
+                    mCore->pending[RECEIVER].push_back(promise);
+                    mCore->mutex.unlock();
+
+                    if (const auto res = event->wait(timeout); !res) {
+                        assert(res.error() == std::errc::timed_out);
+                        std::lock_guard guard(mCore->mutex);
+                        mCore->pending[RECEIVER].remove(promise);
+                        result = tl::unexpected(ReceiveSyncError::TIMEOUT);
+                        break;
+                    }
+
+                    continue;
+                }
+
+                result = std::move(mCore->buffer[*index]);
+
+                mCore->buffer.release(*index);
+                mCore->trigger(SENDER);
+
+                break;
+            }
+
+            return result;
+        }
+
+        zero::async::coroutine::Task<T, ReceiveError> receive() {
+            tl::expected<T, ReceiveError> result = tl::unexpected(ReceiveError::DISCONNECTED);
+
+            while (true) {
+                const auto index = mCore->buffer.acquire();
+
+                if (!index) {
+                    mCore->mutex.lock();
+
+                    if (mCore->closed) {
+                        mCore->mutex.unlock();
+                        break;
+                    }
+
+                    if (!mCore->buffer.empty()) {
+                        mCore->mutex.unlock();
+                        continue;
+                    }
+
+                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+
+                    mCore->pending[RECEIVER].push_back(promise);
+                    mCore->mutex.unlock();
+
+                    if (const auto res = co_await zero::async::coroutine::Cancellable{
+                        promise->getFuture(),
+                        [=]() -> tl::expected<void, std::error_code> {
+                            if (promise->isFulfilled())
+                                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+
+                            promise->reject(zero::async::coroutine::Error::CANCELLED);
+                            return {};
+                        }
+                    }; !res) {
+                        assert(res.error() == std::errc::operation_canceled);
+                        std::lock_guard guard(mCore->mutex);
+                        mCore->pending[RECEIVER].remove(promise);
+                        result = tl::unexpected(ReceiveError::CANCELLED);
+                        break;
+                    }
+
+                    continue;
+                }
+
+                result = std::move(mCore->buffer[*index]);
+
+                mCore->buffer.release(*index);
+                mCore->trigger(SENDER);
+
+                break;
+            }
+
+            co_return result;
+        }
+
+        [[nodiscard]] std::size_t size() const {
+            return mCore->buffer.size();
+        }
+
+        [[nodiscard]] std::size_t capacity() const {
+            return mCore->buffer.capacity();
+        }
+
+        [[nodiscard]] bool empty() const {
+            return mCore->buffer.empty();
+        }
+
+        [[nodiscard]] bool full() const {
+            return mCore->buffer.full();
+        }
+
+        [[nodiscard]] bool closed() const {
+            return mCore->closed;
+        }
+
+    private:
+        std::shared_ptr<ChannelCore<T>> mCore;
     };
 
     template<typename T>
-    using SenderPtr = std::shared_ptr<ISender<T>>;
+    using Channel = std::pair<Sender<T>, Receiver<T>>;
 
     template<typename T>
-    using ReceiverPtr = std::shared_ptr<IReceiver<T>>;
+    Channel<T> channel(std::shared_ptr<EventLoop> eventLoop, const std::size_t capacity) {
+        const auto core = std::make_shared<ChannelCore<T>>(std::move(eventLoop), capacity);
+        return {Sender<T>{core}, Receiver<T>{core}};
+    }
 
     template<typename T>
-    using ChannelPtr = std::shared_ptr<Channel<T>>;
+    Channel<T> channel(const std::size_t capacity) {
+        return channel<T>(getEventLoop(), capacity);
+    }
 }
 
 template<>
-struct std::is_error_code_enum<asyncio::ChannelError> : std::true_type {
+struct std::is_error_code_enum<asyncio::TrySendError> : std::true_type {
+};
+
+template<>
+struct std::is_error_code_enum<asyncio::SendSyncError> : std::true_type {
+};
+
+template<>
+struct std::is_error_code_enum<asyncio::SendError> : std::true_type {
+};
+
+template<>
+struct std::is_error_code_enum<asyncio::TryReceiveError> : std::true_type {
+};
+
+template<>
+struct std::is_error_code_enum<asyncio::ReceiveSyncError> : std::true_type {
+};
+
+template<>
+struct std::is_error_code_enum<asyncio::ReceiveError> : std::true_type {
 };
 
 #endif //ASYNCIO_CHANNEL_H

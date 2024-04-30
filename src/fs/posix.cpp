@@ -11,12 +11,12 @@ const char *asyncio::fs::PosixAIO::ErrorCategory::name() const noexcept {
 std::string asyncio::fs::PosixAIO::ErrorCategory::message(const int value) const {
     std::string msg;
 
-    switch (value) {
-    case ALL_DONE:
+    switch (static_cast<Error>(value)) {
+    case Error::ALL_DONE:
         msg = "all requests had already been completed before the call";
         break;
 
-    case NOT_CANCELED:
+    case Error::NOT_CANCELED:
         msg = "at least one of the requests specified was not canceled because it was in progress";
         break;
 
@@ -142,10 +142,10 @@ asyncio::fs::PosixAIO::read(
                 return tl::unexpected<std::error_code>(errno, std::system_category());
 
             if (result == AIO_ALLDONE)
-                return tl::unexpected(ALL_DONE);
+                return tl::unexpected(Error::ALL_DONE);
 
             if (result == AIO_NOTCANCELED)
-                return tl::unexpected(NOT_CANCELED);
+                return tl::unexpected(Error::NOT_CANCELED);
 
             mPending.remove(&pending);
             pending.promise.reject(zero::async::coroutine::Error::CANCELLED);
@@ -192,10 +192,10 @@ asyncio::fs::PosixAIO::write(
                 return tl::unexpected<std::error_code>(errno, std::system_category());
 
             if (result == AIO_ALLDONE)
-                return tl::unexpected(ALL_DONE);
+                return tl::unexpected(Error::ALL_DONE);
 
             if (result == AIO_NOTCANCELED)
-                return tl::unexpected(NOT_CANCELED);
+                return tl::unexpected(Error::NOT_CANCELED);
 
             mPending.remove(&pending);
             pending.promise.reject(zero::async::coroutine::Error::CANCELLED);
@@ -206,5 +206,5 @@ asyncio::fs::PosixAIO::write(
 }
 
 std::error_code asyncio::fs::make_error_code(const PosixAIO::Error e) {
-    return {e, zero::Singleton<PosixAIO::ErrorCategory>::getInstance()};
+    return {static_cast<int>(e), zero::Singleton<PosixAIO::ErrorCategory>::getInstance()};
 }

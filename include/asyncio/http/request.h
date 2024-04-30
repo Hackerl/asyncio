@@ -11,7 +11,7 @@
 
 namespace asyncio::http {
     struct Connection {
-        enum Status {
+        enum class Status {
             NOT_STARTED,
             PAUSED,
             TRANSFERRING
@@ -34,7 +34,7 @@ namespace asyncio::http {
 
     class Response final : public IBufReader, public Reader {
     public:
-        enum Error {
+        enum class Error {
             INVALID_JSON = 1
         };
 
@@ -67,7 +67,7 @@ namespace asyncio::http {
                 co_return j->template get<T>();
             }
             catch (const nlohmann::json::exception &) {
-                co_return tl::unexpected(INVALID_JSON);
+                co_return tl::unexpected(Error::INVALID_JSON);
             }
         }
 
@@ -96,7 +96,7 @@ namespace asyncio::http {
 
     class Requests : public std::enable_shared_from_this<Requests> {
     public:
-        enum CURLError {
+        enum class CURLError {
         };
 
         class CURLErrorCategory final : public std::error_category {
@@ -105,7 +105,7 @@ namespace asyncio::http {
             [[nodiscard]] std::string message(int value) const override;
         };
 
-        enum CURLMError {
+        enum class CURLMError {
         };
 
         class CURLMErrorCategory final : public std::error_category {

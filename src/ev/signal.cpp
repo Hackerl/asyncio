@@ -1,7 +1,7 @@
 #include <asyncio/ev/signal.h>
 
 asyncio::ev::Signal::Signal(std::unique_ptr<event, decltype(event_free) *> event, const std::size_t capacity)
-    : mChannel(std::make_unique<Channel<int>>(capacity)), mEvent(std::move(event)) {
+    : mChannel(asyncio::channel<int>(capacity)), mEvent(std::move(event)) {
     const auto e = mEvent.get();
 
     evsignal_assign(
@@ -9,7 +9,7 @@ asyncio::ev::Signal::Signal(std::unique_ptr<event, decltype(event_free) *> event
         event_get_base(e),
         event_get_signal(e),
         [](const evutil_socket_t fd, short, void *arg) {
-            static_cast<Signal *>(arg)->mChannel->trySend(fd);
+            static_cast<Signal *>(arg)->mChannel.first.trySend(fd);
         },
         this
     );
@@ -59,6 +59,6 @@ int asyncio::ev::Signal::sig() const {
     return event_get_signal(mEvent.get());
 }
 
-zero::async::coroutine::Task<int, std::error_code> asyncio::ev::Signal::on() const {
-    co_return co_await mChannel->receive();
+zero::async::coroutine::Task<int, std::error_code> asyncio::ev::Signal::on() {
+    co_return co_await mChannel.second.receive();
 }

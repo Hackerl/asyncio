@@ -72,7 +72,7 @@ bool asyncio::ev::Event::pending() const {
 zero::async::coroutine::Task<short, std::error_code>
 asyncio::ev::Event::on(const std::optional<std::chrono::milliseconds> timeout) {
     if (mPromise)
-        co_return tl::unexpected(DEVICE_OR_RESOURCE_BUSY);
+        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     co_return co_await zero::async::coroutine::Cancellable{
         zero::async::promise::chain<short, std::error_code>([&](auto promise) {

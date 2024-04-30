@@ -17,7 +17,7 @@ asyncio::ev::PairedBuffer::~PairedBuffer() {
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::ev::PairedBuffer::close() {
     if (!mBev)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     assert(!mPromises[READ_INDEX]);
     assert(!mPromises[WRITE_INDEX]);

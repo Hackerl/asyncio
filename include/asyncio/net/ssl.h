@@ -7,7 +7,7 @@
 #include <event2/bufferevent_ssl.h>
 
 namespace asyncio::net::ssl {
-    enum Error {
+    enum class Error {
     };
 
     class ErrorCategory final : public std::error_category {
@@ -24,7 +24,7 @@ namespace asyncio::net::ssl {
     tl::expected<void, Error> loadEmbeddedCA(const Context *ctx);
 #endif
 
-    enum Version {
+    enum class Version {
         TLS_VERSION_1 = TLS1_VERSION,
         TLS_VERSION_1_1 = TLS1_1_VERSION,
         TLS_VERSION_1_2 = TLS1_2_VERSION,
@@ -45,7 +45,7 @@ namespace asyncio::net::ssl {
     tl::expected<std::shared_ptr<Context>, Error> newContext(const Config &config);
 
     namespace stream {
-        enum State {
+        enum class State {
             OPEN = BUFFEREVENT_SSL_OPEN,
             CONNECTING = BUFFEREVENT_SSL_CONNECTING,
             ACCEPTING = BUFFEREVENT_SSL_ACCEPTING

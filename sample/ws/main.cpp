@@ -24,11 +24,11 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
         }
 
         switch (message->opcode) {
-        case asyncio::http::ws::TEXT:
+        case asyncio::http::ws::Opcode::TEXT:
             fmt::print("receive text message: {}\n", std::get<std::string>(message->data));
             break;
 
-        case asyncio::http::ws::BINARY:
+        case asyncio::http::ws::Opcode::BINARY:
             fmt::print(
                 "receive binary message: {}\n",
                 zero::encoding::hex::encode(std::get<std::vector<std::byte>>(message->data))

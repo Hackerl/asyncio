@@ -32,15 +32,9 @@ namespace asyncio::net::dgram {
 
         [[nodiscard]] FileDescriptor fd() const override;
 
-        tl::expected<void, std::error_code> setTimeout(std::chrono::milliseconds timeout) override;
-
-        tl::expected<void, std::error_code>
-        setTimeout(std::chrono::milliseconds readTimeout, std::chrono::milliseconds writeTimeout) override;
-
     private:
         FileDescriptor mFD;
         std::array<ev::Event, 2> mEvents;
-        std::array<std::optional<std::chrono::milliseconds>, 2> mTimeouts;
     };
 
     tl::expected<Socket, std::error_code> bind(const Address &address);

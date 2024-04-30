@@ -18,17 +18,17 @@ constexpr auto DEFAULT_TRANSFER_TIMEOUT = 1h;
 std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_t n, void *userdata) {
     const auto connection = static_cast<asyncio::http::Connection *>(userdata);
 
-    if (connection->status == asyncio::http::Connection::NOT_STARTED) {
-        connection->status = asyncio::http::Connection::TRANSFERRING;
+    if (connection->status == asyncio::http::Connection::Status::NOT_STARTED) {
+        connection->status = asyncio::http::Connection::Status::TRANSFERRING;
         connection->promise.resolve();
     }
-    else if (connection->status == asyncio::http::Connection::PAUSED) {
-        connection->status = asyncio::http::Connection::TRANSFERRING;
+    else if (connection->status == asyncio::http::Connection::Status::PAUSED) {
+        connection->status = asyncio::http::Connection::Status::TRANSFERRING;
         return size * n;
     }
 
     if (auto task = connection->buffers[0].writeAll(std::as_bytes(std::span{buffer, size * n})); !task.done()) {
-        connection->status = asyncio::http::Connection::PAUSED;
+        connection->status = asyncio::http::Connection::Status::PAUSED;
         task.future().then([=] {
             curl_easy_pause(connection->easy.get(), CURLPAUSE_CONT);
         });
@@ -130,7 +130,7 @@ zero::async::coroutine::Task<nlohmann::json, std::error_code> asyncio::http::Res
         co_return nlohmann::json::parse(*std::move(content));
     }
     catch (const nlohmann::json::exception &) {
-        co_return tl::unexpected(INVALID_JSON);
+        co_return tl::unexpected(Error::INVALID_JSON);
     }
 }
 
@@ -173,14 +173,14 @@ const char *asyncio::http::Response::ErrorCategory::name() const noexcept {
 }
 
 std::string asyncio::http::Response::ErrorCategory::message(const int value) const {
-    if (value == INVALID_JSON)
+    if (static_cast<Error>(value) == Error::INVALID_JSON)
         return "invalid json message";
 
     return "unknown";
 }
 
 std::error_code asyncio::http::make_error_code(const Response::Error e) {
-    return {e, zero::Singleton<Response::ErrorCategory>::getInstance()};
+    return {static_cast<int>(e), zero::Singleton<Response::ErrorCategory>::getInstance()};
 }
 
 const char *asyncio::http::Requests::CURLErrorCategory::name() const noexcept {
@@ -257,7 +257,7 @@ asyncio::http::Requests::make(const Options &options) {
     CURLM *multi = curl_multi_init();
 
     if (!multi)
-        return tl::unexpected(NOT_ENOUGH_MEMORY);
+        return tl::unexpected<std::error_code>(errno, std::generic_category());
 
     auto timer = std::unique_ptr<event, decltype(event_free) *>(
         evtimer_new(getEventLoop()->base(), nullptr, nullptr),
@@ -324,7 +324,7 @@ void asyncio::http::Requests::onCURLEvent(const curl_socket_t s, const int what,
 #else
         s,
 #endif
-        static_cast<short>((what & CURL_POLL_IN ? ev::READ : 0) | (what & CURL_POLL_OUT ? ev::WRITE : 0) | EV_PERSIST),
+        static_cast<short>((what & CURL_POLL_IN ? ev::What::READ : 0) | (what & CURL_POLL_OUT ? ev::What::WRITE : 0) | EV_PERSIST),
         [](const evutil_socket_t fd, const short w, void *arg) {
             const auto ctx = static_cast<Context *>(arg);
             const auto requests = ctx->requests;
@@ -332,7 +332,7 @@ void asyncio::http::Requests::onCURLEvent(const curl_socket_t s, const int what,
             curl_multi_socket_action(
                 requests->mMulti.get(),
                 fd,
-                (w & ev::READ ? CURL_CSELECT_IN : 0) | (w & ev::WRITE ? CURL_CSELECT_OUT : 0),
+                (w & ev::What::READ ? CURL_CSELECT_IN : 0) | (w & ev::What::WRITE ? CURL_CSELECT_OUT : 0),
                 &requests->mRunning
             );
 
@@ -362,14 +362,14 @@ void asyncio::http::Requests::recycle() const {
         if (msg->data.result != CURLE_OK) {
             connection->error = static_cast<CURLError>(msg->data.result);
 
-            if (connection->status != Connection::NOT_STARTED)
+            if (connection->status != Connection::Status::NOT_STARTED)
                 continue;
 
             connection->promise.reject(static_cast<CURLError>(msg->data.result));
             continue;
         }
 
-        if (connection->status != Connection::NOT_STARTED)
+        if (connection->status != Connection::Status::NOT_STARTED)
             continue;
 
         connection->promise.resolve();
@@ -388,7 +388,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy = {curl_easy_init(), curl_easy_cleanup};
 
     if (!easy)
-        return tl::unexpected(NOT_ENOUGH_MEMORY);
+        return tl::unexpected<std::error_code>(errno, std::generic_category());
 
     auto buffers = ev::pipe();
     EXPECT(buffers);

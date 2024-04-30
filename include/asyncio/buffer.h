@@ -95,7 +95,7 @@ namespace asyncio {
                 CO_EXPECT(n);
 
                 if (*n == 0) {
-                    result = tl::unexpected<std::error_code>(UNEXPECTED_EOF);
+                    result = tl::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
                     break;
                 }
 
@@ -107,7 +107,7 @@ namespace asyncio {
 
         zero::async::coroutine::Task<void, std::error_code> peek(const std::span<std::byte> data) override {
             if (data.size() > mCapacity)
-                co_return tl::unexpected(INVALID_ARGUMENT);
+                co_return tl::unexpected(IOError::INVALID_ARGUMENT);
 
             if (const std::size_t available = this->available(); available < data.size()) {
                 if (mHead > 0) {
@@ -121,7 +121,7 @@ namespace asyncio {
                     CO_EXPECT(n);
 
                     if (*n == 0)
-                        co_return tl::unexpected<std::error_code>(UNEXPECTED_EOF);
+                        co_return tl::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
 
                     mTail += *n;
                 }

@@ -13,6 +13,11 @@ asyncio::Worker::~Worker() {
     mThread.join();
 }
 
+
+std::thread::native_handle_type asyncio::Worker::handle() {
+    return mThread.native_handle();
+}
+
 void asyncio::Worker::work() {
     while (true) {
         std::unique_lock lock(mMutex);

@@ -1,8 +1,6 @@
 #include <asyncio/fs/pipe.h>
 
-#ifdef _WIN32
-#include <asyncio/thread.h>
-#else
+#ifndef _WIN32
 #include <unistd.h>
 #include <algorithm>
 #include <zero/defer.h>
@@ -55,7 +53,7 @@ asyncio::fs::Pipe::~Pipe() {
 tl::expected<asyncio::fs::Pipe, std::error_code> asyncio::fs::Pipe::from(const FileDescriptor fd) {
 #ifdef _WIN32
     if (GetFileType(reinterpret_cast<HANDLE>(fd)) != FILE_TYPE_PIPE)
-        return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
     return Pipe{fd};
 #else
@@ -76,7 +74,7 @@ tl::expected<asyncio::fs::Pipe, std::error_code> asyncio::fs::Pipe::from(const F
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::fs::Pipe::close() {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
 #ifdef _WIN32
     if (!CloseHandle(reinterpret_cast<HANDLE>(std::exchange(mFD, INVALID_FILE_DESCRIPTOR))))
@@ -93,7 +91,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::fs::Pipe::close() {
 
 zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::read(const std::span<std::byte> data) {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
 #ifdef _WIN32
     co_return co_await toThread(
@@ -153,7 +151,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::re
 zero::async::coroutine::Task<std::size_t, std::error_code>
 asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
     if (mFD == INVALID_FILE_DESCRIPTOR)
-        co_return tl::unexpected(BAD_FILE_DESCRIPTOR);
+        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
 
 #ifdef _WIN32
     co_return co_await toThread(
@@ -181,7 +179,7 @@ asyncio::fs::Pipe::write(const std::span<const std::byte> data) {
         }
     ).transformError([](const auto &ec) -> std::error_code {
         if (ec == std::error_code{ERROR_NO_DATA, std::system_category()})
-            return BROKEN_PIPE;
+            return IOError::BROKEN_PIPE;
 
         return ec;
     });

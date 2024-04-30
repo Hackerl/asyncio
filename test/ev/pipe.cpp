@@ -72,26 +72,15 @@ TEST_CASE("buffer pipe", "[ev]") {
         }
 
         SECTION("read timeout") {
-            buffers->at(0).setTimeout(20ms, 0ms);
-
             std::byte data[10240];
-            const auto n = co_await buffers->at(0).read(data);
+            const auto n = co_await asyncio::timeout(buffers->at(0).read(data), 20ms);
             REQUIRE(!n);
-            REQUIRE(n.error() == std::errc::timed_out);
+            REQUIRE(n.error() == asyncio::TimeoutError::ELAPSED);
         }
 
         SECTION("write timeout") {
-            buffers->at(0).setTimeout(0ms, 500ms);
-
             const auto data = std::make_unique<std::byte[]>(1024 * 1024);
-            const auto result = co_await buffers->at(0).writeAll({data.get(), 1024 * 1024});
-            REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::timed_out);
-        }
-
-        SECTION("timeout") {
-            std::byte data[10240];
-            const auto result = co_await asyncio::timeout(buffers->at(0).read(data), 20ms);
+            const auto result = co_await asyncio::timeout(buffers->at(0).writeAll({data.get(), 1024 * 1024}), 500ms);
             REQUIRE(!result);
             REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
         }

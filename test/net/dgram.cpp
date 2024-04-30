@@ -95,15 +95,6 @@ TEST_CASE("datagram network connection", "[net]") {
             );
         }
 
-        SECTION("read timeout") {
-            server->setTimeout(50ms, 0ms);
-
-            std::byte data[1024];
-            const auto result = co_await server->readFrom(data);
-            REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::timed_out);
-        }
-
         SECTION("timeout") {
             std::byte data[1024];
             const auto result = co_await asyncio::timeout(server->readFrom(data), 50ms);

@@ -16,6 +16,8 @@ namespace asyncio {
         void work();
 
     public:
+        std::thread::native_handle_type handle();
+
         template<typename F>
         void execute(F &&f) {
             std::lock_guard guard(mMutex);
@@ -30,10 +32,6 @@ namespace asyncio {
         std::function<void()> mTask;
         std::condition_variable mCond;
         std::thread mThread;
-
-        template<typename F, typename C>
-        friend zero::async::coroutine::Task<typename std::invoke_result_t<F>::value_type, std::error_code>
-        toThread(F f, C cancel);
     };
 }
 

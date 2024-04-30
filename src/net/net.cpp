@@ -19,7 +19,7 @@ asyncio::net::IPv4Address::from(const std::string &ip, const unsigned short port
     IPv4 ipv4 = {};
 
     if (evutil_inet_pton(AF_INET, ip.c_str(), ipv4.data()) != 1)
-        return tl::unexpected(INVALID_ARGUMENT);
+        return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     return IPv4Address{port, ipv4};
 }
@@ -42,7 +42,7 @@ asyncio::net::IPv6Address::from(const std::string &ip, const unsigned short port
     IPv6 ipv6 = {};
 
     if (evutil_inet_pton_scope(AF_INET6, ip.c_str(), ipv6.data(), &index) != 1)
-        return tl::unexpected(INVALID_ARGUMENT);
+        return tl::unexpected(IOError::INVALID_ARGUMENT);
 
     if (!index)
         return IPv6Address{port, ipv6};
@@ -81,7 +81,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
     switch (addr->sa_family) {
     case AF_INET: {
         if (length != sizeof(sockaddr_in)) {
-            result = tl::unexpected<std::error_code>(INVALID_ARGUMENT);
+            result = tl::unexpected<std::error_code>(IOError::INVALID_ARGUMENT);
             break;
         }
 
@@ -98,7 +98,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 
     case AF_INET6: {
         if (length != sizeof(sockaddr_in6)) {
-            result = tl::unexpected<std::error_code>(INVALID_ARGUMENT);
+            result = tl::unexpected<std::error_code>(IOError::INVALID_ARGUMENT);
             break;
         }
 
@@ -130,7 +130,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 #if __unix__ || __APPLE__
     case AF_UNIX: {
         if (length < sizeof(sa_family_t)) {
-            result = tl::unexpected<std::error_code>(INVALID_ARGUMENT);
+            result = tl::unexpected<std::error_code>(IOError::INVALID_ARGUMENT);
             break;
         }
 
@@ -154,7 +154,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 #endif
 
     default:
-        result = tl::unexpected<std::error_code>(ADDRESS_FAMILY_NOT_SUPPORTED);
+        result = tl::unexpected<std::error_code>(IOError::ADDRESS_FAMILY_NOT_SUPPORTED);
         break;
     }
 
@@ -210,7 +210,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
                 const auto &path = arg.path;
 
                 if (path.empty() || path.length() - (path.front() == '@' ? 1 : 0) >= sizeof(sockaddr_un::sun_path))
-                    return tl::unexpected(INVALID_ARGUMENT);
+                    return tl::unexpected(IOError::INVALID_ARGUMENT);
 
                 ptr->sun_family = AF_UNIX;
                 memcpy(ptr->sun_path, path.c_str(), path.length());
@@ -226,7 +226,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
             }
 #endif
             else
-                return tl::unexpected(ADDRESS_FAMILY_NOT_SUPPORTED);
+                return tl::unexpected(IOError::ADDRESS_FAMILY_NOT_SUPPORTED);
         },
         address
     );
