@@ -12,11 +12,6 @@
 namespace asyncio {
     constexpr auto DEFAULT_MAX_WORKER_NUMBER = 16;
 
-    class EventLoop;
-
-    std::shared_ptr<EventLoop> getEventLoop();
-    void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
-
     class EventLoop {
     public:
         enum class Error {
@@ -241,6 +236,9 @@ namespace asyncio {
 
     std::error_code make_error_code(EventLoop::Error e);
 
+    std::shared_ptr<EventLoop> getEventLoop();
+    void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
+
     template<typename F>
     auto toThread(F &&f) {
         return getEventLoop()->toThread(std::forward<F>(f));
@@ -274,13 +272,11 @@ namespace asyncio {
             co_return tl::expected<tl::expected<T, E>, TimeoutError>{co_await task};
 
         auto timer = sleep(ms);
-        const auto taskPtr = std::make_shared<zero::async::coroutine::Task<T, E>>(std::move(task));
-
-        const auto future = timer.future().then([=] {
-            return taskPtr->cancel();
+        auto future = timer.future().then([&] {
+            return task.cancel();
         });
 
-        auto result = co_await *taskPtr;
+        auto result = co_await task;
 
         if (future.isReady()) {
             if (!future.result())
@@ -290,6 +286,8 @@ namespace asyncio {
         }
 
         timer.cancel();
+        co_await std::move(future);
+
         co_return tl::expected<tl::expected<T, E>, TimeoutError>{std::move(result)};
     }
 

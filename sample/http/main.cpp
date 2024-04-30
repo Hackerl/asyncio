@@ -40,10 +40,10 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
         }
     }
 
-    const auto result = asyncio::http::Requests::make(options);
-    CO_EXPECT(result);
+    auto requests = asyncio::http::Requests::make(options);
+    CO_EXPECT(requests);
 
-    const auto response = co_await [&, requests = *result] {
+    const auto response = co_await [&] {
         if (!body)
             return requests->request(*method, url, options);
 

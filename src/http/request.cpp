@@ -38,8 +38,8 @@ std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_
     return size * n;
 }
 
-asyncio::http::Response::Response(std::shared_ptr<Requests> requests, std::unique_ptr<Connection> connection)
-    : mRequests(std::move(requests)), mConnection(std::move(connection)) {
+asyncio::http::Response::Response(Requests *requests, std::unique_ptr<Connection> connection)
+    : mRequests(requests), mConnection(std::move(connection)) {
 }
 
 asyncio::http::Response::~Response() {
@@ -239,12 +239,39 @@ asyncio::http::Requests::Requests(CURLM *multi, std::unique_ptr<event, decltype(
     curl_multi_setopt(mMulti.get(), CURLMOPT_TIMERDATA, this);
 }
 
+asyncio::http::Requests::Requests(Requests &&rhs) noexcept
+    : mRunning(rhs.mRunning), mOptions(std::move(rhs.mOptions)),
+      mTimer(std::move(rhs.mTimer)), mMulti(std::move(rhs.mMulti)) {
+    assert(mRunning == 0);
+    const auto timer = mTimer.get();
+    evtimer_assign(timer, event_get_base(timer), event_get_callback(timer), this);
+
+    curl_multi_setopt(mMulti.get(), CURLMOPT_SOCKETDATA, this);
+    curl_multi_setopt(mMulti.get(), CURLMOPT_TIMERDATA, this);
+}
+
+asyncio::http::Requests &asyncio::http::Requests::operator=(Requests &&rhs) noexcept {
+    assert(rhs.mRunning == 0);
+
+    mRunning = rhs.mRunning;
+    mOptions = std::move(rhs.mOptions);
+    mTimer = std::move(rhs.mTimer);
+    mMulti = std::move(rhs.mMulti);
+
+    const auto timer = mTimer.get();
+    evtimer_assign(timer, event_get_base(timer), event_get_callback(timer), this);
+
+    curl_multi_setopt(mMulti.get(), CURLMOPT_SOCKETDATA, this);
+    curl_multi_setopt(mMulti.get(), CURLMOPT_TIMERDATA, this);
+
+    return *this;
+}
+
 asyncio::http::Requests::~Requests() {
     assert(mRunning == 0);
 }
 
-tl::expected<std::shared_ptr<asyncio::http::Requests>, std::error_code>
-asyncio::http::Requests::make(const Options &options) {
+tl::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests::make(const Options &options) {
     static std::once_flag flag;
 
     std::call_once(flag, [] {
@@ -269,7 +296,7 @@ asyncio::http::Requests::make(const Options &options) {
         return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
     }
 
-    return std::make_shared<Requests>(multi, std::move(timer), options);
+    return Requests{multi, std::move(timer), options};
 }
 
 void asyncio::http::Requests::onTimer() {
@@ -284,8 +311,8 @@ void asyncio::http::Requests::onCURLTimer(const long timeout) const {
     }
 
     const timeval tv = {
-        timeout / 1000,
-        timeout % 1000 * 1000
+        static_cast<decltype(timeval::tv_sec)>(timeout / 1000),
+        static_cast<decltype(timeval::tv_usec)>(timeout % 1000 * 1000)
     };
 
     evtimer_add(mTimer.get(), &tv);
@@ -294,7 +321,7 @@ void asyncio::http::Requests::onCURLTimer(const long timeout) const {
 void asyncio::http::Requests::onCURLEvent(const curl_socket_t s, const int what, void *data) {
     struct Context {
         event e;
-        std::shared_ptr<Requests> requests;
+        Requests *requests;
     };
 
     auto context = static_cast<Context *>(data);
@@ -309,7 +336,7 @@ void asyncio::http::Requests::onCURLEvent(const curl_socket_t s, const int what,
     }
 
     if (!context) {
-        context = new Context{.requests = shared_from_this()};
+        context = new Context{.requests = this};
         curl_multi_assign(mMulti.get(), s, context);
     }
     else {
@@ -499,7 +526,7 @@ asyncio::http::Requests::perform(std::unique_ptr<Connection> connection) {
         co_return tl::unexpected(result.error());
     }
 
-    co_return Response{shared_from_this(), std::move(connection)};
+    co_return Response{this, std::move(connection)};
 }
 
 zero::async::coroutine::Task<asyncio::http::Response, std::error_code>

@@ -21,17 +21,6 @@
 
 thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 
-std::shared_ptr<asyncio::EventLoop> asyncio::getEventLoop() {
-    if (threadEventLoop.expired())
-        return nullptr;
-
-    return threadEventLoop.lock();
-}
-
-void asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
-    threadEventLoop = eventLoop;
-}
-
 const char *asyncio::EventLoop::ErrorCategory::name() const noexcept {
     return "asyncio::EventLoop";
 }
@@ -48,10 +37,6 @@ std::error_condition asyncio::EventLoop::ErrorCategory::default_error_condition(
         return std::errc::invalid_argument;
 
     return error_category::default_error_condition(value);
-}
-
-std::error_code asyncio::make_error_code(const EventLoop::Error e) {
-    return {static_cast<int>(e), zero::Singleton<EventLoop::ErrorCategory>::getInstance()};
 }
 
 asyncio::EventLoop::EventLoop(
@@ -207,6 +192,21 @@ void asyncio::EventLoop::loopExit(const std::optional<std::chrono::milliseconds>
     };
 
     event_base_loopexit(mBase.get(), &tv);
+}
+
+std::error_code asyncio::make_error_code(const EventLoop::Error e) {
+    return {static_cast<int>(e), zero::Singleton<EventLoop::ErrorCategory>::getInstance()};
+}
+
+std::shared_ptr<asyncio::EventLoop> asyncio::getEventLoop() {
+    if (threadEventLoop.expired())
+        return nullptr;
+
+    return threadEventLoop.lock();
+}
+
+void asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
+    threadEventLoop = eventLoop;
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {

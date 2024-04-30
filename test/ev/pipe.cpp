@@ -80,7 +80,7 @@ TEST_CASE("buffer pipe", "[ev]") {
 
         SECTION("write timeout") {
             const auto data = std::make_unique<std::byte[]>(1024 * 1024);
-            const auto result = co_await asyncio::timeout(buffers->at(0).writeAll({data.get(), 1024 * 1024}), 500ms);
+            const auto result = co_await asyncio::timeout(buffers->at(0).writeAll({data.get(), 1024 * 1024}), 50ms);
             REQUIRE(!result);
             REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
         }

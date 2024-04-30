@@ -44,7 +44,7 @@ namespace asyncio::http {
             [[nodiscard]] std::string message(int value) const override;
         };
 
-        Response(std::shared_ptr<Requests> requests, std::unique_ptr<Connection> connection);
+        Response(Requests *requests, std::unique_ptr<Connection> connection);
         Response(Response &&) = default;
         ~Response() override;
 
@@ -79,7 +79,7 @@ namespace asyncio::http {
         zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) override;
 
     private:
-        std::shared_ptr<Requests> mRequests;
+        Requests *mRequests;
         std::unique_ptr<Connection> mConnection;
     };
 
@@ -94,7 +94,7 @@ namespace asyncio::http {
         std::optional<std::string> userAgent;
     };
 
-    class Requests : public std::enable_shared_from_this<Requests> {
+    class Requests {
     public:
         enum class CURLError {
         };
@@ -116,9 +116,11 @@ namespace asyncio::http {
 
         Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer);
         Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer, Options options);
+        Requests(Requests &&rhs) noexcept;
+        Requests &operator=(Requests &&rhs) noexcept;
         ~Requests();
 
-        static tl::expected<std::shared_ptr<Requests>, std::error_code> make(const Options &options = {});
+        static tl::expected<Requests, std::error_code> make(const Options &options = {});
 
     private:
         void onTimer();
@@ -166,10 +168,9 @@ namespace asyncio::http {
 
         template<typename T>
             requires (
-                std::is_same_v<T, nlohmann::json> ||
-                requires(T obj, nlohmann::json &j) {
-                    { to_json(j, obj) } -> std::same_as<void>;
-                }
+                std::is_class_v<T> &&
+                !std::is_same_v<T, std::string> &&
+                (std::is_same_v<T, nlohmann::json> || nlohmann::detail::is_compatible_type<nlohmann::json, T>::value)
             )
         zero::async::coroutine::Task<Response, std::error_code> request(
             std::string method,

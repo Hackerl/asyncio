@@ -54,10 +54,10 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::Requests::make();
+                        auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
-                        const auto response = co_await requests.value()->get(*url);
+                        const auto response = co_await requests->get(*url);
                         REQUIRE(response);
                         REQUIRE(response->statusCode() == 200);
 
@@ -115,10 +115,10 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::Requests::make();
+                        auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
-                        const auto response = co_await requests.value()->get(*url);
+                        const auto response = co_await requests->get(*url);
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -160,10 +160,10 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::Requests::make();
+                        auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
-                        const auto response = co_await requests.value()->get(*url);
+                        const auto response = co_await requests->get(*url);
                         REQUIRE(response);
 
                         const auto people = co_await response->json<People>();
@@ -225,10 +225,10 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::Requests::make();
+                        auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
-                        const auto response = co_await requests.value()->post(*url, "hello world");
+                        const auto response = co_await requests->post(*url, "hello world");
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -287,11 +287,11 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::Requests::make();
+                        auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const std::map<std::string, std::string> payload = {{"name", "jack"}};
-                        const auto response = co_await requests.value()->post(*url, payload);
+                        const auto response = co_await requests->post(*url, payload);
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -352,11 +352,11 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::Requests::make();
+                        auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const std::map<std::string, std::filesystem::path> payload = {{"file", path}};
-                        const auto response = co_await requests.value()->post(*url, payload);
+                        const auto response = co_await requests->post(*url, payload);
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -419,7 +419,7 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::Requests::make();
+                        auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
                         const std::map<std::string, std::variant<std::string, std::filesystem::path>> payload = {
@@ -427,7 +427,7 @@ TEST_CASE("http requests", "[http]") {
                             {"file", path}
                         };
 
-                        const auto response = co_await requests.value()->post(*url, payload);
+                        const auto response = co_await requests->post(*url, payload);
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -495,10 +495,10 @@ TEST_CASE("http requests", "[http]") {
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
 
-                        const auto requests = asyncio::http::Requests::make();
+                        auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
-                        const auto response = co_await requests.value()->post(*url, People{"jack", 18});
+                        const auto response = co_await requests->post(*url, People{"jack", 18});
                         REQUIRE(response);
 
                         const auto content = co_await response->string();
@@ -541,10 +541,10 @@ TEST_CASE("http requests", "[http]") {
                     const auto url = asyncio::http::URL::from(URL);
                     REQUIRE(url);
 
-                    const auto requests = asyncio::http::Requests::make();
+                    auto requests = asyncio::http::Requests::make();
                     REQUIRE(requests);
 
-                    const auto response = co_await requests.value()->get(*url);
+                    const auto response = co_await requests->get(*url);
                     REQUIRE(response);
 
                     const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
