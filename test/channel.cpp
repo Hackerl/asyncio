@@ -153,4 +153,14 @@ TEST_CASE("async channel buffer", "[channel]") {
             }
         }
     });
+
+    SECTION("error condition") {
+        const std::error_condition condition = asyncio::ChannelError::DISCONNECTED;
+        REQUIRE(condition == asyncio::TrySendError::DISCONNECTED);
+        REQUIRE(condition == asyncio::SendSyncError::DISCONNECTED);
+        REQUIRE(condition == asyncio::SendError::DISCONNECTED);
+        REQUIRE(condition == asyncio::TryReceiveError::DISCONNECTED);
+        REQUIRE(condition == asyncio::ReceiveSyncError::DISCONNECTED);
+        REQUIRE(condition == asyncio::ReceiveError::DISCONNECTED);
+    }
 }

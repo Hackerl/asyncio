@@ -8,6 +8,19 @@
 #include <zero/atomic/circular_buffer.h>
 
 namespace asyncio {
+    enum class ChannelError {
+        DISCONNECTED = 1
+    };
+
+    class ChannelErrorCategory final : public std::error_category {
+    public:
+        [[nodiscard]] const char *name() const noexcept override;
+        [[nodiscard]] std::string message(int value) const override;
+        [[nodiscard]] bool equivalent(const std::error_code &code, int value) const noexcept override;
+    };
+
+    std::error_condition make_error_condition(ChannelError e);
+
     static constexpr auto SENDER = 0;
     static constexpr auto RECEIVER = 1;
 
@@ -126,7 +139,7 @@ namespace asyncio {
             mCore->close();
         }
 
-        template<typename U>
+        template<typename U = T>
         tl::expected<void, TrySendError> trySend(U &&element) {
             if (mCore->closed)
                 return tl::unexpected(TrySendError::DISCONNECTED);
@@ -143,7 +156,7 @@ namespace asyncio {
             return {};
         }
 
-        template<typename U>
+        template<typename U = T>
         tl::expected<void, SendSyncError>
         sendSync(U &&element, const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
             if (mCore->closed)
@@ -517,6 +530,10 @@ namespace asyncio {
         return channel<T>(getEventLoop(), capacity);
     }
 }
+
+template<>
+struct std::is_error_condition_enum<asyncio::ChannelError> : std::true_type {
+};
 
 template<>
 struct std::is_error_code_enum<asyncio::TrySendError> : std::true_type {

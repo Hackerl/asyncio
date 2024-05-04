@@ -1,6 +1,33 @@
 #include <asyncio/channel.h>
 #include <zero/singleton.h>
 
+const char *asyncio::ChannelErrorCategory::name() const noexcept {
+    return "asyncio::channel";
+}
+
+std::string asyncio::ChannelErrorCategory::message(const int value) const {
+    if (static_cast<ChannelError>(value) == ChannelError::DISCONNECTED)
+        return "channel disconnected";
+
+    return "unknown";
+}
+
+bool asyncio::ChannelErrorCategory::equivalent(const std::error_code &code, const int value) const noexcept {
+    if (static_cast<ChannelError>(value) == ChannelError::DISCONNECTED)
+        return code == TrySendError::DISCONNECTED ||
+            code == SendSyncError::DISCONNECTED ||
+            code == SendError::DISCONNECTED ||
+            code == TryReceiveError::DISCONNECTED ||
+            code == ReceiveSyncError::DISCONNECTED ||
+            code == ReceiveError::DISCONNECTED;
+
+    return error_category::equivalent(code, value);
+}
+
+std::error_condition asyncio::make_error_condition(const ChannelError e) {
+    return {static_cast<int>(e), zero::Singleton<ChannelErrorCategory>::getInstance()};
+}
+
 const char *asyncio::TrySendErrorCategory::name() const noexcept {
     return "asyncio::Sender::trySend";
 }
