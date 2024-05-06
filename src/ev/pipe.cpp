@@ -25,7 +25,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::PairedBuffer::c
     bufferevent_flush(mBev.get(), EV_WRITE, BEV_FINISHED);
     mBev.reset();
 
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 tl::expected<std::array<asyncio::ev::PairedBuffer, 2>, std::error_code> asyncio::ev::pipe(const std::size_t capacity) {

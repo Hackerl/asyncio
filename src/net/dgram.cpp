@@ -162,7 +162,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::net::dgram::Socket:
     if (evutil_closesocket(std::exchange(mFD, INVALID_FILE_DESCRIPTOR)) != 0)
         co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
 
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 zero::async::coroutine::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>

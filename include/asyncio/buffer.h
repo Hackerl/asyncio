@@ -129,7 +129,7 @@ namespace asyncio {
 
             assert(available() >= data.size());
             std::copy_n(mBuffer.get() + mHead, data.size(), data.data());
-            co_return tl::expected<void, std::error_code>{};
+            co_return {};
         }
 
     private:

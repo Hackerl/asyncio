@@ -54,5 +54,5 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
     CO_EXPECT(signal);
 
     co_await race(signal->on(), serve(*std::move(listener)));
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }

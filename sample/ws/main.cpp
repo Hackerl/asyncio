@@ -42,5 +42,5 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
         CO_EXPECT(co_await ws->writeMessage(*std::move(message)));
     }
 
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }

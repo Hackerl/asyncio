@@ -11,7 +11,7 @@ void asyncio::sync::Mutex::wakeup() const {
 zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Mutex::lock() {
     if (!mLocked && mPending.empty()) {
         mLocked = true;
-        co_return tl::expected<void, std::error_code>{};
+        co_return {};
     }
 
     const auto promise = std::make_shared<Promise<void, std::error_code>>();
@@ -39,7 +39,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Mutex::lock()
 
     assert(!mLocked);
     mLocked = true;
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 void asyncio::sync::Mutex::unlock() {

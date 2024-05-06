@@ -36,7 +36,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Condition::wa
         co_return tl::unexpected(result.error());
     }
 
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 void asyncio::sync::Condition::notify() {

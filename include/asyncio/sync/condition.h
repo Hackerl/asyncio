@@ -15,7 +15,7 @@ namespace asyncio::sync {
                 CO_EXPECT(co_await wait(mutex));
             }
 
-            co_return tl::expected<void, std::error_code>{};
+            co_return {};
         }
 
         void notify();

@@ -167,7 +167,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::close()
         co_await flush();
 
     mBev.reset();
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::ev::Buffer::read(const std::span<std::byte> data) {
@@ -301,7 +301,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(co
 
     if (evbuffer_get_length(input) >= data.size()) {
         evbuffer_copyout(input, data.data(), data.size());
-        co_return tl::expected<void, std::error_code>{};
+        co_return {};
     }
 
     if (mClosed)
@@ -330,7 +330,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::peek(co
         co_return tl::unexpected(result.error());
 
     evbuffer_copyout(input, data.data(), data.size());
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 zero::async::coroutine::Task<std::size_t, std::error_code>
@@ -406,7 +406,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::ev::Buffer::flush()
         co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
 
     if (evbuffer_get_length(bufferevent_get_output(mBev.get())) == 0)
-        co_return tl::expected<void, std::error_code>{};
+        co_return {};
 
     co_return co_await zero::async::coroutine::Cancellable{
         zero::async::promise::chain<void, std::error_code>([this](auto promise) {

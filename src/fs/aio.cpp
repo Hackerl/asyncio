@@ -108,7 +108,7 @@ void asyncio::fs::AIO::onEvent() const {
     const int n = io_getevents(mContext, 1, 128, events, nullptr);
     assert(n > 0);
 
-    for (io_event *event = events; event < events + n; event++) {
+    for (io_event *event = events; event < events + n; ++event) {
         const auto promise = reinterpret_cast<Promise<std::size_t, std::error_code> *>(event->data);
 
         if (event->res < 0)

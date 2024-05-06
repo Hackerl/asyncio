@@ -80,5 +80,5 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
     CO_EXPECT(content);
 
     fmt::print("{}", *content);
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }

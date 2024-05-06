@@ -13,7 +13,7 @@ namespace asyncio::binary {
 
         T v = 0;
 
-        for (std::size_t i = 0; i < sizeof(T); i++)
+        for (std::size_t i = 0; i < sizeof(T); ++i)
             v |= static_cast<T>(*(data + i)) << i * 8;
 
         co_return v;
@@ -27,7 +27,7 @@ namespace asyncio::binary {
 
         T v = 0;
 
-        for (std::size_t i = 0; i < sizeof(T); i++)
+        for (std::size_t i = 0; i < sizeof(T); ++i)
             v |= static_cast<T>(*(data + i)) << (sizeof(T) - i - 1) * 8;
 
         co_return v;
@@ -38,7 +38,7 @@ namespace asyncio::binary {
     zero::async::coroutine::Task<void, std::error_code> writeLE(IWriter &writer, const T value) {
         std::byte data[sizeof(T)];
 
-        for (std::size_t i = 0; i < sizeof(T); i++)
+        for (std::size_t i = 0; i < sizeof(T); ++i)
             data[i] = static_cast<std::byte>(value >> i * 8);
 
         co_return co_await writer.writeAll(data);
@@ -49,7 +49,7 @@ namespace asyncio::binary {
     zero::async::coroutine::Task<void, std::error_code> writeBE(IWriter &writer, const T value) {
         std::byte data[sizeof(T)];
 
-        for (std::size_t i = 0; i < sizeof(T); i++)
+        for (std::size_t i = 0; i < sizeof(T); ++i)
             data[i] = static_cast<std::byte>(value >> (sizeof(T) - i - 1) * 8);
 
         co_return co_await writer.writeAll(data);

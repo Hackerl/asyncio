@@ -273,7 +273,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) cons
 
     CO_EXPECT(co_await mBuffer->writeAll(key));
 
-    for (std::size_t i = 0; i < length; i++) {
+    for (std::size_t i = 0; i < length; ++i) {
         message.data[i] ^= key[i % 4];
     }
 
@@ -368,7 +368,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
     }
 
     CO_EXPECT(co_await mBuffer->close());
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 std::error_code asyncio::http::ws::make_error_code(const WebSocket::Error e) {

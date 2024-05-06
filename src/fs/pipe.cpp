@@ -86,7 +86,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::fs::Pipe::close() {
         co_return tl::unexpected<std::error_code>(errno, std::system_category());
 #endif
 
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::fs::Pipe::read(const std::span<std::byte> data) {

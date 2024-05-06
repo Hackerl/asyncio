@@ -12,7 +12,7 @@ produce(asyncio::Sender<int> sender, const std::shared_ptr<std::atomic<int>> cou
         CO_EXPECT(co_await sender.send((*counter)++));
     }
 
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 tl::expected<void, std::error_code>

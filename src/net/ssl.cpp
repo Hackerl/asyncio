@@ -47,7 +47,7 @@ tl::expected<void, asyncio::net::ssl::Error> asyncio::net::ssl::loadEmbeddedCA(c
     if (!store)
         return tl::unexpected(static_cast<Error>(ERR_get_error()));
 
-    for (int i = 0; i < sk_X509_INFO_num(info); i++) {
+    for (int i = 0; i < sk_X509_INFO_num(info); ++i) {
         const X509_INFO *item = sk_X509_INFO_value(info, i);
 
         if (item->x509)

@@ -119,7 +119,7 @@ asyncio::http::Response::output(const std::filesystem::path path) const {
     if (mConnection->error)
         co_return tl::unexpected(*mConnection->error);
 
-    co_return tl::expected<void, std::error_code>{};
+    co_return {};
 }
 
 zero::async::coroutine::Task<nlohmann::json, std::error_code> asyncio::http::Response::json() const {

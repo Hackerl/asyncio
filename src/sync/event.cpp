@@ -2,7 +2,7 @@
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Event::wait() {
     if (mValue)
-        co_return tl::expected<void, std::error_code>{};
+        co_return {};
 
     const auto promise = std::make_shared<Promise<void, std::error_code>>();
     mPending.push_back(promise);
