@@ -1,14 +1,5 @@
 #include <asyncio/http/url.h>
 #include <asyncio/io.h>
-#include <zero/singleton.h>
-
-const char *asyncio::http::URL::ErrorCategory::name() const noexcept {
-    return "asyncio::http::url";
-}
-
-std::string asyncio::http::URL::ErrorCategory::message(int value) const {
-    return curl_url_strerror(static_cast<CURLUcode>(value));
-}
 
 asyncio::http::URL::URL() : mURL(curl_url(), curl_url_cleanup) {
     if (!mURL)
@@ -218,10 +209,6 @@ asyncio::http::URL &asyncio::http::URL::append(const std::string &subPath) {
     }
 
     return *this;
-}
-
-std::error_code asyncio::http::make_error_code(const URL::Error e) {
-    return {static_cast<int>(e), zero::Singleton<URL::ErrorCategory>::getInstance()};
 }
 
 template<>

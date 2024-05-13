@@ -8,18 +8,16 @@
 #include <tl/expected.hpp>
 #include <curl/curl.h>
 #include <zero/cmdline.h>
+#include <zero/error.h>
 
 namespace asyncio::http {
     class URL {
     public:
-        enum class Error {
-        };
-
-        class ErrorCategory final : public std::error_category {
-        public:
-            [[nodiscard]] const char *name() const noexcept override;
-            [[nodiscard]] std::string message(int value) const override;
-        };
+        DEFINE_ERROR_TRANSFORMER_TYPES(
+            Error,
+            "asyncio::http::url",
+            [](const int v) { return curl_url_strerror(static_cast<CURLUcode>(v)); }
+        )
 
         URL();
         explicit URL(CURLU *url);
@@ -75,14 +73,12 @@ namespace asyncio::http {
         std::unique_ptr<CURLU, decltype(curl_url_cleanup) *> mURL;
     };
 
-    std::error_code make_error_code(URL::Error e);
+    DEFINE_MAKE_ERROR_CODE(URL::Error)
 }
+
+DECLARE_ERROR_CODE(asyncio::http::URL::Error)
 
 template<>
 tl::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input);
-
-template<>
-struct std::is_error_code_enum<asyncio::http::URL::Error> : std::true_type {
-};
 
 #endif //ASYNCIO_URL_H

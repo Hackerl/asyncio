@@ -2,7 +2,6 @@
 #include <asyncio/net/ssl.h>
 #include <asyncio/binary.h>
 #include <zero/encoding/base64.h>
-#include <zero/singleton.h>
 #include <zero/expect.h>
 #include <zero/defer.h>
 #include <cassert>
@@ -71,106 +70,6 @@ void asyncio::http::ws::Header::mask(const bool mask) {
     }
 
     mBytes[1] |= MASK_BIT;
-}
-
-const char *asyncio::http::ws::WebSocket::ErrorCategory::name() const noexcept {
-    return "asyncio::http::ws::WebSocket";
-}
-
-std::string asyncio::http::ws::WebSocket::ErrorCategory::message(const int value) const {
-    std::string msg;
-
-    switch (static_cast<Error>(value)) {
-    case Error::UNSUPPORTED_MASKED_FRAME:
-        msg = "unsupported masked frame";
-        break;
-
-    case Error::UNSUPPORTED_OPCODE:
-        msg = "unsupported opcode";
-        break;
-
-    case Error::NOT_CONNECTED:
-        msg = "websocket not connected";
-        break;
-
-    default:
-        msg = "unknown";
-        break;
-    }
-
-    return msg;
-}
-
-const char *asyncio::http::ws::WebSocket::CloseCodeCategory::name() const noexcept {
-    return "asyncio::http::ws::WebSocket::close";
-}
-
-std::string asyncio::http::ws::WebSocket::CloseCodeCategory::message(const int value) const {
-    std::string msg;
-
-    switch (static_cast<CloseCode>(value)) {
-    case CloseCode::NORMAL_CLOSURE:
-        msg = "normal closure";
-        break;
-
-    case CloseCode::GOING_AWAY:
-        msg = "going away";
-        break;
-
-    case CloseCode::PROTOCOL_ERROR:
-        msg = "protocol error";
-        break;
-
-    case CloseCode::UNSUPPORTED_DATA:
-        msg = "unsupported data";
-        break;
-
-    case CloseCode::NO_STATUS_RCVD:
-        msg = "no status rcvd";
-        break;
-
-    case CloseCode::ABNORMAL_CLOSURE:
-        msg = "abnormal closure";
-        break;
-
-    case CloseCode::INVALID_TEXT:
-        msg = "invalid text";
-        break;
-
-    case CloseCode::POLICY_VIOLATION:
-        msg = "policy violation";
-        break;
-
-    case CloseCode::MESSAGE_TOO_BIG:
-        msg = "message too big";
-        break;
-
-    case CloseCode::MANDATORY_EXTENSION:
-        msg = "mandatory extension";
-        break;
-
-    case CloseCode::INTERNAL_ERROR:
-        msg = "internal error";
-        break;
-
-    case CloseCode::SERVICE_RESTART:
-        msg = "service restart";
-        break;
-
-    case CloseCode::TRY_AGAIN_LATER:
-        msg = "try again later";
-        break;
-
-    case CloseCode::BAD_GATEWAY:
-        msg = "bad gateway";
-        break;
-
-    default:
-        msg = fmt::format("close code {}", value);
-        break;
-    }
-
-    return msg;
 }
 
 asyncio::http::ws::WebSocket::WebSocket(std::unique_ptr<IBuffer> buffer)
@@ -369,58 +268,6 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
 
     CO_EXPECT(co_await mBuffer->close());
     co_return {};
-}
-
-std::error_code asyncio::http::ws::make_error_code(const WebSocket::Error e) {
-    return {static_cast<int>(e), zero::Singleton<WebSocket::ErrorCategory>::getInstance()};
-}
-
-std::error_code asyncio::http::ws::make_error_code(const WebSocket::CloseCode e) {
-    return {static_cast<int>(e), zero::Singleton<WebSocket::CloseCodeCategory>::getInstance()};
-}
-
-const char *asyncio::http::ws::HandshakeErrorCategory::name() const noexcept {
-    return "asyncio::http::ws::handshake";
-}
-
-std::string asyncio::http::ws::HandshakeErrorCategory::message(const int value) const {
-    std::string msg;
-
-    switch (static_cast<HandshakeError>(value)) {
-    case HandshakeError::UNSUPPORTED_SCHEME:
-        msg = "unsupported websocket scheme";
-        break;
-
-    case HandshakeError::INVALID_RESPONSE:
-        msg = "invalid http response";
-        break;
-
-    case HandshakeError::UNEXPECTED_STATUS_CODE:
-        msg = "unexpected http response status code";
-        break;
-
-    case HandshakeError::INVALID_HTTP_HEADER:
-        msg = "invalid http header";
-        break;
-
-    case HandshakeError::NO_ACCEPT_HEADER:
-        msg = "no websocket accept header";
-        break;
-
-    case HandshakeError::HASH_MISMATCH:
-        msg = "hash mismatch";
-        break;
-
-    default:
-        msg = "unknown";
-        break;
-    }
-
-    return msg;
-}
-
-std::error_code asyncio::http::ws::make_error_code(const HandshakeError e) {
-    return {static_cast<int>(e), zero::Singleton<HandshakeErrorCategory>::getInstance()};
 }
 
 zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::connect(const URL url) {

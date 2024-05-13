@@ -23,7 +23,6 @@ add_library(
         STATIC
         src/io.cpp
         src/worker.cpp
-        src/channel.cpp
         src/event_loop.cpp
         src/sync/mutex.cpp
         src/sync/event.cpp

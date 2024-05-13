@@ -1,57 +1,6 @@
 #include <asyncio/net/dns.h>
 #include <asyncio/promise.h>
-#include <zero/singleton.h>
 #include <ranges>
-
-const char *asyncio::net::dns::ErrorCategory::name() const noexcept {
-    return "asyncio::net::dns";
-}
-
-std::string asyncio::net::dns::ErrorCategory::message(const int value) const {
-    return evutil_gai_strerror(value);
-}
-
-std::error_condition asyncio::net::dns::ErrorCategory::default_error_condition(const int value) const noexcept {
-    std::error_condition condition;
-
-    switch (value) {
-    case EVUTIL_EAI_CANCEL:
-        condition = std::errc::operation_canceled;
-        break;
-
-    case EVUTIL_EAI_ADDRFAMILY:
-        condition = std::errc::address_family_not_supported;
-        break;
-
-    case EVUTIL_EAI_AGAIN:
-        condition = std::errc::resource_unavailable_try_again;
-        break;
-
-    case EVUTIL_EAI_BADFLAGS:
-        condition = std::errc::invalid_argument;
-        break;
-
-    case EVUTIL_EAI_MEMORY:
-        condition = std::errc::not_enough_memory;
-        break;
-
-    case EVUTIL_EAI_FAMILY:
-    case EVUTIL_EAI_SERVICE:
-    case EVUTIL_EAI_SOCKTYPE:
-        condition = std::errc::not_supported;
-        break;
-
-    default:
-        condition = error_category::default_error_condition(value);
-        break;
-    }
-
-    return condition;
-}
-
-std::error_code asyncio::net::dns::make_error_code(const Error e) {
-    return {static_cast<int>(e), zero::Singleton<ErrorCategory>::getInstance()};
-}
 
 zero::async::coroutine::Task<std::vector<asyncio::net::Address>, std::error_code>
 asyncio::net::dns::getAddressInfo(

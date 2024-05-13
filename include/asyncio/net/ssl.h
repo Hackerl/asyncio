@@ -3,20 +3,21 @@
 
 #include "stream.h"
 #include <filesystem>
+#include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <event2/bufferevent_ssl.h>
 
 namespace asyncio::net::ssl {
-    enum class Error {
-    };
+    DEFINE_ERROR_TRANSFORMER(
+        Error,
+        "asyncio::net::ssl",
+        [](const int v) -> std::string {
+            char buffer[1024];
+            ERR_error_string_n(static_cast<unsigned long>(v), buffer, sizeof(buffer));
 
-    class ErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-    };
-
-    std::error_code make_error_code(Error e);
+            return buffer;
+        }
+    )
 
     using Context = SSL_CTX;
 
@@ -101,8 +102,6 @@ namespace asyncio::net::ssl {
     }
 }
 
-template<>
-struct std::is_error_code_enum<asyncio::net::ssl::Error> : std::true_type {
-};
+DECLARE_ERROR_CODE(asyncio::net::ssl::Error)
 
 #endif //ASYNCIO_SSL_H

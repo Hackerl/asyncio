@@ -54,40 +54,32 @@ namespace asyncio::http::ws {
 
     class WebSocket {
     public:
-        enum class Error {
-            UNSUPPORTED_MASKED_FRAME = 1,
-            UNSUPPORTED_OPCODE,
-            NOT_CONNECTED
-        };
+        DEFINE_ERROR_CODE_TYPES(
+            Error,
+            "asyncio::http::ws::WebSocket",
+            UNSUPPORTED_MASKED_FRAME, "unsupported masked frame",
+            UNSUPPORTED_OPCODE, "unsupported opcode",
+            NOT_CONNECTED, "websocket not connected"
+        )
 
-        class ErrorCategory final : public std::error_category {
-        public:
-            [[nodiscard]] const char *name() const noexcept override;
-            [[nodiscard]] std::string message(int value) const override;
-        };
-
-        enum class CloseCode {
-            NORMAL_CLOSURE = 1000,
-            GOING_AWAY = 1001,
-            PROTOCOL_ERROR = 1002,
-            UNSUPPORTED_DATA = 1003,
-            NO_STATUS_RCVD = 1005,
-            ABNORMAL_CLOSURE = 1006,
-            INVALID_TEXT = 1007,
-            POLICY_VIOLATION = 1008,
-            MESSAGE_TOO_BIG = 1009,
-            MANDATORY_EXTENSION = 1010,
-            INTERNAL_ERROR = 1011,
-            SERVICE_RESTART = 1012,
-            TRY_AGAIN_LATER = 1013,
-            BAD_GATEWAY = 1014
-        };
-
-        class CloseCodeCategory final : public std::error_category {
-        public:
-            [[nodiscard]] const char *name() const noexcept override;
-            [[nodiscard]] std::string message(int value) const override;
-        };
+        DEFINE_ERROR_CODE_TYPES(
+            CloseCode,
+            "asyncio::http::ws::WebSocket::close",
+            NORMAL_CLOSURE, "normal closure",
+            GOING_AWAY, "going away",
+            PROTOCOL_ERROR, "protocol error",
+            UNSUPPORTED_DATA, "unsupported data",
+            NO_STATUS_RCVD, "no status rcvd",
+            ABNORMAL_CLOSURE, "abnormal closure",
+            INVALID_TEXT, "invalid text",
+            POLICY_VIOLATION, "policy violation",
+            MESSAGE_TOO_BIG, "message too big",
+            MANDATORY_EXTENSION, "mandatory extension",
+            INTERNAL_ERROR, "internal error",
+            SERVICE_RESTART, "service restart",
+            TRY_AGAIN_LATER, "try again later",
+            BAD_GATEWAY, "bad gateway"
+        )
 
         explicit WebSocket(std::unique_ptr<IBuffer> buffer);
 
@@ -115,39 +107,27 @@ namespace asyncio::http::ws {
         std::unique_ptr<IBuffer> mBuffer;
     };
 
-    std::error_code make_error_code(WebSocket::Error e);
-    std::error_code make_error_code(WebSocket::CloseCode e);
+    DEFINE_MAKE_ERROR_CODE(WebSocket::Error)
+    DEFINE_MAKE_ERROR_CODE(WebSocket::CloseCode)
 
-    enum class HandshakeError {
-        UNSUPPORTED_SCHEME,
-        INVALID_RESPONSE,
-        UNEXPECTED_STATUS_CODE,
-        INVALID_HTTP_HEADER,
-        NO_ACCEPT_HEADER,
-        HASH_MISMATCH
-    };
-
-    class HandshakeErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-    };
-
-    std::error_code make_error_code(HandshakeError e);
+    DEFINE_ERROR_CODE(
+        HandshakeError,
+        "asyncio::http::ws::handshake",
+        UNSUPPORTED_SCHEME, "unsupported websocket scheme",
+        INVALID_RESPONSE, "invalid http response",
+        UNEXPECTED_STATUS_CODE, "unexpected http response status code",
+        INVALID_HTTP_HEADER, "invalid http header",
+        NO_ACCEPT_HEADER, "no websocket accept header",
+        HASH_MISMATCH, "hash mismatch"
+    )
 
     zero::async::coroutine::Task<WebSocket, std::error_code> connect(URL url);
 }
 
-template<>
-struct std::is_error_code_enum<asyncio::http::ws::WebSocket::Error> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::http::ws::WebSocket::CloseCode> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::http::ws::HandshakeError> : std::true_type {
-};
+DECLARE_ERROR_CODES(
+    asyncio::http::ws::WebSocket::Error,
+    asyncio::http::ws::WebSocket::CloseCode,
+    asyncio::http::ws::HandshakeError
+)
 
 #endif //ASYNCIO_WEBSOCKET_H

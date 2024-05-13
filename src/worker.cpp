@@ -1,4 +1,5 @@
 #include <asyncio/worker.h>
+#include <utility>
 
 asyncio::Worker::Worker() : mExit(false), mThread(&Worker::work, this) {
 }

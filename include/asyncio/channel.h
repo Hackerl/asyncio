@@ -8,19 +8,6 @@
 #include <zero/atomic/circular_buffer.h>
 
 namespace asyncio {
-    enum class ChannelError {
-        DISCONNECTED = 1
-    };
-
-    class ChannelErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] bool equivalent(const std::error_code &code, int value) const noexcept override;
-    };
-
-    std::error_condition make_error_condition(ChannelError e);
-
     static constexpr auto SENDER = 0;
     static constexpr auto RECEIVER = 1;
 
@@ -66,47 +53,26 @@ namespace asyncio {
         }
     };
 
-    enum class TrySendError {
-        DISCONNECTED = 1,
-        FULL
-    };
+    DEFINE_ERROR_CODE_EX(
+        TrySendError,
+        "asyncio::Sender::trySend",
+        DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
+        FULL, "sending on a full channel", std::errc::operation_would_block
+    )
 
-    class TrySendErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
+    DEFINE_ERROR_CODE_EX(
+        SendSyncError,
+        "asyncio::Sender::sendSync",
+        DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
+        TIMEOUT, "timed out waiting on send operation", std::errc::timed_out
+    )
 
-    std::error_code make_error_code(TrySendError e);
-
-    enum class SendSyncError {
-        DISCONNECTED = 1,
-        TIMEOUT
-    };
-
-    class SendSyncErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    std::error_code make_error_code(SendSyncError e);
-
-    enum class SendError {
-        DISCONNECTED = 1,
-        CANCELLED
-    };
-
-    class SendErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    std::error_code make_error_code(SendError e);
+    DEFINE_ERROR_CODE_EX(
+        SendError,
+        "asyncio::Sender::sendSync",
+        DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
+        CANCELLED, "send operation has been cancelled", std::errc::operation_canceled
+    )
 
     template<typename T>
     class Sender {
@@ -298,47 +264,26 @@ namespace asyncio {
         std::shared_ptr<ChannelCore<T>> mCore;
     };
 
-    enum class TryReceiveError {
-        DISCONNECTED = 1,
-        EMPTY
-    };
+    DEFINE_ERROR_CODE_EX(
+        TryReceiveError,
+        "asyncio::Sender::tryReceive",
+        DISCONNECTED, "receiving on an empty and disconnected channel", DEFAULT_ERROR_CONDITION,
+        EMPTY, "receiving on an empty channel", std::errc::operation_would_block
+    )
 
-    class TryReceiveErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
+    DEFINE_ERROR_CODE_EX(
+        ReceiveSyncError,
+        "asyncio::Sender::receive",
+        DISCONNECTED, "channel is empty and disconnected", DEFAULT_ERROR_CONDITION,
+        TIMEOUT, "timed out waiting on receive operation", std::errc::timed_out
+    )
 
-    std::error_code make_error_code(TryReceiveError e);
-
-    enum class ReceiveSyncError {
-        DISCONNECTED = 1,
-        TIMEOUT
-    };
-
-    class ReceiveSyncErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    std::error_code make_error_code(ReceiveSyncError e);
-
-    enum class ReceiveError {
-        DISCONNECTED = 1,
-        CANCELLED
-    };
-
-    class ReceiveErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    std::error_code make_error_code(ReceiveError e);
+    DEFINE_ERROR_CODE_EX(
+        ReceiveError,
+        "asyncio::Sender::receive",
+        DISCONNECTED, "channel is empty and disconnected", DEFAULT_ERROR_CONDITION,
+        CANCELLED, "receive operation has been cancelled", std::errc::operation_canceled
+    )
 
     template<typename T>
     class Receiver {
@@ -516,6 +461,19 @@ namespace asyncio {
         std::shared_ptr<ChannelCore<T>> mCore;
     };
 
+    DEFINE_ERROR_CONDITION(
+        ChannelError,
+        "asyncio::channel",
+        DISCONNECTED,
+        "channel disconnected",
+        code == make_error_code(TrySendError::DISCONNECTED) ||
+        code == make_error_code(SendSyncError::DISCONNECTED) ||
+        code == make_error_code(SendError::DISCONNECTED) ||
+        code == make_error_code(TryReceiveError::DISCONNECTED) ||
+        code == make_error_code(ReceiveSyncError::DISCONNECTED) ||
+        code == make_error_code(ReceiveError::DISCONNECTED)
+    )
+
     template<typename T>
     using Channel = std::pair<Sender<T>, Receiver<T>>;
 
@@ -531,32 +489,15 @@ namespace asyncio {
     }
 }
 
-template<>
-struct std::is_error_condition_enum<asyncio::ChannelError> : std::true_type {
-};
+DECLARE_ERROR_CODES(
+    asyncio::TrySendError,
+    asyncio::SendSyncError,
+    asyncio::SendError,
+    asyncio::TryReceiveError,
+    asyncio::ReceiveSyncError,
+    asyncio::ReceiveError
+)
 
-template<>
-struct std::is_error_code_enum<asyncio::TrySendError> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::SendSyncError> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::SendError> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::TryReceiveError> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::ReceiveSyncError> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::ReceiveError> : std::true_type {
-};
+DECLARE_ERROR_CONDITION(asyncio::ChannelError)
 
 #endif //ASYNCIO_CHANNEL_H

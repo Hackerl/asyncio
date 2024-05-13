@@ -6,17 +6,19 @@
 namespace asyncio::net::dns {
     using AddressInfo = evutil_addrinfo;
 
-    enum class Error {
-    };
-
-    class ErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    std::error_code make_error_code(Error e);
+    DEFINE_ERROR_TRANSFORMER_EX(
+        Error,
+        "asyncio::net::dns",
+        evutil_gai_strerror,
+        EVUTIL_EAI_CANCEL, std::errc::operation_canceled,
+        EVUTIL_EAI_ADDRFAMILY, std::errc::address_family_not_supported,
+        EVUTIL_EAI_AGAIN, std::errc::resource_unavailable_try_again,
+        EVUTIL_EAI_BADFLAGS, std::errc::invalid_argument,
+        EVUTIL_EAI_MEMORY, std::errc::not_enough_memory,
+        EVUTIL_EAI_FAMILY, std::errc::not_supported,
+        EVUTIL_EAI_SERVICE, std::errc::not_supported,
+        EVUTIL_EAI_SOCKTYPE, std::errc::not_supported
+    )
 
     zero::async::coroutine::Task<std::vector<Address>, std::error_code>
     getAddressInfo(std::string node, std::optional<std::string> service, std::optional<AddressInfo> hints);
@@ -27,8 +29,6 @@ namespace asyncio::net::dns {
     zero::async::coroutine::Task<std::vector<IPv6>, std::error_code> lookupIPv6(std::string host);
 }
 
-template<>
-struct std::is_error_code_enum<asyncio::net::dns::Error> : std::true_type {
-};
+DECLARE_ERROR_CODE(asyncio::net::dns::Error)
 
 #endif //ASYNCIO_DNS_H

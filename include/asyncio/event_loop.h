@@ -14,16 +14,11 @@ namespace asyncio {
 
     class EventLoop {
     public:
-        enum class Error {
-            INVALID_NAMESERVER = 1
-        };
-
-        class ErrorCategory final : public std::error_category {
-        public:
-            [[nodiscard]] const char *name() const noexcept override;
-            [[nodiscard]] std::string message(int value) const override;
-            [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-        };
+        DEFINE_ERROR_CODE_TYPES_EX(
+            Error,
+            "asyncio::EventLoop",
+            INVALID_NAMESERVER, "invalid nameserver", std::errc::invalid_argument
+        )
 
         EventLoop(
             std::unique_ptr<event_base, decltype(event_base_free) *> base,
@@ -234,7 +229,7 @@ namespace asyncio {
         std::list<net::Address> mNameservers;
     };
 
-    std::error_code make_error_code(EventLoop::Error e);
+    DEFINE_MAKE_ERROR_CODE(EventLoop::Error)
 
     std::shared_ptr<EventLoop> getEventLoop();
     void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
@@ -251,18 +246,11 @@ namespace asyncio {
 
     zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
-    enum class TimeoutError {
-        ELAPSED = 1
-    };
-
-    class TimeoutErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    std::error_code make_error_code(TimeoutError e);
+    DEFINE_ERROR_CODE_EX(
+        TimeoutError,
+        "asyncio::timeout",
+        ELAPSED, "deadline has elapsed", std::errc::timed_out
+    )
 
     template<typename T, typename E>
         requires (!std::is_same_v<E, std::exception_ptr>)
@@ -311,12 +299,6 @@ namespace asyncio {
     }
 }
 
-template<>
-struct std::is_error_code_enum<asyncio::EventLoop::Error> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::TimeoutError> : std::true_type {
-};
+DECLARE_ERROR_CODES(asyncio::EventLoop::Error, asyncio::TimeoutError)
 
 #endif //ASYNCIO_EVENT_LOOP_H

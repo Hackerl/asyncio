@@ -34,15 +34,11 @@ namespace asyncio::http {
 
     class Response final : public IBufReader, public Reader {
     public:
-        enum class Error {
-            INVALID_JSON = 1
-        };
-
-        class ErrorCategory final : public std::error_category {
-        public:
-            [[nodiscard]] const char *name() const noexcept override;
-            [[nodiscard]] std::string message(int value) const override;
-        };
+        DEFINE_ERROR_CODE_TYPES(
+            Error,
+            "asyncio::http::Response",
+            INVALID_JSON, "invalid json message"
+        )
 
         Response(Requests *requests, std::unique_ptr<Connection> connection);
         Response(Response &&) = default;
@@ -83,7 +79,7 @@ namespace asyncio::http {
         std::unique_ptr<Connection> mConnection;
     };
 
-    std::error_code make_error_code(Response::Error e);
+    DEFINE_MAKE_ERROR_CODE(Response::Error)
 
     struct Options {
         std::optional<std::string> proxy;
@@ -96,23 +92,17 @@ namespace asyncio::http {
 
     class Requests {
     public:
-        enum class CURLError {
-        };
+        DEFINE_ERROR_TRANSFORMER_TYPES(
+            CURLError,
+            "asyncio::http::Requests::curl",
+            [](const int v) { return curl_easy_strerror(static_cast<CURLcode>(v)); }
+        )
 
-        class CURLErrorCategory final : public std::error_category {
-        public:
-            [[nodiscard]] const char *name() const noexcept override;
-            [[nodiscard]] std::string message(int value) const override;
-        };
-
-        enum class CURLMError {
-        };
-
-        class CURLMErrorCategory final : public std::error_category {
-        public:
-            [[nodiscard]] const char *name() const noexcept override;
-            [[nodiscard]] std::string message(int value) const override;
-        };
+        DEFINE_ERROR_TRANSFORMER_TYPES(
+            CURLMError,
+            "asyncio::http::Requests::curl::multi",
+            [](const int v) { return curl_multi_strerror(static_cast<CURLMcode>(v)); }
+        )
 
         Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer);
         Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer, Options options);
@@ -244,20 +234,14 @@ namespace asyncio::http {
         friend class Response;
     };
 
-    std::error_code make_error_code(Requests::CURLError e);
-    std::error_code make_error_code(Requests::CURLMError e);
+    DEFINE_MAKE_ERROR_CODE(Requests::CURLError)
+    DEFINE_MAKE_ERROR_CODE(Requests::CURLMError)
 }
 
-template<>
-struct std::is_error_code_enum<asyncio::http::Response::Error> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::http::Requests::CURLError> : std::true_type {
-};
-
-template<>
-struct std::is_error_code_enum<asyncio::http::Requests::CURLMError> : std::true_type {
-};
+DECLARE_ERROR_CODES(
+    asyncio::http::Response::Error,
+    asyncio::http::Requests::CURLError,
+    asyncio::http::Requests::CURLMError
+)
 
 #endif //ASYNCIO_REQUEST_H

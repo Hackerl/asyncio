@@ -14,16 +14,12 @@ namespace asyncio::fs {
         };
 
     public:
-        enum class Error {
-            ALL_DONE = 1,
-            NOT_CANCELED
-        };
-
-        class ErrorCategory final : public std::error_category {
-        public:
-            [[nodiscard]] const char *name() const noexcept override;
-            [[nodiscard]] std::string message(int value) const override;
-        };
+        DEFINE_ERROR_CODE(
+            Error,
+            "asyncio::fs::PosixAIO",
+            ALL_DONE, "all requests had already been completed before the call",
+            NOT_CANCELED, "at least one of the requests specified was not canceled because it was in progress"
+        )
 
         explicit PosixAIO(std::unique_ptr<event, decltype(event_free) *> event);
         PosixAIO(PosixAIO &&rhs) noexcept;
@@ -58,11 +54,9 @@ namespace asyncio::fs {
         std::unique_ptr<event, decltype(event_free) *> mEvent;
     };
 
-    std::error_code make_error_code(PosixAIO::Error e);
+    DEFINE_MAKE_ERROR_CODE(PosixAIO::Error)
 }
 
-template<>
-struct std::is_error_code_enum<asyncio::fs::PosixAIO::Error> : std::true_type {
-};
+DECLARE_ERROR_CODE(asyncio::fs::PosixAIO::Error)
 
 #endif //ASYNCIO_POSIX_H

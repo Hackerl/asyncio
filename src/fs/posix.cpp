@@ -1,32 +1,7 @@
 #include <asyncio/fs/posix.h>
 #include <asyncio/event_loop.h>
-#include <zero/singleton.h>
 #include <csignal>
 #include <cassert>
-
-const char *asyncio::fs::PosixAIO::ErrorCategory::name() const noexcept {
-    return "asyncio::fs::PosixAIO";
-}
-
-std::string asyncio::fs::PosixAIO::ErrorCategory::message(const int value) const {
-    std::string msg;
-
-    switch (static_cast<Error>(value)) {
-    case Error::ALL_DONE:
-        msg = "all requests had already been completed before the call";
-        break;
-
-    case Error::NOT_CANCELED:
-        msg = "at least one of the requests specified was not canceled because it was in progress";
-        break;
-
-    default:
-        msg = "unknown";
-        break;
-    }
-
-    return msg;
-}
 
 asyncio::fs::PosixAIO::PosixAIO(std::unique_ptr<event, decltype(event_free) *> event) : mEvent(std::move(event)) {
     const auto e = mEvent.get();
@@ -203,8 +178,4 @@ asyncio::fs::PosixAIO::write(
             return {};
         }
     };
-}
-
-std::error_code asyncio::fs::make_error_code(const PosixAIO::Error e) {
-    return {static_cast<int>(e), zero::Singleton<PosixAIO::ErrorCategory>::getInstance()};
 }

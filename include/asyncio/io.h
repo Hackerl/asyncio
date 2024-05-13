@@ -8,26 +8,17 @@
 #include <zero/async/coroutine.h>
 
 namespace asyncio {
-    enum class IOError {
-        BROKEN_PIPE = 1,
-        INVALID_ARGUMENT,
-        DEVICE_OR_RESOURCE_BUSY,
-        NOT_SUPPORTED,
-        OPERATION_NOT_SUPPORTED,
-        FUNCTION_NOT_SUPPORTED,
-        UNEXPECTED_EOF,
-        BAD_FILE_DESCRIPTOR,
-        ADDRESS_FAMILY_NOT_SUPPORTED
-    };
-
-    class IOErrorCategory final : public std::error_category {
-    public:
-        [[nodiscard]] const char *name() const noexcept override;
-        [[nodiscard]] std::string message(int value) const override;
-        [[nodiscard]] std::error_condition default_error_condition(int value) const noexcept override;
-    };
-
-    std::error_code make_error_code(IOError e);
+    DEFINE_ERROR_CODE_EX(
+        IOError,
+        "asyncio::io",
+        BROKEN_PIPE, "broken pipe", std::errc::broken_pipe,
+        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
+        DEVICE_OR_RESOURCE_BUSY, "device or resource busy", std::errc::device_or_resource_busy,
+        FUNCTION_NOT_SUPPORTED, "function not supported", std::errc::function_not_supported,
+        UNEXPECTED_EOF, "unexpected end of file", DEFAULT_ERROR_CONDITION,
+        BAD_FILE_DESCRIPTOR, "bad file descriptor", std::errc::bad_file_descriptor,
+        ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
+    )
 
     constexpr auto INVALID_FILE_DESCRIPTOR = -1;
     constexpr auto DEFAULT_BUFFER_CAPACITY = 1024 * 1024;
@@ -130,8 +121,6 @@ namespace asyncio {
     }
 }
 
-template<>
-struct std::is_error_code_enum<asyncio::IOError> : std::true_type {
-};
+DECLARE_ERROR_CODE(asyncio::IOError)
 
 #endif //ASYNCIO_IO_H

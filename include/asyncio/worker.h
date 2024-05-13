@@ -4,7 +4,6 @@
 #include <thread>
 #include <functional>
 #include <condition_variable>
-#include <zero/async/coroutine.h>
 
 namespace asyncio {
     class Worker {

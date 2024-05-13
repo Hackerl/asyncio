@@ -3,8 +3,6 @@
 #include <asyncio/promise.h>
 #include <zero/defer.h>
 #include <zero/os/net.h>
-#include <zero/singleton.h>
-#include <openssl/err.h>
 #include <openssl/x509v3.h>
 
 #ifdef ASYNCIO_EMBED_CA_CERT
@@ -12,21 +10,6 @@
 #endif
 
 static const auto defaultContext = asyncio::net::ssl::newContext({});
-
-const char *asyncio::net::ssl::ErrorCategory::name() const noexcept {
-    return "asyncio::net::ssl";
-}
-
-std::string asyncio::net::ssl::ErrorCategory::message(const int value) const {
-    char buffer[1024];
-    ERR_error_string_n(static_cast<unsigned long>(value), buffer, sizeof(buffer));
-
-    return buffer;
-}
-
-std::error_code asyncio::net::ssl::make_error_code(const Error e) {
-    return {static_cast<int>(e), zero::Singleton<ErrorCategory>::getInstance()};
-}
 
 #ifdef ASYNCIO_EMBED_CA_CERT
 tl::expected<void, asyncio::net::ssl::Error> asyncio::net::ssl::loadEmbeddedCA(const Context *ctx) {

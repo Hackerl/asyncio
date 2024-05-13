@@ -2,7 +2,6 @@
 #include <asyncio/event_loop.h>
 #include <asyncio/fs/file.h>
 #include <asyncio/ev/event.h>
-#include <zero/singleton.h>
 #include <fcntl.h>
 #include <mutex>
 
@@ -166,37 +165,6 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::Response::pee
     return mConnection->buffers[1].peek(data).transformError([this](const auto &ec) {
         return mConnection->error.value_or(ec);
     });
-}
-
-const char *asyncio::http::Response::ErrorCategory::name() const noexcept {
-    return "asyncio::http::Response";
-}
-
-std::string asyncio::http::Response::ErrorCategory::message(const int value) const {
-    if (static_cast<Error>(value) == Error::INVALID_JSON)
-        return "invalid json message";
-
-    return "unknown";
-}
-
-std::error_code asyncio::http::make_error_code(const Response::Error e) {
-    return {static_cast<int>(e), zero::Singleton<Response::ErrorCategory>::getInstance()};
-}
-
-const char *asyncio::http::Requests::CURLErrorCategory::name() const noexcept {
-    return "asyncio::http::Requests::curl";
-}
-
-std::string asyncio::http::Requests::CURLErrorCategory::message(const int value) const {
-    return curl_easy_strerror(static_cast<CURLcode>(value));
-}
-
-const char *asyncio::http::Requests::CURLMErrorCategory::name() const noexcept {
-    return "asyncio::http::Requests::curl::multi";
-}
-
-std::string asyncio::http::Requests::CURLMErrorCategory::message(const int value) const {
-    return curl_multi_strerror(static_cast<CURLMcode>(value));
 }
 
 asyncio::http::Requests::Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer)
@@ -642,12 +610,4 @@ asyncio::http::Requests::request(
     });
 
     co_return co_await perform(*std::move(connection));
-}
-
-std::error_code asyncio::http::make_error_code(const Requests::CURLError e) {
-    return {static_cast<int>(e), zero::Singleton<Requests::CURLErrorCategory>::getInstance()};
-}
-
-std::error_code asyncio::http::make_error_code(const Requests::CURLMError e) {
-    return {static_cast<int>(e), zero::Singleton<Requests::CURLMErrorCategory>::getInstance()};
 }

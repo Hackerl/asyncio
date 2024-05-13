@@ -25,24 +25,24 @@ namespace asyncio {
         void resolve(Ts &&... args) {
             assert(this->mCore);
             assert(!this->mCore->result);
-            assert(this->mCore->status != zero::async::promise::State::ONLY_RESULT);
-            assert(this->mCore->status != zero::async::promise::State::DONE);
+            assert(this->mCore->state != zero::async::promise::State::ONLY_RESULT);
+            assert(this->mCore->state != zero::async::promise::State::DONE);
 
             if constexpr (std::is_void_v<T>)
                 this->mCore->result.emplace();
             else
                 this->mCore->result.emplace(tl::in_place, std::forward<Ts>(args)...);
 
-            zero::async::promise::State state = this->mCore->status;
+            zero::async::promise::State state = this->mCore->state;
 
             if (state == zero::async::promise::State::PENDING &&
-                this->mCore->status.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
+                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
                 this->mCore->event.set();
                 return;
             }
 
             if (state != zero::async::promise::State::ONLY_CALLBACK ||
-                !this->mCore->status.compare_exchange_strong(state, zero::async::promise::State::DONE))
+                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
                 throw std::logic_error(fmt::format("unexpected state: {}", static_cast<int>(state)));
 
             this->mCore->event.set();
@@ -56,20 +56,20 @@ namespace asyncio {
         void reject(Ts &&... args) {
             assert(this->mCore);
             assert(!this->mCore->result);
-            assert(this->mCore->status != zero::async::promise::State::ONLY_RESULT);
-            assert(this->mCore->status != zero::async::promise::State::DONE);
+            assert(this->mCore->state != zero::async::promise::State::ONLY_RESULT);
+            assert(this->mCore->state != zero::async::promise::State::DONE);
 
             this->mCore->result.emplace(tl::unexpected<E>(std::forward<Ts>(args)...));
-            zero::async::promise::State state = this->mCore->status;
+            zero::async::promise::State state = this->mCore->state;
 
             if (state == zero::async::promise::State::PENDING &&
-                this->mCore->status.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
+                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
                 this->mCore->event.set();
                 return;
             }
 
             if (state != zero::async::promise::State::ONLY_CALLBACK ||
-                !this->mCore->status.compare_exchange_strong(state, zero::async::promise::State::DONE))
+                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
                 throw std::logic_error(fmt::format("unexpected state: {}", static_cast<int>(state)));
 
             this->mCore->event.set();
