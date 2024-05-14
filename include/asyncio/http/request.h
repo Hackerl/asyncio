@@ -95,13 +95,13 @@ namespace asyncio::http {
         DEFINE_ERROR_TRANSFORMER_TYPES(
             CURLError,
             "asyncio::http::Requests::curl",
-            [](const int v) { return curl_easy_strerror(static_cast<CURLcode>(v)); }
+            [](const int value) { return curl_easy_strerror(static_cast<CURLcode>(value)); }
         )
 
         DEFINE_ERROR_TRANSFORMER_TYPES(
             CURLMError,
             "asyncio::http::Requests::curl::multi",
-            [](const int v) { return curl_multi_strerror(static_cast<CURLMcode>(v)); }
+            [](const int value) { return curl_multi_strerror(static_cast<CURLMcode>(value)); }
         )
 
         Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer);

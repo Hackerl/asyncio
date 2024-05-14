@@ -16,7 +16,7 @@ namespace asyncio::http {
         DEFINE_ERROR_TRANSFORMER_TYPES(
             Error,
             "asyncio::http::url",
-            [](const int v) { return curl_url_strerror(static_cast<CURLUcode>(v)); }
+            [](const int value) { return curl_url_strerror(static_cast<CURLUcode>(value)); }
         )
 
         URL();

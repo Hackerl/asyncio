@@ -11,9 +11,9 @@ namespace asyncio::net::ssl {
     DEFINE_ERROR_TRANSFORMER(
         Error,
         "asyncio::net::ssl",
-        [](const int v) -> std::string {
+        [](const int value) -> std::string {
             char buffer[1024];
-            ERR_error_string_n(static_cast<unsigned long>(v), buffer, sizeof(buffer));
+            ERR_error_string_n(static_cast<unsigned long>(value), buffer, sizeof(buffer));
 
             return buffer;
         }

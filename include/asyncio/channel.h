@@ -466,12 +466,14 @@ namespace asyncio {
         "asyncio::channel",
         DISCONNECTED,
         "channel disconnected",
-        code == make_error_code(TrySendError::DISCONNECTED) ||
-        code == make_error_code(SendSyncError::DISCONNECTED) ||
-        code == make_error_code(SendError::DISCONNECTED) ||
-        code == make_error_code(TryReceiveError::DISCONNECTED) ||
-        code == make_error_code(ReceiveSyncError::DISCONNECTED) ||
-        code == make_error_code(ReceiveError::DISCONNECTED)
+        [](const std::error_code &ec) {
+            return ec == make_error_code(TrySendError::DISCONNECTED) ||
+                ec == make_error_code(SendSyncError::DISCONNECTED) ||
+                ec == make_error_code(SendError::DISCONNECTED) ||
+                ec == make_error_code(TryReceiveError::DISCONNECTED) ||
+                ec == make_error_code(ReceiveSyncError::DISCONNECTED) ||
+                ec == make_error_code(ReceiveError::DISCONNECTED);
+        }
     )
 
     template<typename T>
