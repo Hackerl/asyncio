@@ -10,14 +10,42 @@ namespace asyncio::net::dns {
         Error,
         "asyncio::net::dns",
         evutil_gai_strerror,
-        EVUTIL_EAI_CANCEL, std::errc::operation_canceled,
-        EVUTIL_EAI_ADDRFAMILY, std::errc::address_family_not_supported,
-        EVUTIL_EAI_AGAIN, std::errc::resource_unavailable_try_again,
-        EVUTIL_EAI_BADFLAGS, std::errc::invalid_argument,
-        EVUTIL_EAI_MEMORY, std::errc::not_enough_memory,
-        EVUTIL_EAI_FAMILY, std::errc::not_supported,
-        EVUTIL_EAI_SERVICE, std::errc::not_supported,
-        EVUTIL_EAI_SOCKTYPE, std::errc::not_supported
+        [](const int value) {
+            std::optional<std::error_condition> condition;
+
+            switch (value) {
+            case EVUTIL_EAI_CANCEL:
+                condition = std::errc::operation_canceled;
+                break;
+
+            case EVUTIL_EAI_ADDRFAMILY:
+                condition = std::errc::address_family_not_supported;
+                break;
+
+            case EVUTIL_EAI_AGAIN:
+                condition = std::errc::resource_unavailable_try_again;
+                break;
+
+            case EVUTIL_EAI_BADFLAGS:
+                condition = std::errc::invalid_argument;
+                break;
+
+            case EVUTIL_EAI_MEMORY:
+                condition = std::errc::not_enough_memory;
+                break;
+
+            case EVUTIL_EAI_FAMILY:
+            case EVUTIL_EAI_SERVICE:
+            case EVUTIL_EAI_SOCKTYPE:
+                condition = std::errc::not_supported;
+                break;
+
+            default:
+                break;
+            }
+
+            return condition;
+        }
     )
 
     zero::async::coroutine::Task<std::vector<Address>, std::error_code>
