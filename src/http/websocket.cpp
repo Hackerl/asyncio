@@ -83,7 +83,7 @@ asyncio::http::ws::WebSocket::readFrame() const {
     CO_EXPECT(co_await mBuffer->readExactly({reinterpret_cast<std::byte *>(&header), sizeof(Header)}));
 
     if (header.mask())
-        co_return tl::unexpected(Error::UNSUPPORTED_MASKED_FRAME);
+        co_return std::unexpected(Error::UNSUPPORTED_MASKED_FRAME);
 
     std::vector<std::byte> data;
 
@@ -202,14 +202,14 @@ asyncio::http::ws::WebSocket::readMessage() const {
             CO_EXPECT(co_await mBuffer->close());
 
             if (message->data.size() < 2)
-                co_return tl::unexpected(CloseCode::NO_STATUS_RCVD);
+                co_return std::unexpected(CloseCode::NO_STATUS_RCVD);
 
-            co_return tl::unexpected(
+            co_return std::unexpected(
                 static_cast<CloseCode>(ntohs(*reinterpret_cast<const unsigned short *>(message->data.data())))
             );
         }
         else {
-            co_return tl::unexpected(Error::UNSUPPORTED_OPCODE);
+            co_return std::unexpected(Error::UNSUPPORTED_OPCODE);
         }
     }
 }
@@ -246,7 +246,7 @@ asyncio::http::ws::WebSocket::sendBinary(const std::span<const std::byte> data) 
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
     if (mState != State::CONNECTED)
-        co_return tl::unexpected(Error::NOT_CONNECTED);
+        co_return std::unexpected(Error::NOT_CONNECTED);
 
     mState = State::CLOSING;
     const auto c = htons(static_cast<unsigned short>(code));
@@ -282,21 +282,21 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     std::unique_ptr<IBuffer> buffer;
 
     if (*scheme == WS_SCHEME) {
-        auto buf = co_await net::stream::connect(*host, *port).transform([](net::stream::Buffer &&b) {
-            return std::make_unique<net::stream::Buffer>(std::move(b));
+        auto buf = co_await net::connect(*host, *port).transform([](net::Buffer &&rhs) {
+            return std::make_unique<net::Buffer>(std::move(rhs));
         });
         CO_EXPECT(buf);
         buffer = *std::move(buf);
     }
     else if (*scheme == WS_SECURE_SCHEME) {
-        auto buf = co_await net::ssl::stream::connect(*host, *port).transform([](net::ssl::stream::Buffer &&b) {
-            return std::make_unique<net::ssl::stream::Buffer>(std::move(b));
+        auto buf = co_await net::ssl::connect(*host, *port).transform([](net::ssl::Buffer &&rhs) {
+            return std::make_unique<net::ssl::Buffer>(std::move(rhs));
         });
         CO_EXPECT(buf);
         buffer = *std::move(buf);
     }
     else {
-        co_return tl::unexpected(HandshakeError::UNSUPPORTED_SCHEME);
+        co_return std::unexpected(HandshakeError::UNSUPPORTED_SCHEME);
     }
 
     std::random_device rd;
@@ -334,13 +334,13 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     auto tokens = zero::strings::split(*line);
 
     if (tokens.size() < 2)
-        co_return tl::unexpected(HandshakeError::INVALID_RESPONSE);
+        co_return std::unexpected(HandshakeError::INVALID_RESPONSE);
 
     const auto code = zero::strings::toNumber<int>(tokens[1]);
     CO_EXPECT(code);
 
     if (code != SWITCHING_PROTOCOLS_STATUS)
-        co_return tl::unexpected(HandshakeError::UNEXPECTED_STATUS_CODE);
+        co_return std::unexpected(HandshakeError::UNEXPECTED_STATUS_CODE);
 
     std::map<std::string, std::string> headers;
 
@@ -354,7 +354,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
         tokens = zero::strings::split(*line, ":", 1);
 
         if (tokens.size() != 2)
-            co_return tl::unexpected(HandshakeError::INVALID_HTTP_HEADER);
+            co_return std::unexpected(HandshakeError::INVALID_HTTP_HEADER);
 
         headers[tokens[0]] = zero::strings::trim(tokens[1]);
     }
@@ -362,7 +362,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     const auto it = headers.find("Sec-WebSocket-Accept");
 
     if (it == headers.end())
-        co_return tl::unexpected(HandshakeError::NO_ACCEPT_HEADER);
+        co_return std::unexpected(HandshakeError::NO_ACCEPT_HEADER);
 
     std::byte digest[SHA_DIGEST_LENGTH];
     const std::string data = key + WS_MAGIC;
@@ -370,7 +370,7 @@ zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyn
     SHA1(reinterpret_cast<const unsigned char *>(data.data()), data.size(), reinterpret_cast<unsigned char *>(digest));
 
     if (it->second != zero::encoding::base64::encode(digest))
-        co_return tl::unexpected(HandshakeError::HASH_MISMATCH);
+        co_return std::unexpected(HandshakeError::HASH_MISMATCH);
 
     co_return WebSocket{std::move(buffer)};
 }

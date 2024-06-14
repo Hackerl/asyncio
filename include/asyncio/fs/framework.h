@@ -9,7 +9,7 @@ namespace asyncio {
     namespace fs {
         class IFramework : public zero::Interface {
         public:
-            virtual tl::expected<void, std::error_code> associate(FileDescriptor fd) = 0;
+            virtual std::expected<void, std::error_code> associate(FileDescriptor fd) = 0;
 
             virtual zero::async::coroutine::Task<std::size_t, std::error_code>
             read(

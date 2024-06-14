@@ -3,8 +3,6 @@
 
 #include "promise.h"
 #include <chrono>
-#include <zero/async/coroutine.h>
-#include <zero/atomic/event.h>
 #include <zero/atomic/circular_buffer.h>
 
 namespace asyncio {
@@ -106,14 +104,14 @@ namespace asyncio {
         }
 
         template<typename U = T>
-        tl::expected<void, TrySendError> trySend(U &&element) {
+        std::expected<void, TrySendError> trySend(U &&element) {
             if (mCore->closed)
-                return tl::unexpected(TrySendError::DISCONNECTED);
+                return std::unexpected(TrySendError::DISCONNECTED);
 
             const auto index = mCore->buffer.reserve();
 
             if (!index)
-                return tl::unexpected(TrySendError::FULL);
+                return std::unexpected(TrySendError::FULL);
 
             mCore->buffer[*index] = std::forward<U>(element);
             mCore->buffer.commit(*index);
@@ -123,12 +121,12 @@ namespace asyncio {
         }
 
         template<typename U = T>
-        tl::expected<void, SendSyncError>
+        std::expected<void, SendSyncError>
         sendSync(U &&element, const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
             if (mCore->closed)
-                return tl::unexpected(SendSyncError::DISCONNECTED);
+                return std::unexpected(SendSyncError::DISCONNECTED);
 
-            tl::expected<void, SendSyncError> result;
+            std::expected<void, SendSyncError> result;
 
             while (true) {
                 const auto index = mCore->buffer.reserve();
@@ -138,7 +136,7 @@ namespace asyncio {
 
                     if (mCore->closed) {
                         mCore->mutex.unlock();
-                        result = tl::unexpected(SendSyncError::DISCONNECTED);
+                        result = std::unexpected(SendSyncError::DISCONNECTED);
                         break;
                     }
 
@@ -147,21 +145,17 @@ namespace asyncio {
                         continue;
                     }
 
-                    const auto event = std::make_shared<zero::atomic::Event>();
                     const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
-
-                    promise->getFuture().finally([=] {
-                        event->set();
-                    });
+                    const auto future = promise->getFuture();
 
                     mCore->pending[SENDER].push_back(promise);
                     mCore->mutex.unlock();
 
-                    if (const auto res = event->wait(timeout); !res) {
+                    if (const auto res = future.wait(timeout); !res) {
                         assert(res.error() == std::errc::timed_out);
                         std::lock_guard guard(mCore->mutex);
                         mCore->pending[SENDER].remove(promise);
-                        result = tl::unexpected(SendSyncError::TIMEOUT);
+                        result = std::unexpected(SendSyncError::TIMEOUT);
                         break;
                     }
 
@@ -180,9 +174,9 @@ namespace asyncio {
 
         zero::async::coroutine::Task<void, SendError> send(T element) {
             if (mCore->closed)
-                co_return tl::unexpected(SendError::DISCONNECTED);
+                co_return std::unexpected(SendError::DISCONNECTED);
 
-            tl::expected<void, SendError> result;
+            std::expected<void, SendError> result;
 
             while (true) {
                 const auto index = mCore->buffer.reserve();
@@ -192,7 +186,7 @@ namespace asyncio {
 
                     if (mCore->closed) {
                         mCore->mutex.unlock();
-                        result = tl::unexpected(SendError::DISCONNECTED);
+                        result = std::unexpected(SendError::DISCONNECTED);
                         break;
                     }
 
@@ -208,9 +202,9 @@ namespace asyncio {
 
                     if (const auto res = co_await zero::async::coroutine::Cancellable{
                         promise->getFuture(),
-                        [=]() -> tl::expected<void, std::error_code> {
+                        [=]() -> std::expected<void, std::error_code> {
                             if (promise->isFulfilled())
-                                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
                             promise->reject(zero::async::coroutine::Error::CANCELLED);
                             return {};
@@ -219,7 +213,7 @@ namespace asyncio {
                         assert(res.error() == std::errc::operation_canceled);
                         std::lock_guard guard(mCore->mutex);
                         mCore->pending[SENDER].remove(promise);
-                        result = tl::unexpected(SendError::CANCELLED);
+                        result = std::unexpected(SendError::CANCELLED);
                         break;
                     }
 
@@ -316,11 +310,11 @@ namespace asyncio {
             mCore->close();
         }
 
-        tl::expected<T, TryReceiveError> tryReceive() {
+        std::expected<T, TryReceiveError> tryReceive() {
             const auto index = mCore->buffer.acquire();
 
             if (!index)
-                return tl::unexpected(mCore->closed ? TryReceiveError::DISCONNECTED : TryReceiveError::EMPTY);
+                return std::unexpected(mCore->closed ? TryReceiveError::DISCONNECTED : TryReceiveError::EMPTY);
 
             T element = std::move(mCore->buffer[*index]);
 
@@ -330,9 +324,9 @@ namespace asyncio {
             return element;
         }
 
-        tl::expected<T, ReceiveSyncError>
+        std::expected<T, ReceiveSyncError>
         receiveSync(const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
-            tl::expected<T, ReceiveSyncError> result = tl::unexpected(ReceiveSyncError::DISCONNECTED);
+            std::expected<T, ReceiveSyncError> result = std::unexpected(ReceiveSyncError::DISCONNECTED);
 
             while (true) {
                 const auto index = mCore->buffer.acquire();
@@ -340,31 +334,27 @@ namespace asyncio {
                 if (!index) {
                     mCore->mutex.lock();
 
-                    if (mCore->closed) {
-                        mCore->mutex.unlock();
-                        break;
-                    }
-
                     if (!mCore->buffer.empty()) {
                         mCore->mutex.unlock();
                         continue;
                     }
 
-                    const auto event = std::make_shared<zero::atomic::Event>();
-                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+                    if (mCore->closed) {
+                        mCore->mutex.unlock();
+                        break;
+                    }
 
-                    promise->getFuture().finally([=] {
-                        event->set();
-                    });
+                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+                    const auto future = promise->getFuture();
 
                     mCore->pending[RECEIVER].push_back(promise);
                     mCore->mutex.unlock();
 
-                    if (const auto res = event->wait(timeout); !res) {
+                    if (const auto res = future.wait(timeout); !res) {
                         assert(res.error() == std::errc::timed_out);
                         std::lock_guard guard(mCore->mutex);
                         mCore->pending[RECEIVER].remove(promise);
-                        result = tl::unexpected(ReceiveSyncError::TIMEOUT);
+                        result = std::unexpected(ReceiveSyncError::TIMEOUT);
                         break;
                     }
 
@@ -383,7 +373,7 @@ namespace asyncio {
         }
 
         zero::async::coroutine::Task<T, ReceiveError> receive() {
-            tl::expected<T, ReceiveError> result = tl::unexpected(ReceiveError::DISCONNECTED);
+            std::expected<T, ReceiveError> result = std::unexpected(ReceiveError::DISCONNECTED);
 
             while (true) {
                 const auto index = mCore->buffer.acquire();
@@ -391,14 +381,14 @@ namespace asyncio {
                 if (!index) {
                     mCore->mutex.lock();
 
-                    if (mCore->closed) {
-                        mCore->mutex.unlock();
-                        break;
-                    }
-
                     if (!mCore->buffer.empty()) {
                         mCore->mutex.unlock();
                         continue;
+                    }
+
+                    if (mCore->closed) {
+                        mCore->mutex.unlock();
+                        break;
                     }
 
                     const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
@@ -408,9 +398,9 @@ namespace asyncio {
 
                     if (const auto res = co_await zero::async::coroutine::Cancellable{
                         promise->getFuture(),
-                        [=]() -> tl::expected<void, std::error_code> {
+                        [=]() -> std::expected<void, std::error_code> {
                             if (promise->isFulfilled())
-                                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
                             promise->reject(zero::async::coroutine::Error::CANCELLED);
                             return {};
@@ -419,7 +409,7 @@ namespace asyncio {
                         assert(res.error() == std::errc::operation_canceled);
                         std::lock_guard guard(mCore->mutex);
                         mCore->pending[RECEIVER].remove(promise);
-                        result = tl::unexpected(ReceiveError::CANCELLED);
+                        result = std::unexpected(ReceiveError::CANCELLED);
                         break;
                     }
 

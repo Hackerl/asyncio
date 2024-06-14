@@ -31,7 +31,7 @@ namespace asyncio {
             if constexpr (std::is_void_v<T>)
                 this->mCore->result.emplace();
             else
-                this->mCore->result.emplace(tl::in_place, std::forward<Ts>(args)...);
+                this->mCore->result.emplace(std::in_place, std::forward<Ts>(args)...);
 
             zero::async::promise::State state = this->mCore->state;
 
@@ -47,9 +47,10 @@ namespace asyncio {
 
             this->mCore->event.set();
 
-            mEventLoop->post([core = this->mCore] {
+            const auto result = mEventLoop->post([core = this->mCore] {
                 core->trigger();
             });
+            assert(result);
         }
 
         template<typename... Ts>
@@ -59,7 +60,7 @@ namespace asyncio {
             assert(this->mCore->state != zero::async::promise::State::ONLY_RESULT);
             assert(this->mCore->state != zero::async::promise::State::DONE);
 
-            this->mCore->result.emplace(tl::unexpected<E>(std::forward<Ts>(args)...));
+            this->mCore->result.emplace(std::unexpected<E>(std::in_place, std::forward<Ts>(args)...));
             zero::async::promise::State state = this->mCore->state;
 
             if (state == zero::async::promise::State::PENDING &&
@@ -74,9 +75,10 @@ namespace asyncio {
 
             this->mCore->event.set();
 
-            mEventLoop->post([core = this->mCore] {
+            const auto result = mEventLoop->post([core = this->mCore] {
                 core->trigger();
             });
+            assert(result);
         }
 
     private:

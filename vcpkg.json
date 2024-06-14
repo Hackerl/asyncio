@@ -9,12 +9,7 @@
         "openssl"
       ]
     },
-    {
-      "name": "libevent",
-      "features": [
-        "openssl"
-      ]
-    },
+    "libuv",
     "nlohmann-json",
     "zero"
   ],

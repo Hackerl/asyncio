@@ -4,7 +4,7 @@
 #include <zero/formatter.h>
 #include <csignal>
 
-zero::async::coroutine::Task<void, std::error_code> handle(asyncio::net::ssl::stream::Buffer buffer) {
+zero::async::coroutine::Task<void, std::error_code> handle(asyncio::net::ssl::Buffer buffer) {
     fmt::print("new connection[{}]\n", fmt::to_string(*buffer.remoteAddress()));
 
     while (true) {
@@ -17,14 +17,14 @@ zero::async::coroutine::Task<void, std::error_code> handle(asyncio::net::ssl::st
     }
 }
 
-zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::ssl::stream::Listener listener) {
-    tl::expected<void, std::error_code> result;
+zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::ssl::Listener listener) {
+    std::expected<void, std::error_code> result;
 
     while (true) {
         auto buffer = co_await listener.accept();
 
         if (!buffer) {
-            result = tl::unexpected(buffer.error());
+            result = std::unexpected(buffer.error());
             break;
         }
 
@@ -66,7 +66,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
     });
     CO_EXPECT(context);
 
-    auto listener = asyncio::net::ssl::stream::listen(*context, host, port);
+    auto listener = asyncio::net::ssl::listen(*context, host, port);
     CO_EXPECT(listener);
 
     auto signal = asyncio::ev::Signal::make(SIGINT);

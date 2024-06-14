@@ -1,158 +1,135 @@
 #include <asyncio/channel.h>
+#include <asyncio/time.h>
+#include <asyncio/thread.h>
 #include <catch2/catch_test_macros.hpp>
+#include <future>
 
-using namespace std::chrono_literals;
-
-zero::async::coroutine::Task<void, std::error_code>
-produce(asyncio::Sender<int> sender, const std::shared_ptr<std::atomic<int>> counter) {
-    while (true) {
-        if (*counter >= 10000)
-            break;
-
-        CO_EXPECT(co_await sender.send((*counter)++));
-    }
-
-    co_return {};
-}
-
-tl::expected<void, std::error_code>
-produceSync(asyncio::Sender<int> sender, const std::shared_ptr<std::atomic<int>> &counter) {
-    while (true) {
-        if (*counter >= 10000)
-            break;
-
-        sender.sendSync((*counter)++);
-    }
-
-    return {};
-}
+constexpr auto MAX_COUNT = 100000;
 
 zero::async::coroutine::Task<void, std::error_code>
-consume(asyncio::Receiver<int> receiver, const std::shared_ptr<std::atomic<int>> counter) {
+produce(asyncio::Sender<std::string> sender, const std::shared_ptr<std::atomic<int>> counter) {
     while (true) {
-        CO_EXPECT(co_await receiver.receive());
+        if (*counter >= MAX_COUNT)
+            co_return {};
+
+        CO_EXPECT(co_await sender.send("hello world"));
         ++*counter;
     }
 }
 
-tl::expected<void, std::error_code>
-consumeSync(asyncio::Receiver<int> receiver, const std::shared_ptr<std::atomic<int>> &counter) {
+std::expected<void, std::error_code>
+produceSync(asyncio::Sender<std::string> sender, const std::shared_ptr<std::atomic<int>> &counter) {
     while (true) {
-        EXPECT(receiver.receiveSync());
+        if (*counter >= MAX_COUNT)
+            return {};
+
+        EXPECT(sender.sendSync("hello world"));
         ++*counter;
     }
 }
 
-TEST_CASE("async channel buffer", "[channel]") {
-    const std::shared_ptr<std::atomic<int>> counters[2] = {
-        std::make_shared<std::atomic<int>>(),
-        std::make_shared<std::atomic<int>>()
-    };
+zero::async::coroutine::Task<void, std::error_code>
+consume(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::atomic<int>> counter) {
+    while (true) {
+        if (const auto result = co_await receiver.receive(); !result) {
+            if (result.error() != asyncio::ReceiveError::DISCONNECTED)
+                co_return std::unexpected(result.error());
 
-    asyncio::run([&]() -> zero::async::coroutine::Task<void> {
-        SECTION("async sender/async receiver") {
-            auto [sender, receiver] = asyncio::channel<int>(100);
-
-            co_await allSettled(
-                [](auto s, auto ct) -> zero::async::coroutine::Task<void> {
-                    const auto result = co_await zero::async::coroutine::allSettled(produce(s, ct), produce(s, ct));
-                    REQUIRE(result[0]);
-                    REQUIRE(result[1]);
-                }(std::move(sender), counters[0]),
-                [](auto r, auto ct) -> zero::async::coroutine::Task<void> {
-                    const auto result = co_await zero::async::coroutine::allSettled(
-                        consume(r, ct),
-                        consume(r, ct)
-                    );
-                    REQUIRE(result[0].error() == asyncio::ReceiveError::DISCONNECTED);
-                    REQUIRE(result[1].error() == asyncio::ReceiveError::DISCONNECTED);
-                }(std::move(receiver), counters[1])
-            );
-
-            REQUIRE(*counters[0] == *counters[1]);
+            co_return {};
         }
 
-        SECTION("sync sender/async receiver") {
-            auto [sender, receiver] = asyncio::channel<int>(100);
+        ++*counter;
+    }
+}
 
-            co_await allSettled(
-                [](auto s, auto ct) -> zero::async::coroutine::Task<void> {
-                    const auto result = co_await zero::async::coroutine::allSettled(
-                        asyncio::toThread([=] { return produceSync(s, ct); }),
-                        asyncio::toThread([=] { return produceSync(s, ct); })
-                    );
-                    REQUIRE(result[0]);
-                    REQUIRE(result[1]);
-                }(std::move(sender), counters[0]),
-                [](auto r, auto ct) -> zero::async::coroutine::Task<void> {
-                    const auto result = co_await zero::async::coroutine::allSettled(
-                        consume(r, ct),
-                        consume(r, ct)
-                    );
-                    REQUIRE(result[0].error() == asyncio::ReceiveError::DISCONNECTED);
-                    REQUIRE(result[1].error() == asyncio::ReceiveError::DISCONNECTED);
-                }(std::move(receiver), counters[1])
-            );
-            REQUIRE(*counters[0] == *counters[1]);
+std::expected<void, std::error_code>
+consumeSync(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::atomic<int>> &counter) {
+    while (true) {
+        if (const auto result = receiver.receiveSync(); !result) {
+            if (result.error() != asyncio::ReceiveSyncError::DISCONNECTED)
+                return std::unexpected(result.error());
+
+            return {};
         }
 
-        SECTION("async sender/sync receiver") {
-            auto [sender, receiver] = asyncio::channel<int>(100);
+        ++*counter;
+    }
+}
 
-            co_await allSettled(
-                [](auto s, auto ct) -> zero::async::coroutine::Task<void> {
-                    const auto result = co_await zero::async::coroutine::allSettled(produce(s, ct), produce(s, ct));
-                    REQUIRE(result[0]);
-                    REQUIRE(result[1]);
-                }(std::move(sender), counters[0]),
-                [](auto r, auto ct) -> zero::async::coroutine::Task<void> {
-                    const auto result = co_await zero::async::coroutine::allSettled(
-                        asyncio::toThread([=] { return consumeSync(r, ct); }),
-                        asyncio::toThread([=] { return consumeSync(r, ct); })
-                    );
-                    REQUIRE(result[0].error() == asyncio::ReceiveSyncError::DISCONNECTED);
-                    REQUIRE(result[1].error() == asyncio::ReceiveSyncError::DISCONNECTED);
-                }(std::move(receiver), counters[1])
+TEST_CASE("asyncio channel", "[channel]") {
+    const auto result = asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+        const std::array counters = {
+            std::make_shared<std::atomic<int>>(),
+            std::make_shared<std::atomic<int>>()
+        };
+
+        SECTION("normal") {
+            using namespace std::chrono_literals;
+            auto [sender, receiver] = asyncio::channel<std::string>(100);
+
+            std::array futures = {
+                std::async(produceSync, sender, counters[0]),
+                std::async(produceSync, sender, counters[0]),
+                std::async(produceSync, sender, counters[0]),
+                std::async(consumeSync, receiver, counters[1]),
+                std::async(consumeSync, receiver, counters[1])
+            };
+
+            const auto res = co_await all(
+                produce(std::move(sender), counters[0]),
+                consume(receiver, counters[1]),
+                consume(receiver, counters[1])
             );
+            REQUIRE(res);
+
+            for (auto &future: futures) {
+                const auto r = co_await asyncio::toThread([&] {
+                    return future.get();
+                });
+                REQUIRE(r);
+                REQUIRE(*r);
+            }
 
             REQUIRE(*counters[0] == *counters[1]);
         }
 
         SECTION("timeout") {
-            auto [sender, receiver] = asyncio::channel<int>(2);
+            auto [sender, receiver] = asyncio::channel<std::string>(2);
 
-            {
-                const auto result = co_await timeout(receiver.receive(), 20ms);
-                REQUIRE(!result);
-                REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
+            SECTION("receive") {
+                using namespace std::chrono_literals;
+                const auto res = co_await timeout(receiver.receive(), 20ms);
+                REQUIRE(!res);
+                REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
             }
 
-            {
-                const auto result = co_await asyncio::toThread([&] {
-                    return receiver.receiveSync(20ms);
-                });
-                REQUIRE(!result);
-                REQUIRE(result.error() == asyncio::ReceiveSyncError::TIMEOUT);
+            SECTION("receiveSync") {
+                using namespace std::chrono_literals;
+                const auto res = receiver.receiveSync(20ms);
+                REQUIRE(!res);
+                REQUIRE(res.error() == asyncio::ReceiveSyncError::TIMEOUT);
             }
 
-            sender.trySend(0);
+            REQUIRE(sender.trySend("hello world"));
             REQUIRE(sender.full());
 
-            {
-                const auto result = co_await timeout(sender.send(0), 20ms);
-                REQUIRE(!result);
-                REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
+            SECTION("send") {
+                using namespace std::chrono_literals;
+                const auto res = co_await timeout(sender.send("hello world"), 20ms);
+                REQUIRE(!res);
+                REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
             }
 
-            {
-                const auto result = co_await asyncio::toThread([&] {
-                    return sender.sendSync(0, 20ms);
-                });
-                REQUIRE(!result);
-                REQUIRE(result.error() == asyncio::SendSyncError::TIMEOUT);
+            SECTION("sendSync") {
+                using namespace std::chrono_literals;
+                const auto res = sender.sendSync("hello world", 20ms);
+                REQUIRE(!res);
+                REQUIRE(res.error() == asyncio::SendSyncError::TIMEOUT);
             }
         }
     });
+    REQUIRE(result);
+    REQUIRE(*result);
 
     SECTION("error condition") {
         const std::error_condition condition = asyncio::ChannelError::DISCONNECTED;

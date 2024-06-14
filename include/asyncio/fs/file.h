@@ -14,16 +14,16 @@ namespace asyncio::fs {
         File &operator=(File &&rhs) noexcept;
         ~File() override;
 
-        static tl::expected<File, std::error_code> from(FileDescriptor fd, bool append = false);
+        static std::expected<File, std::error_code> from(FileDescriptor fd, bool append = false);
 
         zero::async::coroutine::Task<void, std::error_code> close() override;
         zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 
-        tl::expected<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) override;
-        tl::expected<void, std::error_code> rewind() override;
-        [[nodiscard]] tl::expected<std::uint64_t, std::error_code> length() const override;
-        [[nodiscard]] tl::expected<std::uint64_t, std::error_code> position() const override;
+        std::expected<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) override;
+        std::expected<void, std::error_code> rewind() override;
+        [[nodiscard]] std::expected<std::uint64_t, std::error_code> length() const override;
+        [[nodiscard]] std::expected<std::uint64_t, std::error_code> position() const override;
 
         [[nodiscard]] FileDescriptor fd() const override;
 
@@ -34,8 +34,8 @@ namespace asyncio::fs {
         std::shared_ptr<EventLoop> mEventLoop;
     };
 
-    tl::expected<File, std::error_code> open(const std::filesystem::path &path);
-    tl::expected<File, std::error_code> open(const std::filesystem::path &path, int flags);
+    std::expected<File, std::error_code> open(const std::filesystem::path &path);
+    std::expected<File, std::error_code> open(const std::filesystem::path &path, int flags);
 }
 
 #endif //ASYNCIO_FILE_H

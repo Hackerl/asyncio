@@ -63,7 +63,7 @@ namespace asyncio::http {
                 co_return j->template get<T>();
             }
             catch (const nlohmann::json::exception &) {
-                co_return tl::unexpected(Error::INVALID_JSON);
+                co_return std::unexpected(Error::INVALID_JSON);
             }
         }
 
@@ -110,7 +110,7 @@ namespace asyncio::http {
         Requests &operator=(Requests &&rhs) noexcept;
         ~Requests();
 
-        static tl::expected<Requests, std::error_code> make(const Options &options = {});
+        static std::expected<Requests, std::error_code> make(const Options &options = {});
 
     private:
         void onTimer();
@@ -122,7 +122,7 @@ namespace asyncio::http {
         Options &options();
 
     private:
-        tl::expected<std::unique_ptr<Connection>, std::error_code>
+        std::expected<std::unique_ptr<Connection>, std::error_code>
         prepare(std::string method, const URL &url, const std::optional<Options> &options);
 
         zero::async::coroutine::Task<Response, std::error_code>

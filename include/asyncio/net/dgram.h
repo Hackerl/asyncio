@@ -2,21 +2,33 @@
 #define ASYNCIO_DGRAM_H
 
 #include "net.h"
-#include <asyncio/ev/event.h>
+#include <asyncio/uv.h>
 
-namespace asyncio::net::dgram {
-    class Socket final : public ISocket, public Reader, public Writer {
+namespace asyncio::net {
+    class UDPSocket final : public ISocket, public Reader, public Writer {
     public:
-        Socket(FileDescriptor fd, std::array<ev::Event, 2> events);
-        Socket(Socket &&rhs) noexcept;
-        Socket &operator=(Socket &&rhs) noexcept;
-        ~Socket() override;
+        explicit UDPSocket(uv::Handle<uv_udp_t> udp);
 
-        static tl::expected<Socket, std::error_code> make(int family);
+    private:
+        static std::expected<UDPSocket, std::error_code> bind(const SocketAddress &address);
+        static std::expected<UDPSocket, std::error_code> connect(const SocketAddress &address);
+
+    public:
+        static std::expected<UDPSocket, std::error_code> bind(const std::string &ip, unsigned short port);
+        static std::expected<UDPSocket, std::error_code> bind(const IPv4Address &address);
+        static std::expected<UDPSocket, std::error_code> bind(const IPv6Address &address);
+
+        static zero::async::coroutine::Task<UDPSocket, std::error_code>
+        connect(std::string host, unsigned short port);
+
+        static std::expected<UDPSocket, std::error_code> connect(const IPv4Address &address);
+        static std::expected<UDPSocket, std::error_code> connect(const IPv6Address &address);
+
+        [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;
+        [[nodiscard]] std::expected<Address, std::error_code> remoteAddress() const override;
 
         zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
-        zero::async::coroutine::Task<void, std::error_code> close() override;
 
         zero::async::coroutine::Task<std::pair<std::size_t, Address>, std::error_code>
         readFrom(std::span<std::byte> data) override;
@@ -24,25 +36,10 @@ namespace asyncio::net::dgram {
         zero::async::coroutine::Task<std::size_t, std::error_code>
         writeTo(std::span<const std::byte> data, Address address) override;
 
-        [[nodiscard]] tl::expected<Address, std::error_code> localAddress() const override;
-        [[nodiscard]] tl::expected<Address, std::error_code> remoteAddress() const override;
-
-        tl::expected<void, std::error_code> bind(const Address &address) override;
-        zero::async::coroutine::Task<void, std::error_code> connect(Address address) override;
-
-        [[nodiscard]] FileDescriptor fd() const override;
+        zero::async::coroutine::Task<void, std::error_code> close() override;
 
     private:
-        FileDescriptor mFD;
-        std::array<ev::Event, 2> mEvents;
+        uv::Handle<uv_udp_t> mUDP;
     };
-
-    tl::expected<Socket, std::error_code> bind(const Address &address);
-    tl::expected<Socket, std::error_code> bind(std::span<const Address> addresses);
-    tl::expected<Socket, std::error_code> bind(const std::string &ip, unsigned short port);
-
-    zero::async::coroutine::Task<Socket, std::error_code> connect(Address address);
-    zero::async::coroutine::Task<Socket, std::error_code> connect(std::span<const Address> addresses);
-    zero::async::coroutine::Task<Socket, std::error_code> connect(std::string host, unsigned short port);
 }
 #endif //ASYNCIO_DGRAM_H

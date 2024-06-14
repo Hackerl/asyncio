@@ -102,7 +102,7 @@ zero::async::coroutine::Task<std::string, std::error_code> asyncio::http::Respon
     CO_EXPECT(data);
 
     if (mConnection->error)
-        co_return tl::unexpected(*mConnection->error);
+        co_return std::unexpected(*mConnection->error);
 
     co_return std::string{reinterpret_cast<const char *>(data->data()), data->size()};
 }
@@ -116,7 +116,7 @@ asyncio::http::Response::output(const std::filesystem::path path) const {
     CO_EXPECT(co_await file->close());
 
     if (mConnection->error)
-        co_return tl::unexpected(*mConnection->error);
+        co_return std::unexpected(*mConnection->error);
 
     co_return {};
 }
@@ -129,7 +129,7 @@ zero::async::coroutine::Task<nlohmann::json, std::error_code> asyncio::http::Res
         co_return nlohmann::json::parse(*std::move(content));
     }
     catch (const nlohmann::json::exception &) {
-        co_return tl::unexpected(Error::INVALID_JSON);
+        co_return std::unexpected(Error::INVALID_JSON);
     }
 }
 
@@ -239,7 +239,7 @@ asyncio::http::Requests::~Requests() {
     assert(mRunning == 0);
 }
 
-tl::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests::make(const Options &options) {
+std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests::make(const Options &options) {
     static std::once_flag flag;
 
     std::call_once(flag, [] {
@@ -252,7 +252,7 @@ tl::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests::
     CURLM *multi = curl_multi_init();
 
     if (!multi)
-        return tl::unexpected<std::error_code>(errno, std::generic_category());
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     auto timer = std::unique_ptr<event, decltype(event_free) *>(
         evtimer_new(getEventLoop()->base(), nullptr, nullptr),
@@ -261,7 +261,7 @@ tl::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests::
 
     if (!timer) {
         curl_multi_cleanup(multi);
-        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+        return std::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
     return Requests{multi, std::move(timer), options};
@@ -375,7 +375,7 @@ asyncio::http::Options &asyncio::http::Requests::options() {
     return mOptions;
 }
 
-tl::expected<std::unique_ptr<asyncio::http::Connection>, std::error_code>
+std::expected<std::unique_ptr<asyncio::http::Connection>, std::error_code>
 asyncio::http::Requests::prepare(std::string method, const URL &url, const std::optional<Options> &options) {
     const auto u = url.string();
     EXPECT(u);
@@ -383,7 +383,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy = {curl_easy_init(), curl_easy_cleanup};
 
     if (!easy)
-        return tl::unexpected<std::error_code>(errno, std::generic_category());
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     auto buffers = ev::pipe();
     EXPECT(buffers);
@@ -475,23 +475,23 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
 zero::async::coroutine::Task<asyncio::http::Response, std::error_code>
 asyncio::http::Requests::perform(std::unique_ptr<Connection> connection) {
     if (const CURLMcode code = curl_multi_add_handle(mMulti.get(), connection->easy.get()); code != CURLM_OK)
-        co_return tl::unexpected(static_cast<CURLMError>(code));
+        co_return std::unexpected(static_cast<CURLMError>(code));
 
     if (const auto result = co_await zero::async::coroutine::Cancellable{
         connection->promise.getFuture(),
-        [connection = connection.get(), multi = mMulti.get()]() -> tl::expected<void, std::error_code> {
+        [connection = connection.get(), multi = mMulti.get()]() -> std::expected<void, std::error_code> {
             if (connection->promise.isFulfilled())
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             if (const CURLMcode code = curl_multi_remove_handle(multi, connection->easy.get()); code != CURLM_OK)
-                return tl::unexpected(static_cast<CURLMError>(code));
+                return std::unexpected(static_cast<CURLMError>(code));
 
             connection->promise.reject(zero::async::coroutine::Error::CANCELLED);
             return {};
         }
     }; !result) {
         curl_multi_remove_handle(mMulti.get(), connection->easy.get());
-        co_return tl::unexpected(result.error());
+        co_return std::unexpected(result.error());
     }
 
     co_return Response{this, std::move(connection)};
@@ -560,7 +560,7 @@ asyncio::http::Requests::request(
 
         if (const CURLcode code = curl_mime_filedata(field, value.string().c_str()); code != CURLE_OK) {
             curl_mime_free(form);
-            co_return tl::unexpected(static_cast<CURLError>(code));
+            co_return std::unexpected(static_cast<CURLError>(code));
         }
     }
 
@@ -599,7 +599,7 @@ asyncio::http::Requests::request(
             std::get<std::filesystem::path>(v).string().c_str()
         ); code != CURLE_OK) {
             curl_mime_free(form);
-            co_return tl::unexpected(static_cast<CURLError>(code));
+            co_return std::unexpected(static_cast<CURLError>(code));
         }
     }
 

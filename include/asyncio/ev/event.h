@@ -22,7 +22,7 @@ namespace asyncio::ev {
         Event &operator=(Event &&rhs) noexcept;
         ~Event();
 
-        static tl::expected<Event, std::error_code> make(FileDescriptor fd, short events);
+        static std::expected<Event, std::error_code> make(FileDescriptor fd, short events);
 
         [[nodiscard]] FileDescriptor fd() const;
         [[nodiscard]] bool pending() const;

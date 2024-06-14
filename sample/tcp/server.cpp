@@ -4,7 +4,7 @@
 #include <zero/formatter.h>
 #include <csignal>
 
-zero::async::coroutine::Task<void, std::error_code> handle(asyncio::net::stream::Buffer buffer) {
+zero::async::coroutine::Task<void, std::error_code> handle(asyncio::net::Buffer buffer) {
     fmt::print("new connection[{}]\n", fmt::to_string(*buffer.remoteAddress()));
 
     while (true) {
@@ -17,14 +17,14 @@ zero::async::coroutine::Task<void, std::error_code> handle(asyncio::net::stream:
     }
 }
 
-zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::stream::Listener listener) {
-    tl::expected<void, std::error_code> result;
+zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::Listener listener) {
+    std::expected<void, std::error_code> result;
 
     while (true) {
         auto buffer = co_await listener.accept();
 
         if (!buffer) {
-            result = tl::unexpected(buffer.error());
+            result = std::unexpected(buffer.error());
             break;
         }
 
@@ -47,7 +47,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
     const auto host = cmdline.get<std::string>("host");
     const auto port = cmdline.get<unsigned short>("port");
 
-    auto listener = asyncio::net::stream::listen(host, port);
+    auto listener = asyncio::net::listen(host, port);
     CO_EXPECT(listener);
 
     auto signal = asyncio::ev::Signal::make(SIGINT);

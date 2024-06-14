@@ -15,7 +15,7 @@ namespace asyncio::net {
         IPv4 ip;
 
         bool operator==(const IPv4Address &) const = default;
-        static tl::expected<IPv4Address, std::error_code> from(const std::string &ip, unsigned short port);
+        static std::expected<IPv4Address, std::error_code> from(const std::string &ip, unsigned short port);
     };
 
     struct IPv6Address {
@@ -26,7 +26,7 @@ namespace asyncio::net {
         bool operator==(const IPv6Address &) const = default;
 
         static IPv6Address from(const IPv4Address &ipv4);
-        static tl::expected<IPv6Address, std::error_code> from(const std::string &ip, unsigned short port);
+        static std::expected<IPv6Address, std::error_code> from(const std::string &ip, unsigned short port);
     };
 
     struct UnixAddress {
@@ -36,7 +36,7 @@ namespace asyncio::net {
     };
 
     using Address = std::variant<IPv4Address, IPv6Address, UnixAddress>;
-    using SocketAddress = std::unique_ptr<sockaddr, decltype(free) *>;
+    using SocketAddress = std::pair<std::unique_ptr<sockaddr>, socklen_t>;
 
     template<typename T>
         requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address> || std::is_same_v<T, UnixAddress>)
@@ -52,23 +52,19 @@ namespace asyncio::net {
         }
     }
 
-    tl::expected<Address, std::error_code> addressFrom(const std::string &ip, unsigned short port);
-    tl::expected<Address, std::error_code> addressFrom(FileDescriptor fd, bool peer);
-    tl::expected<Address, std::error_code> addressFrom(const sockaddr *addr, socklen_t length);
+    std::expected<Address, std::error_code> addressFrom(const std::string &ip, unsigned short port);
+    std::expected<Address, std::error_code> addressFrom(const sockaddr *addr, socklen_t length);
 
-    tl::expected<std::pair<SocketAddress, socklen_t>, std::error_code> socketAddressFrom(const Address &address);
+    std::expected<SocketAddress, std::error_code> socketAddressFrom(const Address &address);
 
     class IEndpoint : public virtual zero::Interface {
     public:
-        [[nodiscard]] virtual tl::expected<Address, std::error_code> localAddress() const = 0;
-        [[nodiscard]] virtual tl::expected<Address, std::error_code> remoteAddress() const = 0;
+        [[nodiscard]] virtual std::expected<Address, std::error_code> localAddress() const = 0;
+        [[nodiscard]] virtual std::expected<Address, std::error_code> remoteAddress() const = 0;
     };
 
-    class ISocket : public virtual IStreamIO, public IFileDescriptor, public virtual IEndpoint {
+    class ISocket : public virtual IStreamIO, public virtual IEndpoint {
     public:
-        virtual tl::expected<void, std::error_code> bind(const Address &address) = 0;
-        virtual zero::async::coroutine::Task<void, std::error_code> connect(Address address) = 0;
-
         virtual zero::async::coroutine::Task<std::pair<std::size_t, Address>, std::error_code>
         readFrom(std::span<std::byte> data) = 0;
 
@@ -105,9 +101,7 @@ struct fmt::formatter<asyncio::net::IPv6Address, Char> {
         return fmt::format_to(
             ctx.out(),
             "[{}%{}]:{}",
-            zero::os::net::stringify(address.ip),
-            *address.zone,
-            address.port
+            zero::os::net::stringify(address.ip), *address.zone, address.port
         );
     }
 };

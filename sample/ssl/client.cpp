@@ -43,7 +43,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
     const auto context = newContext(config);
     CO_EXPECT(context);
 
-    auto buffer = co_await asyncio::net::ssl::stream::connect(*context, host, port);
+    auto buffer = co_await asyncio::net::ssl::connect(*context, host, port);
     CO_EXPECT(buffer);
 
     while (true) {
@@ -54,7 +54,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
 
         if (!line) {
             if (line.error() != asyncio::IOError::UNEXPECTED_EOF)
-                co_return tl::unexpected(line.error());
+                co_return std::unexpected(line.error());
 
             break;
         }

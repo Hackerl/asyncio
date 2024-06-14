@@ -1,373 +1,194 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/dns.h>
 #include <asyncio/promise.h>
-#include <zero/defer.h>
-#include <cassert>
 
-#if __unix__ || __APPLE__
-#include <sys/un.h>
-#endif
-
-asyncio::net::stream::Buffer::Buffer(
-    std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev,
-    const std::size_t capacity
-) : ev::Buffer(std::move(bev), capacity) {
+asyncio::net::TCPStream::TCPStream(uv::Handle<uv_stream_t> stream) : Stream(std::move(stream)) {
 }
 
-tl::expected<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::Buffer::make(const FileDescriptor fd, const std::size_t capacity, const bool own) {
-    bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), fd, own ? BEV_OPT_CLOSE_ON_FREE : 0);
+// TODO
+// except for MSVC, adding const will fail to compile.
+// ReSharper disable once CppParameterMayBeConst
+zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::net::TCPStream::connect(SocketAddress address) {
+    auto tcp = std::make_unique<uv_tcp_t>();
 
-    if (!bev)
-        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+    CO_EXPECT(uv::expected([&] {
+        return uv_tcp_init(getEventLoop()->raw(), tcp.get());
+    }));
 
-    return Buffer{{bev, bufferevent_free}, capacity};
+    TCPStream stream(uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}});
+
+    Promise<void, std::error_code> promise;
+    uv_connect_t request = {.data = &promise};
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_tcp_connect(
+            &request,
+            reinterpret_cast<uv_tcp_t *>(stream.mStream.raw()),
+            address.first.get(),
+            [](const auto handle, const int status) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(handle->data);
+
+                if (status < 0) {
+                    p->reject(static_cast<uv::Error>(status));
+                    return;
+                }
+
+                p->resolve();
+            }
+        );
+    }));
+
+    CO_EXPECT(co_await promise.getFuture());
+    co_return std::move(stream);
 }
 
-tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::localAddress() const {
-    const FileDescriptor fd = this->fd();
+zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::net::TCPStream::connect(const std::string host, const unsigned short port) {
+    addrinfo hints = {};
 
-    if (fd == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
 
-    return addressFrom(fd, false);
-}
+    const auto addresses = co_await dns::getAddressInfo(host, std::to_string(port), hints);
+    CO_EXPECT(addresses);
+    assert(!addresses->empty());
 
-tl::expected<asyncio::net::Address, std::error_code> asyncio::net::stream::Buffer::remoteAddress() const {
-    const FileDescriptor fd = this->fd();
-
-    if (fd == INVALID_FILE_DESCRIPTOR)
-        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
-
-    return addressFrom(fd, true);
-}
-
-asyncio::net::stream::Acceptor::Acceptor(evconnlistener *listener) : mListener(listener, evconnlistener_free) {
-    evconnlistener_set_cb(
-        mListener.get(),
-        [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
-            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
-        },
-        this
-    );
-}
-
-asyncio::net::stream::Acceptor::Acceptor(Acceptor &&rhs) noexcept : mListener(std::move(rhs.mListener)) {
-    assert(!rhs.mPromise);
-    evconnlistener_set_cb(
-        mListener.get(),
-        [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
-            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
-        },
-        this
-    );
-}
-
-asyncio::net::stream::Acceptor &asyncio::net::stream::Acceptor::operator=(Acceptor &&rhs) noexcept {
-    assert(!rhs.mPromise);
-    mListener = std::move(rhs.mListener);
-
-    evconnlistener_set_cb(
-        mListener.get(),
-        [](evconnlistener *, evutil_socket_t fd, sockaddr *, int, void *arg) {
-            std::exchange(static_cast<Acceptor *>(arg)->mPromise, std::nullopt)->resolve(fd);
-        },
-        this
-    );
-
-    return *this;
-}
-
-asyncio::net::stream::Acceptor::~Acceptor() {
-    assert(!mPromise);
-}
-
-zero::async::coroutine::Task<asyncio::FileDescriptor, std::error_code> asyncio::net::stream::Acceptor::fd() {
-    if (!mListener)
-        co_return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
-
-    if (mPromise)
-        co_return tl::unexpected(IOError::DEVICE_OR_RESOURCE_BUSY);
-
-    co_return co_await zero::async::coroutine::Cancellable{
-        zero::async::promise::chain<FileDescriptor, std::error_code>([this](auto promise) {
-            mPromise.emplace(std::move(promise));
-            evconnlistener_enable(mListener.get());
-        }).finally([this] {
-            evconnlistener_disable(mListener.get());
-        }),
-        [this]() -> tl::expected<void, std::error_code> {
-            if (!mPromise)
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
-
-            std::exchange(mPromise, std::nullopt)->reject(zero::async::coroutine::Error::CANCELLED);
-            return {};
-        }
-    };
-}
-
-tl::expected<void, std::error_code> asyncio::net::stream::Acceptor::close() {
-    if (!mListener)
-        return tl::unexpected(IOError::BAD_FILE_DESCRIPTOR);
-
-    if (auto promise = std::exchange(mPromise, std::nullopt); promise)
-        promise->reject(IOError::BAD_FILE_DESCRIPTOR);
-
-    mListener.reset();
-    return {};
-}
-
-asyncio::net::stream::Listener::Listener(evconnlistener *listener) : Acceptor(listener) {
-}
-
-zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::Listener::accept() {
-    const auto result = co_await fd();
-    CO_EXPECT(result);
-    co_return Buffer::make(*result);
-}
-
-tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const Address &address) {
-    const auto socketAddress = socketAddressFrom(address);
-    EXPECT(socketAddress);
-
-    evconnlistener *listener = evconnlistener_new_bind(
-        getEventLoop()->base(),
-        nullptr,
-        nullptr,
-        LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE | LEV_OPT_DISABLED,
-        -1,
-        socketAddress->first.get(),
-#ifdef _WIN32
-        socketAddress->second
-#else
-        static_cast<int>(socketAddress->second)
-#endif
-    );
-
-    if (!listener)
-        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
-
-    return Listener{listener};
-}
-
-tl::expected<asyncio::net::stream::Listener, std::error_code>
-asyncio::net::stream::listen(const std::span<const Address> addresses) {
-    if (addresses.empty())
-        return tl::unexpected(IOError::INVALID_ARGUMENT);
-
-    auto it = addresses.begin();
+    auto it = addresses->begin();
 
     while (true) {
-        auto result = listen(*it);
+        auto socketAddress = socketAddressFrom(*it);
+        CO_EXPECT(socketAddress);
 
-        if (result)
-            return *std::move(result);
-
-        if (++it == addresses.end())
-            return tl::unexpected(result.error());
-    }
-}
-
-tl::expected<asyncio::net::stream::Listener, std::error_code>
-asyncio::net::stream::listen(const std::string &ip, const unsigned short port) {
-    const auto address = addressFrom(ip, port);
-    EXPECT(address);
-    return listen(*address);
-}
-
-zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(const Address address) {
-    if (std::holds_alternative<IPv4Address>(address)) {
-        const auto [port, ip] = std::get<IPv4Address>(address);
-        co_return co_await connect(zero::os::net::stringify(ip), port);
-    }
-
-    if (std::holds_alternative<IPv6Address>(address)) {
-        const auto &[port, ip, zone] = std::get<IPv6Address>(address);
-        co_return co_await connect(zero::os::net::stringify(ip), port);
-    }
-#if __unix__ || __APPLE__
-    if (std::holds_alternative<UnixAddress>(address)) {
-        co_return co_await connect(std::get<UnixAddress>(address).path);
-    }
-#endif
-
-    co_return tl::unexpected(IOError::ADDRESS_FAMILY_NOT_SUPPORTED);
-}
-
-zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(const std::span<const Address> addresses) {
-    if (addresses.empty())
-        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
-
-    auto it = addresses.begin();
-
-    while (true) {
-        auto result = co_await connect(*it);
+        auto result = co_await connect(*std::move(socketAddress));
 
         if (result)
             co_return *std::move(result);
 
-        if (++it == addresses.end())
-            co_return tl::unexpected(result.error());
+        if (++it == addresses->end())
+            co_return std::unexpected(result.error());
     }
 }
 
-zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(const std::string host, const unsigned short port) {
-    const auto dnsBase = getEventLoop()->makeDNSBase();
-    CO_EXPECT(dnsBase);
-
-    bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), -1, BEV_OPT_CLOSE_ON_FREE);
-
-    if (!bev)
-        co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
-
-    DEFER(
-        if (bev)
-            bufferevent_free(bev);
-    );
-
-    Promise<void, std::error_code> promise;
-
-    bufferevent_setcb(
-        bev,
-        nullptr,
-        nullptr,
-        [](bufferevent *b, const short what, void *arg) {
-            const auto p = static_cast<Promise<void, std::error_code> *>(arg);
-            assert(!p->isFulfilled());
-
-            if ((what & BEV_EVENT_CONNECTED) == 0) {
-                if (const int e = bufferevent_socket_get_dns_error(b)) {
-                    p->reject(static_cast<dns::Error>(e));
-                    return;
-                }
-
-                p->reject(EVUTIL_SOCKET_ERROR(), std::system_category());
-                return;
-            }
-
-            p->resolve();
-        },
-        &promise
-    );
-
-    if (bufferevent_socket_connect_hostname(bev, dnsBase->get(), AF_UNSPEC, host.c_str(), port) < 0)
-        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
-
-    CO_EXPECT(co_await zero::async::coroutine::Cancellable{
-        promise.getFuture(),
-        [&]() -> tl::expected<void, std::error_code> {
-            if (promise.isFulfilled())
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
-
-            bufferevent_free(std::exchange(bev, nullptr));
-            promise.reject(zero::async::coroutine::Error::CANCELLED);
-            return {};
-        }
-    });
-
-    co_return Buffer{{std::exchange(bev, nullptr), bufferevent_free}, DEFAULT_BUFFER_CAPACITY};
+zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::net::TCPStream::connect(const IPv4Address address) {
+    auto socketAddress = socketAddressFrom(address);
+    CO_EXPECT(socketAddress);
+    co_return co_await connect(*std::move(socketAddress));
 }
 
-#if __unix__ || __APPLE__
-tl::expected<asyncio::net::stream::Listener, std::error_code> asyncio::net::stream::listen(const std::string &path) {
-    if (path.empty())
-        return tl::unexpected(IOError::INVALID_ARGUMENT);
-
-    sockaddr_un sa = {};
-    socklen_t length = sizeof(sa_family_t) + path.length() + 1;
-
-    sa.sun_family = AF_UNIX;
-    strncpy(sa.sun_path, path.c_str(), sizeof(sa.sun_path) - 1);
-
-    if (path.front() == '@') {
-        length--;
-        sa.sun_path[0] = '\0';
-    }
-
-    evconnlistener *listener = evconnlistener_new_bind(
-        getEventLoop()->base(),
-        nullptr,
-        nullptr,
-        LEV_OPT_CLOSE_ON_FREE | LEV_OPT_DISABLED,
-        -1,
-        reinterpret_cast<const sockaddr *>(&sa),
-        static_cast<int>(length)
-    );
-
-    if (!listener)
-        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
-
-    return Listener{listener};
+zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::net::TCPStream::connect(const IPv6Address address) {
+    auto socketAddress = socketAddressFrom(address);
+    CO_EXPECT(socketAddress);
+    co_return co_await connect(*std::move(socketAddress));
 }
 
-zero::async::coroutine::Task<asyncio::net::stream::Buffer, std::error_code>
-asyncio::net::stream::connect(const std::string path) {
-    if (path.empty())
-        co_return tl::unexpected(IOError::INVALID_ARGUMENT);
+std::expected<asyncio::net::Address, std::error_code> asyncio::net::TCPStream::localAddress() const {
+    sockaddr_storage storage = {};
+    int length = sizeof(sockaddr_storage);
 
-    sockaddr_un sa = {};
-    socklen_t length = sizeof(sa_family_t) + path.length() + 1;
+    EXPECT(uv::expected([&] {
+        return uv_tcp_getsockname(
+            reinterpret_cast<const uv_tcp_t *>(mStream.raw()),
+            reinterpret_cast<sockaddr *>(&storage),
+            &length
+        );
+    }));
 
-    sa.sun_family = AF_UNIX;
-    strncpy(sa.sun_path, path.c_str(), sizeof(sa.sun_path) - 1);
-
-    if (path.front() == '@') {
-        length--;
-        sa.sun_path[0] = '\0';
-    }
-
-    bufferevent *bev = bufferevent_socket_new(getEventLoop()->base(), -1, BEV_OPT_CLOSE_ON_FREE);
-
-    if (!bev)
-        co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
-
-    DEFER(
-        if (bev)
-            bufferevent_free(bev);
-    );
-
-    Promise<void, std::error_code> promise;
-
-    bufferevent_setcb(
-        bev,
-        nullptr,
-        nullptr,
-        [](bufferevent *, const short what, void *arg) {
-            const auto p = static_cast<Promise<void, std::error_code> *>(arg);
-            assert(!p->isFulfilled());
-
-            if (p->isFulfilled())
-                return;
-
-            if ((what & BEV_EVENT_CONNECTED) == 0) {
-                p->reject(EVUTIL_SOCKET_ERROR(), std::system_category());
-                return;
-            }
-
-            p->resolve();
-        },
-        &promise
-    );
-
-    if (bufferevent_socket_connect(bev, reinterpret_cast<const sockaddr *>(&sa), static_cast<int>(length)) < 0)
-        co_return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
-
-    CO_EXPECT(co_await zero::async::coroutine::Cancellable{
-        promise.getFuture(),
-        [&]() -> tl::expected<void, std::error_code> {
-            if (promise.isFulfilled())
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
-
-            bufferevent_free(std::exchange(bev, nullptr));
-            promise.reject(zero::async::coroutine::Error::CANCELLED);
-            return {};
-        }
-    });
-
-    co_return Buffer{{std::exchange(bev, nullptr), bufferevent_free}, DEFAULT_BUFFER_CAPACITY};
+    return addressFrom(reinterpret_cast<const sockaddr *>(&storage), length);
 }
-#endif
+
+std::expected<asyncio::net::Address, std::error_code> asyncio::net::TCPStream::remoteAddress() const {
+    sockaddr_storage storage = {};
+    int length = sizeof(sockaddr_storage);
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_getpeername(
+            reinterpret_cast<const uv_tcp_t *>(mStream.raw()),
+            reinterpret_cast<sockaddr *>(&storage),
+            &length
+        );
+    }));
+
+    return addressFrom(reinterpret_cast<const sockaddr *>(&storage), length);
+}
+
+zero::async::coroutine::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
+asyncio::net::TCPStream::readFrom(const std::span<std::byte> data) {
+    auto remote = remoteAddress();
+    CO_EXPECT(remote);
+
+    auto n = co_await read(data);
+    CO_EXPECT(n);
+
+    co_return std::pair{*n, *std::move(remote)};
+}
+
+zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::net::TCPStream::writeTo(const std::span<const std::byte> data, const Address address) {
+    co_return co_await write(data);
+}
+
+zero::async::coroutine::Task<void, std::error_code> asyncio::net::TCPStream::close() {
+    mStream.close();
+    co_return {};
+}
+
+asyncio::net::TCPListener::TCPListener(Listener listener) : mListener(std::move(listener)) {
+}
+
+std::expected<asyncio::net::TCPListener, std::error_code>
+asyncio::net::TCPListener::listen(const SocketAddress &address) {
+    auto tcp = std::make_unique<uv_tcp_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_init(getEventLoop()->raw(), tcp.get());
+    }));
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_bind(tcp.get(), address.first.get(), 0);
+    }));
+
+    auto listener = Listener::make(
+        uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}}
+    );
+    EXPECT(listener);
+
+    return TCPListener{*std::move(listener)};
+}
+
+std::expected<asyncio::net::TCPListener, std::error_code>
+asyncio::net::TCPListener::listen(const std::string &ip, const unsigned short port) {
+    const auto address = addressFrom(ip, port);
+    EXPECT(address);
+    auto socketAddress = socketAddressFrom(*address);
+    EXPECT(socketAddress);
+    return listen(*std::move(socketAddress));
+}
+
+std::expected<asyncio::net::TCPListener, std::error_code>
+asyncio::net::TCPListener::listen(const IPv4Address &address) {
+    auto socketAddress = socketAddressFrom(address);
+    EXPECT(socketAddress);
+    return listen(*std::move(socketAddress));
+}
+
+std::expected<asyncio::net::TCPListener, std::error_code>
+asyncio::net::TCPListener::listen(const IPv6Address &address) {
+    auto socketAddress = socketAddressFrom(address);
+    EXPECT(socketAddress);
+    return listen(*std::move(socketAddress));
+}
+
+zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::net::TCPListener::accept() {
+    auto tcp = std::make_unique<uv_tcp_t>();
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_tcp_init(getEventLoop()->raw(), tcp.get());
+    }));
+
+    CO_EXPECT(co_await mListener.accept(reinterpret_cast<uv_stream_t *>(tcp.get())));
+    co_return TCPStream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}}};
+}

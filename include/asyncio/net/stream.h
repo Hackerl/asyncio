@@ -1,64 +1,51 @@
-#ifndef ASYNCIO_STREAM_H
-#define ASYNCIO_STREAM_H
+#ifndef ASYNCIO_NET_STREAM_H
+#define ASYNCIO_NET_STREAM_H
 
 #include "net.h"
-#include <event2/listener.h>
-#include <asyncio/ev/buffer.h>
+#include <asyncio/stream.h>
 
-namespace asyncio::net::stream {
-    class IBuffer : public virtual IEndpoint, public virtual asyncio::IBuffer {
-    };
-
-    class Buffer : public ev::Buffer, public IBuffer {
+namespace asyncio::net {
+    class TCPStream : public Stream, public ISocket {
     public:
-        Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
+        explicit TCPStream(uv::Handle<uv_stream_t> stream);
 
-        static tl::expected<Buffer, std::error_code>
-        make(FileDescriptor fd, std::size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
-
-        [[nodiscard]] tl::expected<Address, std::error_code> localAddress() const override;
-        [[nodiscard]] tl::expected<Address, std::error_code> remoteAddress() const override;
-    };
-
-    class Acceptor {
-    public:
-        explicit Acceptor(evconnlistener *listener);
-        Acceptor(Acceptor &&rhs) noexcept;
-        Acceptor &operator=(Acceptor &&rhs) noexcept;
-        ~Acceptor();
-
-    protected:
-        zero::async::coroutine::Task<FileDescriptor, std::error_code> fd();
+    private:
+        static zero::async::coroutine::Task<TCPStream, std::error_code> connect(SocketAddress address);
 
     public:
-        tl::expected<void, std::error_code> close();
+        static zero::async::coroutine::Task<TCPStream, std::error_code> connect(std::string host, unsigned short port);
+        static zero::async::coroutine::Task<TCPStream, std::error_code> connect(IPv4Address address);
+        static zero::async::coroutine::Task<TCPStream, std::error_code> connect(IPv6Address address);
 
-    protected:
-        std::unique_ptr<evconnlistener, decltype(evconnlistener_free) *> mListener;
-        std::optional<Promise<FileDescriptor, std::error_code>> mPromise;
+        [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;
+        [[nodiscard]] std::expected<Address, std::error_code> remoteAddress() const override;
+
+        zero::async::coroutine::Task<std::pair<std::size_t, Address>, std::error_code>
+        readFrom(std::span<std::byte> data) override;
+
+        zero::async::coroutine::Task<std::size_t, std::error_code>
+        writeTo(std::span<const std::byte> data, Address address) override;
+
+        zero::async::coroutine::Task<void, std::error_code> close() override;
     };
 
-    class Listener : public Acceptor {
+    class TCPListener {
     public:
-        explicit Listener(evconnlistener *listener);
+        explicit TCPListener(Listener listener);
 
-        zero::async::coroutine::Task<Buffer, std::error_code> accept();
+    private:
+        static std::expected<TCPListener, std::error_code> listen(const SocketAddress &address);
+
+    public:
+        static std::expected<TCPListener, std::error_code> listen(const std::string &ip, unsigned short port);
+        static std::expected<TCPListener, std::error_code> listen(const IPv4Address &address);
+        static std::expected<TCPListener, std::error_code> listen(const IPv6Address &address);
+
+        zero::async::coroutine::Task<TCPStream, std::error_code> accept();
+
+    private:
+        Listener mListener;
     };
-
-    tl::expected<Listener, std::error_code> listen(const Address &address);
-    tl::expected<Listener, std::error_code> listen(std::span<const Address> addresses);
-    tl::expected<Listener, std::error_code> listen(const std::string &ip, unsigned short port);
-
-    zero::async::coroutine::Task<Buffer, std::error_code> connect(Address address);
-    zero::async::coroutine::Task<Buffer, std::error_code> connect(std::span<const Address> addresses);
-
-    zero::async::coroutine::Task<Buffer, std::error_code>
-    connect(std::string host, unsigned short port);
-
-#if __unix__ || __APPLE__
-    tl::expected<Listener, std::error_code> listen(const std::string &path);
-    zero::async::coroutine::Task<Buffer, std::error_code> connect(std::string path);
-#endif
 }
 
-#endif //ASYNCIO_STREAM_H
+#endif //ASYNCIO_NET_STREAM_H

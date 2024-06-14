@@ -6,54 +6,49 @@ zero::async::coroutine::Task<std::vector<asyncio::net::Address>, std::error_code
 asyncio::net::dns::getAddressInfo(
     const std::string node,
     const std::optional<std::string> service,
-    const std::optional<AddressInfo> hints
+    const std::optional<addrinfo> hints
 ) {
-    const auto dnsBase = getEventLoop()->makeDNSBase();
-    CO_EXPECT(dnsBase);
+    Promise<std::vector<Address>, uv::Error> promise;
+    uv_getaddrinfo_t request = {.data = &promise};
 
-    Promise<std::vector<Address>, Error> promise;
+    CO_EXPECT(uv::expected([&] {
+        return uv_getaddrinfo(
+            getEventLoop()->raw(),
+            &request,
+            [](const auto req, const int status, addrinfo *res) {
+                const auto p = static_cast<Promise<std::vector<Address>, uv::Error> *>(req->data);
 
-    evdns_getaddrinfo_request *request = evdns_getaddrinfo(
-        dnsBase->get(),
-        node.c_str(),
-        service ? service->c_str() : nullptr,
-        hints ? &*hints : nullptr,
-        [](int result, evutil_addrinfo *res, void *arg) {
-            const auto p = static_cast<Promise<std::vector<Address>, Error> *>(arg);
+                if (status < 0) {
+                    p->reject(static_cast<uv::Error>(status));
+                    return;
+                }
 
-            if (result != 0) {
-                p->reject(static_cast<Error>(result));
-                return;
-            }
+                std::vector<Address> addresses;
 
-            std::vector<Address> addresses;
+                for (auto i = res; i; i = i->ai_next) {
+                    auto address = addressFrom(i->ai_addr, static_cast<socklen_t>(i->ai_addrlen));
 
-            for (auto i = res; i; i = i->ai_next) {
-#ifdef _WIN32
-                auto address = addressFrom(i->ai_addr, static_cast<socklen_t>(i->ai_addrlen));
-#else
-                auto address = addressFrom(i->ai_addr, i->ai_addrlen);
-#endif
+                    if (!address)
+                        continue;
 
-                if (!address)
-                    continue;
+                    addresses.push_back(*std::move(address));
+                }
 
-                addresses.push_back(*std::move(address));
-            }
-
-            evutil_freeaddrinfo(res);
-            p->resolve(std::move(addresses));
-        },
-        &promise
-    );
-
-    if (!request)
-        co_return co_await promise.getFuture();
+                uv_freeaddrinfo(res);
+                p->resolve(std::move(addresses));
+            },
+            node.c_str(),
+            service ? service->c_str() : nullptr,
+            hints ? &*hints : nullptr
+        );
+    }));
 
     co_return co_await zero::async::coroutine::Cancellable{
         promise.getFuture(),
-        [=]() -> tl::expected<void, std::error_code> {
-            evdns_getaddrinfo_cancel(request);
+        [&]() -> std::expected<void, std::error_code> {
+            EXPECT(uv::expected([&] {
+                return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
+            }));
             return {};
         }
     };
@@ -61,9 +56,9 @@ asyncio::net::dns::getAddressInfo(
 
 zero::async::coroutine::Task<std::vector<asyncio::net::IP>, std::error_code>
 asyncio::net::dns::lookupIP(std::string host) {
-    AddressInfo hints = {};
+    addrinfo hints = {};
 
-    hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
+    hints.ai_flags = AI_ADDRCONFIG;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
@@ -85,9 +80,9 @@ asyncio::net::dns::lookupIP(std::string host) {
 
 zero::async::coroutine::Task<std::vector<asyncio::net::IPv4>, std::error_code>
 asyncio::net::dns::lookupIPv4(std::string host) {
-    AddressInfo hints = {};
+    addrinfo hints = {};
 
-    hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
+    hints.ai_flags = AI_ADDRCONFIG;
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
@@ -106,9 +101,9 @@ asyncio::net::dns::lookupIPv4(std::string host) {
 
 zero::async::coroutine::Task<std::vector<asyncio::net::IPv6>, std::error_code>
 asyncio::net::dns::lookupIPv6(std::string host) {
-    AddressInfo hints = {};
+    addrinfo hints = {};
 
-    hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
+    hints.ai_flags = AI_ADDRCONFIG;
     hints.ai_family = AF_INET6;
     hints.ai_socktype = SOCK_STREAM;
 

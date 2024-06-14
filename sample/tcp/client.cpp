@@ -15,7 +15,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
     const auto host = cmdline.get<std::string>("host");
     const auto port = cmdline.get<unsigned short>("port");
 
-    auto buffer = co_await asyncio::net::stream::connect(host, port);
+    auto buffer = co_await asyncio::net::connect(host, port);
     CO_EXPECT(buffer);
 
     while (true) {
@@ -26,7 +26,7 @@ zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *
 
         if (!line) {
             if (line.error() != asyncio::IOError::UNEXPECTED_EOF)
-                co_return tl::unexpected(line.error());
+                co_return std::unexpected(line.error());
 
             break;
         }

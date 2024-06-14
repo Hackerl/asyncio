@@ -19,9 +19,9 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Mutex::lock()
 
     const auto result = co_await zero::async::coroutine::Cancellable{
         promise->getFuture(),
-        [=]() -> tl::expected<void, std::error_code> {
+        [=]() -> std::expected<void, std::error_code> {
             if (promise->isFulfilled())
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             promise->reject(zero::async::coroutine::Error::CANCELLED);
             return {};
@@ -34,7 +34,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Mutex::lock()
         if (!mLocked)
             wakeup();
 
-        co_return tl::unexpected(result.error());
+        co_return std::unexpected(result.error());
     }
 
     assert(!mLocked);

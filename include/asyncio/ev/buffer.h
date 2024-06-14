@@ -17,7 +17,7 @@ namespace asyncio::ev {
         Buffer &operator=(Buffer &&rhs) noexcept;
         ~Buffer() override;
 
-        static tl::expected<Buffer, std::error_code>
+        static std::expected<Buffer, std::error_code>
         make(FileDescriptor fd, std::size_t capacity = DEFAULT_BUFFER_CAPACITY, bool own = true);
 
     private:

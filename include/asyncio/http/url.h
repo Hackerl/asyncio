@@ -5,7 +5,7 @@
 #include <string>
 #include <optional>
 #include <system_error>
-#include <tl/expected.hpp>
+#include <expected>
 #include <curl/curl.h>
 #include <zero/cmdline.h>
 #include <zero/error.h>
@@ -27,16 +27,16 @@ namespace asyncio::http {
         URL &operator=(const URL &rhs);
         URL &operator=(URL &&rhs) noexcept;
 
-        static tl::expected<URL, std::error_code> from(const std::string &str);
+        static std::expected<URL, std::error_code> from(const std::string &str);
 
-        [[nodiscard]] tl::expected<std::string, std::error_code> string() const;
-        [[nodiscard]] tl::expected<std::string, std::error_code> scheme() const;
-        [[nodiscard]] tl::expected<std::string, std::error_code> user() const;
-        [[nodiscard]] tl::expected<std::string, std::error_code> password() const;
-        [[nodiscard]] tl::expected<std::string, std::error_code> host() const;
-        [[nodiscard]] tl::expected<std::string, std::error_code> path() const;
-        [[nodiscard]] tl::expected<std::string, std::error_code> query() const;
-        [[nodiscard]] tl::expected<unsigned short, std::error_code> port() const;
+        [[nodiscard]] std::expected<std::string, std::error_code> string() const;
+        [[nodiscard]] std::expected<std::string, std::error_code> scheme() const;
+        [[nodiscard]] std::expected<std::string, std::error_code> user() const;
+        [[nodiscard]] std::expected<std::string, std::error_code> password() const;
+        [[nodiscard]] std::expected<std::string, std::error_code> host() const;
+        [[nodiscard]] std::expected<std::string, std::error_code> path() const;
+        [[nodiscard]] std::expected<std::string, std::error_code> query() const;
+        [[nodiscard]] std::expected<unsigned short, std::error_code> port() const;
 
         URL &scheme(const std::optional<std::string> &scheme);
         URL &user(const std::optional<std::string> &user);
@@ -79,6 +79,6 @@ namespace asyncio::http {
 DECLARE_ERROR_CODE(asyncio::http::URL::Error)
 
 template<>
-tl::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input);
+std::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input);
 
 #endif //ASYNCIO_URL_H

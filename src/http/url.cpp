@@ -34,96 +34,96 @@ asyncio::http::URL &asyncio::http::URL::operator=(URL &&rhs) noexcept {
     return *this;
 }
 
-tl::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(const std::string &str) {
+std::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(const std::string &str) {
     CURLU *url = curl_url();
 
     if (!url)
-        return tl::unexpected<std::error_code>(errno, std::generic_category());
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     if (const CURLUcode code = curl_url_set(url, CURLUPART_URL, str.c_str(),CURLU_NON_SUPPORT_SCHEME);
         code != CURLUE_OK) {
         curl_url_cleanup(url);
-        return tl::unexpected(static_cast<Error>(code));
+        return std::unexpected(static_cast<Error>(code));
     }
 
     return URL{url};
 }
 
-tl::expected<std::string, std::error_code> asyncio::http::URL::string() const {
+std::expected<std::string, std::error_code> asyncio::http::URL::string() const {
     char *url;
 
     if (const CURLUcode code = curl_url_get(mURL.get(), CURLUPART_URL, &url, 0); code != CURLUE_OK)
-        return tl::unexpected(static_cast<Error>(code));
+        return std::unexpected(static_cast<Error>(code));
 
     return std::unique_ptr<char, decltype(curl_free) *>(url, curl_free).get();
 }
 
-tl::expected<std::string, std::error_code> asyncio::http::URL::scheme() const {
+std::expected<std::string, std::error_code> asyncio::http::URL::scheme() const {
     char *scheme;
 
     if (const CURLUcode code = curl_url_get(mURL.get(), CURLUPART_SCHEME, &scheme, 0); code != CURLUE_OK)
-        return tl::unexpected(static_cast<Error>(code));
+        return std::unexpected(static_cast<Error>(code));
 
     return std::unique_ptr<char, decltype(curl_free) *>(scheme, curl_free).get();
 }
 
-tl::expected<std::string, std::error_code> asyncio::http::URL::user() const {
+std::expected<std::string, std::error_code> asyncio::http::URL::user() const {
     char *user;
 
     if (const CURLUcode code = curl_url_get(mURL.get(), CURLUPART_USER, &user, 0); code != CURLUE_OK)
-        return tl::unexpected(static_cast<Error>(code));
+        return std::unexpected(static_cast<Error>(code));
 
     return std::unique_ptr<char, decltype(curl_free) *>(user, curl_free).get();
 }
 
-tl::expected<std::string, std::error_code> asyncio::http::URL::password() const {
+std::expected<std::string, std::error_code> asyncio::http::URL::password() const {
     char *password;
 
     if (const CURLUcode code = curl_url_get(mURL.get(), CURLUPART_PASSWORD, &password, 0); code != CURLUE_OK)
-        return tl::unexpected(static_cast<Error>(code));
+        return std::unexpected(static_cast<Error>(code));
 
     return std::unique_ptr<char, decltype(curl_free) *>(password, curl_free).get();
 }
 
-tl::expected<std::string, std::error_code> asyncio::http::URL::host() const {
+std::expected<std::string, std::error_code> asyncio::http::URL::host() const {
     char *host;
 
     if (const CURLUcode code = curl_url_get(mURL.get(), CURLUPART_HOST, &host, 0); code != CURLUE_OK)
-        return tl::unexpected(static_cast<Error>(code));
+        return std::unexpected(static_cast<Error>(code));
 
     return std::unique_ptr<char, decltype(curl_free) *>(host, curl_free).get();
 }
 
-tl::expected<std::string, std::error_code> asyncio::http::URL::path() const {
+std::expected<std::string, std::error_code> asyncio::http::URL::path() const {
     char *path;
 
     if (const CURLUcode code = curl_url_get(mURL.get(), CURLUPART_PATH, &path, 0); code != CURLUE_OK)
-        return tl::unexpected(static_cast<Error>(code));
+        return std::unexpected(static_cast<Error>(code));
 
     return std::unique_ptr<char, decltype(curl_free) *>(path, curl_free).get();
 }
 
-tl::expected<std::string, std::error_code> asyncio::http::URL::query() const {
+std::expected<std::string, std::error_code> asyncio::http::URL::query() const {
     char *query;
 
     if (const CURLUcode code = curl_url_get(mURL.get(), CURLUPART_QUERY, &query, 0); code != CURLUE_OK)
-        return tl::unexpected(static_cast<Error>(code));
+        return std::unexpected(static_cast<Error>(code));
 
     return std::unique_ptr<char, decltype(curl_free) *>(query, curl_free).get();
 }
 
-tl::expected<unsigned short, std::error_code> asyncio::http::URL::port() const {
+std::expected<unsigned short, std::error_code> asyncio::http::URL::port() const {
     char *port;
 
     if (const CURLUcode code = curl_url_get(mURL.get(), CURLUPART_PORT, &port, CURLU_DEFAULT_PORT); code != CURLUE_OK)
-        return tl::unexpected(static_cast<Error>(code));
+        return std::unexpected(static_cast<Error>(code));
 
     const auto n = zero::strings::toNumber<unsigned short>(
         std::unique_ptr<char, decltype(curl_free) *>(port, curl_free).get()
     );
 
     if (!n)
-        return tl::unexpected(n.error());
+        return std::unexpected(n.error());
 
     return *n;
 }
@@ -212,6 +212,6 @@ asyncio::http::URL &asyncio::http::URL::append(const std::string &subPath) {
 }
 
 template<>
-tl::expected<asyncio::http::URL, std::error_code> zero::scan(const std::string_view input) {
+std::expected<asyncio::http::URL, std::error_code> zero::scan(const std::string_view input) {
     return asyncio::http::URL::from({input.begin(), input.end()});
 }

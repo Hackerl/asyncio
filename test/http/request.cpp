@@ -15,7 +15,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(People, name, age);
 
 TEST_CASE("http requests", "[http]") {
     asyncio::run([]() -> zero::async::coroutine::Task<void> {
-        auto listener = asyncio::net::stream::listen("127.0.0.1", 30000);
+        auto listener = asyncio::net::listen("127.0.0.1", 30000);
         REQUIRE(listener);
 
         SECTION("get") {

@@ -37,11 +37,11 @@ asyncio::fs::PosixAIO::~PosixAIO() {
     evsignal_del(mEvent.get());
 }
 
-tl::expected<asyncio::fs::PosixAIO, std::error_code> asyncio::fs::PosixAIO::make(event_base *base) {
+std::expected<asyncio::fs::PosixAIO, std::error_code> asyncio::fs::PosixAIO::make(event_base *base) {
     event *e = evsignal_new(base, -1, nullptr, nullptr);
 
     if (!e)
-        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+        return std::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
 
     return PosixAIO{{e, event_free}};
 }
@@ -76,7 +76,7 @@ void asyncio::fs::PosixAIO::onSignal() {
     }
 }
 
-tl::expected<void, std::error_code> asyncio::fs::PosixAIO::associate(const FileDescriptor) {
+std::expected<void, std::error_code> asyncio::fs::PosixAIO::associate(const FileDescriptor) {
     return {};
 }
 
@@ -102,25 +102,25 @@ asyncio::fs::PosixAIO::read(
 
     if (aio_read(&cb) < 0) {
         mPending.remove(&pending);
-        co_return tl::unexpected<std::error_code>(errno, std::system_category());
+        co_return std::unexpected(std::error_code(errno, std::system_category()));
     }
 
     co_return co_await zero::async::coroutine::Cancellable{
         pending.promise.getFuture(),
-        [&]() -> tl::expected<void, std::error_code> {
+        [&]() -> std::expected<void, std::error_code> {
             if (pending.promise.isFulfilled())
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             const int result = aio_cancel(fd, pending.cb);
 
             if (result == -1)
-                return tl::unexpected<std::error_code>(errno, std::system_category());
+                return std::unexpected(std::error_code(errno, std::system_category()));
 
             if (result == AIO_ALLDONE)
-                return tl::unexpected(Error::ALL_DONE);
+                return std::unexpected(Error::ALL_DONE);
 
             if (result == AIO_NOTCANCELED)
-                return tl::unexpected(Error::NOT_CANCELED);
+                return std::unexpected(Error::NOT_CANCELED);
 
             mPending.remove(&pending);
             pending.promise.reject(zero::async::coroutine::Error::CANCELLED);
@@ -152,25 +152,25 @@ asyncio::fs::PosixAIO::write(
 
     if (aio_write(&cb) < 0) {
         mPending.remove(&pending);
-        co_return tl::unexpected<std::error_code>(errno, std::system_category());
+        co_return std::unexpected(std::error_code(errno, std::system_category()));
     }
 
     co_return co_await zero::async::coroutine::Cancellable{
         pending.promise.getFuture(),
-        [&]() -> tl::expected<void, std::error_code> {
+        [&]() -> std::expected<void, std::error_code> {
             if (pending.promise.isFulfilled())
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             const int result = aio_cancel(fd, pending.cb);
 
             if (result == -1)
-                return tl::unexpected<std::error_code>(errno, std::system_category());
+                return std::unexpected(std::error_code(errno, std::system_category()));
 
             if (result == AIO_ALLDONE)
-                return tl::unexpected(Error::ALL_DONE);
+                return std::unexpected(Error::ALL_DONE);
 
             if (result == AIO_NOTCANCELED)
-                return tl::unexpected(Error::NOT_CANCELED);
+                return std::unexpected(Error::NOT_CANCELED);
 
             mPending.remove(&pending);
             pending.promise.reject(zero::async::coroutine::Error::CANCELLED);

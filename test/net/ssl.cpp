@@ -141,7 +141,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
             );
             REQUIRE(context);
 
-            auto listener = asyncio::net::ssl::stream::listen(*context, "127.0.0.1", 30000);
+            auto listener = asyncio::net::ssl::listen(*context, "127.0.0.1", 30000);
             REQUIRE(listener);
 
             SECTION("normal") {
@@ -178,7 +178,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                         );
                         REQUIRE(ctx);
 
-                        auto buffer = co_await asyncio::net::ssl::stream::connect(
+                        auto buffer = co_await asyncio::net::ssl::connect(
                             *ctx,
                             "localhost",
                             30000
@@ -216,7 +216,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                 );
                 REQUIRE(ctx);
 
-                auto task = asyncio::net::ssl::stream::connect(
+                auto task = asyncio::net::ssl::connect(
                     *ctx,
                     "localhost",
                     30000
@@ -242,7 +242,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
             );
             REQUIRE(context);
 
-            auto listener = asyncio::net::ssl::stream::listen(*context, "127.0.0.1", 30000);
+            auto listener = asyncio::net::ssl::listen(*context, "127.0.0.1", 30000);
             REQUIRE(listener);
 
             SECTION("normal") {
@@ -273,7 +273,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                         const auto ctx = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
                         REQUIRE(ctx);
 
-                        auto buffer = co_await asyncio::net::ssl::stream::connect(
+                        auto buffer = co_await asyncio::net::ssl::connect(
                             *ctx,
                             "localhost",
                             30000
@@ -305,7 +305,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                 const auto ctx = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
                 REQUIRE(ctx);
 
-                auto task = asyncio::net::ssl::stream::connect(
+                auto task = asyncio::net::ssl::connect(
                     *ctx,
                     "localhost",
                     30000

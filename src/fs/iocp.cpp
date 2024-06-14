@@ -35,11 +35,11 @@ asyncio::fs::IOCP::~IOCP() {
     CloseHandle(mHandle);
 }
 
-tl::expected<asyncio::fs::IOCP, std::error_code> asyncio::fs::IOCP::make() {
+std::expected<asyncio::fs::IOCP, std::error_code> asyncio::fs::IOCP::make() {
     const auto handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1);
 
     if (!handle)
-        return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
+        return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
 
     return IOCP{handle};
 }
@@ -69,9 +69,9 @@ void asyncio::fs::IOCP::dispatch(const HANDLE handle) {
     }
 }
 
-tl::expected<void, std::error_code> asyncio::fs::IOCP::associate(const FileDescriptor fd) {
+std::expected<void, std::error_code> asyncio::fs::IOCP::associate(const FileDescriptor fd) {
     if (!CreateIoCompletionPort(reinterpret_cast<HANDLE>(fd), mHandle, 0, 0))
-        return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
+        return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
 
     return {};
 }
@@ -95,13 +95,13 @@ asyncio::fs::IOCP::read(
     const auto handle = reinterpret_cast<HANDLE>(fd);
 
     if (!ReadFile(handle, data.data(), data.size(), &n, &request.overlapped) && GetLastError() != ERROR_IO_PENDING)
-        co_return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
+        co_return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
 
     co_return co_await zero::async::coroutine::Cancellable{
         request.promise.getFuture(),
-        [&]() -> tl::expected<void, std::error_code> {
+        [&]() -> std::expected<void, std::error_code> {
             if (!CancelIoEx(handle, &request.overlapped))
-                return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
+                return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
 
             return {};
         }
@@ -127,13 +127,13 @@ asyncio::fs::IOCP::write(
     const auto handle = reinterpret_cast<HANDLE>(fd);
 
     if (!WriteFile(handle, data.data(), data.size(), &n, &request.overlapped) && GetLastError() != ERROR_IO_PENDING)
-        co_return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
+        co_return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
 
     co_return co_await zero::async::coroutine::Cancellable{
         request.promise.getFuture(),
-        [&]() -> tl::expected<void, std::error_code> {
+        [&]() -> std::expected<void, std::error_code> {
             if (!CancelIoEx(handle, &request.overlapped))
-                return tl::unexpected<std::error_code>(static_cast<int>(GetLastError()), std::system_category());
+                return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
 
             return {};
         }

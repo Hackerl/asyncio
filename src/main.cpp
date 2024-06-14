@@ -1,4 +1,6 @@
 #include <asyncio/event_loop.h>
+#include <zero/formatter.h>
+#include <fmt/std.h>
 
 #ifdef _WIN32
 #include <zero/defer.h>

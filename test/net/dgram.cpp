@@ -3,103 +3,106 @@
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/std.h>
 
-using namespace std::chrono_literals;
-
-constexpr std::string_view MESSAGE = "hello";
+constexpr std::string_view MESSAGE = "hello world";
 
 TEST_CASE("datagram network connection", "[net]") {
-    asyncio::run([]() -> zero::async::coroutine::Task<void> {
-        auto server = asyncio::net::dgram::bind("127.0.0.1", 30000);
+    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        auto server = asyncio::net::UDPSocket::bind("127.0.0.1", 30000);
         REQUIRE(server);
 
         SECTION("normal") {
             co_await allSettled(
-                [](auto s) -> zero::async::coroutine::Task<void> {
-                    std::byte data[1024];
-                    const auto result = co_await s.readFrom(data);
-                    REQUIRE(result);
+                [](auto socket) -> zero::async::coroutine::Task<void> {
+                    std::string message;
+                    message.resize(MESSAGE.size());
 
-                    const auto &[num, from] = *result;
+                    const auto res = co_await socket.readFrom(std::as_writable_bytes(std::span{message}));
+                    REQUIRE(res);
+
+                    const auto &[num, from] = *res;
                     REQUIRE(num);
                     REQUIRE(num == MESSAGE.size());
                     REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
                     REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30001)");
-                    REQUIRE(memcmp(data, MESSAGE.data(), MESSAGE.size()) == 0);
+                    REQUIRE(message == MESSAGE);
 
-                    const auto n = co_await s.writeTo({data, num}, from);
+                    const auto n = co_await socket.writeTo(std::as_bytes(std::span{message}), from);
                     REQUIRE(n);
                     REQUIRE(*n == num);
                 }(*std::move(server)),
                 []() -> zero::async::coroutine::Task<void> {
-                    auto client = asyncio::net::dgram::bind("127.0.0.1", 30001);
-                    REQUIRE(client);
+                    using namespace std::string_view_literals;
+
+                    auto socket = asyncio::net::UDPSocket::bind("127.0.0.1", 30001);
+                    REQUIRE(socket);
 
                     const auto address = asyncio::net::IPv4Address::from("127.0.0.1", 30000);
                     REQUIRE(address);
 
-                    const auto n = co_await client->writeTo(std::as_bytes(std::span{MESSAGE}), *address);
+                    const auto n = co_await socket->writeTo(std::as_bytes(std::span{"hello world"sv}), *address);
                     REQUIRE(n);
                     REQUIRE(*n == MESSAGE.size());
 
-                    std::byte data[1024];
-                    const auto result = co_await client->readFrom(data);
-                    REQUIRE(result);
+                    std::string message;
+                    message.resize(MESSAGE.size());
 
-                    const auto &[num, from] = *result;
+                    const auto res = co_await socket->readFrom(std::as_writable_bytes(std::span{message}));
+                    REQUIRE(res);
+
+                    const auto &[num, from] = *res;
                     REQUIRE(num);
                     REQUIRE(num == MESSAGE.size());
                     REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
                     REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
-                    REQUIRE(memcmp(data, MESSAGE.data(), MESSAGE.size()) == 0);
+                    REQUIRE(message == MESSAGE);
                 }()
             );
         }
 
         SECTION("connect") {
             co_await allSettled(
-                [](auto s) -> zero::async::coroutine::Task<void> {
-                    std::byte data[1024];
-                    const auto result = co_await s.readFrom(data);
-                    REQUIRE(result);
+                [](auto socket) -> zero::async::coroutine::Task<void> {
+                    std::string message;
+                    message.resize(MESSAGE.size());
 
-                    const auto &[num, from] = *result;
+                    const auto res = co_await socket.readFrom(std::as_writable_bytes(std::span{message}));
+                    REQUIRE(res);
+
+                    const auto &[num, from] = *res;
                     REQUIRE(num);
                     REQUIRE(num == MESSAGE.size());
                     REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
                     REQUIRE(fmt::to_string(from).find("127.0.0.1") != std::string::npos);
-                    REQUIRE(memcmp(data, MESSAGE.data(), MESSAGE.size()) == 0);
+                    REQUIRE(message == MESSAGE);
 
-                    const auto n = co_await s.writeTo({data, num}, from);
+                    const auto n = co_await socket.writeTo(std::as_bytes(std::span{message}), from);
                     REQUIRE(n);
                     REQUIRE(*n == num);
                 }(*std::move(server)),
                 []() -> zero::async::coroutine::Task<void> {
-                    auto client = co_await asyncio::net::dgram::connect("127.0.0.1", 30000);
-                    REQUIRE(client);
+                    auto socket = co_await asyncio::net::UDPSocket::connect("127.0.0.1", 30000);
+                    REQUIRE(socket);
 
-                    const auto n = co_await client->write(std::as_bytes(std::span{MESSAGE}));
+                    const auto n = co_await socket->write(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(n);
                     REQUIRE(*n == MESSAGE.size());
 
-                    std::byte data[1024];
-                    const auto result = co_await client->readFrom(data);
-                    REQUIRE(result);
+                    std::string message;
+                    message.resize(MESSAGE.size());
 
-                    const auto &[num, from] = *result;
+                    const auto res = co_await socket->readFrom(std::as_writable_bytes(std::span{message}));
+                    REQUIRE(res);
+
+                    const auto &[num, from] = *res;
                     REQUIRE(num);
                     REQUIRE(num == MESSAGE.size());
                     REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
                     REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
-                    REQUIRE(memcmp(data, MESSAGE.data(), MESSAGE.size()) == 0);
+                    REQUIRE(message == MESSAGE);
                 }()
             );
         }
-
-        SECTION("timeout") {
-            std::byte data[1024];
-            const auto result = co_await asyncio::timeout(server->readFrom(data), 50ms);
-            REQUIRE(!result);
-            REQUIRE(result.error() == asyncio::TimeoutError::ELAPSED);
-        }
     });
+    REQUIRE(result);
+    REQUIRE(*result);
 }

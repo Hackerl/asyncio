@@ -14,7 +14,7 @@ namespace asyncio::ev {
         zero::async::coroutine::Task<void, std::error_code> close() override;
     };
 
-    tl::expected<std::array<PairedBuffer, 2>, std::error_code> pipe(std::size_t capacity = DEFAULT_BUFFER_CAPACITY);
+    std::expected<std::array<PairedBuffer, 2>, std::error_code> pipe(std::size_t capacity = DEFAULT_BUFFER_CAPACITY);
 }
 
 #endif //ASYNCIO_PIPE_H

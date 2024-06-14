@@ -11,7 +11,7 @@ namespace asyncio::ev {
         Signal &operator=(Signal &&rhs) noexcept;
         ~Signal();
 
-        static tl::expected<Signal, std::error_code> make(int sig, std::size_t capacity = 64);
+        static std::expected<Signal, std::error_code> make(int sig, std::size_t capacity = 64);
 
         [[nodiscard]] int sig() const;
         zero::async::coroutine::Task<int, std::error_code> on();

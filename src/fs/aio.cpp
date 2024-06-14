@@ -76,17 +76,17 @@ asyncio::fs::AIO::~AIO() {
     close(mEventFD);
 }
 
-tl::expected<asyncio::fs::AIO, std::error_code> asyncio::fs::AIO::make(event_base *base) {
+std::expected<asyncio::fs::AIO, std::error_code> asyncio::fs::AIO::make(event_base *base) {
     aio_context_t ctx = {};
 
     if (io_setup(128, &ctx) != 0)
-        return tl::unexpected<std::error_code>(errno, std::system_category());
+        return std::unexpected(std::error_code(errno, std::system_category()));
 
     const int efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
 
     if (efd < 0) {
         io_destroy(ctx);
-        return tl::unexpected<std::error_code>(errno, std::system_category());
+        return std::unexpected(std::error_code(errno, std::system_category()));
     }
 
     event *e = event_new(base, -1, EV_READ | EV_PERSIST, nullptr, nullptr);
@@ -94,7 +94,7 @@ tl::expected<asyncio::fs::AIO, std::error_code> asyncio::fs::AIO::make(event_bas
     if (!e) {
         close(efd);
         io_destroy(ctx);
-        return tl::unexpected<std::error_code>(EVUTIL_SOCKET_ERROR(), std::system_category());
+        return std::unexpected(std::error_code(EVUTIL_SOCKET_ERROR(), std::system_category()));
     }
 
     return AIO{ctx, efd, {e, event_free}};
@@ -118,7 +118,7 @@ void asyncio::fs::AIO::onEvent() const {
     }
 }
 
-tl::expected<void, std::error_code> asyncio::fs::AIO::associate(const FileDescriptor) {
+std::expected<void, std::error_code> asyncio::fs::AIO::associate(const FileDescriptor) {
     return {};
 }
 
@@ -142,18 +142,18 @@ asyncio::fs::AIO::read(
     cb.aio_resfd = mEventFD;
 
     if (iocb *cbs[1] = {&cb}; io_submit(mContext, 1, cbs) != 1)
-        co_return tl::unexpected<std::error_code>(errno, std::system_category());
+        co_return std::unexpected(std::error_code(errno, std::system_category()));
 
     co_return co_await zero::async::coroutine::Cancellable{
         promise.getFuture(),
-        [&]() -> tl::expected<void, std::error_code> {
+        [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             io_event result = {};
 
             if (io_cancel(mContext, &cb, &result) != 0)
-                return tl::unexpected<std::error_code>(errno, std::system_category());
+                return std::unexpected(std::error_code(errno, std::system_category()));
 
             promise.reject(zero::async::coroutine::Error::CANCELLED);
             return {};
@@ -181,18 +181,18 @@ asyncio::fs::AIO::write(
     cb.aio_resfd = mEventFD;
 
     if (iocb *cbs[1] = {&cb}; io_submit(mContext, 1, cbs) != 1)
-        co_return tl::unexpected<std::error_code>(errno, std::system_category());
+        co_return std::unexpected(std::error_code(errno, std::system_category()));
 
     co_return co_await zero::async::coroutine::Cancellable{
         promise.getFuture(),
-        [&]() -> tl::expected<void, std::error_code> {
+        [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             io_event result = {};
 
             if (io_cancel(mContext, &cb, &result) != 0)
-                return tl::unexpected<std::error_code>(errno, std::system_category());
+                return std::unexpected(std::error_code(errno, std::system_category()));
 
             promise.reject(zero::async::coroutine::Error::CANCELLED);
             return {};

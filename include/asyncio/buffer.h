@@ -74,7 +74,7 @@ namespace asyncio {
         }
 
         zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readUntil(const std::byte byte) override {
-            tl::expected<std::vector<std::byte>, std::error_code> result;
+            std::expected<std::vector<std::byte>, std::error_code> result;
 
             while (true) {
                 const auto first = mBuffer.get() + mHead;
@@ -95,7 +95,7 @@ namespace asyncio {
                 CO_EXPECT(n);
 
                 if (*n == 0) {
-                    result = tl::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
+                    result = std::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
                     break;
                 }
 
@@ -107,7 +107,7 @@ namespace asyncio {
 
         zero::async::coroutine::Task<void, std::error_code> peek(const std::span<std::byte> data) override {
             if (data.size() > mCapacity)
-                co_return tl::unexpected(IOError::INVALID_ARGUMENT);
+                co_return std::unexpected(IOError::INVALID_ARGUMENT);
 
             if (const std::size_t available = this->available(); available < data.size()) {
                 if (mHead > 0) {
@@ -121,7 +121,7 @@ namespace asyncio {
                     CO_EXPECT(n);
 
                     if (*n == 0)
-                        co_return tl::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
+                        co_return std::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
 
                     mTail += *n;
                 }
@@ -166,7 +166,7 @@ namespace asyncio {
     public:
         zero::async::coroutine::Task<std::size_t, std::error_code>
         write(const std::span<const std::byte> data) override {
-            tl::expected<std::size_t, std::error_code> result;
+            std::expected<std::size_t, std::error_code> result;
 
             while (*result < data.size()) {
                 assert(mPending <= mCapacity);
@@ -176,7 +176,7 @@ namespace asyncio {
                         if (*result > 0)
                             break;
 
-                        result = tl::unexpected(res.error());
+                        result = std::unexpected(res.error());
                         break;
                     }
 
@@ -202,19 +202,19 @@ namespace asyncio {
         }
 
         zero::async::coroutine::Task<void, std::error_code> flush() override {
-            tl::expected<void, std::error_code> result;
+            std::expected<void, std::error_code> result;
             std::size_t offset = 0;
 
             while (offset < mPending) {
                 if (co_await zero::async::coroutine::cancelled) {
-                    result = tl::unexpected<std::error_code>(zero::async::coroutine::Error::CANCELLED);
+                    result = std::unexpected<std::error_code>(zero::async::coroutine::Error::CANCELLED);
                     break;
                 }
 
                 const auto n = co_await rawWrite({mBuffer.get() + offset, mPending - offset});
 
                 if (!n) {
-                    result = tl::unexpected(n.error());
+                    result = std::unexpected(n.error());
                     break;
                 }
 

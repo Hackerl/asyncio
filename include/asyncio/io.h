@@ -1,9 +1,9 @@
 #ifndef ASYNCIO_IO_H
 #define ASYNCIO_IO_H
 
+#include <uv.h>
 #include <span>
 #include <chrono>
-#include <event2/util.h>
 #include <zero/interface.h>
 #include <zero/async/coroutine.h>
 
@@ -20,10 +20,10 @@ namespace asyncio {
         ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
     )
 
-    constexpr auto INVALID_FILE_DESCRIPTOR = -1;
-    constexpr auto DEFAULT_BUFFER_CAPACITY = 1024 * 1024;
+    //constexpr auto INVALID_FILE_DESCRIPTOR = -1;
+    //constexpr auto DEFAULT_BUFFER_CAPACITY = 1024 * 1024;
 
-    using FileDescriptor = evutil_socket_t;
+    using OSSocket = uv_os_sock_t;
 
     class IReader : public virtual zero::Interface {
     public:
@@ -43,10 +43,10 @@ namespace asyncio {
         virtual zero::async::coroutine::Task<void, std::error_code> close() = 0;
     };
 
-    class IFileDescriptor : public virtual zero::Interface {
+    /*class IFileDescriptor : public virtual zero::Interface {
     public:
         [[nodiscard]] virtual FileDescriptor fd() const = 0;
-    };
+    };*/
 
     class ISeekable : public virtual zero::Interface {
     public:
@@ -56,10 +56,10 @@ namespace asyncio {
             END
         };
 
-        virtual tl::expected<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
-        virtual tl::expected<void, std::error_code> rewind() = 0;
-        [[nodiscard]] virtual tl::expected<std::uint64_t, std::error_code> length() const = 0;
-        [[nodiscard]] virtual tl::expected<std::uint64_t, std::error_code> position() const = 0;
+        virtual std::expected<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
+        virtual std::expected<void, std::error_code> rewind() = 0;
+        [[nodiscard]] virtual std::expected<std::uint64_t, std::error_code> length() const = 0;
+        [[nodiscard]] virtual std::expected<std::uint64_t, std::error_code> position() const = 0;
     };
 
     class IBuffered : public virtual zero::Interface {

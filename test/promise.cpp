@@ -2,10 +2,8 @@
 #include <asyncio/sync/event.h>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace std::chrono_literals;
-
 TEST_CASE("asyncio promise", "[promise]") {
-    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
         asyncio::Promise<void> promise;
         const auto event = std::make_shared<asyncio::sync::Event>();
         REQUIRE(!event->isSet());
@@ -18,4 +16,6 @@ TEST_CASE("asyncio promise", "[promise]") {
         REQUIRE(!event->isSet());
         co_await event->wait();
     });
+    REQUIRE(result);
+    REQUIRE(*result);
 }

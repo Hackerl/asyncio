@@ -11,9 +11,9 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Condition::wa
 
     const auto result = co_await zero::async::coroutine::Cancellable{
         promise->getFuture(),
-        [=, this]() -> tl::expected<void, std::error_code> {
+        [=, this]() -> std::expected<void, std::error_code> {
             if (mPending.remove(promise) == 0)
-                return tl::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
 
             promise->reject(zero::async::coroutine::Error::CANCELLED);
             return {};
@@ -33,7 +33,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Condition::wa
         if (counter != mCounter)
             notify();
 
-        co_return tl::unexpected(result.error());
+        co_return std::unexpected(result.error());
     }
 
     co_return {};

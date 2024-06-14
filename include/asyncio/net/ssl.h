@@ -22,7 +22,7 @@ namespace asyncio::net::ssl {
     using Context = SSL_CTX;
 
 #ifdef ASYNCIO_EMBED_CA_CERT
-    tl::expected<void, Error> loadEmbeddedCA(const Context *ctx);
+    std::expected<void, Error> loadEmbeddedCA(const Context *ctx);
 #endif
 
     enum class Version {
@@ -43,7 +43,7 @@ namespace asyncio::net::ssl {
         bool server{};
     };
 
-    tl::expected<std::shared_ptr<Context>, Error> newContext(const Config &config);
+    std::expected<std::shared_ptr<Context>, Error> newContext(const Config &config);
 
     namespace stream {
         enum class State {
@@ -52,11 +52,11 @@ namespace asyncio::net::ssl {
             ACCEPTING = BUFFEREVENT_SSL_ACCEPTING
         };
 
-        class Buffer final : public net::stream::Buffer {
+        class Buffer final : public net::Buffer {
         public:
             Buffer(std::unique_ptr<bufferevent, void (*)(bufferevent *)> bev, std::size_t capacity);
 
-            static tl::expected<Buffer, std::error_code>
+            static std::expected<Buffer, std::error_code>
             make(
                 FileDescriptor fd,
                 const std::shared_ptr<Context> &context,
@@ -69,7 +69,7 @@ namespace asyncio::net::ssl {
             [[nodiscard]] std::error_code getError() const override;
         };
 
-        class Listener : public net::stream::Acceptor {
+        class Listener : public net::Acceptor {
         public:
             Listener(std::shared_ptr<Context> context, evconnlistener *listener);
 
@@ -79,12 +79,12 @@ namespace asyncio::net::ssl {
             std::shared_ptr<Context> mContext;
         };
 
-        tl::expected<Listener, std::error_code> listen(const std::shared_ptr<Context> &context, const Address &address);
+        std::expected<Listener, std::error_code> listen(const std::shared_ptr<Context> &context, const Address &address);
 
-        tl::expected<Listener, std::error_code>
+        std::expected<Listener, std::error_code>
         listen(const std::shared_ptr<Context> &context, std::span<const Address> addresses);
 
-        tl::expected<Listener, std::error_code>
+        std::expected<Listener, std::error_code>
         listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port);
 
         zero::async::coroutine::Task<Buffer, std::error_code> connect(Address address);

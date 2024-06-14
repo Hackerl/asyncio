@@ -25,13 +25,13 @@ namespace asyncio::fs {
         PosixAIO(PosixAIO &&rhs) noexcept;
         ~PosixAIO() override;
 
-        static tl::expected<PosixAIO, std::error_code> make(event_base *base);
+        static std::expected<PosixAIO, std::error_code> make(event_base *base);
 
     private:
         void onSignal();
 
     public:
-        tl::expected<void, std::error_code> associate(FileDescriptor fd) override;
+        std::expected<void, std::error_code> associate(FileDescriptor fd) override;
 
         zero::async::coroutine::Task<std::size_t, std::error_code>
         read(

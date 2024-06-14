@@ -15,7 +15,7 @@ namespace asyncio::ev {
         Timer &operator=(Timer &&rhs) noexcept;
         ~Timer();
 
-        static tl::expected<Timer, std::error_code> make();
+        static std::expected<Timer, std::error_code> make();
         zero::async::coroutine::Task<void, std::error_code> after(std::chrono::milliseconds delay);
 
     private:
