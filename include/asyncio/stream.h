@@ -9,6 +9,7 @@ namespace asyncio {
     class Stream : public IReader, public IWriter {
     public:
         explicit Stream(uv::Handle<uv_stream_t> stream);
+        static std::expected<std::array<Stream, 2>, std::error_code> pair();
 
         uv::Handle<uv_stream_t> &handle();
         [[nodiscard]] const uv::Handle<uv_stream_t> &handle() const;
@@ -39,6 +40,8 @@ namespace asyncio {
     private:
         std::unique_ptr<Context> mContext;
     };
+
+    std::expected<std::array<Stream, 2>, std::error_code> pair();
 }
 
 #endif //ASYNCIO_STREAM_H

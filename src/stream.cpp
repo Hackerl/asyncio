@@ -1,7 +1,89 @@
 #include <asyncio/stream.h>
 #include <asyncio/promise.h>
+#include <zero/defer.h>
 
 asyncio::Stream::Stream(uv::Handle<uv_stream_t> stream) : mStream(std::move(stream)) {
+}
+
+std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::pair() {
+    std::array<uv_os_sock_t, 2> sockets = {};
+
+    EXPECT(uv::expected([&] {
+        return uv_socketpair(SOCK_STREAM, 0, sockets.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE);
+    }));
+#ifdef _WIN32
+    DEFER(
+        for (const auto &fd: sockets) {
+            if (fd == -1)
+                continue;
+
+            closesocket(fd);
+        }
+    );
+
+    auto first = std::make_unique<uv_tcp_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_init(getEventLoop()->raw(), first.get());
+    }));
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_open(first.get(), sockets[0]);
+    }));
+    sockets[0] = -1;
+
+    auto second = std::make_unique<uv_tcp_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_init(getEventLoop()->raw(), second.get());
+    }));
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_open(second.get(), sockets[1]);
+    }));
+    sockets[1] = -1;
+
+    return std::array{
+        Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(first.release())}}},
+        Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(second.release())}}}
+    };
+#else
+    DEFER(
+        for (const auto &fd: sockets) {
+            if (fd == -1)
+                continue;
+
+            close(fd);
+        }
+    );
+
+    auto first = std::make_unique<uv_pipe_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_pipe_init(getEventLoop()->raw(), first.get(), 0);
+    }));
+
+    EXPECT(uv::expected([&] {
+        return uv_pipe_open(first.get(), sockets[0]);
+    }));
+    sockets[0] = -1;
+
+    auto second = std::make_unique<uv_pipe_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_pipe_init(getEventLoop()->raw(), second.get(), 0);
+    }));
+
+    EXPECT(uv::expected([&] {
+        return uv_pipe_open(second.get(), sockets[1]);
+    }));
+    sockets[1] = -1;
+
+    return std::array{
+        Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(first.release())}}},
+        Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(second.release())}}}
+    };
+#endif
 }
 
 asyncio::uv::Handle<uv_stream_s> &asyncio::Stream::handle() {

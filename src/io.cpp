@@ -13,7 +13,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::IReader::readExactl
         }
 
         if (*n == 0) {
-            result = std::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
+            result = std::unexpected<std::error_code>(Error::UNEXPECTED_EOF);
             break;
         }
 
@@ -27,7 +27,7 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::I
     std::expected<std::vector<std::byte>, std::error_code> result;
 
     while (true) {
-        std::byte data[10240];
+        std::array<std::byte, 10240> data = {};
         const auto n = co_await read(data);
 
         if (!n) {
@@ -38,7 +38,7 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::I
         if (*n == 0)
             break;
 
-        std::copy_n(data, *n, std::back_inserter(*result));
+        std::copy_n(data.begin(), *n, std::back_inserter(*result));
     }
 
     co_return result;
@@ -77,7 +77,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reade
             break;
         }
 
-        std::byte data[10240];
+        std::array<std::byte, 10240> data = {};
         const auto n = co_await reader.read(data);
 
         if (!n) {
@@ -90,7 +90,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reade
 
         co_await zero::async::coroutine::lock;
 
-        if (const auto res = co_await writer.writeAll({data, *n}); !res) {
+        if (const auto res = co_await writer.writeAll({data.data(), *n}); !res) {
             result = std::unexpected(res.error());
             break;
         }

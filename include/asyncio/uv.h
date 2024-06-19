@@ -2,6 +2,7 @@
 #define ASYNCIO_UV_H
 
 #include <uv.h>
+#include <array>
 #include <memory>
 #include <optional>
 #include <expected>
@@ -11,11 +12,11 @@ namespace asyncio::uv {
     DEFINE_ERROR_TRANSFORMER_EX(
         Error,
         "asyncio::ev",
-        [](const int value) -> std::string {
-            char buffer[1024];
-            uv_strerror_r(value, buffer, sizeof(buffer));
-            return buffer;
-        },
+        ([](const int value) -> std::string {
+            std::array<char, 1024> buffer = {};
+            uv_strerror_r(value, buffer.data(), buffer.size());
+            return buffer.data();
+        }),
         [](const int value) {
             std::optional<std::error_condition> condition;
 

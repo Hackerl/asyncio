@@ -13,6 +13,8 @@ namespace asyncio::net {
         static zero::async::coroutine::Task<TCPStream, std::error_code> connect(SocketAddress address);
 
     public:
+        static std::expected<TCPStream, std::error_code> from(uv_os_sock_t socket);
+
         static zero::async::coroutine::Task<TCPStream, std::error_code> connect(std::string host, unsigned short port);
         static zero::async::coroutine::Task<TCPStream, std::error_code> connect(IPv4Address address);
         static zero::async::coroutine::Task<TCPStream, std::error_code> connect(IPv6Address address);
@@ -82,6 +84,8 @@ namespace asyncio::net {
     class UnixStream final : public ISocket, public ICloseable {
     public:
         explicit UnixStream(Pipe pipe);
+
+        static std::expected<UnixStream, std::error_code> from(uv_os_sock_t socket);
         static zero::async::coroutine::Task<UnixStream, std::error_code> connect(std::string path);
 
         [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;

@@ -104,7 +104,7 @@ std::expected<std::array<asyncio::Pipe, 2>, std::error_code> asyncio::pipe() {
 
     auto writer = Pipe::from(fds[1]);
     EXPECT(writer);
-    fds[0] = -1;
+    fds[1] = -1;
 
     return std::array{*std::move(reader), *std::move(writer)};
 }

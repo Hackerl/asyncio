@@ -8,22 +8,14 @@
 #include <zero/async/coroutine.h>
 
 namespace asyncio {
-    DEFINE_ERROR_CODE_EX(
+    DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
-        BROKEN_PIPE, "broken pipe", std::errc::broken_pipe,
-        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
-        DEVICE_OR_RESOURCE_BUSY, "device or resource busy", std::errc::device_or_resource_busy,
-        FUNCTION_NOT_SUPPORTED, "function not supported", std::errc::function_not_supported,
-        UNEXPECTED_EOF, "unexpected end of file", DEFAULT_ERROR_CONDITION,
-        BAD_FILE_DESCRIPTOR, "bad file descriptor", std::errc::bad_file_descriptor,
-        ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
+        UNEXPECTED_EOF, "unexpected end of file"
     )
 
     //constexpr auto INVALID_FILE_DESCRIPTOR = -1;
     //constexpr auto DEFAULT_BUFFER_CAPACITY = 1024 * 1024;
-
-    using OSSocket = uv_os_sock_t;
 
     class ICloseable : public virtual zero::Interface {
     public:
@@ -32,6 +24,12 @@ namespace asyncio {
 
     class IReader : public virtual zero::Interface {
     public:
+        DEFINE_ERROR_CODE_INNER_EX(
+            Error,
+            "asyncio::IReader",
+            UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
+        )
+
         virtual zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> readExactly(std::span<std::byte> data);
         virtual zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll();
@@ -42,6 +40,15 @@ namespace asyncio {
         virtual zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
     };
+
+    template<typename T>
+    concept Reader = std::derived_from<T, IReader>;
+
+    template<typename T>
+    concept Writer = std::derived_from<T, IWriter>;
+
+    template<typename T>
+    concept StreamIO = Reader<T> && Writer<T>;
 
     /*class IFileDescriptor : public virtual zero::Interface {
     public:
@@ -78,31 +85,18 @@ namespace asyncio {
 
     zero::async::coroutine::Task<void, std::error_code> copy(IReader &reader, IWriter &writer);
 
-    template<typename R, typename W>
-        requires (std::derived_from<R, IReader> && std::derived_from<W, IWriter>)
+    template<Reader R, Writer W>
     zero::async::coroutine::Task<void, std::error_code> copy(std::shared_ptr<R> reader, std::shared_ptr<W> writer) {
         co_return co_await copy(*reader, *writer);
     }
 
-    template<typename T, typename U>
-        requires (
-            std::derived_from<T, IReader> &&
-            std::derived_from<T, IWriter> &&
-            std::derived_from<U, IReader> &&
-            std::derived_from<U, IWriter>
-        )
+    template<StreamIO T, StreamIO U>
     zero::async::coroutine::Task<void, std::error_code>
     copyBidirectional(std::shared_ptr<T> first, std::shared_ptr<U> second) {
         co_return co_await race(copy(first, second), copy(second, first));
     }
 
-    template<typename T, typename U>
-        requires (
-            std::derived_from<T, IReader> &&
-            std::derived_from<T, IWriter> &&
-            std::derived_from<U, IReader> &&
-            std::derived_from<U, IWriter>
-        )
+    template<StreamIO T, StreamIO U>
     zero::async::coroutine::Task<void, std::error_code>
     copyBidirectional(T first, U second) {
         co_return co_await copyBidirectional(
@@ -112,6 +106,7 @@ namespace asyncio {
     }
 }
 
-DECLARE_ERROR_CODE(asyncio::IOError)
+DECLARE_ERROR_CONDITION(asyncio::IOError)
+DECLARE_ERROR_CODE(asyncio::IReader::Error)
 
 #endif //ASYNCIO_IO_H

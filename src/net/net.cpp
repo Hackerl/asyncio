@@ -68,7 +68,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
     switch (addr->sa_family) {
     case AF_INET: {
         if (length != 0 && length != sizeof(sockaddr_in)) {
-            result = std::unexpected<std::error_code>(IOError::INVALID_ARGUMENT);
+            result = std::unexpected<std::error_code>(ParseAddressError::INVALID_ARGUMENT);
             break;
         }
 
@@ -85,7 +85,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 
     case AF_INET6: {
         if (length != 0 && length != sizeof(sockaddr_in6)) {
-            result = std::unexpected<std::error_code>(IOError::INVALID_ARGUMENT);
+            result = std::unexpected<std::error_code>(ParseAddressError::INVALID_ARGUMENT);
             break;
         }
 
@@ -117,7 +117,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 #if __unix__ || __APPLE__
     case AF_UNIX: {
         if (length < sizeof(sa_family_t)) {
-            result = std::unexpected<std::error_code>(IOError::INVALID_ARGUMENT);
+            result = std::unexpected<std::error_code>(ParseAddressError::INVALID_ARGUMENT);
             break;
         }
 
@@ -141,7 +141,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 #endif
 
     default:
-        result = std::unexpected<std::error_code>(IOError::ADDRESS_FAMILY_NOT_SUPPORTED);
+        result = std::unexpected<std::error_code>(ParseAddressError::ADDRESS_FAMILY_NOT_SUPPORTED);
         break;
     }
 
@@ -187,7 +187,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
                 const auto &path = arg.path;
 
                 if (path.empty() || path.length() - (path.front() == '@' ? 1 : 0) >= sizeof(sockaddr_un::sun_path))
-                    return std::unexpected(IOError::INVALID_ARGUMENT);
+                    return std::unexpected(ConvertToSocketAddressError::INVALID_ARGUMENT);
 
                 ptr->sun_family = AF_UNIX;
                 std::memcpy(ptr->sun_path, path.c_str(), path.length());
@@ -203,7 +203,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
             }
 #endif
             else
-                return std::unexpected(IOError::ADDRESS_FAMILY_NOT_SUPPORTED);
+                return std::unexpected(ConvertToSocketAddressError::ADDRESS_FAMILY_NOT_SUPPORTED);
         },
         address
     );

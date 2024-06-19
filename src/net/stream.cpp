@@ -43,6 +43,20 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
     co_return TCPStream{std::move(stream)};
 }
 
+std::expected<asyncio::net::TCPStream, std::error_code> asyncio::net::TCPStream::from(const uv_os_sock_t socket) {
+    auto tcp = std::make_unique<uv_tcp_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_init(getEventLoop()->raw(), tcp.get());
+    }));
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_open(tcp.get(), socket);
+    }));
+
+    return TCPStream{Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}}}};
+}
+
 zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
 asyncio::net::TCPStream::connect(const std::string host, const unsigned short port) {
     addrinfo hints = {};
@@ -308,6 +322,12 @@ zero::async::coroutine::Task<asyncio::net::NamedPipeStream, std::error_code> asy
 }
 #else
 asyncio::net::UnixStream::UnixStream(Pipe pipe) : mPipe(std::move(pipe)) {
+}
+
+std::expected<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixStream::from(const uv_os_sock_t socket) {
+    auto pipe = Pipe::from(socket);
+    EXPECT(pipe);
+    return UnixStream{*std::move(pipe)};
 }
 
 zero::async::coroutine::Task<asyncio::net::UnixStream, std::error_code>

@@ -6,13 +6,22 @@
 #include <zero/expect.h>
 
 namespace asyncio {
+    DEFINE_ERROR_CODE_EX(
+        BufReaderError,
+        "asyncio::BufReader",
+        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
+        UNEXPECTED_EOF, "unexpected end of file", IOError::UNEXPECTED_EOF
+    )
+
     template<typename T>
         requires (
             std::derived_from<T, IReader> ||
             std::convertible_to<T, std::unique_ptr<IReader>> ||
             std::convertible_to<T, std::shared_ptr<IReader>>
         )
-    class BufReader final : public IBufReader, public Reader {
+    class BufReader final : public IBufReader {
+        static constexpr auto DEFAULT_BUFFER_CAPACITY = 8192;
+
     public:
         explicit BufReader(T reader, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY)
             : mReader(std::move(reader)), mCapacity(capacity), mHead(0), mTail(0),
@@ -30,6 +39,10 @@ namespace asyncio {
         }
 
     public:
+        [[nodiscard]] std::size_t capacity() const {
+            return mCapacity;
+        }
+
         zero::async::coroutine::Task<std::size_t, std::error_code> read(const std::span<std::byte> data) override {
             if (available() == 0) {
                 if (data.size() >= mCapacity)
@@ -53,10 +66,6 @@ namespace asyncio {
             mHead += size;
 
             co_return size;
-        }
-
-        [[nodiscard]] std::size_t capacity() const override {
-            return mCapacity;
         }
 
         [[nodiscard]] std::size_t available() const override {
@@ -95,7 +104,7 @@ namespace asyncio {
                 CO_EXPECT(n);
 
                 if (*n == 0) {
-                    result = std::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
+                    result = std::unexpected(make_error_code(BufReaderError::UNEXPECTED_EOF));
                     break;
                 }
 
@@ -107,7 +116,7 @@ namespace asyncio {
 
         zero::async::coroutine::Task<void, std::error_code> peek(const std::span<std::byte> data) override {
             if (data.size() > mCapacity)
-                co_return std::unexpected(IOError::INVALID_ARGUMENT);
+                co_return std::unexpected(make_error_code(BufReaderError::INVALID_ARGUMENT));
 
             if (const std::size_t available = this->available(); available < data.size()) {
                 if (mHead > 0) {
@@ -121,7 +130,7 @@ namespace asyncio {
                     CO_EXPECT(n);
 
                     if (*n == 0)
-                        co_return std::unexpected<std::error_code>(IOError::UNEXPECTED_EOF);
+                        co_return std::unexpected(make_error_code(BufReaderError::UNEXPECTED_EOF));
 
                     mTail += *n;
                 }
@@ -146,7 +155,9 @@ namespace asyncio {
             std::convertible_to<T, std::unique_ptr<IWriter>> ||
             std::convertible_to<T, std::shared_ptr<IWriter>>
         )
-    class BufWriter final : public IBufWriter, public Writer {
+    class BufWriter final : public IBufWriter {
+        static constexpr auto DEFAULT_BUFFER_CAPACITY = 8192;
+
     public:
         explicit BufWriter(T writer, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY)
             : mWriter(std::move(writer)), mCapacity(capacity), mPending(0),
@@ -164,6 +175,10 @@ namespace asyncio {
         }
 
     public:
+        [[nodiscard]] std::size_t capacity() const {
+            return mCapacity;
+        }
+
         zero::async::coroutine::Task<std::size_t, std::error_code>
         write(const std::span<const std::byte> data) override {
             std::expected<std::size_t, std::error_code> result;
@@ -191,10 +206,6 @@ namespace asyncio {
             }
 
             co_return result;
-        }
-
-        [[nodiscard]] std::size_t capacity() const override {
-            return mCapacity;
         }
 
         [[nodiscard]] std::size_t pending() const override {
@@ -235,5 +246,7 @@ namespace asyncio {
         std::unique_ptr<std::byte[]> mBuffer;
     };
 }
+
+DECLARE_ERROR_CODES(asyncio::BufReaderError)
 
 #endif //ASYNCIO_BUFFER_H

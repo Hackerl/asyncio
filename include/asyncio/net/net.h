@@ -52,8 +52,22 @@ namespace asyncio::net {
         }
     }
 
+    DEFINE_ERROR_CODE_EX(
+        ParseAddressError,
+        "asyncio::net::addressFrom",
+        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
+        ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
+    )
+
     std::expected<Address, std::error_code> addressFrom(const std::string &ip, unsigned short port);
     std::expected<Address, std::error_code> addressFrom(const sockaddr *addr, socklen_t length);
+
+    DEFINE_ERROR_CODE_EX(
+        ConvertToSocketAddressError,
+        "asyncio::net::socketAddressFrom",
+        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
+        ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
+    )
 
     std::expected<SocketAddress, std::error_code> socketAddressFrom(const Address &address);
 
@@ -118,5 +132,7 @@ struct fmt::formatter<asyncio::net::UnixAddress, Char> {
         return std::ranges::copy(address.path, ctx.out()).out;
     }
 };
+
+DECLARE_ERROR_CODES(asyncio::net::ParseAddressError, asyncio::net::ConvertToSocketAddressError)
 
 #endif //ASYNCIO_NET_H

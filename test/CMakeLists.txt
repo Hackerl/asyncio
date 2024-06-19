@@ -2,12 +2,12 @@ find_package(Catch2 CONFIG REQUIRED)
 
 add_executable(
         asyncio_test
-#        io.cpp
-#        buffer.cpp
-#        binary.cpp
+        io.cpp
         time.cpp
         poll.cpp
         thread.cpp
+        buffer.cpp
+        binary.cpp
         promise.cpp
         channel.cpp
         event_loop.cpp
@@ -19,11 +19,6 @@ add_executable(
 #        sync/mutex.cpp
 #        sync/event.cpp
 #        sync/condition.cpp
-#        ev/pipe.cpp
-#        ev/event.cpp
-#        ev/buffer.cpp
-#        ev/signal.cpp
-#        ev/timer.cpp
 #        fs/file.cpp
 #        fs/pipe.cpp
 #        net/net.cpp

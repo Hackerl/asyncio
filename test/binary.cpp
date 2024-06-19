@@ -1,11 +1,10 @@
 #include <asyncio/binary.h>
-#include <asyncio/event_loop.h>
-#include <asyncio/ev/pipe.h>
+#include <asyncio/pipe.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
 template<typename T>
-zero::async::coroutine::Task<void> transfer(auto buffers) {
+zero::async::coroutine::Task<void> transfer(auto pipes) {
     const auto i = GENERATE(
         T{6789},
         (std::numeric_limits<T>::max)(),
@@ -13,52 +12,54 @@ zero::async::coroutine::Task<void> transfer(auto buffers) {
     );
 
     co_await allSettled(
-        [](auto buffer, auto value) -> zero::async::coroutine::Task<void> {
-            auto result = co_await asyncio::binary::writeLE(buffer, value);
-            REQUIRE(result);
-
-            result = co_await asyncio::binary::writeBE(buffer, value);
-            REQUIRE(result);
-        }(std::move(buffers[0]), i),
-        [](auto buffer, auto value) -> zero::async::coroutine::Task<void> {
-            auto result = co_await asyncio::binary::readLE<T>(buffer);
+        [](auto reader, auto value) -> zero::async::coroutine::Task<void> {
+            auto result = co_await asyncio::binary::readLE<T>(reader);
             REQUIRE(result);
             REQUIRE(*result == value);
 
-            result = co_await asyncio::binary::readBE<T>(buffer);
+            result = co_await asyncio::binary::readBE<T>(reader);
             REQUIRE(result);
             REQUIRE(*result == value);
-        }(std::move(buffers[1]), i)
+        }(std::move(pipes[0]), i),
+        [](auto writer, auto value) -> zero::async::coroutine::Task<void> {
+            auto result = co_await asyncio::binary::writeLE(writer, value);
+            REQUIRE(result);
+
+            result = co_await asyncio::binary::writeBE(writer, value);
+            REQUIRE(result);
+        }(std::move(pipes[1]), i)
     );
 }
 
 TEST_CASE("binary transfer", "[binary]") {
-    asyncio::run([]() -> zero::async::coroutine::Task<void> {
-        auto buffers = asyncio::ev::pipe();
-        REQUIRE(buffers);
+    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+        auto pipes = asyncio::pipe();
+        REQUIRE(pipes);
 
         SECTION("int16_t") {
-            co_await transfer<std::int16_t>(*std::move(buffers));
+            co_await transfer<std::int16_t>(*std::move(pipes));
         }
 
         SECTION("uint16_t") {
-            co_await transfer<std::uint16_t>(*std::move(buffers));
+            co_await transfer<std::uint16_t>(*std::move(pipes));
         }
 
         SECTION("int32_t") {
-            co_await transfer<std::int32_t>(*std::move(buffers));
+            co_await transfer<std::int32_t>(*std::move(pipes));
         }
 
         SECTION("uint32_t") {
-            co_await transfer<std::uint32_t>(*std::move(buffers));
+            co_await transfer<std::uint32_t>(*std::move(pipes));
         }
 
         SECTION("int64_t") {
-            co_await transfer<std::int64_t>(*std::move(buffers));
+            co_await transfer<std::int64_t>(*std::move(pipes));
         }
 
         SECTION("uint64_t") {
-            co_await transfer<std::uint64_t>(*std::move(buffers));
+            co_await transfer<std::uint64_t>(*std::move(pipes));
         }
     });
+    REQUIRE(result);
+    REQUIRE(*result);
 }
