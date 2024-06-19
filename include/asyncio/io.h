@@ -25,22 +25,22 @@ namespace asyncio {
 
     using OSSocket = uv_os_sock_t;
 
+    class ICloseable : public virtual zero::Interface {
+    public:
+        virtual zero::async::coroutine::Task<void, std::error_code> close() = 0;
+    };
+
     class IReader : public virtual zero::Interface {
     public:
         virtual zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
-        virtual zero::async::coroutine::Task<void, std::error_code> readExactly(std::span<std::byte> data) = 0;
-        virtual zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll() = 0;
+        virtual zero::async::coroutine::Task<void, std::error_code> readExactly(std::span<std::byte> data);
+        virtual zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll();
     };
 
     class IWriter : public virtual zero::Interface {
     public:
         virtual zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
-        virtual zero::async::coroutine::Task<void, std::error_code> writeAll(std::span<const std::byte> data) = 0;
-    };
-
-    class IStreamIO : public virtual IReader, public virtual IWriter {
-    public:
-        virtual zero::async::coroutine::Task<void, std::error_code> close() = 0;
+        virtual zero::async::coroutine::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
     };
 
     /*class IFileDescriptor : public virtual zero::Interface {
@@ -62,12 +62,7 @@ namespace asyncio {
         [[nodiscard]] virtual std::expected<std::uint64_t, std::error_code> position() const = 0;
     };
 
-    class IBuffered : public virtual zero::Interface {
-    public:
-        [[nodiscard]] virtual std::size_t capacity() const = 0;
-    };
-
-    class IBufReader : public virtual IReader, public virtual IBuffered {
+    class IBufReader : public virtual IReader {
     public:
         [[nodiscard]] virtual std::size_t available() const = 0;
         virtual zero::async::coroutine::Task<std::string, std::error_code> readLine() = 0;
@@ -75,24 +70,10 @@ namespace asyncio {
         virtual zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) = 0;
     };
 
-    class IBufWriter : public virtual IWriter, public virtual IBuffered {
+    class IBufWriter : public virtual IWriter {
     public:
         [[nodiscard]] virtual std::size_t pending() const = 0;
         virtual zero::async::coroutine::Task<void, std::error_code> flush() = 0;
-    };
-
-    class IBuffer : public virtual IStreamIO, public IBufReader, public IBufWriter {
-    };
-
-    class Reader : public virtual IReader {
-    public:
-        zero::async::coroutine::Task<void, std::error_code> readExactly(std::span<std::byte> data) override;
-        zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll() override;
-    };
-
-    class Writer : public virtual IWriter {
-    public:
-        zero::async::coroutine::Task<void, std::error_code> writeAll(std::span<const std::byte> data) override;
     };
 
     zero::async::coroutine::Task<void, std::error_code> copy(IReader &reader, IWriter &writer);
@@ -104,14 +85,24 @@ namespace asyncio {
     }
 
     template<typename T, typename U>
-        requires (std::derived_from<T, IStreamIO> && std::derived_from<U, IStreamIO>)
+        requires (
+            std::derived_from<T, IReader> &&
+            std::derived_from<T, IWriter> &&
+            std::derived_from<U, IReader> &&
+            std::derived_from<U, IWriter>
+        )
     zero::async::coroutine::Task<void, std::error_code>
     copyBidirectional(std::shared_ptr<T> first, std::shared_ptr<U> second) {
         co_return co_await race(copy(first, second), copy(second, first));
     }
 
     template<typename T, typename U>
-        requires (std::derived_from<T, IStreamIO> && std::derived_from<U, IStreamIO>)
+        requires (
+            std::derived_from<T, IReader> &&
+            std::derived_from<T, IWriter> &&
+            std::derived_from<U, IReader> &&
+            std::derived_from<U, IWriter>
+        )
     zero::async::coroutine::Task<void, std::error_code>
     copyBidirectional(T first, U second) {
         co_return co_await copyBidirectional(

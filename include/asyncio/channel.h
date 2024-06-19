@@ -451,7 +451,7 @@ namespace asyncio {
         std::shared_ptr<ChannelCore<T>> mCore;
     };
 
-    DEFINE_ERROR_CONDITION(
+    DEFINE_ERROR_CONDITION_EX(
         ChannelError,
         "asyncio::channel",
         DISCONNECTED,

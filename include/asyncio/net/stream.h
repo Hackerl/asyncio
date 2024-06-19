@@ -2,12 +2,12 @@
 #define ASYNCIO_NET_STREAM_H
 
 #include "net.h"
-#include <asyncio/stream.h>
+#include <asyncio/pipe.h>
 
 namespace asyncio::net {
-    class TCPStream : public Stream, public ISocket {
+    class TCPStream final : public ISocket, public ICloseable {
     public:
-        explicit TCPStream(uv::Handle<uv_stream_t> stream);
+        explicit TCPStream(Stream stream);
 
     private:
         static zero::async::coroutine::Task<TCPStream, std::error_code> connect(SocketAddress address);
@@ -20,6 +20,9 @@ namespace asyncio::net {
         [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;
         [[nodiscard]] std::expected<Address, std::error_code> remoteAddress() const override;
 
+        zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
+        zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
+
         zero::async::coroutine::Task<std::pair<std::size_t, Address>, std::error_code>
         readFrom(std::span<std::byte> data) override;
 
@@ -27,6 +30,9 @@ namespace asyncio::net {
         writeTo(std::span<const std::byte> data, Address address) override;
 
         zero::async::coroutine::Task<void, std::error_code> close() override;
+
+    private:
+        Stream mStream;
     };
 
     class TCPListener {
@@ -46,6 +52,69 @@ namespace asyncio::net {
     private:
         Listener mListener;
     };
+
+#ifdef _WIN32
+    class NamedPipeStream final : public IReader, public IWriter, public ICloseable {
+    public:
+        explicit NamedPipeStream(Pipe pipe);
+        static zero::async::coroutine::Task<NamedPipeStream, std::error_code> connect(std::string name);
+
+        zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
+        zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
+
+        zero::async::coroutine::Task<void, std::error_code> close() override;
+
+    private:
+        Pipe mPipe;
+    };
+
+    class NamedPipeListener {
+    public:
+        explicit NamedPipeListener(Listener listener);
+        static std::expected<NamedPipeListener, std::error_code> listen(const std::string &name);
+
+        zero::async::coroutine::Task<NamedPipeStream, std::error_code> accept();
+
+    private:
+        Listener mListener;
+    };
+#else
+    class UnixStream final : public ISocket, public ICloseable {
+    public:
+        explicit UnixStream(Pipe pipe);
+        static zero::async::coroutine::Task<UnixStream, std::error_code> connect(std::string path);
+
+        [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;
+        [[nodiscard]] std::expected<Address, std::error_code> remoteAddress() const override;
+
+        zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
+        zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
+
+        zero::async::coroutine::Task<std::pair<std::size_t, Address>, std::error_code>
+        readFrom(std::span<std::byte> data) override;
+
+        zero::async::coroutine::Task<std::size_t, std::error_code>
+        writeTo(std::span<const std::byte> data, Address address) override;
+
+        zero::async::coroutine::Task<void, std::error_code> close() override;
+
+    private:
+        Pipe mPipe;
+    };
+
+    class UnixListener {
+    public:
+        explicit UnixListener(Listener listener);
+
+        static std::expected<UnixListener, std::error_code> listen(std::string path);
+        static std::expected<UnixListener, std::error_code> listen(const UnixAddress &address);
+
+        zero::async::coroutine::Task<UnixStream, std::error_code> accept();
+
+    private:
+        Listener mListener;
+    };
+#endif
 }
 
 #endif //ASYNCIO_NET_STREAM_H

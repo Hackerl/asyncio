@@ -6,9 +6,12 @@
 #include "sync/event.h"
 
 namespace asyncio {
-    class Stream : public virtual IStreamIO, public Reader, public Writer {
+    class Stream : public IReader, public IWriter {
     public:
         explicit Stream(uv::Handle<uv_stream_t> stream);
+
+        uv::Handle<uv_stream_t> &handle();
+        [[nodiscard]] const uv::Handle<uv_stream_t> &handle() const;
 
         zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;

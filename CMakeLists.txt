@@ -25,6 +25,7 @@ add_library(
         src/io.cpp
         src/time.cpp
         src/poll.cpp
+        src/pipe.cpp
         src/signal.cpp
         src/stream.cpp
         src/event_loop.cpp

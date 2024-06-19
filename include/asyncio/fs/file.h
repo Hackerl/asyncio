@@ -16,7 +16,7 @@ namespace asyncio::fs {
 
         static std::expected<File, std::error_code> from(FileDescriptor fd, bool append = false);
 
-        zero::async::coroutine::Task<void, std::error_code> close() override;
+        zero::async::coroutine::Task<void, std::error_code> close();
         zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 

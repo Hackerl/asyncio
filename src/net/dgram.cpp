@@ -141,7 +141,7 @@ asyncio::net::UDPSocket::write(const std::span<const std::byte> data) {
         uv_buf_t buffer;
 
         buffer.base = reinterpret_cast<char *>(const_cast<std::byte *>(data.data()));
-        buffer.len = data.size();
+        buffer.len = static_cast<decltype(uv_buf_t::len)>(data.size());
 
         return uv_udp_send(
             &request,
@@ -182,7 +182,7 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
             [](const auto handle, const size_t, uv_buf_t *buf) {
                 const auto span = static_cast<Context *>(handle->data)->data;
                 buf->base = reinterpret_cast<char *>(span.data());
-                buf->len = span.size();
+                buf->len = static_cast<decltype(uv_buf_t::len)>(span.size());
             },
             [](uv_udp_t *handle, const ssize_t n, const uv_buf_t *, const sockaddr *addr, const unsigned) {
                 uv_udp_recv_stop(handle);
@@ -231,7 +231,7 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, const Ad
         uv_buf_t buffer;
 
         buffer.base = reinterpret_cast<char *>(const_cast<std::byte *>(data.data()));
-        buffer.len = data.size();
+        buffer.len = static_cast<decltype(uv_buf_t::len)>(data.size());
 
         return uv_udp_send(
             &request,

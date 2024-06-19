@@ -31,6 +31,10 @@ namespace asyncio::uv {
                 condition = std::errc::resource_unavailable_try_again;
                 break;
 
+            case UV_ENOBUFS:
+                condition = std::errc::no_buffer_space;
+                break;
+
             default:
                 break;
             }

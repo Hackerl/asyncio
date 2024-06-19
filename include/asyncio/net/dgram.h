@@ -5,7 +5,7 @@
 #include <asyncio/uv.h>
 
 namespace asyncio::net {
-    class UDPSocket final : public ISocket, public Reader, public Writer {
+    class UDPSocket final : public ISocket, public ICloseable {
     public:
         explicit UDPSocket(uv::Handle<uv_udp_t> udp);
 

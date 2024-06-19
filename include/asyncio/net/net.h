@@ -63,7 +63,7 @@ namespace asyncio::net {
         [[nodiscard]] virtual std::expected<Address, std::error_code> remoteAddress() const = 0;
     };
 
-    class ISocket : public virtual IStreamIO, public virtual IEndpoint {
+    class ISocket : public virtual IReader, public virtual IWriter, public IEndpoint {
     public:
         virtual zero::async::coroutine::Task<std::pair<std::size_t, Address>, std::error_code>
         readFrom(std::span<std::byte> data) = 0;

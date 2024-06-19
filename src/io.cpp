@@ -1,6 +1,6 @@
 #include <asyncio/io.h>
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::Reader::readExactly(const std::span<std::byte> data) {
+zero::async::coroutine::Task<void, std::error_code> asyncio::IReader::readExactly(const std::span<std::byte> data) {
     std::expected<void, std::error_code> result;
     std::size_t offset = 0;
 
@@ -23,7 +23,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::Reader::readExactly
     co_return result;
 }
 
-zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::Reader::readAll() {
+zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::IReader::readAll() {
     std::expected<std::vector<std::byte>, std::error_code> result;
 
     while (true) {
@@ -44,7 +44,7 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::R
     co_return result;
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::Writer::writeAll(const std::span<const std::byte> data) {
+zero::async::coroutine::Task<void, std::error_code> asyncio::IWriter::writeAll(const std::span<const std::byte> data) {
     std::expected<void, std::error_code> result;
     std::size_t offset = 0;
 

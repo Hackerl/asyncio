@@ -2,7 +2,7 @@
 #include <asyncio/net/dns.h>
 #include <asyncio/promise.h>
 
-asyncio::net::TCPStream::TCPStream(uv::Handle<uv_stream_t> stream) : Stream(std::move(stream)) {
+asyncio::net::TCPStream::TCPStream(Stream stream) : mStream(std::move(stream)) {
 }
 
 // TODO
@@ -16,7 +16,7 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
     }));
 
-    TCPStream stream(uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}});
+    Stream stream(uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}});
 
     Promise<void, std::error_code> promise;
     uv_connect_t request = {.data = &promise};
@@ -24,7 +24,7 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
     CO_EXPECT(uv::expected([&] {
         return uv_tcp_connect(
             &request,
-            reinterpret_cast<uv_tcp_t *>(stream.mStream.raw()),
+            reinterpret_cast<uv_tcp_t *>(stream.handle().raw()),
             address.first.get(),
             [](const auto handle, const int status) {
                 const auto p = static_cast<Promise<void, std::error_code> *>(handle->data);
@@ -40,7 +40,7 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
     }));
 
     CO_EXPECT(co_await promise.getFuture());
-    co_return std::move(stream);
+    co_return TCPStream{std::move(stream)};
 }
 
 zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
@@ -90,7 +90,7 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::TCPStream::l
 
     EXPECT(uv::expected([&] {
         return uv_tcp_getsockname(
-            reinterpret_cast<const uv_tcp_t *>(mStream.raw()),
+            reinterpret_cast<const uv_tcp_t *>(mStream.handle().raw()),
             reinterpret_cast<sockaddr *>(&storage),
             &length
         );
@@ -105,13 +105,23 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::TCPStream::r
 
     EXPECT(uv::expected([&] {
         return uv_tcp_getpeername(
-            reinterpret_cast<const uv_tcp_t *>(mStream.raw()),
+            reinterpret_cast<const uv_tcp_t *>(mStream.handle().raw()),
             reinterpret_cast<sockaddr *>(&storage),
             &length
         );
     }));
 
     return addressFrom(reinterpret_cast<const sockaddr *>(&storage), length);
+}
+
+zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::net::TCPStream::read(const std::span<std::byte> data) {
+    co_return co_await mStream.read(data);
+}
+
+zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::net::TCPStream::write(const std::span<const std::byte> data) {
+    co_return co_await mStream.write(data);
 }
 
 zero::async::coroutine::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
@@ -126,12 +136,12 @@ asyncio::net::TCPStream::readFrom(const std::span<std::byte> data) {
 }
 
 zero::async::coroutine::Task<std::size_t, std::error_code>
-asyncio::net::TCPStream::writeTo(const std::span<const std::byte> data, const Address address) {
+asyncio::net::TCPStream::writeTo(const std::span<const std::byte> data, const Address) {
     co_return co_await write(data);
 }
 
 zero::async::coroutine::Task<void, std::error_code> asyncio::net::TCPStream::close() {
-    mStream.close();
+    mStream.handle().close();
     co_return {};
 }
 
@@ -190,5 +200,256 @@ asyncio::net::TCPListener::accept() {
     }));
 
     CO_EXPECT(co_await mListener.accept(reinterpret_cast<uv_stream_t *>(tcp.get())));
-    co_return TCPStream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}}};
+
+    co_return TCPStream{
+        Stream{
+            uv::Handle{
+                std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}
+            }
+        }
+    };
 }
+
+#ifdef _WIN32
+asyncio::net::NamedPipeStream::NamedPipeStream(Pipe pipe) : mPipe(std::move(pipe)) {
+}
+
+zero::async::coroutine::Task<asyncio::net::NamedPipeStream, std::error_code>
+asyncio::net::NamedPipeStream::connect(const std::string name) {
+    auto pipe = std::make_unique<uv_pipe_t>();
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
+    }));
+
+    Pipe stream(uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}});
+
+    Promise<void, std::error_code> promise;
+    uv_connect_t request = {.data = &promise};
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_pipe_connect2(
+            &request,
+            reinterpret_cast<uv_pipe_t *>(stream.handle().raw()),
+            name.c_str(),
+            name.length(),
+            UV_PIPE_NO_TRUNCATE,
+            [](const auto handle, const int status) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(handle->data);
+
+                if (status < 0) {
+                    p->reject(static_cast<uv::Error>(status));
+                    return;
+                }
+
+                p->resolve();
+            }
+        );
+    }));
+
+    CO_EXPECT(co_await promise.getFuture());
+    co_return NamedPipeStream{std::move(stream)};
+}
+
+zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::net::NamedPipeStream::read(const std::span<std::byte> data) {
+    co_return co_await mPipe.read(data);
+}
+
+zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::net::NamedPipeStream::write(const std::span<const std::byte> data) {
+    co_return co_await mPipe.write(data);
+}
+
+zero::async::coroutine::Task<void, std::error_code> asyncio::net::NamedPipeStream::close() {
+    mPipe.handle().close();
+    co_return {};
+}
+
+asyncio::net::NamedPipeListener::NamedPipeListener(Listener listener) : mListener(std::move(listener)) {
+}
+
+std::expected<asyncio::net::NamedPipeListener, std::error_code>
+asyncio::net::NamedPipeListener::listen(const std::string &name) {
+    auto pipe = std::make_unique<uv_pipe_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
+    }));
+
+    EXPECT(uv::expected([&] {
+        return uv_pipe_bind2(pipe.get(), name.c_str(), name.length(), UV_PIPE_NO_TRUNCATE);
+    }));
+
+    auto listener = Listener::make(
+        uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}}
+    );
+    EXPECT(listener);
+
+    return NamedPipeListener{*std::move(listener)};
+}
+
+zero::async::coroutine::Task<asyncio::net::NamedPipeStream, std::error_code> asyncio::net::NamedPipeListener::accept() {
+    auto pipe = std::make_unique<uv_pipe_t>();
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
+    }));
+
+    CO_EXPECT(co_await mListener.accept(reinterpret_cast<uv_stream_t *>(pipe.get())));
+
+    co_return NamedPipeStream{
+        Pipe{
+            uv::Handle{
+                std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}
+            }
+        }
+    };
+}
+#else
+asyncio::net::UnixStream::UnixStream(Pipe pipe) : mPipe(std::move(pipe)) {
+}
+
+zero::async::coroutine::Task<asyncio::net::UnixStream, std::error_code>
+asyncio::net::UnixStream::connect(std::string path) {
+    assert(!path.empty());
+
+    if (path.front() == '@')
+        path.front() = '\0';
+
+    auto pipe = std::make_unique<uv_pipe_t>();
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
+    }));
+
+    Pipe stream(uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}});
+
+    Promise<void, std::error_code> promise;
+    uv_connect_t request = {.data = &promise};
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_pipe_connect2(
+            &request,
+            reinterpret_cast<uv_pipe_t *>(stream.handle().raw()),
+            path.c_str(),
+            path.length(),
+            UV_PIPE_NO_TRUNCATE,
+            [](const auto handle, const int status) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(handle->data);
+
+                if (status < 0) {
+                    p->reject(static_cast<uv::Error>(status));
+                    return;
+                }
+
+                p->resolve();
+            }
+        );
+    }));
+
+    CO_EXPECT(co_await promise.getFuture());
+    co_return UnixStream{std::move(stream)};
+}
+
+std::expected<asyncio::net::UnixListener, std::error_code>
+asyncio::net::UnixListener::listen(const UnixAddress &address) {
+    return listen(address.path);
+}
+
+std::expected<asyncio::net::Address, std::error_code> asyncio::net::UnixStream::localAddress() const {
+    auto address = mPipe.localAddress();
+    EXPECT(address);
+
+    if (!address->empty() && address->front() == '\0')
+        address->front() = '@';
+
+    return UnixAddress{*std::move(address)};
+}
+
+std::expected<asyncio::net::Address, std::error_code> asyncio::net::UnixStream::remoteAddress() const {
+    auto address = mPipe.remoteAddress();
+    EXPECT(address);
+
+    if (!address->empty() && address->front() == '\0')
+        address->front() = '@';
+
+    return UnixAddress{*std::move(address)};
+}
+
+zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::net::UnixStream::read(const std::span<std::byte> data) {
+    co_return co_await mPipe.read(data);
+}
+
+zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::net::UnixStream::write(const std::span<const std::byte> data) {
+    co_return co_await mPipe.write(data);
+}
+
+zero::async::coroutine::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
+asyncio::net::UnixStream::readFrom(const std::span<std::byte> data) {
+    auto remote = remoteAddress();
+    CO_EXPECT(remote);
+
+    auto n = co_await read(data);
+    CO_EXPECT(n);
+
+    co_return std::pair{*n, *std::move(remote)};
+}
+
+zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::net::UnixStream::writeTo(const std::span<const std::byte> data, const Address) {
+    co_return co_await write(data);
+}
+
+zero::async::coroutine::Task<void, std::error_code> asyncio::net::UnixStream::close() {
+    mPipe.handle().close();
+    co_return {};
+}
+
+asyncio::net::UnixListener::UnixListener(Listener listener) : mListener(std::move(listener)) {
+}
+
+std::expected<asyncio::net::UnixListener, std::error_code> asyncio::net::UnixListener::listen(std::string path) {
+    assert(!path.empty());
+
+    if (path.front() == '@')
+        path.front() = '\0';
+
+    auto pipe = std::make_unique<uv_pipe_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
+    }));
+
+    EXPECT(uv::expected([&] {
+        return uv_pipe_bind2(pipe.get(), path.c_str(), path.length(), UV_PIPE_NO_TRUNCATE);
+    }));
+
+    auto listener = Listener::make(
+        uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}}
+    );
+    EXPECT(listener);
+
+    return UnixListener{*std::move(listener)};
+}
+
+zero::async::coroutine::Task<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixListener::accept() {
+    auto pipe = std::make_unique<uv_pipe_t>();
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
+    }));
+
+    CO_EXPECT(co_await mListener.accept(reinterpret_cast<uv_stream_t *>(pipe.get())));
+
+    co_return UnixStream{
+        Pipe{
+            uv::Handle{
+                std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}
+            }
+        }
+    };
+}
+#endif

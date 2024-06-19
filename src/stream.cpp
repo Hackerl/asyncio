@@ -4,6 +4,14 @@
 asyncio::Stream::Stream(uv::Handle<uv_stream_t> stream) : mStream(std::move(stream)) {
 }
 
+asyncio::uv::Handle<uv_stream_s> &asyncio::Stream::handle() {
+    return mStream;
+}
+
+const asyncio::uv::Handle<uv_stream_s> &asyncio::Stream::handle() const {
+    return mStream;
+}
+
 zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::Stream::read(const std::span<std::byte> data) {
     struct Context {
         std::span<std::byte> data;
@@ -19,7 +27,7 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::Stream::read
             [](const auto handle, const size_t, uv_buf_t *buf) {
                 const auto span = static_cast<Context *>(handle->data)->data;
                 buf->base = reinterpret_cast<char *>(span.data());
-                buf->len = span.size();
+                buf->len = static_cast<decltype(uv_buf_t::len)>(span.size());
             },
             [](uv_stream_t *handle, const ssize_t n, const uv_buf_t *) {
                 uv_read_stop(handle);
@@ -62,7 +70,7 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
         uv_buf_t buffer;
 
         buffer.base = reinterpret_cast<char *>(const_cast<std::byte *>(data.data()));
-        buffer.len = data.size();
+        buffer.len = static_cast<decltype(uv_buf_t::len)>(data.size());
 
         return uv_write(
             &request,

@@ -31,7 +31,7 @@ namespace asyncio::ev {
     public:
         void resize(std::size_t capacity);
 
-        zero::async::coroutine::Task<void, std::error_code> close() override;
+        zero::async::coroutine::Task<void, std::error_code> close();
         zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
 
         [[nodiscard]] std::size_t available() const override;
