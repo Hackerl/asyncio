@@ -1,8 +1,7 @@
 #ifndef ASYNCIO_SIGNAL_H
 #define ASYNCIO_SIGNAL_H
 
-#include "uv.h"
-#include <zero/async/coroutine.h>
+#include "task.h"
 
 namespace asyncio {
     class Signal {
@@ -10,7 +9,7 @@ namespace asyncio {
         explicit Signal(uv::Handle<uv_signal_t> signal);
         static std::expected<Signal, std::error_code> make();
 
-        zero::async::coroutine::Task<int, std::error_code> on(int sig);
+        task::Task<int, std::error_code> on(int sig);
 
     private:
         uv::Handle<uv_signal_t> mSignal;

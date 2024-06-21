@@ -3,7 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("asyncio buffer", "[buffer]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         auto pipes = asyncio::pipe();
         REQUIRE(pipes);
 
@@ -14,7 +14,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
 
                 SECTION("read") {
                     co_await allSettled(
-                        [](auto r) -> zero::async::coroutine::Task<void> {
+                        [](auto r) -> asyncio::task::Task<void> {
                             std::string message;
                             message.resize(6);
 
@@ -33,7 +33,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                             REQUIRE(n);
                             REQUIRE(*n == 0);
                         }(std::move(reader)),
-                        [](auto writer) -> zero::async::coroutine::Task<void> {
+                        [](auto writer) -> asyncio::task::Task<void> {
                             using namespace std::string_view_literals;
                             const auto res = co_await writer.writeAll(std::as_bytes(std::span{"hello world"sv}));
                             REQUIRE(res);
@@ -43,7 +43,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
 
                 SECTION("read line") {
                     co_await allSettled(
-                        [](auto r) -> zero::async::coroutine::Task<void> {
+                        [](auto r) -> asyncio::task::Task<void> {
                             auto line = co_await r.readLine();
                             REQUIRE(line);
                             REQUIRE(*line == "hello world hello world");
@@ -56,7 +56,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                             REQUIRE(!line);
                             REQUIRE(line.error() == asyncio::IOError::UNEXPECTED_EOF);
                         }(std::move(reader)),
-                        [](auto writer) -> zero::async::coroutine::Task<void> {
+                        [](auto writer) -> asyncio::task::Task<void> {
                             constexpr std::string_view message = "hello world hello world\r\nhello ";
 
                             auto res = co_await writer.writeAll(std::as_bytes(std::span{message}));
@@ -70,7 +70,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
 
                 SECTION("read until") {
                     co_await allSettled(
-                        [](auto r) -> zero::async::coroutine::Task<void> {
+                        [](auto r) -> asyncio::task::Task<void> {
                             using namespace std::string_view_literals;
 
                             auto res = co_await r.readUntil(std::byte{'\1'});
@@ -91,7 +91,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                             REQUIRE(!res);
                             REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
                         }(std::move(reader)),
-                        [](auto writer) -> zero::async::coroutine::Task<void> {
+                        [](auto writer) -> asyncio::task::Task<void> {
                             constexpr std::string_view message = "hello world hello world\1hello ";
 
                             auto res = co_await writer.writeAll(std::as_bytes(std::span{message}));
@@ -106,7 +106,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                 SECTION("peek") {
                     SECTION("normal") {
                         co_await allSettled(
-                            [](auto r) -> zero::async::coroutine::Task<void> {
+                            [](auto r) -> asyncio::task::Task<void> {
                                 std::string message;
                                 message.resize(6);
 
@@ -120,7 +120,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                                 REQUIRE(message == "hello ");
                                 REQUIRE(r.available() == 11);
                             }(std::move(reader)),
-                            [](auto writer) -> zero::async::coroutine::Task<void> {
+                            [](auto writer) -> asyncio::task::Task<void> {
                                 using namespace std::string_view_literals;
                                 const auto res = co_await writer.writeAll(std::as_bytes(std::span{"hello world"sv}));
                                 REQUIRE(res);
@@ -141,7 +141,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                 asyncio::BufReader reader(std::make_unique<asyncio::Pipe>(std::move(pipes->at(0))));
 
                 co_await allSettled(
-                    [](auto r) -> zero::async::coroutine::Task<void> {
+                    [](auto r) -> asyncio::task::Task<void> {
                         std::string message;
                         message.resize(6);
 
@@ -160,7 +160,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(n);
                         REQUIRE(*n == 0);
                     }(std::move(reader)),
-                    [](auto writer) -> zero::async::coroutine::Task<void> {
+                    [](auto writer) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
                         const auto res = co_await writer.writeAll(std::as_bytes(std::span{"hello world"sv}));
                         REQUIRE(res);
@@ -172,7 +172,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                 asyncio::BufReader reader(std::make_shared<asyncio::Pipe>(std::move(pipes->at(0))));
 
                 co_await allSettled(
-                    [](auto r) -> zero::async::coroutine::Task<void> {
+                    [](auto r) -> asyncio::task::Task<void> {
                         std::string message;
                         message.resize(6);
 
@@ -191,7 +191,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(n);
                         REQUIRE(*n == 0);
                     }(std::move(reader)),
-                    [](auto writer) -> zero::async::coroutine::Task<void> {
+                    [](auto writer) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
                         const auto res = co_await writer.writeAll(std::as_bytes(std::span{"hello world"sv}));
                         REQUIRE(res);
@@ -206,7 +206,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                 REQUIRE(writer.capacity() == 16);
 
                 co_await allSettled(
-                    [](auto writer) -> zero::async::coroutine::Task<void> {
+                    [](auto writer) -> asyncio::task::Task<void> {
                         std::string message;
                         message.resize(11);
 
@@ -222,7 +222,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(n);
                         REQUIRE(*n == 0);
                     }(std::move(pipes->at(0))),
-                    [](auto w) -> zero::async::coroutine::Task<void> {
+                    [](auto w) -> asyncio::task::Task<void> {
                         constexpr std::string_view message = "hello world";
                         auto res = co_await w.writeAll(std::as_bytes(std::span{message}));
                         REQUIRE(res);
@@ -243,7 +243,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                 REQUIRE(writer.capacity() == 16);
 
                 co_await allSettled(
-                    [](auto reader) -> zero::async::coroutine::Task<void> {
+                    [](auto reader) -> asyncio::task::Task<void> {
                         std::string message;
                         message.resize(11);
 
@@ -259,7 +259,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(n);
                         REQUIRE(*n == 0);
                     }(std::move(pipes->at(0))),
-                    [](auto w) -> zero::async::coroutine::Task<void> {
+                    [](auto w) -> asyncio::task::Task<void> {
                         constexpr std::string_view message = "hello world";
                         auto res = co_await w.writeAll(std::as_bytes(std::span{message}));
                         REQUIRE(res);
@@ -280,7 +280,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                 REQUIRE(writer.capacity() == 16);
 
                 co_await allSettled(
-                    [](auto reader) -> zero::async::coroutine::Task<void> {
+                    [](auto reader) -> asyncio::task::Task<void> {
                         std::string message;
                         message.resize(11);
 
@@ -296,7 +296,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                         REQUIRE(n);
                         REQUIRE(*n == 0);
                     }(std::move(pipes->at(0))),
-                    [](auto w) -> zero::async::coroutine::Task<void> {
+                    [](auto w) -> asyncio::task::Task<void> {
                         constexpr std::string_view message = "hello world";
                         auto res = co_await w.writeAll(std::as_bytes(std::span{message}));
                         REQUIRE(res);

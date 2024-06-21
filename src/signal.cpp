@@ -1,5 +1,4 @@
 #include <asyncio/signal.h>
-#include <asyncio/promise.h>
 
 asyncio::Signal::Signal(uv::Handle<uv_signal_t> signal) : mSignal(std::move(signal)) {
 }
@@ -14,7 +13,7 @@ std::expected<asyncio::Signal, std::error_code> asyncio::Signal::make() {
     return Signal{uv::Handle{std::move(signal)}};
 }
 
-zero::async::coroutine::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
+asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
     Promise<int, std::error_code> promise;
     mSignal->data = &promise;
 
@@ -28,14 +27,14 @@ zero::async::coroutine::Task<int, std::error_code> asyncio::Signal::on(const int
         );
     }));
 
-    co_return co_await zero::async::coroutine::Cancellable{
+    co_return co_await task::Cancellable{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(task::Error::WILL_BE_DONE);
 
             uv_signal_stop(mSignal.raw());
-            promise.reject(zero::async::coroutine::Error::CANCELLED);
+            promise.reject(task::Error::CANCELLED);
             return {};
         }
     };

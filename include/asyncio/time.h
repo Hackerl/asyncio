@@ -1,10 +1,10 @@
 #ifndef ASYNCIO_TIME_H
 #define ASYNCIO_TIME_H
 
-#include <zero/async/coroutine.h>
+#include "task.h"
 
 namespace asyncio {
-    zero::async::coroutine::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
+    task::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
     DEFINE_ERROR_CODE_EX(
         TimeoutError,
@@ -14,8 +14,8 @@ namespace asyncio {
 
     template<typename T, typename E>
         requires (!std::is_same_v<E, std::exception_ptr>)
-    zero::async::coroutine::Task<std::expected<T, E>, TimeoutError>
-    timeout(zero::async::coroutine::Task<T, E> task, const std::chrono::milliseconds ms) {
+    task::Task<std::expected<T, E>, TimeoutError>
+    timeout(task::Task<T, E> task, const std::chrono::milliseconds ms) {
         if (ms == std::chrono::milliseconds::zero())
             co_return std::expected<std::expected<T, E>, TimeoutError>{co_await task};
 

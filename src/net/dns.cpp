@@ -1,8 +1,6 @@
 #include <asyncio/net/dns.h>
-#include <asyncio/promise.h>
-#include <ranges>
 
-zero::async::coroutine::Task<std::vector<asyncio::net::Address>, std::error_code>
+asyncio::task::Task<std::vector<asyncio::net::Address>, std::error_code>
 asyncio::net::dns::getAddressInfo(
     const std::string node,
     const std::optional<std::string> service,
@@ -43,7 +41,7 @@ asyncio::net::dns::getAddressInfo(
         );
     }));
 
-    co_return co_await zero::async::coroutine::Cancellable{
+    co_return co_await task::Cancellable{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             EXPECT(uv::expected([&] {
@@ -54,7 +52,7 @@ asyncio::net::dns::getAddressInfo(
     };
 }
 
-zero::async::coroutine::Task<std::vector<asyncio::net::IP>, std::error_code>
+asyncio::task::Task<std::vector<asyncio::net::IP>, std::error_code>
 asyncio::net::dns::lookupIP(std::string host) {
     addrinfo hints = {};
 
@@ -78,7 +76,7 @@ asyncio::net::dns::lookupIP(std::string host) {
         });
 }
 
-zero::async::coroutine::Task<std::vector<asyncio::net::IPv4>, std::error_code>
+asyncio::task::Task<std::vector<asyncio::net::IPv4>, std::error_code>
 asyncio::net::dns::lookupIPv4(std::string host) {
     addrinfo hints = {};
 
@@ -99,7 +97,7 @@ asyncio::net::dns::lookupIPv4(std::string host) {
         });
 }
 
-zero::async::coroutine::Task<std::vector<asyncio::net::IPv6>, std::error_code>
+asyncio::task::Task<std::vector<asyncio::net::IPv6>, std::error_code>
 asyncio::net::dns::lookupIPv6(std::string host) {
     addrinfo hints = {};
 

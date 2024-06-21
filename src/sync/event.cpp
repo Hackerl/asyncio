@@ -1,19 +1,22 @@
 #include <asyncio/sync/event.h>
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Event::wait() {
+asyncio::sync::Event::Event() : mValue(false) {
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::sync::Event::wait() {
     if (mValue)
         co_return {};
 
     const auto promise = std::make_shared<Promise<void, std::error_code>>();
     mPending.push_back(promise);
 
-    co_return co_await zero::async::coroutine::Cancellable{
+    co_return co_await task::Cancellable{
         promise->getFuture(),
         [=, this]() -> std::expected<void, std::error_code> {
             if (mPending.remove(promise) == 0)
-                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(task::Error::WILL_BE_DONE);
 
-            promise->reject(zero::async::coroutine::Error::CANCELLED);
+            promise->reject(task::Error::CANCELLED);
             return {};
         }
     };

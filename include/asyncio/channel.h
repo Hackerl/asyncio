@@ -1,7 +1,7 @@
 #ifndef ASYNCIO_CHANNEL_H
 #define ASYNCIO_CHANNEL_H
 
-#include "promise.h"
+#include "task.h"
 #include <chrono>
 #include <zero/atomic/circular_buffer.h>
 
@@ -172,7 +172,7 @@ namespace asyncio {
             return result;
         }
 
-        zero::async::coroutine::Task<void, SendError> send(T element) {
+        task::Task<void, SendError> send(T element) {
             if (mCore->closed)
                 co_return std::unexpected(SendError::DISCONNECTED);
 
@@ -200,13 +200,13 @@ namespace asyncio {
                     mCore->pending[SENDER].push_back(promise);
                     mCore->mutex.unlock();
 
-                    if (const auto res = co_await zero::async::coroutine::Cancellable{
+                    if (const auto res = co_await task::Cancellable{
                         promise->getFuture(),
                         [=]() -> std::expected<void, std::error_code> {
                             if (promise->isFulfilled())
-                                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                                return std::unexpected(task::Error::WILL_BE_DONE);
 
-                            promise->reject(zero::async::coroutine::Error::CANCELLED);
+                            promise->reject(task::Error::CANCELLED);
                             return {};
                         }
                     }; !res) {
@@ -372,7 +372,7 @@ namespace asyncio {
             return result;
         }
 
-        zero::async::coroutine::Task<T, ReceiveError> receive() {
+        task::Task<T, ReceiveError> receive() {
             std::expected<T, ReceiveError> result = std::unexpected(ReceiveError::DISCONNECTED);
 
             while (true) {
@@ -396,13 +396,13 @@ namespace asyncio {
                     mCore->pending[RECEIVER].push_back(promise);
                     mCore->mutex.unlock();
 
-                    if (const auto res = co_await zero::async::coroutine::Cancellable{
+                    if (const auto res = co_await task::Cancellable{
                         promise->getFuture(),
                         [=]() -> std::expected<void, std::error_code> {
                             if (promise->isFulfilled())
-                                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                                return std::unexpected(task::Error::WILL_BE_DONE);
 
-                            promise->reject(zero::async::coroutine::Error::CANCELLED);
+                            promise->reject(task::Error::CANCELLED);
                             return {};
                         }
                     }; !res) {

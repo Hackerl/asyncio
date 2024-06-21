@@ -1,7 +1,6 @@
 #ifndef ASYNCIO_NET_H
 #define ASYNCIO_NET_H
 
-#include <variant>
 #include <asyncio/io.h>
 #include <zero/os/net.h>
 
@@ -77,12 +76,12 @@ namespace asyncio::net {
         [[nodiscard]] virtual std::expected<Address, std::error_code> remoteAddress() const = 0;
     };
 
-    class ISocket : public virtual IReader, public virtual IWriter, public IEndpoint {
+    class ISocket : public IReader, public IWriter, public ICloseable, public IEndpoint {
     public:
-        virtual zero::async::coroutine::Task<std::pair<std::size_t, Address>, std::error_code>
+        virtual task::Task<std::pair<std::size_t, Address>, std::error_code>
         readFrom(std::span<std::byte> data) = 0;
 
-        virtual zero::async::coroutine::Task<std::size_t, std::error_code>
+        virtual task::Task<std::size_t, std::error_code>
         writeTo(std::span<const std::byte> data, Address address) = 0;
     };
 }

@@ -1,7 +1,7 @@
 #include <asyncio/http/request.h>
 #include <zero/cmdline.h>
 
-zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *argv[]) {
+asyncio::task::Task<void, std::error_code> amain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<asyncio::http::URL>("url", "http request url");

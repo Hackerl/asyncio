@@ -1,12 +1,11 @@
 #include <asyncio/signal.h>
 #include <asyncio/time.h>
-#include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
 #include <unistd.h>
 #include <thread>
 
 TEST_CASE("signal handler", "[ev]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         auto signal = asyncio::Signal::make();
         REQUIRE(signal);
 

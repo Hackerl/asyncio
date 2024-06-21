@@ -5,7 +5,7 @@
 TEST_CASE("event loop", "[event loop]") {
     SECTION("with error") {
         SECTION("success") {
-            const auto result = asyncio::run([]() -> zero::async::coroutine::Task<int, std::error_code> {
+            const auto result = asyncio::run([]() -> asyncio::task::Task<int, std::error_code> {
                 using namespace std::chrono_literals;
                 co_await asyncio::sleep(10ms);
                 co_return 1024;
@@ -16,7 +16,7 @@ TEST_CASE("event loop", "[event loop]") {
         }
 
         SECTION("failure") {
-            const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void, std::error_code> {
+            const auto result = asyncio::run([]() -> asyncio::task::Task<void, std::error_code> {
                 using namespace std::chrono_literals;
                 co_await asyncio::sleep(10ms);
                 co_return std::unexpected(make_error_code(std::errc::invalid_argument));
@@ -29,7 +29,7 @@ TEST_CASE("event loop", "[event loop]") {
 
     SECTION("with exception") {
         SECTION("success") {
-            const auto result = asyncio::run([]() -> zero::async::coroutine::Task<int> {
+            const auto result = asyncio::run([]() -> asyncio::task::Task<int> {
                 using namespace std::chrono_literals;
                 co_await asyncio::sleep(10ms);
                 co_return 1024;
@@ -40,7 +40,7 @@ TEST_CASE("event loop", "[event loop]") {
         }
 
         SECTION("failure") {
-            const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+            const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
                 using namespace std::chrono_literals;
                 co_await asyncio::sleep(10ms);
                 throw std::system_error(make_error_code(std::errc::invalid_argument));

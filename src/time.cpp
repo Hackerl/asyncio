@@ -1,7 +1,6 @@
-#include <asyncio/promise.h>
 #include <asyncio/time.h>
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
+asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
     auto ptr = std::make_unique<uv_timer_t>();
 
     CO_EXPECT(uv::expected([&] {
@@ -25,14 +24,14 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sleep(const std::ch
         );
     }));
 
-    co_return co_await zero::async::coroutine::Cancellable{
+    co_return co_await task::Cancellable{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(task::Error::WILL_BE_DONE);
 
             uv_timer_stop(timer.raw());
-            promise.reject(zero::async::coroutine::Error::CANCELLED);
+            promise.reject(task::Error::CANCELLED);
             return {};
         }
     };

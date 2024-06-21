@@ -2,7 +2,7 @@
 #include <zero/cmdline.h>
 #include <zero/encoding/hex.h>
 
-zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *argv[]) {
+asyncio::task::Task<void, std::error_code> amain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<asyncio::http::URL>("url", "websocket url");

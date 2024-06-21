@@ -184,7 +184,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 * Basic
 
   ```cpp
-  asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+  asyncio::run([&]() -> asyncio::task::Task<void> {
       auto buffer = co_await asyncio::net::connect(host, port);
 
       if (!buffer) {
@@ -217,7 +217,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 * TLS
 
   ```cpp
-  asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+  asyncio::run([&]() -> asyncio::task::Task<void> {
       asyncio::net::ssl::Config config = {
               .insecure = insecure,
               .server = false
@@ -273,7 +273,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 * Basic
 
   ```cpp
-  asyncio::run([]() -> zero::async::coroutine::Task<void> {
+  asyncio::run([]() -> asyncio::task::Task<void> {
       co_await asyncio::toThread([]() -> std::expected<void, std::error_code> {
           auto tp = std::chrono::system_clock::now();
           std::this_thread::sleep_for(50ms);
@@ -286,7 +286,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 * Throw error
 
   ```cpp
-  asyncio::run([]() -> zero::async::coroutine::Task<void> {
+  asyncio::run([]() -> asyncio::task::Task<void> {
       auto result = co_await asyncio::toThread([]() -> std::expected<void, std::error_code> {
           std::this_thread::sleep_for(10ms);
           return std::unexpected(make_error_code(std::errc::bad_message));
@@ -302,11 +302,11 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 * Basic
 
   ```cpp
-  asyncio::run([]() -> zero::async::coroutine::Task<void> {
+  asyncio::run([]() -> asyncio::task::Task<void> {
       auto channel = asyncio::Channel<int>::make(100);
 
-      co_await zero::async::coroutine::allSettled(
-              [](auto channel) -> zero::async::coroutine::Task<void, std::error_code> {
+      co_await task::allSettled(
+              [](auto channel) -> asyncio::task::Task<void, std::error_code> {
                   std::expected<void, std::error_code> result;
 
                   for (int i = 0; i < 1000; i++) {
@@ -322,7 +322,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 
                   co_return result;
               }(channel),
-              [](auto channel) -> zero::async::coroutine::Task<void, std::error_code> {
+              [](auto channel) -> asyncio::task::Task<void, std::error_code> {
                   std::expected<void, std::error_code> result;
 
                   while (true) {
@@ -345,11 +345,11 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
 * Concurrent
 
   ```cpp
-  asyncio::run([]() -> zero::async::coroutine::Task<void> {
+  asyncio::run([]() -> asyncio::task::Task<void> {
       auto channel = asyncio::Channel<int>::make(100);
 
-      co_await zero::async::coroutine::allSettled(
-              [](auto channel) -> zero::async::coroutine::Task<void, std::error_code> {
+      co_await task::allSettled(
+              [](auto channel) -> asyncio::task::Task<void, std::error_code> {
                   std::expected<void, std::error_code> result;
 
                   for (int i = 0; i < 1000; i++) {

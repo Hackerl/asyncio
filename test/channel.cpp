@@ -6,7 +6,7 @@
 
 constexpr auto MAX_COUNT = 100000;
 
-zero::async::coroutine::Task<void, std::error_code>
+asyncio::task::Task<void, std::error_code>
 produce(asyncio::Sender<std::string> sender, const std::shared_ptr<std::atomic<int>> counter) {
     while (true) {
         if (*counter >= MAX_COUNT)
@@ -28,7 +28,7 @@ produceSync(asyncio::Sender<std::string> sender, const std::shared_ptr<std::atom
     }
 }
 
-zero::async::coroutine::Task<void, std::error_code>
+asyncio::task::Task<void, std::error_code>
 consume(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::atomic<int>> counter) {
     while (true) {
         if (const auto result = co_await receiver.receive(); !result) {
@@ -57,7 +57,7 @@ consumeSync(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::
 }
 
 TEST_CASE("asyncio channel", "[channel]") {
-    const auto result = asyncio::run([&]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([&]() -> asyncio::task::Task<void> {
         const std::array counters = {
             std::make_shared<std::atomic<int>>(),
             std::make_shared<std::atomic<int>>()

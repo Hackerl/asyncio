@@ -1,8 +1,7 @@
 #ifndef ASYNCIO_POLL_H
 #define ASYNCIO_POLL_H
 
-#include "uv.h"
-#include <zero/async/coroutine.h>
+#include "task.h"
 
 namespace asyncio {
     class Poll {
@@ -20,7 +19,7 @@ namespace asyncio {
         static std::expected<Poll, std::error_code> make(SOCKET socket);
 #endif
 
-        zero::async::coroutine::Task<int, std::error_code> on(int events);
+        task::Task<int, std::error_code> on(int events);
 
     private:
         uv::Handle<uv_poll_t> mPoll;

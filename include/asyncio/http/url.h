@@ -2,10 +2,6 @@
 #define ASYNCIO_URL_H
 
 #include <memory>
-#include <string>
-#include <optional>
-#include <system_error>
-#include <expected>
 #include <curl/curl.h>
 #include <zero/cmdline.h>
 #include <zero/error.h>
@@ -13,14 +9,14 @@
 namespace asyncio::http {
     class URL {
     public:
-        DEFINE_ERROR_TRANSFORMER_TYPES(
+        DEFINE_ERROR_TRANSFORMER_INNER(
             Error,
             "asyncio::http::url",
             [](const int value) { return curl_url_strerror(static_cast<CURLUcode>(value)); }
         )
 
         URL();
-        explicit URL(CURLU *url);
+        explicit URL(std::unique_ptr<CURLU, decltype(curl_url_cleanup) *> url);
         URL(const URL &rhs);
         URL(URL &&rhs) noexcept;
 
@@ -72,8 +68,6 @@ namespace asyncio::http {
     private:
         std::unique_ptr<CURLU, decltype(curl_url_cleanup) *> mURL;
     };
-
-    DEFINE_MAKE_ERROR_CODE(URL::Error)
 }
 
 DECLARE_ERROR_CODE(asyncio::http::URL::Error)

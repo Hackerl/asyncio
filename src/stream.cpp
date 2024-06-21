@@ -1,5 +1,4 @@
 #include <asyncio/stream.h>
-#include <asyncio/promise.h>
 #include <zero/defer.h>
 
 asyncio::Stream::Stream(uv::Handle<uv_stream_t> stream) : mStream(std::move(stream)) {
@@ -53,7 +52,7 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
             if (fd == -1)
                 continue;
 
-            close(fd);
+            ::close(fd);
         }
     );
 
@@ -94,7 +93,7 @@ const asyncio::uv::Handle<uv_stream_s> &asyncio::Stream::handle() const {
     return mStream;
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::Stream::read(const std::span<std::byte> data) {
+asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const std::span<std::byte> data) {
     struct Context {
         std::span<std::byte> data;
         Promise<std::size_t, std::error_code> promise;
@@ -130,20 +129,20 @@ zero::async::coroutine::Task<std::size_t, std::error_code> asyncio::Stream::read
         );
     }));
 
-    co_return co_await zero::async::coroutine::Cancellable{
+    co_return co_await task::Cancellable{
         context.promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())
-                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(task::Error::WILL_BE_DONE);
 
             uv_read_stop(mStream.raw());
-            context.promise.reject(zero::async::coroutine::Error::CANCELLED);
+            context.promise.reject(task::Error::CANCELLED);
             return {};
         }
     };
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::Stream::write(const std::span<const std::byte> data) {
     Promise<void, std::error_code> promise;
     uv_write_t request = {.data = &promise};
@@ -186,7 +185,12 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
     co_return data.size();
 }
 
-asyncio::Listener::Listener(std::unique_ptr<Context> context) : mContext(std::move(context)) {
+asyncio::task::Task<void, std::error_code> asyncio::Stream::close() {
+    mStream.close();
+    co_return {};
+}
+
+asyncio::Listener::Listener(std::unique_ptr<Core> core) : mCore(std::move(core)) {
 }
 
 std::expected<asyncio::Listener, std::error_code> asyncio::Listener::make(uv::Handle<uv_stream_t> stream) {
@@ -195,7 +199,7 @@ std::expected<asyncio::Listener, std::error_code> asyncio::Listener::make(uv::Ha
             stream.raw(),
             256,
             [](const auto handle, const int status) {
-                auto &[stream, event, ec] = *static_cast<Context *>(handle->data);
+                auto &[stream, event, ec] = *static_cast<Core *>(handle->data);
 
                 if (status < 0)
                     ec = static_cast<uv::Error>(status);
@@ -205,25 +209,25 @@ std::expected<asyncio::Listener, std::error_code> asyncio::Listener::make(uv::Ha
         );
     }));
 
-    auto context = std::make_unique<Context>(std::move(stream));
+    auto context = std::make_unique<Core>(std::move(stream));
     context->stream->data = context.get();
 
     return Listener{std::move(context)};
 }
 
 asyncio::uv::Handle<uv_stream_s> &asyncio::Listener::handle() {
-    return mContext->stream;
+    return mCore->stream;
 }
 
 const asyncio::uv::Handle<uv_stream_s> &asyncio::Listener::handle() const {
-    return mContext->stream;
+    return mCore->stream;
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-zero::async::coroutine::Task<void, std::error_code> asyncio::Listener::accept(uv_stream_t *stream) {
+asyncio::task::Task<void, std::error_code> asyncio::Listener::accept(uv_stream_t *stream) {
     while (true) {
         const auto result = uv::expected([&] {
-            return uv_accept(mContext->stream.raw(), stream);
+            return uv_accept(mCore->stream.raw(), stream);
         });
 
         if (result)
@@ -232,10 +236,10 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::Listener::accept(uv
         if (result.error() != std::errc::resource_unavailable_try_again)
             co_return std::unexpected(result.error());
 
-        mContext->event.reset();
-        CO_EXPECT(co_await mContext->event.wait());
+        mCore->event.reset();
+        CO_EXPECT(co_await mCore->event.wait());
 
-        if (mContext->ec)
-            co_return std::unexpected(*mContext->ec);
+        if (mCore->ec)
+            co_return std::unexpected(*mCore->ec);
     }
 }

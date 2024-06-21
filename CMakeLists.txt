@@ -21,7 +21,6 @@ find_package(nlohmann_json CONFIG REQUIRED)
 add_library(
         asyncio
         STATIC
-#        src/io.cpp
         src/io.cpp
         src/time.cpp
         src/poll.cpp
@@ -33,22 +32,11 @@ add_library(
         src/net/dns.cpp
         src/net/dgram.cpp
         src/net/stream.cpp
+        src/http/url.cpp
+        src/http/request.cpp
         src/sync/mutex.cpp
         src/sync/event.cpp
         src/sync/condition.cpp
-#        src/fs/file.cpp
-#        src/fs/pipe.cpp
-#        src/net/net.cpp
-#        src/net/dns.cpp
-#        src/net/ssl.cpp
-#        src/net/dgram.cpp
-#        src/net/stream.cpp
-#        src/http/url.cpp
-#        src/http/request.cpp
-#        src/http/websocket.cpp
-#        $<$<PLATFORM_ID:Windows>:src/fs/iocp.cpp>
-#        $<$<PLATFORM_ID:Linux,Android>:src/fs/aio.cpp>
-#        $<$<PLATFORM_ID:Linux,Darwin>:src/fs/posix.cpp>
 )
 
 if (ASYNCIO_EMBED_CA_CERT)

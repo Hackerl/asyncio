@@ -1,11 +1,10 @@
 #ifndef ASYNCIO_IO_H
 #define ASYNCIO_IO_H
 
-#include <uv.h>
+#include "task.h"
 #include <span>
 #include <chrono>
 #include <zero/interface.h>
-#include <zero/async/coroutine.h>
 
 namespace asyncio {
     DEFINE_ERROR_CONDITION(
@@ -14,12 +13,9 @@ namespace asyncio {
         UNEXPECTED_EOF, "unexpected end of file"
     )
 
-    //constexpr auto INVALID_FILE_DESCRIPTOR = -1;
-    //constexpr auto DEFAULT_BUFFER_CAPACITY = 1024 * 1024;
-
     class ICloseable : public virtual zero::Interface {
     public:
-        virtual zero::async::coroutine::Task<void, std::error_code> close() = 0;
+        virtual task::Task<void, std::error_code> close() = 0;
     };
 
     class IReader : public virtual zero::Interface {
@@ -30,15 +26,15 @@ namespace asyncio {
             UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
         )
 
-        virtual zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
-        virtual zero::async::coroutine::Task<void, std::error_code> readExactly(std::span<std::byte> data);
-        virtual zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readAll();
+        virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
+        virtual task::Task<void, std::error_code> readExactly(std::span<std::byte> data);
+        virtual task::Task<std::vector<std::byte>, std::error_code> readAll();
     };
 
     class IWriter : public virtual zero::Interface {
     public:
-        virtual zero::async::coroutine::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
-        virtual zero::async::coroutine::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
+        virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
+        virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
     };
 
     template<typename T>
@@ -72,32 +68,32 @@ namespace asyncio {
     class IBufReader : public virtual IReader {
     public:
         [[nodiscard]] virtual std::size_t available() const = 0;
-        virtual zero::async::coroutine::Task<std::string, std::error_code> readLine() = 0;
-        virtual zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) = 0;
-        virtual zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) = 0;
+        virtual task::Task<std::string, std::error_code> readLine() = 0;
+        virtual task::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) = 0;
+        virtual task::Task<void, std::error_code> peek(std::span<std::byte> data) = 0;
     };
 
     class IBufWriter : public virtual IWriter {
     public:
         [[nodiscard]] virtual std::size_t pending() const = 0;
-        virtual zero::async::coroutine::Task<void, std::error_code> flush() = 0;
+        virtual task::Task<void, std::error_code> flush() = 0;
     };
 
-    zero::async::coroutine::Task<void, std::error_code> copy(IReader &reader, IWriter &writer);
+    task::Task<void, std::error_code> copy(IReader &reader, IWriter &writer);
 
     template<Reader R, Writer W>
-    zero::async::coroutine::Task<void, std::error_code> copy(std::shared_ptr<R> reader, std::shared_ptr<W> writer) {
+    task::Task<void, std::error_code> copy(std::shared_ptr<R> reader, std::shared_ptr<W> writer) {
         co_return co_await copy(*reader, *writer);
     }
 
     template<StreamIO T, StreamIO U>
-    zero::async::coroutine::Task<void, std::error_code>
+    task::Task<void, std::error_code>
     copyBidirectional(std::shared_ptr<T> first, std::shared_ptr<U> second) {
         co_return co_await race(copy(first, second), copy(second, first));
     }
 
     template<StreamIO T, StreamIO U>
-    zero::async::coroutine::Task<void, std::error_code>
+    task::Task<void, std::error_code>
     copyBidirectional(T first, U second) {
         co_return co_await copyBidirectional(
             std::make_shared<T>(std::move(first)),

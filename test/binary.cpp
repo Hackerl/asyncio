@@ -4,7 +4,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 template<typename T>
-zero::async::coroutine::Task<void> transfer(auto pipes) {
+asyncio::task::Task<void> transfer(auto pipes) {
     const auto i = GENERATE(
         T{6789},
         (std::numeric_limits<T>::max)(),
@@ -12,7 +12,7 @@ zero::async::coroutine::Task<void> transfer(auto pipes) {
     );
 
     co_await allSettled(
-        [](auto reader, auto value) -> zero::async::coroutine::Task<void> {
+        [](auto reader, auto value) -> asyncio::task::Task<void> {
             auto result = co_await asyncio::binary::readLE<T>(reader);
             REQUIRE(result);
             REQUIRE(*result == value);
@@ -21,7 +21,7 @@ zero::async::coroutine::Task<void> transfer(auto pipes) {
             REQUIRE(result);
             REQUIRE(*result == value);
         }(std::move(pipes[0]), i),
-        [](auto writer, auto value) -> zero::async::coroutine::Task<void> {
+        [](auto writer, auto value) -> asyncio::task::Task<void> {
             auto result = co_await asyncio::binary::writeLE(writer, value);
             REQUIRE(result);
 
@@ -32,7 +32,7 @@ zero::async::coroutine::Task<void> transfer(auto pipes) {
 }
 
 TEST_CASE("binary transfer", "[binary]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         auto pipes = asyncio::pipe();
         REQUIRE(pipes);
 

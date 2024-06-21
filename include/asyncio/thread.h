@@ -1,7 +1,7 @@
 #ifndef ASYNCIO_THREAD_H
 #define ASYNCIO_THREAD_H
 
-#include "promise.h"
+#include "task.h"
 
 namespace asyncio {
     DEFINE_ERROR_CODE_EX(
@@ -11,7 +11,7 @@ namespace asyncio {
     )
 
     template<typename F>
-    zero::async::coroutine::Task<std::invoke_result_t<F>, ToThreadError>
+    task::Task<std::invoke_result_t<F>, ToThreadError>
     toThread(F f) {
         using T = std::invoke_result_t<F>;
 
@@ -36,7 +36,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const int status = *co_await zero::async::coroutine::Cancellable{
+            if (const int status = *co_await task::Cancellable{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     EXPECT(uv::expected([&] {
@@ -74,7 +74,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const int status = *co_await zero::async::coroutine::Cancellable{
+            if (const int status = *co_await task::Cancellable{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     EXPECT(uv::expected([&] {

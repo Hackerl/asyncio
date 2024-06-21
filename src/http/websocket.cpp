@@ -76,7 +76,7 @@ asyncio::http::ws::WebSocket::WebSocket(std::unique_ptr<IBuffer> buffer)
     : mState(State::CONNECTED), mMutex(std::make_unique<sync::Mutex>()), mBuffer(std::move(buffer)) {
 }
 
-zero::async::coroutine::Task<asyncio::http::ws::Frame, std::error_code>
+asyncio::task::Task<asyncio::http::ws::Frame, std::error_code>
 asyncio::http::ws::WebSocket::readFrame() const {
     Header header;
 
@@ -105,7 +105,7 @@ asyncio::http::ws::WebSocket::readFrame() const {
     co_return Frame{header, std::move(data)};
 }
 
-zero::async::coroutine::Task<asyncio::http::ws::InternalMessage, std::error_code>
+asyncio::task::Task<asyncio::http::ws::InternalMessage, std::error_code>
 asyncio::http::ws::WebSocket::readInternalMessage() const {
     auto frame = co_await readFrame();
     CO_EXPECT(frame);
@@ -126,7 +126,7 @@ asyncio::http::ws::WebSocket::readInternalMessage() const {
     co_return InternalMessage{frame->header.opcode(), std::move(frame->data)};
 }
 
-zero::async::coroutine::Task<void, std::error_code>
+asyncio::task::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) const {
     CO_EXPECT(co_await mMutex->lock());
     DEFER(mMutex->unlock());
@@ -179,7 +179,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) cons
     co_return co_await mBuffer->writeAll(message.data);
 }
 
-zero::async::coroutine::Task<asyncio::http::ws::Message, std::error_code>
+asyncio::task::Task<asyncio::http::ws::Message, std::error_code>
 asyncio::http::ws::WebSocket::readMessage() const {
     while (true) {
         auto message = co_await readInternalMessage();
@@ -214,7 +214,7 @@ asyncio::http::ws::WebSocket::readMessage() const {
     }
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMessage(Message message) const {
+asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMessage(Message message) const {
     assert(message.opcode == Opcode::TEXT || message.opcode == Opcode::BINARY);
 
     if (message.opcode == Opcode::TEXT) {
@@ -235,16 +235,16 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
     });
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket::sendText(std::string text) const {
+asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::sendText(std::string text) const {
     co_return co_await writeMessage({Opcode::TEXT, std::move(text)});
 }
 
-zero::async::coroutine::Task<void, std::error_code>
+asyncio::task::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::sendBinary(const std::span<const std::byte> data) const {
     co_return co_await writeMessage({Opcode::BINARY, std::vector<std::byte>{data.begin(), data.end()}});
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
+asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
     if (mState != State::CONNECTED)
         co_return std::unexpected(Error::NOT_CONNECTED);
 
@@ -270,7 +270,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::http::ws::WebSocket
     co_return {};
 }
 
-zero::async::coroutine::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::connect(const URL url) {
+asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::connect(const URL url) {
     const auto scheme = url.scheme();
     const auto host = url.host();
     const auto port = url.port();

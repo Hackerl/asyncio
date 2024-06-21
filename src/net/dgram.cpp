@@ -1,6 +1,5 @@
 #include <asyncio/net/dgram.h>
 #include <asyncio/net/dns.h>
-#include <asyncio/promise.h>
 
 asyncio::net::UDPSocket::UDPSocket(uv::Handle<uv_udp_t> udp) : mUDP(std::move(udp)) {
 }
@@ -62,7 +61,7 @@ asyncio::net::UDPSocket::bind(const IPv6Address &address) {
     return bind(*std::move(socketAddress));
 }
 
-zero::async::coroutine::Task<asyncio::net::UDPSocket, std::error_code>
+asyncio::task::Task<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::connect(const std::string host, const unsigned short port) {
     addrinfo hints = {};
 
@@ -125,14 +124,14 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::UDPSocket::r
     return addressFrom(reinterpret_cast<const sockaddr *>(&storage), length);
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UDPSocket::read(const std::span<std::byte> data) {
     co_return co_await readFrom(data).transform([](const auto result) {
         return result.first;
     });
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UDPSocket::write(const std::span<const std::byte> data) {
     Promise<void, std::error_code> promise;
     uv_udp_send_t request = {.data = &promise};
@@ -166,7 +165,7 @@ asyncio::net::UDPSocket::write(const std::span<const std::byte> data) {
     co_return data.size();
 }
 
-zero::async::coroutine::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
+asyncio::task::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
 asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
     struct Context {
         std::span<std::byte> data;
@@ -206,20 +205,20 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
         );
     }));
 
-    co_return co_await zero::async::coroutine::Cancellable{
+    co_return co_await task::Cancellable{
         context.promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())
-                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(task::Error::WILL_BE_DONE);
 
             uv_udp_recv_stop(mUDP.raw());
-            context.promise.reject(zero::async::coroutine::Error::CANCELLED);
+            context.promise.reject(task::Error::CANCELLED);
             return {};
         }
     };
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, const Address address) {
     const auto socketAddress = socketAddressFrom(address);
     CO_EXPECT(socketAddress);
@@ -256,7 +255,7 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, const Ad
     co_return data.size();
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::net::UDPSocket::close() {
+asyncio::task::Task<void, std::error_code> asyncio::net::UDPSocket::close() {
     mUDP.close();
     co_return {};
 }

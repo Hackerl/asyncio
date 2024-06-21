@@ -233,7 +233,7 @@ asyncio::net::ssl::Listener::Listener(std::shared_ptr<Context> context, evconnli
     : Acceptor(listener), mContext(std::move(context)) {
 }
 
-zero::async::coroutine::Task<asyncio::net::ssl::Buffer, std::error_code>
+asyncio::task::Task<asyncio::net::ssl::Buffer, std::error_code>
 asyncio::net::ssl::Listener::accept() {
     const auto result = co_await fd();
     CO_EXPECT(result);
@@ -294,7 +294,7 @@ asyncio::net::ssl::listen(
     return listen(context, *address);
 }
 
-zero::async::coroutine::Task<asyncio::net::ssl::Buffer, std::error_code>
+asyncio::task::Task<asyncio::net::ssl::Buffer, std::error_code>
 asyncio::net::ssl::connect(Address address) {
     if (!defaultContext)
         co_return std::unexpected(defaultContext.error());
@@ -302,7 +302,7 @@ asyncio::net::ssl::connect(Address address) {
     co_return co_await connect(*defaultContext, std::move(address));
 }
 
-zero::async::coroutine::Task<asyncio::net::ssl::Buffer, std::error_code>
+asyncio::task::Task<asyncio::net::ssl::Buffer, std::error_code>
 asyncio::net::ssl::connect(const std::span<const Address> addresses) {
     if (!defaultContext)
         co_return std::unexpected(defaultContext.error());
@@ -310,7 +310,7 @@ asyncio::net::ssl::connect(const std::span<const Address> addresses) {
     co_return co_await connect(*defaultContext, addresses);
 }
 
-zero::async::coroutine::Task<asyncio::net::ssl::Buffer, std::error_code>
+asyncio::task::Task<asyncio::net::ssl::Buffer, std::error_code>
 asyncio::net::ssl::connect(std::string host, const unsigned short port) {
     if (!defaultContext)
         co_return std::unexpected(defaultContext.error());
@@ -318,7 +318,7 @@ asyncio::net::ssl::connect(std::string host, const unsigned short port) {
     co_return co_await connect(*defaultContext, std::move(host), port);
 }
 
-zero::async::coroutine::Task<asyncio::net::ssl::Buffer, std::error_code>
+asyncio::task::Task<asyncio::net::ssl::Buffer, std::error_code>
 asyncio::net::ssl::connect(std::shared_ptr<Context> context, const Address address) {
     if (std::holds_alternative<IPv4Address>(address)) {
         const auto [port, ip] = std::get<IPv4Address>(address);
@@ -333,7 +333,7 @@ asyncio::net::ssl::connect(std::shared_ptr<Context> context, const Address addre
     co_return std::unexpected(IOError::ADDRESS_FAMILY_NOT_SUPPORTED);
 }
 
-zero::async::coroutine::Task<asyncio::net::ssl::Buffer, std::error_code>
+asyncio::task::Task<asyncio::net::ssl::Buffer, std::error_code>
 asyncio::net::ssl::connect(const std::shared_ptr<Context> context, const std::span<const Address> addresses) {
     if (addresses.empty())
         co_return std::unexpected(IOError::INVALID_ARGUMENT);
@@ -351,7 +351,7 @@ asyncio::net::ssl::connect(const std::shared_ptr<Context> context, const std::sp
     }
 }
 
-zero::async::coroutine::Task<asyncio::net::ssl::Buffer, std::error_code>
+asyncio::task::Task<asyncio::net::ssl::Buffer, std::error_code>
 asyncio::net::ssl::connect(
     const std::shared_ptr<Context> context,
     const std::string host,
@@ -425,14 +425,14 @@ asyncio::net::ssl::connect(
     if (bufferevent_socket_connect_hostname(bev, dnsBase->get(), AF_UNSPEC, host.c_str(), port) < 0)
         co_return std::unexpected(IOError::INVALID_ARGUMENT);
 
-    CO_EXPECT(co_await zero::async::coroutine::Cancellable{
+    CO_EXPECT(co_await task::Cancellable{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(task::Error::WILL_BE_DONE);
 
             bufferevent_free(std::exchange(bev, nullptr));
-            promise.reject(zero::async::coroutine::Error::CANCELLED);
+            promise.reject(task::Error::CANCELLED);
             return {};
         }
     });

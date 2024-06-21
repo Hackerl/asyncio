@@ -1,35 +1,35 @@
 #include <asyncio/sync/mutex.h>
+#include <asyncio/time.h>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace std::chrono_literals;
-
 TEST_CASE("asyncio mutex", "[sync]") {
-    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         const auto mutex = std::make_shared<asyncio::sync::Mutex>();
         REQUIRE(!mutex->locked());
 
-        const auto result = co_await mutex->lock();
-        REQUIRE(result);
+        const auto res = co_await mutex->lock();
+        REQUIRE(res);
         REQUIRE(mutex->locked());
 
         SECTION("normal") {
             co_await allSettled(
-                [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await m->lock();
-                    REQUIRE(res);
+                [](auto m) -> asyncio::task::Task<void> {
+                    const auto r = co_await m->lock();
+                    REQUIRE(r);
                     m->unlock();
                 }(mutex),
-                [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await m->lock();
-                    REQUIRE(res);
+                [](auto m) -> asyncio::task::Task<void> {
+                    const auto r = co_await m->lock();
+                    REQUIRE(r);
                     m->unlock();
                 }(mutex),
-                [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await m->lock();
-                    REQUIRE(res);
+                [](auto m) -> asyncio::task::Task<void> {
+                    const auto r = co_await m->lock();
+                    REQUIRE(r);
                     m->unlock();
                 }(mutex),
-                [](auto m) -> zero::async::coroutine::Task<void> {
+                [](auto m) -> asyncio::task::Task<void> {
+                    using namespace std::chrono_literals;
                     co_await asyncio::sleep(20ms);
                     m->unlock();
                 }(mutex)
@@ -47,32 +47,34 @@ TEST_CASE("asyncio mutex", "[sync]") {
             auto task2 = mutex->lock();
             REQUIRE(!task2.done());
 
-            auto res = co_await task1;
-            REQUIRE(res);
+            auto r = co_await task1;
+            REQUIRE(r);
 
             mutex->unlock();
-            res = co_await task2;
-            REQUIRE(res);
+            r = co_await task2;
+            REQUIRE(r);
         }
 
         SECTION("timeout") {
             co_await allSettled(
-                [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await asyncio::timeout(m->lock(), 10ms);
-                    REQUIRE(!res);
-                    REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
+                [](auto m) -> asyncio::task::Task<void> {
+                    using namespace std::chrono_literals;
+                    const auto r = co_await asyncio::timeout(m->lock(), 10ms);
+                    REQUIRE(!r);
+                    REQUIRE(r.error() == asyncio::TimeoutError::ELAPSED);
                 }(mutex),
-                [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await m->lock();
-                    REQUIRE(res);
+                [](auto m) -> asyncio::task::Task<void> {
+                    const auto r = co_await m->lock();
+                    REQUIRE(r);
                     m->unlock();
                 }(mutex),
-                [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await m->lock();
-                    REQUIRE(res);
+                [](auto m) -> asyncio::task::Task<void> {
+                    const auto r = co_await m->lock();
+                    REQUIRE(r);
                     m->unlock();
                 }(mutex),
-                [](auto m) -> zero::async::coroutine::Task<void> {
+                [](auto m) -> asyncio::task::Task<void> {
+                    using namespace std::chrono_literals;
                     co_await asyncio::sleep(20ms);
                     m->unlock();
                 }(mutex)
@@ -82,20 +84,20 @@ TEST_CASE("asyncio mutex", "[sync]") {
 
         SECTION("cancel") {
             auto task = allSettled(
-                [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await m->lock();
-                    REQUIRE(!res);
-                    REQUIRE(res.error() == std::errc::operation_canceled);
+                [](auto m) -> asyncio::task::Task<void> {
+                    const auto r = co_await m->lock();
+                    REQUIRE(!r);
+                    REQUIRE(r.error() == std::errc::operation_canceled);
                 }(mutex),
-                [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await m->lock();
-                    REQUIRE(!res);
-                    REQUIRE(res.error() == std::errc::operation_canceled);
+                [](auto m) -> asyncio::task::Task<void> {
+                    const auto r = co_await m->lock();
+                    REQUIRE(!r);
+                    REQUIRE(r.error() == std::errc::operation_canceled);
                 }(mutex),
-                [](auto m) -> zero::async::coroutine::Task<void> {
-                    const auto res = co_await m->lock();
-                    REQUIRE(!res);
-                    REQUIRE(res.error() == std::errc::operation_canceled);
+                [](auto m) -> asyncio::task::Task<void> {
+                    const auto r = co_await m->lock();
+                    REQUIRE(!r);
+                    REQUIRE(r.error() == std::errc::operation_canceled);
                 }(mutex)
             );
 
@@ -114,14 +116,14 @@ TEST_CASE("asyncio mutex", "[sync]") {
             auto task2 = mutex->lock();
             REQUIRE(!task2.done());
 
-            auto res = co_await task1;
-            REQUIRE(res);
+            auto r = co_await task1;
+            REQUIRE(r);
             REQUIRE(mutex->locked());
 
             mutex->unlock();
 
-            res = co_await task2;
-            REQUIRE(res);
+            r = co_await task2;
+            REQUIRE(r);
             REQUIRE(mutex->locked());
         }
 
@@ -136,13 +138,15 @@ TEST_CASE("asyncio mutex", "[sync]") {
             auto task2 = mutex->lock();
             REQUIRE(!task2.done());
 
-            auto res = co_await task1;
-            REQUIRE(!res);
-            REQUIRE(res.error() == std::errc::operation_canceled);
+            auto r = co_await task1;
+            REQUIRE(!r);
+            REQUIRE(r.error() == std::errc::operation_canceled);
 
-            res = co_await task2;
-            REQUIRE(res);
+            r = co_await task2;
+            REQUIRE(r);
             REQUIRE(mutex->locked());
         }
     });
+    REQUIRE(result);
+    REQUIRE(*result);
 }

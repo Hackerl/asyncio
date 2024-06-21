@@ -1,5 +1,8 @@
 #include <asyncio/sync/mutex.h>
 
+asyncio::sync::Mutex::Mutex() : mLocked(false) {
+}
+
 void asyncio::sync::Mutex::wakeup() const {
     if (mPending.empty())
         return;
@@ -8,7 +11,7 @@ void asyncio::sync::Mutex::wakeup() const {
         promise->resolve();
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Mutex::lock() {
+asyncio::task::Task<void, std::error_code> asyncio::sync::Mutex::lock() {
     if (!mLocked && mPending.empty()) {
         mLocked = true;
         co_return {};
@@ -17,13 +20,13 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Mutex::lock()
     const auto promise = std::make_shared<Promise<void, std::error_code>>();
     mPending.push_back(promise);
 
-    const auto result = co_await zero::async::coroutine::Cancellable{
+    const auto result = co_await task::Cancellable{
         promise->getFuture(),
         [=]() -> std::expected<void, std::error_code> {
             if (promise->isFulfilled())
-                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(task::Error::WILL_BE_DONE);
 
-            promise->reject(zero::async::coroutine::Error::CANCELLED);
+            promise->reject(task::Error::CANCELLED);
             return {};
         }
     };

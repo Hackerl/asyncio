@@ -1,5 +1,4 @@
 #include <asyncio/poll.h>
-#include <asyncio/promise.h>
 
 asyncio::Poll::Poll(uv::Handle<uv_poll_t> poll) : mPoll(std::move(poll)) {
 
@@ -27,7 +26,7 @@ std::expected<asyncio::Poll, std::error_code> asyncio::Poll::make(const SOCKET s
 }
 #endif
 
-zero::async::coroutine::Task<int, std::error_code> asyncio::Poll::on(const int events) {
+asyncio::task::Task<int, std::error_code> asyncio::Poll::on(const int events) {
     Promise<int, std::error_code> promise;
     mPoll->data = &promise;
 
@@ -49,14 +48,14 @@ zero::async::coroutine::Task<int, std::error_code> asyncio::Poll::on(const int e
         );
     }));
 
-    co_return co_await zero::async::coroutine::Cancellable{
+    co_return co_await task::Cancellable{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(task::Error::WILL_BE_DONE);
 
             uv_poll_stop(mPoll.raw());
-            promise.reject(zero::async::coroutine::Error::CANCELLED);
+            promise.reject(task::Error::CANCELLED);
             return {};
         }
     };

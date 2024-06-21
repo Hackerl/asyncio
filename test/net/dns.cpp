@@ -1,9 +1,8 @@
 #include <asyncio/net/dns.h>
-#include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("DNS query", "[net]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         SECTION("get address info") {
             addrinfo hints = {};
 

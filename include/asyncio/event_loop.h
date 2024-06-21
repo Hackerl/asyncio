@@ -2,9 +2,12 @@
 #define ASYNCIO_EVENT_LOOP_H
 
 #include "uv.h"
+#include <mutex>
 #include <queue>
+#include <cassert>
+#include <functional>
 #include <zero/expect.h>
-#include <zero/async/coroutine.h>
+#include <zero/detail/type_traits.h>
 
 namespace asyncio {
     class EventLoop {
@@ -38,8 +41,13 @@ namespace asyncio {
     std::shared_ptr<EventLoop> getEventLoop();
     void setEventLoop(const std::weak_ptr<EventLoop> &eventLoop);
 
+    namespace task {
+        template<typename T, typename E>
+        class Task;
+    }
+
     template<typename F, typename T = std::invoke_result_t<F>>
-        requires zero::detail::is_specialization<T, zero::async::coroutine::Task>
+        requires zero::detail::is_specialization<T, task::Task>
     std::expected<std::expected<typename T::value_type, typename T::error_type>, std::error_code> run(F &&f) {
         const auto eventLoop = EventLoop::make().transform([](EventLoop &&rhs) {
             return std::make_shared<EventLoop>(std::move(rhs));

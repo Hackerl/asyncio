@@ -1,6 +1,6 @@
 #include <asyncio/io.h>
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::IReader::readExactly(const std::span<std::byte> data) {
+asyncio::task::Task<void, std::error_code> asyncio::IReader::readExactly(const std::span<std::byte> data) {
     std::expected<void, std::error_code> result;
     std::size_t offset = 0;
 
@@ -23,7 +23,7 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::IReader::readExactl
     co_return result;
 }
 
-zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::IReader::readAll() {
+asyncio::task::Task<std::vector<std::byte>, std::error_code> asyncio::IReader::readAll() {
     std::expected<std::vector<std::byte>, std::error_code> result;
 
     while (true) {
@@ -44,13 +44,13 @@ zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> asyncio::I
     co_return result;
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::IWriter::writeAll(const std::span<const std::byte> data) {
+asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std::span<const std::byte> data) {
     std::expected<void, std::error_code> result;
     std::size_t offset = 0;
 
     while (offset < data.size()) {
-        if (co_await zero::async::coroutine::cancelled) {
-            result = std::unexpected<std::error_code>(zero::async::coroutine::Error::CANCELLED);
+        if (co_await task::cancelled) {
+            result = std::unexpected<std::error_code>(task::Error::CANCELLED);
             break;
         }
 
@@ -68,12 +68,12 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::IWriter::writeAll(c
     co_return result;
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reader, IWriter &writer) {
+asyncio::task::Task<void, std::error_code> asyncio::copy(IReader &reader, IWriter &writer) {
     std::expected<void, std::error_code> result;
 
     while (true) {
-        if (co_await zero::async::coroutine::cancelled) {
-            result = std::unexpected<std::error_code>(zero::async::coroutine::Error::CANCELLED);
+        if (co_await task::cancelled) {
+            result = std::unexpected<std::error_code>(task::Error::CANCELLED);
             break;
         }
 
@@ -88,14 +88,14 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::copy(IReader &reade
         if (*n == 0)
             break;
 
-        co_await zero::async::coroutine::lock;
+        co_await task::lock;
 
         if (const auto res = co_await writer.writeAll({data.data(), *n}); !res) {
             result = std::unexpected(res.error());
             break;
         }
 
-        co_await zero::async::coroutine::unlock;
+        co_await task::unlock;
     }
 
     co_return result;

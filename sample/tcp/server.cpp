@@ -4,7 +4,7 @@
 #include <zero/formatter.h>
 #include <csignal>
 
-zero::async::coroutine::Task<void, std::error_code> handle(asyncio::net::Buffer buffer) {
+asyncio::task::Task<void, std::error_code> handle(asyncio::net::Buffer buffer) {
     fmt::print("new connection[{}]\n", fmt::to_string(*buffer.remoteAddress()));
 
     while (true) {
@@ -17,7 +17,7 @@ zero::async::coroutine::Task<void, std::error_code> handle(asyncio::net::Buffer 
     }
 }
 
-zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::Listener listener) {
+asyncio::task::Task<void, std::error_code> serve(asyncio::net::Listener listener) {
     std::expected<void, std::error_code> result;
 
     while (true) {
@@ -36,7 +36,7 @@ zero::async::coroutine::Task<void, std::error_code> serve(asyncio::net::Listener
     co_return result;
 }
 
-zero::async::coroutine::Task<void, std::error_code> amain(const int argc, char *argv[]) {
+asyncio::task::Task<void, std::error_code> amain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");

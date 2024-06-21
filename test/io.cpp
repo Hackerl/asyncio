@@ -5,7 +5,7 @@
 constexpr std::string_view MESSAGE = "hello world";
 
 TEST_CASE("asynchronous io", "[io]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         SECTION("copy") {
             auto streams1 = asyncio::Stream::pair();
             REQUIRE(streams1);
@@ -14,15 +14,15 @@ TEST_CASE("asynchronous io", "[io]") {
             REQUIRE(streams2);
 
             co_await allSettled(
-                [](auto reader, auto writer) -> zero::async::coroutine::Task<void> {
+                [](auto reader, auto writer) -> asyncio::task::Task<void> {
                     const auto res = co_await asyncio::copy(reader, writer);
                     REQUIRE(res);
                 }(std::move(streams1->at(1)), std::move(streams2->at(0))),
-                [](auto writer) -> zero::async::coroutine::Task<void> {
+                [](auto writer) -> asyncio::task::Task<void> {
                     auto res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(res);
                 }(std::move(streams1->at(0))),
-                [](auto reader) -> zero::async::coroutine::Task<void> {
+                [](auto reader) -> asyncio::task::Task<void> {
                     std::string message;
                     message.resize(MESSAGE.size());
 
@@ -45,11 +45,11 @@ TEST_CASE("asynchronous io", "[io]") {
             REQUIRE(streams2);
 
             co_await allSettled(
-                [](auto first, auto second) -> zero::async::coroutine::Task<void> {
+                [](auto first, auto second) -> asyncio::task::Task<void> {
                     const auto res = co_await asyncio::copyBidirectional(std::move(first), std::move(second));
                     REQUIRE(res);
                 }(std::move(streams1->at(1)), std::move(streams2->at(0))),
-                [](auto stream) -> zero::async::coroutine::Task<void> {
+                [](auto stream) -> asyncio::task::Task<void> {
                     auto res = co_await stream.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(res);
 
@@ -64,7 +64,7 @@ TEST_CASE("asynchronous io", "[io]") {
                     REQUIRE(!res);
                     REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
                 }(std::move(streams1->at(0))),
-                [](auto stream) -> zero::async::coroutine::Task<void> {
+                [](auto stream) -> asyncio::task::Task<void> {
                     std::string message;
                     message.resize(MESSAGE.size());
 
@@ -83,14 +83,14 @@ TEST_CASE("asynchronous io", "[io]") {
             REQUIRE(streams);
 
             co_await allSettled(
-                [](auto stream) -> zero::async::coroutine::Task<void> {
+                [](auto stream) -> asyncio::task::Task<void> {
                     auto res = co_await stream.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(res);
 
                     res = co_await stream.writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(res);
                 }(std::move(streams->at(0))),
-                [](auto reader) -> zero::async::coroutine::Task<void> {
+                [](auto reader) -> asyncio::task::Task<void> {
                     const auto res = co_await reader.readAll();
                     REQUIRE(res);
                     REQUIRE(res->size() == MESSAGE.size() * 2);
@@ -106,7 +106,7 @@ TEST_CASE("asynchronous io", "[io]") {
                 REQUIRE(streams);
 
                 co_await allSettled(
-                    [](auto writer) -> zero::async::coroutine::Task<void> {
+                    [](auto writer) -> asyncio::task::Task<void> {
                         auto res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
                         REQUIRE(res);
 
@@ -116,7 +116,7 @@ TEST_CASE("asynchronous io", "[io]") {
                         res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
                         REQUIRE(res);
                     }(std::move(streams->at(0))),
-                    [](auto reader) -> zero::async::coroutine::Task<void> {
+                    [](auto reader) -> asyncio::task::Task<void> {
                         std::string message;
                         message.resize(MESSAGE.size() * 3);
 
@@ -134,14 +134,14 @@ TEST_CASE("asynchronous io", "[io]") {
                 REQUIRE(streams);
 
                 co_await allSettled(
-                    [](auto writer) -> zero::async::coroutine::Task<void> {
+                    [](auto writer) -> asyncio::task::Task<void> {
                         auto res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
                         REQUIRE(res);
 
                         res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
                         REQUIRE(res);
                     }(std::move(streams->at(0))),
-                    [](auto reader) -> zero::async::coroutine::Task<void> {
+                    [](auto reader) -> asyncio::task::Task<void> {
                         std::string message;
                         message.resize(MESSAGE.size() * 3);
 

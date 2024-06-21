@@ -1,6 +1,4 @@
 #include <asyncio/net/net.h>
-#include <asyncio/uv.h>
-#include <zero/expect.h>
 
 #ifdef _WIN32
 #include <netioapi.h>

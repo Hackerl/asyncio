@@ -84,22 +84,22 @@ namespace asyncio::http::ws {
         explicit WebSocket(std::unique_ptr<IBuffer> buffer);
 
     private:
-        [[nodiscard]] zero::async::coroutine::Task<Frame, std::error_code> readFrame() const;
-        [[nodiscard]] zero::async::coroutine::Task<InternalMessage, std::error_code> readInternalMessage() const;
+        [[nodiscard]] task::Task<Frame, std::error_code> readFrame() const;
+        [[nodiscard]] task::Task<InternalMessage, std::error_code> readInternalMessage() const;
 
-        [[nodiscard]] zero::async::coroutine::Task<void, std::error_code>
+        [[nodiscard]] task::Task<void, std::error_code>
         writeInternalMessage(InternalMessage message) const;
 
     public:
-        [[nodiscard]] zero::async::coroutine::Task<Message, std::error_code> readMessage() const;
-        [[nodiscard]] zero::async::coroutine::Task<void, std::error_code> writeMessage(Message message) const;
+        [[nodiscard]] task::Task<Message, std::error_code> readMessage() const;
+        [[nodiscard]] task::Task<void, std::error_code> writeMessage(Message message) const;
 
-        [[nodiscard]] zero::async::coroutine::Task<void, std::error_code> sendText(std::string text) const;
+        [[nodiscard]] task::Task<void, std::error_code> sendText(std::string text) const;
 
-        [[nodiscard]] zero::async::coroutine::Task<void, std::error_code>
+        [[nodiscard]] task::Task<void, std::error_code>
         sendBinary(std::span<const std::byte> data) const;
 
-        zero::async::coroutine::Task<void, std::error_code> close(CloseCode code);
+        task::Task<void, std::error_code> close(CloseCode code);
 
     private:
         State mState;
@@ -121,7 +121,7 @@ namespace asyncio::http::ws {
         HASH_MISMATCH, "hash mismatch"
     )
 
-    zero::async::coroutine::Task<WebSocket, std::error_code> connect(URL url);
+    task::Task<WebSocket, std::error_code> connect(URL url);
 }
 
 DECLARE_ERROR_CODES(

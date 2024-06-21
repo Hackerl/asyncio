@@ -73,7 +73,7 @@ namespace asyncio::net::ssl {
         public:
             Listener(std::shared_ptr<Context> context, evconnlistener *listener);
 
-            zero::async::coroutine::Task<Buffer, std::error_code> accept();
+            task::Task<Buffer, std::error_code> accept();
 
         private:
             std::shared_ptr<Context> mContext;
@@ -87,17 +87,17 @@ namespace asyncio::net::ssl {
         std::expected<Listener, std::error_code>
         listen(const std::shared_ptr<Context> &context, const std::string &ip, unsigned short port);
 
-        zero::async::coroutine::Task<Buffer, std::error_code> connect(Address address);
-        zero::async::coroutine::Task<Buffer, std::error_code> connect(std::span<const Address> addresses);
-        zero::async::coroutine::Task<Buffer, std::error_code> connect(std::string host, unsigned short port);
+        task::Task<Buffer, std::error_code> connect(Address address);
+        task::Task<Buffer, std::error_code> connect(std::span<const Address> addresses);
+        task::Task<Buffer, std::error_code> connect(std::string host, unsigned short port);
 
-        zero::async::coroutine::Task<Buffer, std::error_code>
+        task::Task<Buffer, std::error_code>
         connect(std::shared_ptr<Context> context, Address address);
 
-        zero::async::coroutine::Task<Buffer, std::error_code>
+        task::Task<Buffer, std::error_code>
         connect(std::shared_ptr<Context> context, std::span<const Address> addresses);
 
-        zero::async::coroutine::Task<Buffer, std::error_code>
+        task::Task<Buffer, std::error_code>
         connect(std::shared_ptr<Context> context, std::string host, unsigned short port);
     }
 }

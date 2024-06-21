@@ -1,6 +1,5 @@
 #include <asyncio/poll.h>
 #include <asyncio/time.h>
-#include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
 
 #ifndef _WIN32
@@ -8,7 +7,7 @@
 #endif
 
 TEST_CASE("poll events", "[poll]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         std::array<uv_os_sock_t, 2> sockets = {};
         REQUIRE(uv_socketpair(SOCK_STREAM, 0, sockets.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE) == 0);
 
@@ -21,7 +20,7 @@ TEST_CASE("poll events", "[poll]") {
 
         SECTION("normal") {
             co_await allSettled(
-                [](auto socket, auto poll) -> zero::async::coroutine::Task<void> {
+                [](auto socket, auto poll) -> asyncio::task::Task<void> {
                     using namespace std::string_view_literals;
 
                     const auto res = co_await poll.on(asyncio::Poll::Event::READABLE);
@@ -32,7 +31,7 @@ TEST_CASE("poll events", "[poll]") {
                     REQUIRE(recv(socket, buffer.data(), buffer.size(), 0) == 11);
                     REQUIRE(buffer.data() == "hello world"sv);
                 }(sockets[0], *std::move(polls[0])),
-                [](auto socket, auto poll) -> zero::async::coroutine::Task<void> {
+                [](auto socket, auto poll) -> asyncio::task::Task<void> {
                     using namespace std::string_view_literals;
 
                     const auto res = co_await poll.on(asyncio::Poll::Event::WRITABLE);

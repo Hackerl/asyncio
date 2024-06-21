@@ -1,6 +1,9 @@
 #include <asyncio/sync/condition.h>
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Condition::wait(Mutex &mutex) {
+asyncio::sync::Condition::Condition() : mCounter(0) {
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::sync::Condition::wait(Mutex &mutex) {
     const int counter = mCounter;
 
     assert(mutex.locked());
@@ -9,25 +12,25 @@ zero::async::coroutine::Task<void, std::error_code> asyncio::sync::Condition::wa
     const auto promise = std::make_shared<Promise<void, std::error_code>>();
     mPending.push_back(promise);
 
-    const auto result = co_await zero::async::coroutine::Cancellable{
+    const auto result = co_await task::Cancellable{
         promise->getFuture(),
         [=, this]() -> std::expected<void, std::error_code> {
             if (mPending.remove(promise) == 0)
-                return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                return std::unexpected(task::Error::WILL_BE_DONE);
 
-            promise->reject(zero::async::coroutine::Error::CANCELLED);
+            promise->reject(task::Error::CANCELLED);
             return {};
         }
     };
 
-    co_await zero::async::coroutine::lock;
+    co_await task::lock;
 
     while (true) {
         if (co_await mutex.lock())
             break;
     }
 
-    co_await zero::async::coroutine::unlock;
+    co_await task::unlock;
 
     if (!result) {
         if (counter != mCounter)

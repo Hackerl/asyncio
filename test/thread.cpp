@@ -3,7 +3,7 @@
 #include <thread>
 
 TEST_CASE("asynchronously run in a separate thread", "[thread]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         SECTION("void") {
             using namespace std::chrono_literals;
 

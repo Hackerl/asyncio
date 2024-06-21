@@ -129,7 +129,7 @@ constexpr auto CLIENT_KEY = "-----BEGIN RSA PRIVATE KEY-----\n"
 constexpr std::string_view MESSAGE = "hello world\r\n";
 
 TEST_CASE("ssl stream network connection", "[net]") {
-    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    asyncio::run([]() -> asyncio::task::Task<void> {
         SECTION("mutual authentication") {
             const auto context = asyncio::net::ssl::newContext(
                 {
@@ -146,7 +146,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
 
             SECTION("normal") {
                 co_await allSettled(
-                    [](auto l) -> zero::async::coroutine::Task<void> {
+                    [](auto l) -> asyncio::task::Task<void> {
                         auto buffer = co_await l.accept();
                         REQUIRE(buffer);
 
@@ -168,7 +168,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                         REQUIRE(line);
                         REQUIRE(*line == zero::strings::trim(MESSAGE));
                     }(*std::move(listener)),
-                    []() -> zero::async::coroutine::Task<void> {
+                    []() -> asyncio::task::Task<void> {
                         const auto ctx = asyncio::net::ssl::newContext(
                             {
                                 .ca = std::string{CA_CERT},
@@ -247,7 +247,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
 
             SECTION("normal") {
                 co_await allSettled(
-                    [](auto l) -> zero::async::coroutine::Task<void> {
+                    [](auto l) -> asyncio::task::Task<void> {
                         auto buffer = co_await l.accept();
                         REQUIRE(buffer);
 
@@ -269,7 +269,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                         REQUIRE(line);
                         REQUIRE(*line == zero::strings::trim(MESSAGE));
                     }(*std::move(listener)),
-                    []() -> zero::async::coroutine::Task<void> {
+                    []() -> asyncio::task::Task<void> {
                         const auto ctx = asyncio::net::ssl::newContext({.ca = std::string{CA_CERT}});
                         REQUIRE(ctx);
 

@@ -2,8 +2,6 @@
 #define ASYNCIO_BUFFER_H
 
 #include "io.h"
-#include <cassert>
-#include <zero/expect.h>
 
 namespace asyncio {
     DEFINE_ERROR_CODE_EX(
@@ -29,7 +27,7 @@ namespace asyncio {
         }
 
     private:
-        zero::async::coroutine::Task<std::size_t, std::error_code> rawRead(const std::span<std::byte> data) {
+        task::Task<std::size_t, std::error_code> rawRead(const std::span<std::byte> data) {
             if constexpr (std::derived_from<T, IReader>) {
                 return mReader.read(data);
             }
@@ -43,7 +41,7 @@ namespace asyncio {
             return mCapacity;
         }
 
-        zero::async::coroutine::Task<std::size_t, std::error_code> read(const std::span<std::byte> data) override {
+        task::Task<std::size_t, std::error_code> read(const std::span<std::byte> data) override {
             if (available() == 0) {
                 if (data.size() >= mCapacity)
                     co_return co_await rawRead(data);
@@ -72,7 +70,7 @@ namespace asyncio {
             return mTail - mHead;
         }
 
-        zero::async::coroutine::Task<std::string, std::error_code> readLine() override {
+        task::Task<std::string, std::error_code> readLine() override {
             auto data = co_await readUntil(std::byte{'\n'});
             CO_EXPECT(data);
 
@@ -82,7 +80,7 @@ namespace asyncio {
             co_return std::string{reinterpret_cast<const char *>(data->data()), data->size()};
         }
 
-        zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readUntil(const std::byte byte) override {
+        task::Task<std::vector<std::byte>, std::error_code> readUntil(const std::byte byte) override {
             std::expected<std::vector<std::byte>, std::error_code> result;
 
             while (true) {
@@ -114,7 +112,7 @@ namespace asyncio {
             co_return result;
         }
 
-        zero::async::coroutine::Task<void, std::error_code> peek(const std::span<std::byte> data) override {
+        task::Task<void, std::error_code> peek(const std::span<std::byte> data) override {
             if (data.size() > mCapacity)
                 co_return std::unexpected(make_error_code(BufReaderError::INVALID_ARGUMENT));
 
@@ -165,7 +163,7 @@ namespace asyncio {
         }
 
     private:
-        zero::async::coroutine::Task<std::size_t, std::error_code> rawWrite(const std::span<const std::byte> data) {
+        task::Task<std::size_t, std::error_code> rawWrite(const std::span<const std::byte> data) {
             if constexpr (std::derived_from<T, IWriter>) {
                 return mWriter.write(data);
             }
@@ -179,7 +177,7 @@ namespace asyncio {
             return mCapacity;
         }
 
-        zero::async::coroutine::Task<std::size_t, std::error_code>
+        task::Task<std::size_t, std::error_code>
         write(const std::span<const std::byte> data) override {
             std::expected<std::size_t, std::error_code> result;
 
@@ -212,13 +210,13 @@ namespace asyncio {
             return mPending;
         }
 
-        zero::async::coroutine::Task<void, std::error_code> flush() override {
+        task::Task<void, std::error_code> flush() override {
             std::expected<void, std::error_code> result;
             std::size_t offset = 0;
 
             while (offset < mPending) {
-                if (co_await zero::async::coroutine::cancelled) {
-                    result = std::unexpected<std::error_code>(zero::async::coroutine::Error::CANCELLED);
+                if (co_await task::cancelled) {
+                    result = std::unexpected<std::error_code>(task::Error::CANCELLED);
                     break;
                 }
 

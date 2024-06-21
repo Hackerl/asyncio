@@ -2,6 +2,7 @@
 #define ASYNCIO_PROMISE_H
 
 #include "event_loop.h"
+#include <zero/async/promise.h>
 
 namespace asyncio {
     template<typename T, typename E = std::nullptr_t>

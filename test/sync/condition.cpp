@@ -1,50 +1,51 @@
 #include <asyncio/sync/condition.h>
+#include <asyncio/time.h>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace std::chrono_literals;
-
 TEST_CASE("asyncio condition variable", "[sync]") {
-    asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         const auto condition = std::make_shared<asyncio::sync::Condition>();
         const auto mutex = std::make_shared<asyncio::sync::Mutex>();
         REQUIRE(!mutex->locked());
 
         SECTION("notify") {
             co_await allSettled(
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
-                    auto result = co_await m->lock();
-                    REQUIRE(result);
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    auto res = co_await m->lock();
+                    REQUIRE(res);
                     REQUIRE(m->locked());
 
-                    result = co_await c->wait(*m);
-                    REQUIRE(result);
+                    res = co_await c->wait(*m);
+                    REQUIRE(res);
                     REQUIRE(m->locked());
                     m->unlock();
                 }(condition, mutex),
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
-                    auto result = co_await m->lock();
-                    REQUIRE(result);
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    auto res = co_await m->lock();
+                    REQUIRE(res);
                     REQUIRE(m->locked());
 
-                    result = co_await c->wait(*m);
-                    REQUIRE(result);
+                    res = co_await c->wait(*m);
+                    REQUIRE(res);
                     REQUIRE(m->locked());
                     m->unlock();
                 }(condition, mutex),
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
-                    auto result = co_await m->lock();
-                    REQUIRE(result);
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    auto res = co_await m->lock();
+                    REQUIRE(res);
                     REQUIRE(m->locked());
 
-                    result = co_await c->wait(*m);
-                    REQUIRE(result);
+                    res = co_await c->wait(*m);
+                    REQUIRE(res);
                     REQUIRE(m->locked());
                     m->unlock();
                 }(condition, mutex),
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    using namespace std::chrono_literals;
+
                     co_await asyncio::sleep(20ms);
-                    const auto result = co_await m->lock();
-                    REQUIRE(result);
+                    const auto res = co_await m->lock();
+                    REQUIRE(res);
 
                     c->notify();
                     c->notify();
@@ -56,40 +57,42 @@ TEST_CASE("asyncio condition variable", "[sync]") {
 
         SECTION("broadcast") {
             co_await allSettled(
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
-                    auto result = co_await m->lock();
-                    REQUIRE(result);
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    auto res = co_await m->lock();
+                    REQUIRE(res);
                     REQUIRE(m->locked());
 
-                    result = co_await c->wait(*m);
-                    REQUIRE(result);
+                    res = co_await c->wait(*m);
+                    REQUIRE(res);
                     REQUIRE(m->locked());
                     m->unlock();
                 }(condition, mutex),
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
-                    auto result = co_await m->lock();
-                    REQUIRE(result);
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    auto res = co_await m->lock();
+                    REQUIRE(res);
                     REQUIRE(m->locked());
 
-                    result = co_await c->wait(*m);
-                    REQUIRE(result);
+                    res = co_await c->wait(*m);
+                    REQUIRE(res);
                     REQUIRE(m->locked());
                     m->unlock();
                 }(condition, mutex),
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
-                    auto result = co_await m->lock();
-                    REQUIRE(result);
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    auto res = co_await m->lock();
+                    REQUIRE(res);
                     REQUIRE(m->locked());
 
-                    result = co_await c->wait(*m);
-                    REQUIRE(result);
+                    res = co_await c->wait(*m);
+                    REQUIRE(res);
                     REQUIRE(m->locked());
                     m->unlock();
                 }(condition, mutex),
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    using namespace std::chrono_literals;
+
                     co_await asyncio::sleep(20ms);
-                    const auto result = co_await m->lock();
-                    REQUIRE(result);
+                    const auto res = co_await m->lock();
+                    REQUIRE(res);
 
                     c->broadcast();
                     m->unlock();
@@ -101,24 +104,26 @@ TEST_CASE("asyncio condition variable", "[sync]") {
             const auto value = std::make_shared<int>();
 
             co_await allSettled(
-                [](auto c, auto m, auto v) -> zero::async::coroutine::Task<void> {
-                    auto result = co_await m->lock();
-                    REQUIRE(result);
+                [](auto c, auto m, auto v) -> asyncio::task::Task<void> {
+                    auto res = co_await m->lock();
+                    REQUIRE(res);
                     REQUIRE(m->locked());
 
-                    result = co_await c->wait(*m, [=] {
+                    res = co_await c->wait(*m, [=] {
                         return *v == 1024;
                     });
 
-                    REQUIRE(result);
+                    REQUIRE(res);
                     REQUIRE(m->locked());
                     REQUIRE(*v == 1024);
                     m->unlock();
                 }(condition, mutex, value),
-                [](auto c, auto m, auto v) -> zero::async::coroutine::Task<void> {
+                [](auto c, auto m, auto v) -> asyncio::task::Task<void> {
+                    using namespace std::chrono_literals;
+
                     co_await asyncio::sleep(20ms);
-                    auto result = co_await m->lock();
-                    REQUIRE(result);
+                    auto res = co_await m->lock();
+                    REQUIRE(res);
 
                     *v = 1023;
                     c->notify();
@@ -126,8 +131,8 @@ TEST_CASE("asyncio condition variable", "[sync]") {
 
                     co_await asyncio::sleep(20ms);
 
-                    result = co_await m->lock();
-                    REQUIRE(result);
+                    res = co_await m->lock();
+                    REQUIRE(res);
 
                     *v = 1024;
                     c->notify();
@@ -138,21 +143,25 @@ TEST_CASE("asyncio condition variable", "[sync]") {
 
         SECTION("timeout") {
             co_await allSettled(
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
-                    const auto result = co_await m->lock();
-                    REQUIRE(result);
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    using namespace std::chrono_literals;
+
+                    const auto res = co_await m->lock();
+                    REQUIRE(res);
                     REQUIRE(m->locked());
 
-                    const auto res = co_await asyncio::timeout(c->wait(*m), 10ms);
-                    REQUIRE(!res);
-                    REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
+                    const auto r = co_await asyncio::timeout(c->wait(*m), 10ms);
+                    REQUIRE(!r);
+                    REQUIRE(r.error() == asyncio::TimeoutError::ELAPSED);
                     REQUIRE(m->locked());
                     m->unlock();
                 }(condition, mutex),
-                [](auto c, auto m) -> zero::async::coroutine::Task<void> {
+                [](auto c, auto m) -> asyncio::task::Task<void> {
+                    using namespace std::chrono_literals;
+
                     co_await asyncio::sleep(20ms);
-                    const auto result = co_await m->lock();
-                    REQUIRE(result);
+                    const auto res = co_await m->lock();
+                    REQUIRE(res);
 
                     c->notify();
                     m->unlock();
@@ -161,14 +170,14 @@ TEST_CASE("asyncio condition variable", "[sync]") {
         }
 
         SECTION("cancel") {
-            auto task = [](auto c, auto m) -> zero::async::coroutine::Task<void> {
-                auto result = co_await m->lock();
-                REQUIRE(result);
+            auto task = [](auto c, auto m) -> asyncio::task::Task<void> {
+                auto res = co_await m->lock();
+                REQUIRE(res);
                 REQUIRE(m->locked());
 
-                result = co_await c->wait(*m);
-                REQUIRE(!result);
-                REQUIRE(result.error() == std::errc::operation_canceled);
+                res = co_await c->wait(*m);
+                REQUIRE(!res);
+                REQUIRE(res.error() == std::errc::operation_canceled);
                 REQUIRE(m->locked());
                 m->unlock();
             }(condition, mutex);
@@ -178,34 +187,34 @@ TEST_CASE("asyncio condition variable", "[sync]") {
         }
 
         SECTION("cancel after notify") {
-            auto result = co_await mutex->lock();
-            REQUIRE(result);
+            auto res = co_await mutex->lock();
+            REQUIRE(res);
             REQUIRE(mutex->locked());
 
             auto task = condition->wait(*mutex);
             REQUIRE(!task.done());
 
-            result = co_await mutex->lock();
-            REQUIRE(result);
+            res = co_await mutex->lock();
+            REQUIRE(res);
             REQUIRE(mutex->locked());
 
             condition->notify();
 
-            result = task.cancel();
-            REQUIRE(!result);
-            REQUIRE(result.error() == zero::async::coroutine::Error::WILL_BE_DONE);
+            res = task.cancel();
+            REQUIRE(!res);
+            REQUIRE(res.error() == asyncio::task::Error::WILL_BE_DONE);
 
             mutex->unlock();
             REQUIRE(!mutex->locked());
 
-            result = co_await task;
-            REQUIRE(result);
+            res = co_await task;
+            REQUIRE(res);
             REQUIRE(mutex->locked());
         }
 
         SECTION("notify after cancel") {
-            auto result = co_await mutex->lock();
-            REQUIRE(result);
+            auto res = co_await mutex->lock();
+            REQUIRE(res);
             REQUIRE(mutex->locked());
 
             auto task1 = condition->wait(*mutex);
@@ -213,8 +222,8 @@ TEST_CASE("asyncio condition variable", "[sync]") {
             REQUIRE(task1.cancel());
             REQUIRE(!task1.done());
 
-            result = co_await mutex->lock();
-            REQUIRE(result);
+            res = co_await mutex->lock();
+            REQUIRE(res);
             REQUIRE(mutex->locked());
 
             condition->notify();
@@ -222,17 +231,19 @@ TEST_CASE("asyncio condition variable", "[sync]") {
             auto task2 = condition->wait(*mutex);
             REQUIRE(!task2.done());
 
-            result = co_await task1;
-            REQUIRE(!result);
-            REQUIRE(result.error() == std::errc::operation_canceled);
+            res = co_await task1;
+            REQUIRE(!res);
+            REQUIRE(res.error() == std::errc::operation_canceled);
             REQUIRE(mutex->locked());
 
             mutex->unlock();
             REQUIRE(!mutex->locked());
 
-            result = co_await task2;
-            REQUIRE(result);
+            res = co_await task2;
+            REQUIRE(res);
             REQUIRE(mutex->locked());
         }
     });
+    REQUIRE(result);
+    REQUIRE(*result);
 }

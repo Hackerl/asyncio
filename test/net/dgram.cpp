@@ -1,18 +1,16 @@
 #include <asyncio/net/dgram.h>
-#include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
-#include <fmt/std.h>
 
 constexpr std::string_view MESSAGE = "hello world";
 
 TEST_CASE("datagram network connection", "[net]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         auto server = asyncio::net::UDPSocket::bind("127.0.0.1", 30000);
         REQUIRE(server);
 
         SECTION("normal") {
             co_await allSettled(
-                [](auto socket) -> zero::async::coroutine::Task<void> {
+                [](auto socket) -> asyncio::task::Task<void> {
                     std::string message;
                     message.resize(MESSAGE.size());
 
@@ -30,7 +28,7 @@ TEST_CASE("datagram network connection", "[net]") {
                     REQUIRE(n);
                     REQUIRE(*n == num);
                 }(*std::move(server)),
-                []() -> zero::async::coroutine::Task<void> {
+                []() -> asyncio::task::Task<void> {
                     using namespace std::string_view_literals;
 
                     auto socket = asyncio::net::UDPSocket::bind("127.0.0.1", 30001);
@@ -61,7 +59,7 @@ TEST_CASE("datagram network connection", "[net]") {
 
         SECTION("connect") {
             co_await allSettled(
-                [](auto socket) -> zero::async::coroutine::Task<void> {
+                [](auto socket) -> asyncio::task::Task<void> {
                     std::string message;
                     message.resize(MESSAGE.size());
 
@@ -79,7 +77,7 @@ TEST_CASE("datagram network connection", "[net]") {
                     REQUIRE(n);
                     REQUIRE(*n == num);
                 }(*std::move(server)),
-                []() -> zero::async::coroutine::Task<void> {
+                []() -> asyncio::task::Task<void> {
                     auto socket = co_await asyncio::net::UDPSocket::connect("127.0.0.1", 30000);
                     REQUIRE(socket);
 

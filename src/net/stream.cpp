@@ -1,6 +1,5 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/dns.h>
-#include <asyncio/promise.h>
 
 asyncio::net::TCPStream::TCPStream(Stream stream) : mStream(std::move(stream)) {
 }
@@ -8,7 +7,7 @@ asyncio::net::TCPStream::TCPStream(Stream stream) : mStream(std::move(stream)) {
 // TODO
 // except for MSVC, adding const will fail to compile.
 // ReSharper disable once CppParameterMayBeConst
-zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
 asyncio::net::TCPStream::connect(SocketAddress address) {
     auto tcp = std::make_unique<uv_tcp_t>();
 
@@ -57,7 +56,7 @@ std::expected<asyncio::net::TCPStream, std::error_code> asyncio::net::TCPStream:
     return TCPStream{Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}}}};
 }
 
-zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
 asyncio::net::TCPStream::connect(const std::string host, const unsigned short port) {
     addrinfo hints = {};
 
@@ -84,14 +83,14 @@ asyncio::net::TCPStream::connect(const std::string host, const unsigned short po
     }
 }
 
-zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
 asyncio::net::TCPStream::connect(const IPv4Address address) {
     auto socketAddress = socketAddressFrom(address);
     CO_EXPECT(socketAddress);
     co_return co_await connect(*std::move(socketAddress));
 }
 
-zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
 asyncio::net::TCPStream::connect(const IPv6Address address) {
     auto socketAddress = socketAddressFrom(address);
     CO_EXPECT(socketAddress);
@@ -128,17 +127,17 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::TCPStream::r
     return addressFrom(reinterpret_cast<const sockaddr *>(&storage), length);
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::TCPStream::read(const std::span<std::byte> data) {
     co_return co_await mStream.read(data);
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::TCPStream::write(const std::span<const std::byte> data) {
     co_return co_await mStream.write(data);
 }
 
-zero::async::coroutine::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
+asyncio::task::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
 asyncio::net::TCPStream::readFrom(const std::span<std::byte> data) {
     auto remote = remoteAddress();
     CO_EXPECT(remote);
@@ -149,12 +148,12 @@ asyncio::net::TCPStream::readFrom(const std::span<std::byte> data) {
     co_return std::pair{*n, *std::move(remote)};
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::TCPStream::writeTo(const std::span<const std::byte> data, const Address) {
     co_return co_await write(data);
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::net::TCPStream::close() {
+asyncio::task::Task<void, std::error_code> asyncio::net::TCPStream::close() {
     mStream.handle().close();
     co_return {};
 }
@@ -205,7 +204,7 @@ asyncio::net::TCPListener::listen(const IPv6Address &address) {
     return listen(*std::move(socketAddress));
 }
 
-zero::async::coroutine::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
 asyncio::net::TCPListener::accept() {
     auto tcp = std::make_unique<uv_tcp_t>();
 
@@ -228,7 +227,7 @@ asyncio::net::TCPListener::accept() {
 asyncio::net::NamedPipeStream::NamedPipeStream(Pipe pipe) : mPipe(std::move(pipe)) {
 }
 
-zero::async::coroutine::Task<asyncio::net::NamedPipeStream, std::error_code>
+asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code>
 asyncio::net::NamedPipeStream::connect(const std::string name) {
     auto pipe = std::make_unique<uv_pipe_t>();
 
@@ -265,17 +264,17 @@ asyncio::net::NamedPipeStream::connect(const std::string name) {
     co_return NamedPipeStream{std::move(stream)};
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::NamedPipeStream::read(const std::span<std::byte> data) {
     co_return co_await mPipe.read(data);
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::NamedPipeStream::write(const std::span<const std::byte> data) {
     co_return co_await mPipe.write(data);
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::net::NamedPipeStream::close() {
+asyncio::task::Task<void, std::error_code> asyncio::net::NamedPipeStream::close() {
     mPipe.handle().close();
     co_return {};
 }
@@ -303,7 +302,7 @@ asyncio::net::NamedPipeListener::listen(const std::string &name) {
     return NamedPipeListener{*std::move(listener)};
 }
 
-zero::async::coroutine::Task<asyncio::net::NamedPipeStream, std::error_code> asyncio::net::NamedPipeListener::accept() {
+asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code> asyncio::net::NamedPipeListener::accept() {
     auto pipe = std::make_unique<uv_pipe_t>();
 
     CO_EXPECT(uv::expected([&] {
@@ -330,7 +329,7 @@ std::expected<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixStrea
     return UnixStream{*std::move(pipe)};
 }
 
-zero::async::coroutine::Task<asyncio::net::UnixStream, std::error_code>
+asyncio::task::Task<asyncio::net::UnixStream, std::error_code>
 asyncio::net::UnixStream::connect(std::string path) {
     assert(!path.empty());
 
@@ -397,17 +396,17 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::UnixStream::
     return UnixAddress{*std::move(address)};
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UnixStream::read(const std::span<std::byte> data) {
     co_return co_await mPipe.read(data);
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UnixStream::write(const std::span<const std::byte> data) {
     co_return co_await mPipe.write(data);
 }
 
-zero::async::coroutine::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
+asyncio::task::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
 asyncio::net::UnixStream::readFrom(const std::span<std::byte> data) {
     auto remote = remoteAddress();
     CO_EXPECT(remote);
@@ -418,12 +417,12 @@ asyncio::net::UnixStream::readFrom(const std::span<std::byte> data) {
     co_return std::pair{*n, *std::move(remote)};
 }
 
-zero::async::coroutine::Task<std::size_t, std::error_code>
+asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UnixStream::writeTo(const std::span<const std::byte> data, const Address) {
     co_return co_await write(data);
 }
 
-zero::async::coroutine::Task<void, std::error_code> asyncio::net::UnixStream::close() {
+asyncio::task::Task<void, std::error_code> asyncio::net::UnixStream::close() {
     mPipe.handle().close();
     co_return {};
 }
@@ -455,7 +454,7 @@ std::expected<asyncio::net::UnixListener, std::error_code> asyncio::net::UnixLis
     return UnixListener{*std::move(listener)};
 }
 
-zero::async::coroutine::Task<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixListener::accept() {
+asyncio::task::Task<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixListener::accept() {
     auto pipe = std::make_unique<uv_pipe_t>();
 
     CO_EXPECT(uv::expected([&] {

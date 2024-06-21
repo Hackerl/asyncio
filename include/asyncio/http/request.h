@@ -4,9 +4,7 @@
 #include "url.h"
 #include <map>
 #include <variant>
-#include <zero/expect.h>
-#include <asyncio/ev/pipe.h>
-#include <asyncio/ev/timer.h>
+#include <asyncio/pipe.h>
 #include <nlohmann/json.hpp>
 
 namespace asyncio::http {
@@ -22,7 +20,8 @@ namespace asyncio::http {
                 defer();
         }
 
-        std::array<ev::PairedBuffer, 2> buffers;
+        Pipe reader;
+        Pipe writer;
         std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy;
         Promise<void, std::error_code> promise;
         std::list<std::function<void()>> defers;
@@ -32,9 +31,9 @@ namespace asyncio::http {
 
     class Requests;
 
-    class Response final : public IBufReader, public Reader {
+    class Response final : public IReader {
     public:
-        DEFINE_ERROR_CODE_TYPES(
+        DEFINE_ERROR_CODE_INNER(
             Error,
             "asyncio::http::Response",
             INVALID_JSON, "invalid json message"
@@ -50,12 +49,12 @@ namespace asyncio::http {
         [[nodiscard]] std::vector<std::string> cookies() const;
         [[nodiscard]] std::optional<std::string> header(const std::string &name) const;
 
-        [[nodiscard]] zero::async::coroutine::Task<std::string, std::error_code> string() const;
-        [[nodiscard]] zero::async::coroutine::Task<void, std::error_code> output(std::filesystem::path path) const;
-        [[nodiscard]] zero::async::coroutine::Task<nlohmann::json, std::error_code> json() const;
+        task::Task<std::string, std::error_code> string();
+        task::Task<void, std::error_code> output(std::filesystem::path path);
+        task::Task<nlohmann::json, std::error_code> json();
 
         template<typename T>
-        zero::async::coroutine::Task<T, std::error_code> json() const {
+        task::Task<T, std::error_code> json() {
             const auto j = co_await json();
             CO_EXPECT(j);
 
@@ -67,19 +66,12 @@ namespace asyncio::http {
             }
         }
 
-        zero::async::coroutine::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
-        [[nodiscard]] std::size_t capacity() const override;
-        [[nodiscard]] std::size_t available() const override;
-        zero::async::coroutine::Task<std::string, std::error_code> readLine() override;
-        zero::async::coroutine::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) override;
-        zero::async::coroutine::Task<void, std::error_code> peek(std::span<std::byte> data) override;
+        task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
 
     private:
         Requests *mRequests;
         std::unique_ptr<Connection> mConnection;
     };
-
-    DEFINE_MAKE_ERROR_CODE(Response::Error)
 
     struct Options {
         std::optional<std::string> proxy;
@@ -91,65 +83,71 @@ namespace asyncio::http {
     };
 
     class Requests {
+        struct Core {
+            struct Context {
+                uv::Handle<uv_poll_t> poll;
+                Core *core;
+                curl_socket_t s;
+            };
+
+            int running{};
+            Options options;
+            uv::Handle<uv_timer_t> timer;
+            std::unique_ptr<CURLM, decltype(curl_multi_cleanup) *> multi;
+
+            void recycle();
+            std::expected<void, std::error_code> setTimer(long ms);
+            std::expected<void, std::error_code> handle(curl_socket_t s, int action, Context *context);
+        };
+
     public:
-        DEFINE_ERROR_TRANSFORMER_TYPES(
+        DEFINE_ERROR_TRANSFORMER_INNER(
             CURLError,
             "asyncio::http::Requests::curl",
             [](const int value) { return curl_easy_strerror(static_cast<CURLcode>(value)); }
         )
 
-        DEFINE_ERROR_TRANSFORMER_TYPES(
+        DEFINE_ERROR_TRANSFORMER_INNER(
             CURLMError,
             "asyncio::http::Requests::curl::multi",
             [](const int value) { return curl_multi_strerror(static_cast<CURLMcode>(value)); }
         )
 
-        Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer);
-        Requests(CURLM *multi, std::unique_ptr<event, decltype(event_free) *> timer, Options options);
-        Requests(Requests &&rhs) noexcept;
-        Requests &operator=(Requests &&rhs) noexcept;
-        ~Requests();
+        explicit Requests(std::unique_ptr<Core> core);
+        static std::expected<Requests, std::error_code> make(Options options = {});
 
-        static std::expected<Requests, std::error_code> make(const Options &options = {});
-
-    private:
-        void onTimer();
-        void onCURLTimer(long timeout) const;
-        void onCURLEvent(curl_socket_t s, int what, void *data);
-        void recycle() const;
-
-    public:
         Options &options();
+        [[nodiscard]] const Options &options() const;
 
     private:
         std::expected<std::unique_ptr<Connection>, std::error_code>
         prepare(std::string method, const URL &url, const std::optional<Options> &options);
 
-        zero::async::coroutine::Task<Response, std::error_code>
+        task::Task<Response, std::error_code>
         perform(std::unique_ptr<Connection> connection);
 
     public:
-        zero::async::coroutine::Task<Response, std::error_code>
+        task::Task<Response, std::error_code>
         request(std::string method, URL url, std::optional<Options> options);
 
-        zero::async::coroutine::Task<Response, std::error_code>
+        task::Task<Response, std::error_code>
         request(std::string method, URL url, std::optional<Options> options, std::string payload);
 
-        zero::async::coroutine::Task<Response, std::error_code> request(
+        task::Task<Response, std::error_code> request(
             std::string method,
             URL url,
             std::optional<Options> options,
             std::map<std::string, std::string> payload
         );
 
-        zero::async::coroutine::Task<Response, std::error_code> request(
+        task::Task<Response, std::error_code> request(
             std::string method,
             URL url,
             std::optional<Options> options,
             std::map<std::string, std::filesystem::path> payload
         );
 
-        zero::async::coroutine::Task<Response, std::error_code> request(
+        task::Task<Response, std::error_code> request(
             std::string method,
             URL url,
             std::optional<Options> options,
@@ -162,13 +160,13 @@ namespace asyncio::http {
                 !std::is_same_v<T, std::string> &&
                 (std::is_same_v<T, nlohmann::json> || nlohmann::detail::is_compatible_type<nlohmann::json, T>::value)
             )
-        zero::async::coroutine::Task<Response, std::error_code> request(
+        task::Task<Response, std::error_code> request(
             std::string method,
             const URL url,
             const std::optional<Options> options,
             T payload
         ) {
-            Options opt = options.value_or(mOptions);
+            Options opt = options.value_or(mCore->options);
             opt.headers["Content-Type"] = "application/json";
 
             auto connection = prepare(std::move(method), url, std::move(opt));
@@ -192,50 +190,43 @@ namespace asyncio::http {
             co_return co_await perform(*std::move(connection));
         }
 
-        zero::async::coroutine::Task<Response, std::error_code>
+        task::Task<Response, std::error_code>
         get(const URL &url, const std::optional<Options> &options = std::nullopt) {
             return request("GET", url, options);
         }
 
-        zero::async::coroutine::Task<Response, std::error_code>
+        task::Task<Response, std::error_code>
         head(const URL &url, const std::optional<Options> &options = std::nullopt) {
             return request("HEAD", url, options);
         }
 
-        zero::async::coroutine::Task<Response, std::error_code>
+        task::Task<Response, std::error_code>
         del(const URL &url, const std::optional<Options> &options = std::nullopt) {
             return request("DELETE", url, options);
         }
 
         template<typename T>
-        zero::async::coroutine::Task<Response, std::error_code>
+        task::Task<Response, std::error_code>
         post(const URL &url, T &&payload, const std::optional<Options> &options = std::nullopt) {
             return request("POST", url, options, std::forward<T>(payload));
         }
 
         template<typename T>
-        zero::async::coroutine::Task<Response, std::error_code>
+        task::Task<Response, std::error_code>
         put(const URL &url, T &&payload, const std::optional<Options> &options = std::nullopt) {
             return request("PUT", url, options, std::forward<T>(payload));
         }
 
         template<typename T>
-        zero::async::coroutine::Task<Response, std::error_code>
+        task::Task<Response, std::error_code>
         patch(const URL &url, T &&payload, const std::optional<Options> &options = std::nullopt) {
             return request("PATCH", url, options, std::forward<T>(payload));
         }
 
     private:
-        int mRunning;
-        Options mOptions;
-        std::unique_ptr<event, decltype(event_free) *> mTimer;
-        std::unique_ptr<CURLM, decltype(curl_multi_cleanup) *> mMulti;
-
+        std::unique_ptr<Core> mCore;
         friend class Response;
     };
-
-    DEFINE_MAKE_ERROR_CODE(Requests::CURLError)
-    DEFINE_MAKE_ERROR_CODE(Requests::CURLMError)
 }
 
 DECLARE_ERROR_CODES(

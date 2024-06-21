@@ -1,9 +1,8 @@
-#include <asyncio/promise.h>
 #include <asyncio/time.h>
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("time", "[time]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         SECTION("sleep") {
             using namespace std::chrono_literals;
             const auto tp = std::chrono::system_clock::now();
@@ -49,10 +48,10 @@ TEST_CASE("time", "[time]") {
 
                 const auto promise = std::make_shared<asyncio::Promise<void, std::error_code>>();
                 auto task = asyncio::timeout(
-                    from(zero::async::coroutine::Cancellable{
+                    from(asyncio::task::Cancellable{
                         promise->getFuture(),
                         [=]() -> std::expected<void, std::error_code> {
-                            return std::unexpected(zero::async::coroutine::Error::WILL_BE_DONE);
+                            return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
                         }
                     }),
                     20ms

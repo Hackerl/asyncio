@@ -1,18 +1,16 @@
 #include <asyncio/net/stream.h>
-#include <asyncio/event_loop.h>
 #include <catch2/catch_test_macros.hpp>
-#include <fmt/std.h>
 
 constexpr std::string_view MESSAGE = "hello world";
 
 TEST_CASE("stream network connection", "[net]") {
-    const auto result = asyncio::run([]() -> zero::async::coroutine::Task<void> {
+    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         SECTION("TCP") {
             auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 30000);
             REQUIRE(listener);
 
             co_await allSettled(
-                [](auto l) -> zero::async::coroutine::Task<void> {
+                [](auto l) -> asyncio::task::Task<void> {
                     auto stream = co_await l.accept();
                     REQUIRE(stream);
 
@@ -34,7 +32,7 @@ TEST_CASE("stream network connection", "[net]") {
                     REQUIRE(res);
                     REQUIRE(message == MESSAGE);
                 }(*std::move(listener)),
-                []() -> zero::async::coroutine::Task<void> {
+                []() -> asyncio::task::Task<void> {
                     auto stream = co_await asyncio::net::TCPStream::connect("127.0.0.1", 30000);
                     REQUIRE(stream);
 
@@ -65,7 +63,7 @@ TEST_CASE("stream network connection", "[net]") {
             REQUIRE(listener);
 
             co_await allSettled(
-                [](auto l) -> zero::async::coroutine::Task<void> {
+                [](auto l) -> asyncio::task::Task<void> {
                     auto stream = co_await l.accept();
                     REQUIRE(stream);
 
@@ -79,7 +77,7 @@ TEST_CASE("stream network connection", "[net]") {
                     REQUIRE(res);
                     REQUIRE(message == MESSAGE);
                 }(*std::move(listener)),
-                []() -> zero::async::coroutine::Task<void> {
+                []() -> asyncio::task::Task<void> {
                     auto stream = co_await asyncio::net::NamedPipeStream::connect(R"(\\.\pipe\asyncio-test)");
                     REQUIRE(stream);
 
@@ -103,7 +101,7 @@ TEST_CASE("stream network connection", "[net]") {
                 REQUIRE(listener);
 
                 co_await allSettled(
-                    [](auto l) -> zero::async::coroutine::Task<void> {
+                    [](auto l) -> asyncio::task::Task<void> {
                         auto stream = co_await l.accept();
                         REQUIRE(stream);
 
@@ -121,7 +119,7 @@ TEST_CASE("stream network connection", "[net]") {
                         REQUIRE(res);
                         REQUIRE(message == MESSAGE);
                     }(*std::move(listener)),
-                    [](auto p) -> zero::async::coroutine::Task<void> {
+                    [](auto p) -> asyncio::task::Task<void> {
                         auto stream = co_await asyncio::net::UnixStream::connect(p);
                         REQUIRE(stream);
 
@@ -150,7 +148,7 @@ TEST_CASE("stream network connection", "[net]") {
                 REQUIRE(listener);
 
                 co_await allSettled(
-                    [](auto l) -> zero::async::coroutine::Task<void> {
+                    [](auto l) -> asyncio::task::Task<void> {
                         auto stream = co_await l.accept();
                         REQUIRE(stream);
 
@@ -170,7 +168,7 @@ TEST_CASE("stream network connection", "[net]") {
                         REQUIRE(res);
                         REQUIRE(message == MESSAGE);
                     }(*std::move(listener)),
-                    []() -> zero::async::coroutine::Task<void> {
+                    []() -> asyncio::task::Task<void> {
                         auto stream = co_await asyncio::net::UnixStream::connect("@asyncio-test.sock");
                         REQUIRE(stream);
 

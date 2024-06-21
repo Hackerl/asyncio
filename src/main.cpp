@@ -1,4 +1,4 @@
-#include <asyncio/event_loop.h>
+#include <asyncio/task.h>
 #include <zero/formatter.h>
 #include <fmt/std.h>
 
@@ -8,7 +8,7 @@
 #include <csignal>
 #endif
 
-zero::async::coroutine::Task<void, std::error_code> amain(int argc, char *argv[]);
+asyncio::task::Task<void, std::error_code> amain(int argc, char *argv[]);
 
 int main(const int argc, char *argv[]) {
 #ifdef _WIN32
