@@ -46,7 +46,7 @@ TEST_CASE("asynchronous io", "[io]") {
 
             co_await allSettled(
                 [](auto first, auto second) -> asyncio::task::Task<void> {
-                    const auto res = co_await asyncio::copyBidirectional(std::move(first), std::move(second));
+                    const auto res = co_await asyncio::copyBidirectional(first, second);
                     REQUIRE(res);
                 }(std::move(streams1->at(1)), std::move(streams2->at(0))),
                 [](auto stream) -> asyncio::task::Task<void> {

@@ -11,12 +11,7 @@ namespace asyncio {
         UNEXPECTED_EOF, "unexpected end of file", IOError::UNEXPECTED_EOF
     )
 
-    template<typename T>
-        requires (
-            std::derived_from<T, IReader> ||
-            std::convertible_to<T, std::unique_ptr<IReader>> ||
-            std::convertible_to<T, std::shared_ptr<IReader>>
-        )
+    template<Reader T>
     class BufReader final : public IBufReader {
         static constexpr auto DEFAULT_BUFFER_CAPACITY = 8192;
 
@@ -26,17 +21,6 @@ namespace asyncio {
               mBuffer(std::make_unique<std::byte[]>(capacity)) {
         }
 
-    private:
-        task::Task<std::size_t, std::error_code> rawRead(const std::span<std::byte> data) {
-            if constexpr (std::derived_from<T, IReader>) {
-                return mReader.read(data);
-            }
-            else {
-                return mReader->read(data);
-            }
-        }
-
-    public:
         [[nodiscard]] std::size_t capacity() const {
             return mCapacity;
         }
@@ -44,12 +28,12 @@ namespace asyncio {
         task::Task<std::size_t, std::error_code> read(const std::span<std::byte> data) override {
             if (available() == 0) {
                 if (data.size() >= mCapacity)
-                    co_return co_await rawRead(data);
+                    co_return co_await std::invoke(&IReader::read, mReader, data);
 
                 mHead = 0;
                 mTail = 0;
 
-                const auto n = co_await rawRead({mBuffer.get(), mCapacity});
+                const auto n = co_await std::invoke(&IReader::read, mReader, std::span{mBuffer.get(), mCapacity});
                 CO_EXPECT(n);
 
                 if (*n == 0)
@@ -98,7 +82,7 @@ namespace asyncio {
                 mHead = 0;
                 mTail = 0;
 
-                const auto n = co_await rawRead({mBuffer.get(), mCapacity});
+                const auto n = co_await std::invoke(&IReader::read, mReader, std::span{mBuffer.get(), mCapacity});
                 CO_EXPECT(n);
 
                 if (*n == 0) {
@@ -124,7 +108,11 @@ namespace asyncio {
                 }
 
                 while (mTail < data.size()) {
-                    const auto n = co_await rawRead({mBuffer.get() + mTail, mCapacity - mTail});
+                    const auto n = co_await std::invoke(
+                        &IReader::read,
+                        mReader,
+                        std::span{mBuffer.get() + mTail, mCapacity - mTail}
+                    );
                     CO_EXPECT(n);
 
                     if (*n == 0)
@@ -147,12 +135,7 @@ namespace asyncio {
         std::unique_ptr<std::byte[]> mBuffer;
     };
 
-    template<typename T>
-        requires (
-            std::derived_from<T, IWriter> ||
-            std::convertible_to<T, std::unique_ptr<IWriter>> ||
-            std::convertible_to<T, std::shared_ptr<IWriter>>
-        )
+    template<Writer T>
     class BufWriter final : public IBufWriter {
         static constexpr auto DEFAULT_BUFFER_CAPACITY = 8192;
 
@@ -162,17 +145,6 @@ namespace asyncio {
               mBuffer(std::make_unique<std::byte[]>(capacity)) {
         }
 
-    private:
-        task::Task<std::size_t, std::error_code> rawWrite(const std::span<const std::byte> data) {
-            if constexpr (std::derived_from<T, IWriter>) {
-                return mWriter.write(data);
-            }
-            else {
-                return mWriter->write(data);
-            }
-        }
-
-    public:
         [[nodiscard]] std::size_t capacity() const {
             return mCapacity;
         }
@@ -220,7 +192,11 @@ namespace asyncio {
                     break;
                 }
 
-                const auto n = co_await rawWrite({mBuffer.get() + offset, mPending - offset});
+                const auto n = co_await std::invoke(
+                    &IWriter::write,
+                    mWriter,
+                    std::span{mBuffer.get() + offset, mPending - offset}
+                );
 
                 if (!n) {
                     result = std::unexpected(n.error());

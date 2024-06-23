@@ -38,18 +38,17 @@ namespace asyncio {
     };
 
     template<typename T>
-    concept Reader = std::derived_from<T, IReader>;
+    concept Reader = std::derived_from<T, IReader> ||
+        std::is_convertible_v<std::remove_const_t<T>, std::shared_ptr<IReader>> ||
+        std::is_convertible_v<std::remove_const_t<T>, std::unique_ptr<IReader>>;
 
     template<typename T>
-    concept Writer = std::derived_from<T, IWriter>;
+    concept Writer = std::derived_from<T, IWriter> ||
+        std::is_convertible_v<std::remove_const_t<T>, std::shared_ptr<IWriter>> ||
+        std::is_convertible_v<std::remove_const_t<T>, std::unique_ptr<IWriter>>;
 
     template<typename T>
     concept StreamIO = Reader<T> && Writer<T>;
-
-    /*class IFileDescriptor : public virtual zero::Interface {
-    public:
-        [[nodiscard]] virtual FileDescriptor fd() const = 0;
-    };*/
 
     class ISeekable : public virtual zero::Interface {
     public:
@@ -79,26 +78,41 @@ namespace asyncio {
         virtual task::Task<void, std::error_code> flush() = 0;
     };
 
-    task::Task<void, std::error_code> copy(IReader &reader, IWriter &writer);
+    task::Task<void, std::error_code> copy(Reader auto &reader, Writer auto &writer) {
+        std::expected<void, std::error_code> result;
 
-    template<Reader R, Writer W>
-    task::Task<void, std::error_code> copy(std::shared_ptr<R> reader, std::shared_ptr<W> writer) {
-        co_return co_await copy(*reader, *writer);
+        while (true) {
+            if (co_await task::cancelled) {
+                result = std::unexpected<std::error_code>(task::Error::CANCELLED);
+                break;
+            }
+
+            std::array<std::byte, 10240> data = {};
+            const auto n = co_await std::invoke(&IReader::read, reader, data);
+
+            if (!n) {
+                result = std::unexpected(n.error());
+                break;
+            }
+
+            if (*n == 0)
+                break;
+
+            co_await task::lock;
+
+            if (const auto res = co_await std::invoke(&IWriter::writeAll, writer, std::span{data.data(), *n}); !res) {
+                result = std::unexpected(res.error());
+                break;
+            }
+
+            co_await task::unlock;
+        }
+
+        co_return result;
     }
 
-    template<StreamIO T, StreamIO U>
-    task::Task<void, std::error_code>
-    copyBidirectional(std::shared_ptr<T> first, std::shared_ptr<U> second) {
+    task::Task<void, std::error_code> copyBidirectional(StreamIO auto &first, StreamIO auto &second) {
         co_return co_await race(copy(first, second), copy(second, first));
-    }
-
-    template<StreamIO T, StreamIO U>
-    task::Task<void, std::error_code>
-    copyBidirectional(T first, U second) {
-        co_return co_await copyBidirectional(
-            std::make_shared<T>(std::move(first)),
-            std::make_shared<U>(std::move(second))
-        );
     }
 }
 

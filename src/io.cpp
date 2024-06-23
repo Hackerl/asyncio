@@ -67,36 +67,3 @@ asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std:
 
     co_return result;
 }
-
-asyncio::task::Task<void, std::error_code> asyncio::copy(IReader &reader, IWriter &writer) {
-    std::expected<void, std::error_code> result;
-
-    while (true) {
-        if (co_await task::cancelled) {
-            result = std::unexpected<std::error_code>(task::Error::CANCELLED);
-            break;
-        }
-
-        std::array<std::byte, 10240> data = {};
-        const auto n = co_await reader.read(data);
-
-        if (!n) {
-            result = std::unexpected(n.error());
-            break;
-        }
-
-        if (*n == 0)
-            break;
-
-        co_await task::lock;
-
-        if (const auto res = co_await writer.writeAll({data.data(), *n}); !res) {
-            result = std::unexpected(res.error());
-            break;
-        }
-
-        co_await task::unlock;
-    }
-
-    co_return result;
-}

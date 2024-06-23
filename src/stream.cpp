@@ -1,6 +1,10 @@
 #include <asyncio/stream.h>
 #include <zero/defer.h>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 asyncio::Stream::Stream(uv::Handle<uv_stream_t> stream) : mStream(std::move(stream)) {
 }
 
