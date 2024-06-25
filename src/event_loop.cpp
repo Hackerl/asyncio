@@ -29,7 +29,8 @@ std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
         return uv_async_init(
             loop.get(),
             async.get(),
-            [](const auto handle) {
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_async_t *handle) {
                 auto &[async, mutex, queue] = *static_cast<TaskQueue *>(handle->data);
 
                 while (true) {

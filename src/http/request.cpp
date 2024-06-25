@@ -1,4 +1,5 @@
 #include <asyncio/http/request.h>
+#include <asyncio/fs.h>
 #include <zero/defer.h>
 
 using namespace std::chrono_literals;
@@ -116,9 +117,12 @@ asyncio::task::Task<std::string, std::error_code> asyncio::http::Response::strin
     });
 }
 
+// ReSharper disable once CppMemberFunctionMayBeConst
 asyncio::task::Task<void, std::error_code>
-asyncio::http::Response::output(const std::filesystem::path) {
-    co_return std::unexpected(make_error_code(std::errc::function_not_supported));
+asyncio::http::Response::output(std::filesystem::path path) {
+    auto file = co_await fs::open(std::move(path), UV_FS_O_WRONLY | UV_FS_O_CREAT | UV_FS_O_TRUNC);
+    CO_EXPECT(file);
+    co_return co_await copy(*this, *file);
 }
 
 asyncio::task::Task<nlohmann::json, std::error_code> asyncio::http::Response::json() {
@@ -226,7 +230,8 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
         return uv_poll_start(
             context->poll.raw(),
             (action & CURL_POLL_IN ? UV_READABLE : 0) | (action & CURL_POLL_OUT ? UV_WRITABLE : 0),
-            [](const auto handle, const int status, const int e) {
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_poll_t *handle, const int status, const int e) {
                 if (status < 0)
                     throw std::system_error(static_cast<uv::Error>(status));
 

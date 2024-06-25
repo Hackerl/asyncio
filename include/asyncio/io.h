@@ -58,10 +58,10 @@ namespace asyncio {
             END
         };
 
-        virtual std::expected<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
-        virtual std::expected<void, std::error_code> rewind() = 0;
-        [[nodiscard]] virtual std::expected<std::uint64_t, std::error_code> length() const = 0;
-        [[nodiscard]] virtual std::expected<std::uint64_t, std::error_code> position() const = 0;
+        virtual task::Task<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
+        virtual task::Task<void, std::error_code> rewind();
+        virtual task::Task<std::uint64_t, std::error_code> length();
+        virtual task::Task<std::uint64_t, std::error_code> position();
     };
 
     class IBufReader : public virtual IReader {

@@ -12,7 +12,7 @@ TEST_CASE("signal handler", "[ev]") {
         SECTION("normal") {
             using namespace std::chrono_literals;
 
-            std::thread thread([]() {
+            std::thread thread([] {
                 std::this_thread::sleep_for(20ms);
                 kill(getpid(), SIGINT);
             });

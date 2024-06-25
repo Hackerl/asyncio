@@ -206,19 +206,19 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                 REQUIRE(writer.capacity() == 16);
 
                 co_await allSettled(
-                    [](auto writer) -> asyncio::task::Task<void> {
+                    [](auto reader) -> asyncio::task::Task<void> {
                         std::string message;
                         message.resize(11);
 
-                        auto res = co_await writer.readExactly(std::as_writable_bytes(std::span{message}));
+                        auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
                         REQUIRE(res);
                         REQUIRE(message == "hello world");
 
-                        res = co_await writer.readExactly(std::as_writable_bytes(std::span{message}));
+                        res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
                         REQUIRE(res);
                         REQUIRE(message == "hello world");
 
-                        const auto n = co_await writer.read(std::as_writable_bytes(std::span{message}));
+                        const auto n = co_await reader.read(std::as_writable_bytes(std::span{message}));
                         REQUIRE(n);
                         REQUIRE(*n == 0);
                     }(std::move(pipes->at(0))),

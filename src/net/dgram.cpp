@@ -178,17 +178,18 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
     CO_EXPECT(uv::expected([&] {
         return uv_udp_recv_start(
             mUDP.raw(),
-            [](const auto handle, const size_t, uv_buf_t *buf) {
-                const auto span = static_cast<Context *>(handle->data)->data;
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_handle_t *handle, const size_t, uv_buf_t *buf) {
+                const auto span = static_cast<const Context *>(handle->data)->data;
                 buf->base = reinterpret_cast<char *>(span.data());
                 buf->len = static_cast<decltype(uv_buf_t::len)>(span.size());
             },
             [](uv_udp_t *handle, const ssize_t n, const uv_buf_t *, const sockaddr *addr, const unsigned) {
                 uv_udp_recv_stop(handle);
-                const auto ctx = static_cast<Context *>(handle->data);
+                auto &promise = static_cast<Context *>(handle->data)->promise;
 
                 if (n < 0) {
-                    ctx->promise.reject(static_cast<uv::Error>(n));
+                    promise.reject(static_cast<uv::Error>(n));
                     return;
                 }
 
@@ -196,11 +197,11 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
                 auto address = addressFrom(addr, 0);
 
                 if (!address) {
-                    ctx->promise.reject(address.error());
+                    promise.reject(address.error());
                     return;
                 }
 
-                ctx->promise.resolve(static_cast<std::size_t>(n), *std::move(address));
+                promise.resolve(static_cast<std::size_t>(n), *std::move(address));
             }
         );
     }));

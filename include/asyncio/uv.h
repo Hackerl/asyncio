@@ -36,6 +36,10 @@ namespace asyncio::uv {
                 condition = std::errc::no_buffer_space;
                 break;
 
+            case UV_EEXIST:
+                condition = std::errc::file_exists;
+                break;
+
             default:
                 break;
             }

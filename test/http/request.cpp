@@ -575,32 +575,39 @@ TEST_CASE("http requests", "[http]") {
             }
         }
 
-        /*SECTION("output to file") {
+        SECTION("output to file") {
             co_await allSettled(
                 [](auto l) -> asyncio::task::Task<void> {
-                    auto buffer = co_await l.accept();
-                    REQUIRE(buffer);
+                    using namespace std::string_view_literals;
 
-                    auto line = co_await buffer->readLine();
+                    auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
+                        return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                    });
+                    REQUIRE(stream);
+
+                    asyncio::BufReader reader(*stream);
+
+                    auto line = co_await reader.readLine();
                     REQUIRE(line);
                     REQUIRE(*line == "GET /object?id=0 HTTP/1.1");
 
                     while (true) {
-                        line = co_await buffer->readLine();
+                        line = co_await reader.readLine();
                         REQUIRE(line);
 
                         if (line->empty())
                             break;
                     }
 
-                    constexpr std::string_view response = "HTTP/1.1 200 OK\r\n"
-                        "Content-Length: 11\r\n\r\n"
-                        "hello world";
-
-                    auto res = co_await buffer->writeAll(std::as_bytes(std::span{response}));
-                    REQUIRE(res);
-
-                    res = co_await buffer->flush();
+                    const auto res = co_await stream.value()->writeAll(
+                        std::as_bytes(
+                            std::span{
+                                "HTTP/1.1 200 OK\r\n"
+                                "Content-Length: 11\r\n\r\n"
+                                "hello world"sv
+                            }
+                        )
+                    );
                     REQUIRE(res);
                 }(*std::move(listener)),
                 []() -> asyncio::task::Task<void> {
@@ -624,7 +631,7 @@ TEST_CASE("http requests", "[http]") {
                     REQUIRE(std::filesystem::remove(path));
                 }()
             );
-        }*/
+        }
     });
     REQUIRE(result);
     REQUIRE(*result);

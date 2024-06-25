@@ -3,6 +3,7 @@ find_package(Catch2 CONFIG REQUIRED)
 add_executable(
         asyncio_test
         io.cpp
+        fs.cpp
         time.cpp
         poll.cpp
         thread.cpp

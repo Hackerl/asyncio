@@ -25,8 +25,9 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
             &request,
             reinterpret_cast<uv_tcp_t *>(stream.handle().raw()),
             address.first.get(),
-            [](const auto handle, const int status) {
-                const auto p = static_cast<Promise<void, std::error_code> *>(handle->data);
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_connect_t *req, const int status) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (status < 0) {
                     p->reject(static_cast<uv::Error>(status));
@@ -247,8 +248,9 @@ asyncio::net::NamedPipeStream::connect(const std::string name) {
             name.c_str(),
             name.length(),
             UV_PIPE_NO_TRUNCATE,
-            [](const auto handle, const int status) {
-                const auto p = static_cast<Promise<void, std::error_code> *>(handle->data);
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_connect_t *req, const int status) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (status < 0) {
                     p->reject(static_cast<uv::Error>(status));
@@ -354,8 +356,9 @@ asyncio::net::UnixStream::connect(std::string path) {
             path.c_str(),
             path.length(),
             UV_PIPE_NO_TRUNCATE,
-            [](const auto handle, const int status) {
-                const auto p = static_cast<Promise<void, std::error_code> *>(handle->data);
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_connect_t *req, const int status) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (status < 0) {
                     p->reject(static_cast<uv::Error>(status));

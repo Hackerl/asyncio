@@ -22,6 +22,7 @@ add_library(
         asyncio
         STATIC
         src/io.cpp
+        src/fs.cpp
         src/time.cpp
         src/poll.cpp
         src/pipe.cpp

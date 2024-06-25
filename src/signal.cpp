@@ -20,7 +20,8 @@ asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
     CO_EXPECT(uv::expected([&] {
         return uv_signal_start_oneshot(
             mSignal.raw(),
-            [](const auto handle, const int s) {
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_signal_t *handle, const int s) {
                 static_cast<Promise<int, std::error_code> *>(handle->data)->resolve(s);
             },
             sig

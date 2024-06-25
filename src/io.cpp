@@ -67,3 +67,23 @@ asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std:
 
     co_return result;
 }
+
+asyncio::task::Task<void, std::error_code> asyncio::ISeekable::rewind() {
+    CO_EXPECT(co_await seek(0, Whence::BEGIN));
+    co_return {};
+}
+
+asyncio::task::Task<std::uint64_t, std::error_code> asyncio::ISeekable::length() {
+    const auto pos = co_await position();
+    CO_EXPECT(pos);
+
+    const auto length = co_await seek(0, Whence::END);
+    CO_EXPECT(length);
+
+    CO_EXPECT(co_await seek(*pos, Whence::BEGIN));
+    co_return *length;
+}
+
+asyncio::task::Task<std::uint64_t, std::error_code> asyncio::ISeekable::position() {
+    return seek(0, Whence::CURRENT);
+}

@@ -109,26 +109,27 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
     CO_EXPECT(uv::expected([&] {
         return uv_read_start(
             mStream.raw(),
-            [](const auto handle, const size_t, uv_buf_t *buf) {
-                const auto span = static_cast<Context *>(handle->data)->data;
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_handle_t *handle, const size_t, uv_buf_t *buf) {
+                const auto span = static_cast<const Context *>(handle->data)->data;
                 buf->base = reinterpret_cast<char *>(span.data());
                 buf->len = static_cast<decltype(uv_buf_t::len)>(span.size());
             },
             [](uv_stream_t *handle, const ssize_t n, const uv_buf_t *) {
                 uv_read_stop(handle);
-                const auto ctx = static_cast<Context *>(handle->data);
+                auto &promise = static_cast<Context *>(handle->data)->promise;
 
                 if (n < 0) {
                     if (n == UV_EOF) {
-                        ctx->promise.resolve(0);
+                        promise.resolve(0);
                         return;
                     }
 
-                    ctx->promise.reject(static_cast<uv::Error>(n));
+                    promise.reject(static_cast<uv::Error>(n));
                     return;
                 }
 
-                ctx->promise.resolve(static_cast<std::size_t>(n));
+                promise.resolve(static_cast<std::size_t>(n));
             }
         );
     }));
@@ -202,7 +203,8 @@ std::expected<asyncio::Listener, std::error_code> asyncio::Listener::make(uv::Ha
         return uv_listen(
             stream.raw(),
             256,
-            [](const auto handle, const int status) {
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_stream_t *handle, const int status) {
                 auto &[stream, event, ec] = *static_cast<Core *>(handle->data);
 
                 if (status < 0)
