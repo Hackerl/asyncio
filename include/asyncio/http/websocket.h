@@ -2,6 +2,7 @@
 #define ASYNCIO_WEBSOCKET_H
 
 #include <variant>
+#include <asyncio/io.h>
 #include <asyncio/http/url.h>
 #include <asyncio/sync/mutex.h>
 
@@ -54,22 +55,28 @@ namespace asyncio::http::ws {
 
     class WebSocket {
     public:
-        DEFINE_ERROR_CODE_TYPES(
+        DEFINE_ERROR_CODE_INNER(
             Error,
             "asyncio::http::ws::WebSocket",
+            UNSUPPORTED_SCHEME, "unsupported websocket scheme",
+            INVALID_RESPONSE, "invalid http response",
+            UNEXPECTED_STATUS_CODE, "unexpected http response status code",
+            INVALID_HTTP_HEADER, "invalid http header",
+            NO_ACCEPT_HEADER, "no websocket accept header",
+            HASH_MISMATCH, "hash mismatch",
             UNSUPPORTED_MASKED_FRAME, "unsupported masked frame",
             UNSUPPORTED_OPCODE, "unsupported opcode",
             NOT_CONNECTED, "websocket not connected"
         )
 
-        DEFINE_ERROR_CODE_TYPES(
+        DEFINE_ERROR_CODE_INNER(
             CloseCode,
             "asyncio::http::ws::WebSocket::close",
             NORMAL_CLOSURE, "normal closure",
             GOING_AWAY, "going away",
             PROTOCOL_ERROR, "protocol error",
             UNSUPPORTED_DATA, "unsupported data",
-            NO_STATUS_RCVD, "no status rcvd",
+            NO_STATUS_RCVD, "no status received",
             ABNORMAL_CLOSURE, "abnormal closure",
             INVALID_TEXT, "invalid text",
             POLICY_VIOLATION, "policy violation",
@@ -81,7 +88,13 @@ namespace asyncio::http::ws {
             BAD_GATEWAY, "bad gateway"
         )
 
-        explicit WebSocket(std::unique_ptr<IBuffer> buffer);
+        WebSocket(
+            std::shared_ptr<IReader> reader,
+            std::shared_ptr<IWriter> writer,
+            std::shared_ptr<ICloseable> closeable
+        );
+
+        static task::Task<WebSocket, std::error_code> connect(URL url);
 
     private:
         [[nodiscard]] task::Task<Frame, std::error_code> readFrame() const;
@@ -104,30 +117,12 @@ namespace asyncio::http::ws {
     private:
         State mState;
         std::unique_ptr<sync::Mutex> mMutex;
-        std::unique_ptr<IBuffer> mBuffer;
+        std::shared_ptr<IReader> mReader;
+        std::shared_ptr<IWriter> mWriter;
+        std::shared_ptr<ICloseable> mCloseable;
     };
-
-    DEFINE_MAKE_ERROR_CODE(WebSocket::Error)
-    DEFINE_MAKE_ERROR_CODE(WebSocket::CloseCode)
-
-    DEFINE_ERROR_CODE(
-        HandshakeError,
-        "asyncio::http::ws::handshake",
-        UNSUPPORTED_SCHEME, "unsupported websocket scheme",
-        INVALID_RESPONSE, "invalid http response",
-        UNEXPECTED_STATUS_CODE, "unexpected http response status code",
-        INVALID_HTTP_HEADER, "invalid http header",
-        NO_ACCEPT_HEADER, "no websocket accept header",
-        HASH_MISMATCH, "hash mismatch"
-    )
-
-    task::Task<WebSocket, std::error_code> connect(URL url);
 }
 
-DECLARE_ERROR_CODES(
-    asyncio::http::ws::WebSocket::Error,
-    asyncio::http::ws::WebSocket::CloseCode,
-    asyncio::http::ws::HandshakeError
-)
+DECLARE_ERROR_CODES(asyncio::http::ws::WebSocket::Error, asyncio::http::ws::WebSocket::CloseCode)
 
 #endif //ASYNCIO_WEBSOCKET_H

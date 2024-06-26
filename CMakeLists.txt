@@ -13,6 +13,7 @@ include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+find_package(OpenSSL REQUIRED)
 find_package(zero CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
 find_package(libuv CONFIG REQUIRED)
@@ -35,6 +36,7 @@ add_library(
         src/net/stream.cpp
         src/http/url.cpp
         src/http/request.cpp
+        src/http/websocket.cpp
         src/sync/mutex.cpp
         src/sync/event.cpp
         src/sync/condition.cpp
@@ -69,6 +71,8 @@ target_link_libraries(
         asyncio
         PUBLIC
         zero::zero
+        OpenSSL::SSL
+        OpenSSL::Crypto
         CURL::libcurl
         nlohmann_json::nlohmann_json
         $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>

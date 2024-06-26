@@ -6,6 +6,7 @@
     "curl",
     "libuv",
     "nlohmann-json",
+    "openssl",
     "zero"
   ],
   "default-features": [

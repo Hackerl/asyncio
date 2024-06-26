@@ -10,7 +10,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 
     const auto url = cmdline.get<asyncio::http::URL>("url");
 
-    auto ws = co_await asyncio::http::ws::connect(url);
+    auto ws = co_await asyncio::http::ws::WebSocket::connect(url);
     CO_EXPECT(ws);
 
     while (true) {

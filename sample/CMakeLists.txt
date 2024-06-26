@@ -13,5 +13,5 @@ target_link_libraries(asyncio_tcp_server PRIVATE asyncio-main)
 add_executable(asyncio_http http/main.cpp)
 target_link_libraries(asyncio_http PRIVATE asyncio-main)
 
-#add_executable(asyncio_ws ws/main.cpp)
-#target_link_libraries(asyncio_ws PRIVATE asyncio-main)
+add_executable(asyncio_ws ws/main.cpp)
+target_link_libraries(asyncio_ws PRIVATE asyncio-main)
