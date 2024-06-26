@@ -122,7 +122,7 @@ install(
 )
 
 if (NOT ASYNCIO_DISABLE_SAMPLES)
-#    add_subdirectory(sample)
+    add_subdirectory(sample)
 endif ()
 
 if (BUILD_TESTING)

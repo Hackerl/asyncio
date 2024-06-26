@@ -344,7 +344,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     auto pipes = pipe();
     EXPECT(pipes);
 
-    const auto [proxy, headers, cookies, timeout, connectTimeout, userAgent] = options.value_or(mCore->options);
+    const auto [proxy, headers, cookies, timeout, connectTimeout, userAgent, tls] = options.value_or(mCore->options);
 
     auto connection = std::make_unique<Connection>(std::move(pipes->at(0)), std::move(pipes->at(1)), std::move(easy));
 
@@ -407,6 +407,22 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
             curl_slist_free_all(list);
         });
     }
+
+    const auto &[insecure, ca, cert, privateKey, password] = tls;
+
+    curl_easy_setopt(connection->easy.get(), CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L);
+
+    if (ca)
+        curl_easy_setopt(connection->easy.get(), CURLOPT_CAINFO, ca->c_str());
+
+    if (cert)
+        curl_easy_setopt(connection->easy.get(), CURLOPT_SSLCERT, cert->c_str());
+
+    if (privateKey)
+        curl_easy_setopt(connection->easy.get(), CURLOPT_SSLKEY, privateKey->c_str());
+
+    if (password)
+        curl_easy_setopt(connection->easy.get(), CURLOPT_KEYPASSWD, password->c_str());
 
     return connection;
 }

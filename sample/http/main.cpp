@@ -1,7 +1,7 @@
 #include <asyncio/http/request.h>
 #include <zero/cmdline.h>
 
-asyncio::task::Task<void, std::error_code> amain(const int argc, char *argv[]) {
+asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<asyncio::http::URL>("url", "http request url");
@@ -43,7 +43,7 @@ asyncio::task::Task<void, std::error_code> amain(const int argc, char *argv[]) {
     auto requests = asyncio::http::Requests::make(options);
     CO_EXPECT(requests);
 
-    const auto response = co_await [&] {
+    auto response = co_await [&] {
         if (!body)
             return requests->request(*method, url, options);
 

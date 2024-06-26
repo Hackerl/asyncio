@@ -73,6 +73,14 @@ namespace asyncio::http {
         std::unique_ptr<Connection> mConnection;
     };
 
+    struct TLSConfig {
+        bool insecure{};
+        std::optional<std::filesystem::path> ca;
+        std::optional<std::filesystem::path> cert;
+        std::optional<std::filesystem::path> privateKey;
+        std::optional<std::string> password;
+    };
+
     struct Options {
         std::optional<std::string> proxy;
         std::map<std::string, std::string> headers;
@@ -80,6 +88,7 @@ namespace asyncio::http {
         std::optional<std::chrono::seconds> timeout;
         std::optional<std::chrono::seconds> connectTimeout;
         std::optional<std::string> userAgent;
+        TLSConfig tls;
     };
 
     class Requests {

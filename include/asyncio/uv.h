@@ -11,7 +11,7 @@
 namespace asyncio::uv {
     DEFINE_ERROR_TRANSFORMER_EX(
         Error,
-        "asyncio::ev",
+        "asyncio::uv",
         ([](const int value) -> std::string {
             std::array<char, 1024> buffer = {};
             uv_strerror_r(value, buffer.data(), buffer.size());

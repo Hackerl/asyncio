@@ -36,7 +36,7 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::ssl::Listener lis
     co_return result;
 }
 
-asyncio::task::Task<void, std::error_code> amain(const int argc, char *argv[]) {
+asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");

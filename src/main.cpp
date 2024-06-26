@@ -8,7 +8,7 @@
 #include <csignal>
 #endif
 
-asyncio::task::Task<void, std::error_code> amain(int argc, char *argv[]);
+asyncio::task::Task<void, std::error_code> asyncMain(int argc, char *argv[]);
 
 int main(const int argc, char *argv[]) {
 #ifdef _WIN32
@@ -26,7 +26,7 @@ int main(const int argc, char *argv[]) {
 #endif
 
     const auto result = asyncio::run([=] {
-        return amain(argc, argv);
+        return asyncMain(argc, argv);
     });
 
     if (!result)

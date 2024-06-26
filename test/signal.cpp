@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <thread>
 
-TEST_CASE("signal handler", "[ev]") {
+TEST_CASE("signal handler", "[signal]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         auto signal = asyncio::Signal::make();
         REQUIRE(signal);

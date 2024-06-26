@@ -1,10 +1,12 @@
 #include <asyncio/net/stream.h>
-#include <asyncio/event_loop.h>
+#include <asyncio/buffer.h>
+#include <asyncio/time.h>
 #include <zero/cmdline.h>
 
-using namespace std::chrono_literals;
+asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
+    using namespace std::chrono_literals;
+    using namespace std::string_view_literals;
 
-asyncio::task::Task<void, std::error_code> amain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");
@@ -15,14 +17,18 @@ asyncio::task::Task<void, std::error_code> amain(const int argc, char *argv[]) {
     const auto host = cmdline.get<std::string>("host");
     const auto port = cmdline.get<unsigned short>("port");
 
-    auto buffer = co_await asyncio::net::connect(host, port);
-    CO_EXPECT(buffer);
+    const auto stream = co_await asyncio::net::TCPStream::connect(host, port)
+        .transform([](asyncio::net::TCPStream &&rhs) {
+            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+        });
+    CO_EXPECT(stream);
+
+    asyncio::BufReader reader(*stream);
 
     while (true) {
-        constexpr std::string_view message = "hello world\r\n";
-        CO_EXPECT(co_await buffer->writeAll(std::as_bytes(std::span{message})));
+        CO_EXPECT(co_await stream.value()->writeAll(std::as_bytes(std::span{"hello world\r\n"sv})));
 
-        const auto line = co_await buffer->readLine();
+        const auto line = co_await reader.readLine();
 
         if (!line) {
             if (line.error() != asyncio::IOError::UNEXPECTED_EOF)
