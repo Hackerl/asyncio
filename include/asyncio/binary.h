@@ -6,7 +6,7 @@
 namespace asyncio::binary {
     template<typename T>
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
-    task::Task<T, std::error_code> readLE(Reader auto &reader) {
+    task::Task<T, std::error_code> readLE(Trait<IReader> auto &reader) {
         std::array<std::byte, sizeof(T)> bytes = {};
         CO_EXPECT(co_await std::invoke(&IReader::readExactly, reader, bytes));
 
@@ -20,7 +20,7 @@ namespace asyncio::binary {
 
     template<typename T>
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
-    task::Task<T, std::error_code> readBE(Reader auto &reader) {
+    task::Task<T, std::error_code> readBE(Trait<IReader> auto &reader) {
         std::array<std::byte, sizeof(T)> bytes = {};
         CO_EXPECT(co_await std::invoke(&IReader::readExactly, reader, bytes));
 
@@ -34,7 +34,7 @@ namespace asyncio::binary {
 
     template<typename T>
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
-    task::Task<void, std::error_code> writeLE(Writer auto &writer, const T value) {
+    task::Task<void, std::error_code> writeLE(Trait<IWriter> auto &writer, const T value) {
         std::array<std::byte, sizeof(T)> bytes = {};
 
         for (std::size_t i = 0; i < sizeof(T); ++i)
@@ -45,7 +45,7 @@ namespace asyncio::binary {
 
     template<typename T>
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
-    task::Task<void, std::error_code> writeBE(Writer auto &writer, const T value) {
+    task::Task<void, std::error_code> writeBE(Trait<IWriter> auto &writer, const T value) {
         std::array<std::byte, sizeof(T)> bytes = {};
 
         for (std::size_t i = 0; i < sizeof(T); ++i)

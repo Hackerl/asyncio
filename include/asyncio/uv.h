@@ -54,7 +54,7 @@ namespace asyncio::uv {
         const auto result = f();
 
         if (result < 0)
-            return std::unexpected(static_cast<Error>(result));
+            return std::unexpected(make_error_code(static_cast<Error>(result)));
 
         return result;
     }

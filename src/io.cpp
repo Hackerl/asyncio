@@ -13,7 +13,7 @@ asyncio::task::Task<void, std::error_code> asyncio::IReader::readExactly(const s
         }
 
         if (*n == 0) {
-            result = std::unexpected<std::error_code>(Error::UNEXPECTED_EOF);
+            result = std::unexpected<std::error_code>(ReadExactlyError::UNEXPECTED_EOF);
             break;
         }
 

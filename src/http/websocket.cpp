@@ -1,5 +1,6 @@
 #include <asyncio/http/websocket.h>
 #include <asyncio/net/stream.h>
+#include <asyncio/net/tls.h>
 #include <asyncio/binary.h>
 #include <asyncio/buffer.h>
 #include <zero/encoding/base64.h>
@@ -86,13 +87,30 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
     std::shared_ptr<ICloseable> closeable;
 
     if (*scheme == WS_SCHEME) {
-        auto stream = co_await net::TCPStream::connect(*host, *port).transform([](net::TCPStream &&rhs) {
-            return std::make_shared<net::TCPStream>(std::move(rhs));
-        });
+        auto stream = co_await net::TCPStream::connect(*host, *port)
+            .transform([](net::TCPStream &&rhs) {
+                return std::make_shared<net::TCPStream>(std::move(rhs));
+            });
         CO_EXPECT(stream);
         reader = *stream;
         writer = *stream;
         closeable = *std::move(stream);
+    }
+    else if (*scheme == WS_SCHEME) {
+        auto stream = co_await net::TCPStream::connect(*host, *port);
+        CO_EXPECT(stream);
+
+        auto context = net::tls::ClientConfig().build();
+        CO_EXPECT(context);
+
+        auto tls = co_await net::tls::connect(*std::move(stream), *std::move(context), *host)
+            .transform([](net::tls::TLS<net::TCPStream> &&rhs) {
+                return std::make_shared<net::tls::TLS<net::TCPStream>>(std::move(rhs));
+            });
+        CO_EXPECT(tls);
+        reader = *tls;
+        writer = *tls;
+        closeable = *std::move(tls);
     }
     else {
         co_return std::unexpected(Error::UNSUPPORTED_SCHEME);

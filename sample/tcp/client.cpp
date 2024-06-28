@@ -1,5 +1,4 @@
 #include <asyncio/net/stream.h>
-#include <asyncio/buffer.h>
 #include <asyncio/time.h>
 #include <zero/cmdline.h>
 
@@ -17,27 +16,24 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     const auto host = cmdline.get<std::string>("host");
     const auto port = cmdline.get<unsigned short>("port");
 
-    const auto stream = co_await asyncio::net::TCPStream::connect(host, port)
-        .transform([](asyncio::net::TCPStream &&rhs) {
-            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
-        });
+    auto stream = co_await asyncio::net::TCPStream::connect(host, port);
     CO_EXPECT(stream);
 
-    asyncio::BufReader reader(*stream);
-
     while (true) {
-        CO_EXPECT(co_await stream.value()->writeAll(std::as_bytes(std::span{"hello world\r\n"sv})));
+        CO_EXPECT(co_await stream->writeAll(std::as_bytes(std::span{"hello world"sv})));
 
-        const auto line = co_await reader.readLine();
+        std::string message;
+        message.resize(1024);
 
-        if (!line) {
-            if (line.error() != asyncio::IOError::UNEXPECTED_EOF)
-                co_return std::unexpected(line.error());
+        const auto n = co_await stream->read(std::as_writable_bytes(std::span{message}));
+        CO_EXPECT(n);
 
+        if (*n == 0)
             break;
-        }
 
-        fmt::print("receive message[{}]\n", *line);
+        message.resize(*n);
+
+        fmt::print("receive message: {}\n", message);
         co_await asyncio::sleep(1s);
     }
 

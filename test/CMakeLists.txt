@@ -14,6 +14,7 @@ add_executable(
         event_loop.cpp
         net/net.cpp
         net/dns.cpp
+        net/tls.cpp
         net/dgram.cpp
         net/stream.cpp
         http/url.cpp

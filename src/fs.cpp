@@ -145,10 +145,10 @@ asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
         return pos.QuadPart;
 #else
         const auto pos = zero::os::unix::expected([&] {
-#ifdef __APPLE__
-            return lseek(
-#else
+#ifdef _LARGEFILE64_SOURCE
             return lseek64(
+#else
+            return lseek(
 #endif
                 mFile,
                 offset,

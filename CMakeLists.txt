@@ -3,8 +3,7 @@ project(asyncio)
 
 set(CMAKE_CXX_STANDARD 23)
 
-option(ASYNCIO_DISABLE_SAMPLES "disable asyncio samples" OFF)
-option(ASYNCIO_EMBED_CA_CERT "use embedded CA certificates" OFF)
+option(BUILD_SAMPLES "build asyncio samples" ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(ASYNCIO_VERSION 1.0.3)
@@ -32,6 +31,7 @@ add_library(
         src/event_loop.cpp
         src/net/net.cpp
         src/net/dns.cpp
+        src/net/tls.cpp
         src/net/dgram.cpp
         src/net/stream.cpp
         src/http/url.cpp
@@ -41,24 +41,6 @@ add_library(
         src/sync/event.cpp
         src/sync/condition.cpp
 )
-
-if (ASYNCIO_EMBED_CA_CERT)
-    set(CA_CERT_FILE ${CMAKE_CURRENT_BINARY_DIR}/cacert.pem)
-    set(CA_CERT_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/cacert.h)
-
-    if (NOT EXISTS ${CA_CERT_FILE})
-        file(DOWNLOAD https://curl.se/ca/cacert.pem ${CA_CERT_FILE})
-    endif ()
-
-    if (NOT EXISTS ${CA_CERT_HEADER})
-        file(READ ${CA_CERT_FILE} content HEX)
-        string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," content ${content})
-        file(WRITE ${CA_CERT_HEADER} "constexpr unsigned char CA_CERT[] = {${content}};")
-    endif ()
-
-    set(EXCLUDE_HEADERS ${EXCLUDE_HEADERS} PATTERN "cacert.h" EXCLUDE)
-    target_compile_definitions(asyncio PUBLIC ASYNCIO_EMBED_CA_CERT)
-endif ()
 
 target_include_directories(
         asyncio
@@ -125,7 +107,7 @@ install(
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
-if (NOT ASYNCIO_DISABLE_SAMPLES)
+if (BUILD_SAMPLES)
     add_subdirectory(sample)
 endif ()
 

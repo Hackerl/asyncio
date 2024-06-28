@@ -21,7 +21,7 @@ namespace asyncio {
     class IReader : public virtual zero::Interface {
     public:
         DEFINE_ERROR_CODE_INNER_EX(
-            Error,
+            ReadExactlyError,
             "asyncio::IReader",
             UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
         )
@@ -37,18 +37,10 @@ namespace asyncio {
         virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
     };
 
-    template<typename T>
-    concept Reader = std::derived_from<T, IReader> ||
-        std::is_convertible_v<std::remove_const_t<T>, std::shared_ptr<IReader>> ||
-        std::is_convertible_v<std::remove_const_t<T>, std::unique_ptr<IReader>>;
-
-    template<typename T>
-    concept Writer = std::derived_from<T, IWriter> ||
-        std::is_convertible_v<std::remove_const_t<T>, std::shared_ptr<IWriter>> ||
-        std::is_convertible_v<std::remove_const_t<T>, std::unique_ptr<IWriter>>;
-
-    template<typename T>
-    concept StreamIO = Reader<T> && Writer<T>;
+    template<typename T, typename I>
+    concept Trait = std::derived_from<T, I> ||
+        std::is_convertible_v<std::remove_const_t<T>, std::shared_ptr<I>> ||
+        std::is_convertible_v<std::remove_const_t<T>, std::unique_ptr<I>>;
 
     class ISeekable : public virtual zero::Interface {
     public:
@@ -78,7 +70,7 @@ namespace asyncio {
         virtual task::Task<void, std::error_code> flush() = 0;
     };
 
-    task::Task<void, std::error_code> copy(Reader auto &reader, Writer auto &writer) {
+    task::Task<void, std::error_code> copy(Trait<IReader> auto &reader, Trait<IWriter> auto &writer) {
         std::expected<void, std::error_code> result;
 
         while (true) {
@@ -111,12 +103,14 @@ namespace asyncio {
         co_return result;
     }
 
-    task::Task<void, std::error_code> copyBidirectional(StreamIO auto &first, StreamIO auto &second) {
+    template<typename T, typename U>
+        requires (Trait<T, IReader> && Trait<T, IWriter> && Trait<U, IReader> && Trait<U, IWriter>)
+    task::Task<void, std::error_code> copyBidirectional(T &first, U &second) {
         co_return co_await race(copy(first, second), copy(second, first));
     }
 }
 
 DECLARE_ERROR_CONDITION(asyncio::IOError)
-DECLARE_ERROR_CODE(asyncio::IReader::Error)
+DECLARE_ERROR_CODE(asyncio::IReader::ReadExactlyError)
 
 #endif //ASYNCIO_IO_H

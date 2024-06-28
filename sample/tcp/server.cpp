@@ -1,31 +1,35 @@
 #include <asyncio/net/stream.h>
-#include <asyncio/buffer.h>
 #include <asyncio/signal.h>
 #include <zero/cmdline.h>
 
-asyncio::task::Task<void, std::error_code> handle(const std::shared_ptr<asyncio::net::TCPStream> stream) {
-    const auto address = stream->remoteAddress();
+asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
+    const auto address = stream.remoteAddress();
     CO_EXPECT(address);
 
     fmt::print("new connection[{}]\n", fmt::to_string(*address));
 
-    asyncio::BufReader reader(stream);
-
     while (true) {
-        auto line = co_await reader.readLine();
-        CO_EXPECT(line);
+        std::string message;
+        message.resize(1024);
 
-        fmt::print("receive message[{}]\n", *line);
-        line->append("\r\n");
-        CO_EXPECT(co_await stream->writeAll(std::as_bytes(std::span{*line})));
+        const auto n = co_await stream.read(std::as_writable_bytes(std::span{message}));
+        CO_EXPECT(n);
+
+        if (*n == 0)
+            break;
+
+        message.resize(*n);
+
+        fmt::print("receive message: {}\n", message);
+        CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{message})));
     }
+
+    co_return {};
 }
 
 asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
     while (true) {
-        auto stream = co_await listener.accept().transform([](asyncio::net::TCPStream &&rhs) {
-            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
-        });
+        auto stream = co_await listener.accept();
         CO_EXPECT(stream);
 
         handle(*std::move(stream)).future().fail([](const std::error_code &ec) {
