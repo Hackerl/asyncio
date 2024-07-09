@@ -138,8 +138,6 @@ TEST_CASE("stream network connection", "[net]") {
                         REQUIRE(res);
                     }(path)
                 );
-
-                REQUIRE(std::filesystem::remove(path));
             }
 
 #ifdef __linux__

@@ -129,7 +129,7 @@ asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
 
 asyncio::task::Task<std::uint64_t, std::error_code>
 asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
-    co_return co_await toThread([&] -> std::expected<std::uint64_t, std::error_code> {
+    co_return co_await toThread([&]() -> std::expected<std::uint64_t, std::error_code> {
 #ifdef _WIN32
         LARGE_INTEGER pos;
 
@@ -190,7 +190,7 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
                     return;
                 }
 
-                p->resolve(req->result);
+                p->resolve(static_cast<uv_file>(req->result));
             }
         );
     }));

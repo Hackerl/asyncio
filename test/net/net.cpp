@@ -90,7 +90,7 @@ TEST_CASE("network components", "[net]") {
                 (const std::byte *) &addr->sin6_addr,
                 (const std::byte *) &addr->sin6_addr + sizeof(sockaddr_in6::sin6_addr),
                 [](const auto &byte) {
-                return byte == std::byte{0};
+                    return byte == std::byte{0};
                 }
             )
         );

@@ -2,7 +2,6 @@
 #define ASYNCIO_UV_H
 
 #include <uv.h>
-#include <array>
 #include <memory>
 #include <optional>
 #include <expected>

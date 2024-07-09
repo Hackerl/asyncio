@@ -31,7 +31,7 @@ namespace asyncio {
         std::expected<void, std::error_code> post(std::function<void()> function);
 
         void stop();
-        std::expected<void, std::error_code> run();
+        void run();
 
     private:
         std::unique_ptr<uv_loop_t, void (*)(uv_loop_t *)> mLoop;

@@ -232,9 +232,6 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
             (action & CURL_POLL_IN ? UV_READABLE : 0) | (action & CURL_POLL_OUT ? UV_WRITABLE : 0),
             // ReSharper disable once CppParameterMayBeConstPtrOrRef
             [](uv_poll_t *handle, const int status, const int e) {
-                if (status < 0)
-                    throw std::system_error(static_cast<uv::Error>(status));
-
                 const auto ctx = static_cast<const Context *>(handle->data);
                 const auto core = ctx->core;
 
@@ -246,7 +243,9 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
                 curl_multi_socket_action(
                     core->multi.get(),
                     ctx->s,
-                    (e & UV_READABLE ? CURL_CSELECT_IN : 0) | (e & UV_WRITABLE ? CURL_CSELECT_OUT : 0),
+                    status < 0
+                        ? CURL_CSELECT_ERR
+                        : (e & UV_READABLE ? CURL_CSELECT_IN : 0) | (e & UV_WRITABLE ? CURL_CSELECT_OUT : 0),
                     &core->running
                 );
 
