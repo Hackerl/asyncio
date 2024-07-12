@@ -150,7 +150,15 @@ std::expected<asyncio::net::SocketAddress, std::error_code>
 asyncio::net::socketAddressFrom(const Address &address) {
     return std::visit(
         []<typename T>(const T &arg) -> std::expected<SocketAddress, std::error_code> {
-            auto addr = std::unique_ptr<sockaddr>(reinterpret_cast<sockaddr *>(new sockaddr_storage()));
+            auto addr = std::unique_ptr<sockaddr, decltype(&std::free)>(
+                static_cast<sockaddr *>(std::malloc(sizeof(sockaddr_storage))),
+                std::free
+            );
+
+            if (!addr)
+                return std::unexpected(std::error_code(errno, std::generic_category()));
+
+            std::memset(addr.get(), 0, sizeof(sockaddr_storage));
 
             if constexpr (std::is_same_v<T, IPv4Address>) {
                 const auto ptr = reinterpret_cast<sockaddr_in *>(addr.get());

@@ -24,32 +24,55 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     );
 
-    auto first = std::make_unique<uv_tcp_t>();
+    std::unique_ptr<uv_tcp_t, decltype(&std::free)> first(
+        static_cast<uv_tcp_t *>(std::malloc(sizeof(uv_tcp_t))),
+        std::free
+    );
+
+    if (!first)
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     EXPECT(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), first.get());
     }));
 
+    uv::Handle firstHandle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(first.release()),
+            std::free
+        }
+    );
+
     EXPECT(uv::expected([&] {
-        return uv_tcp_open(first.get(), sockets[0]);
+        return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(firstHandle.raw()), sockets[0]);
     }));
     sockets[0] = -1;
 
-    auto second = std::make_unique<uv_tcp_t>();
+    std::unique_ptr<uv_tcp_t, decltype(&std::free)> second(
+        static_cast<uv_tcp_t *>(std::malloc(sizeof(uv_tcp_t))),
+        std::free
+    );
+
+    if (!second)
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     EXPECT(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), second.get());
     }));
 
+    uv::Handle secondHandle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(second.release()),
+            std::free
+        }
+    );
+
     EXPECT(uv::expected([&] {
-        return uv_tcp_open(second.get(), sockets[1]);
+        return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(secondHandle.raw()), sockets[1]);
     }));
     sockets[1] = -1;
 
-    return std::array{
-        Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(first.release())}}},
-        Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(second.release())}}}
-    };
+    return std::array{Stream{std::move(firstHandle)}, Stream{std::move(secondHandle)}};
 #else
     DEFER(
         for (const auto &fd: sockets) {
@@ -60,32 +83,55 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     );
 
-    auto first = std::make_unique<uv_pipe_t>();
+    std::unique_ptr<uv_pipe_t, decltype(&std::free)> first(
+        static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
+        std::free
+    );
+
+    if (!first)
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), first.get(), 0);
     }));
 
+    uv::Handle firstHandle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(first.release()),
+            std::free
+        }
+    );
+
     EXPECT(uv::expected([&] {
-        return uv_pipe_open(first.get(), sockets[0]);
+        return uv_pipe_open(reinterpret_cast<uv_pipe_t *>(firstHandle.raw()), sockets[0]);
     }));
     sockets[0] = -1;
 
-    auto second = std::make_unique<uv_pipe_t>();
+    std::unique_ptr<uv_pipe_t, decltype(&std::free)> second(
+        static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
+        std::free
+    );
+
+    if (!second)
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), second.get(), 0);
     }));
 
+    uv::Handle secondHandle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(second.release()),
+            std::free
+        }
+    );
+
     EXPECT(uv::expected([&] {
-        return uv_pipe_open(second.get(), sockets[1]);
+        return uv_pipe_open(reinterpret_cast<uv_pipe_t *>(secondHandle.raw()), sockets[1]);
     }));
     sockets[1] = -1;
 
-    return std::array{
-        Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(first.release())}}},
-        Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(second.release())}}}
-    };
+    return std::array{Stream{std::move(firstHandle)}, Stream{std::move(secondHandle)}};
 #endif
 }
 

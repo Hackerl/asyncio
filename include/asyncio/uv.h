@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <expected>
+#include <functional>
 #include <zero/error.h>
 
 namespace asyncio::uv {
@@ -61,13 +62,17 @@ namespace asyncio::uv {
     template<typename T>
     class Handle {
     public:
-        explicit Handle(std::unique_ptr<T> handle) : mHandle{
+        template<typename Deleter>
+        explicit Handle(std::unique_ptr<T, Deleter> handle) : mHandle{
             handle.release(),
-            [](T *ptr) {
+            [deleter = std::move(handle.get_deleter())](T *ptr) {
+                ptr->data = new Deleter(deleter);
                 uv_close(
                     reinterpret_cast<uv_handle_t *>(ptr),
                     [](uv_handle_t *h) {
-                        delete reinterpret_cast<T *>(h);
+                        const auto del = static_cast<Deleter *>(h->data);
+                        (*del)(reinterpret_cast<T *>(h));
+                        delete del;
                     }
                 );
             }
@@ -95,7 +100,7 @@ namespace asyncio::uv {
         }
 
     private:
-        std::unique_ptr<T, void(*)(T *)> mHandle;
+        std::unique_ptr<T, std::function<void(T *)>> mHandle;
     };
 }
 

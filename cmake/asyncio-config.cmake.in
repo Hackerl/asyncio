@@ -4,7 +4,8 @@ include(CMakeFindDependencyMacro)
 
 find_dependency(zero)
 find_dependency(CURL)
-find_dependency(Libevent)
+find_dependency(libuv)
+find_dependency(OpenSSL)
 find_dependency(nlohmann_json)
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")

@@ -35,7 +35,7 @@ namespace asyncio::net {
     };
 
     using Address = std::variant<IPv4Address, IPv6Address, UnixAddress>;
-    using SocketAddress = std::pair<std::unique_ptr<sockaddr>, socklen_t>;
+    using SocketAddress = std::pair<std::unique_ptr<sockaddr, decltype(&std::free)>, socklen_t>;
 
     template<typename T>
         requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address> || std::is_same_v<T, UnixAddress>)

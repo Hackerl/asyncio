@@ -70,8 +70,6 @@ jobs:
           CXXFLAGS: -fsanitize=address
       - name: Test
         run: ctest --output-on-failure --test-dir build -E "^asynchronous io$"
-        env:
-          ASAN_OPTIONS: new_delete_type_mismatch=0
 
   macos-amd64:
     runs-on: macos-13

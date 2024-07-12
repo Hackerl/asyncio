@@ -14,7 +14,7 @@ asyncio::http::URL::URL() : mURL(curl_url(), curl_url_cleanup) {
         throw std::system_error(errno, std::generic_category());
 }
 
-asyncio::http::URL::URL(std::unique_ptr<CURLU, decltype(curl_url_cleanup) *> url) : mURL(std::move(url)) {
+asyncio::http::URL::URL(std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url) : mURL(std::move(url)) {
 }
 
 asyncio::http::URL::URL(const URL &rhs) : mURL(curl_url_dup(rhs.mURL.get()), curl_url_cleanup) {
@@ -43,7 +43,7 @@ asyncio::http::URL &asyncio::http::URL::operator=(URL &&rhs) noexcept {
 }
 
 std::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(const std::string &str) {
-    std::unique_ptr<CURLU, decltype(curl_url_cleanup) *> url(curl_url(), curl_url_cleanup);
+    std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url(curl_url(), curl_url_cleanup);
 
     if (!url)
         return std::unexpected(std::error_code(errno, std::generic_category()));
@@ -62,7 +62,7 @@ std::expected<std::string, std::error_code> asyncio::http::URL::string() const {
         return curl_url_get(mURL.get(), CURLUPART_URL, &url, 0);
     }));
 
-    return std::unique_ptr<char, decltype(curl_free) *>(url, curl_free).get();
+    return std::unique_ptr<char, decltype(&curl_free)>(url, curl_free).get();
 }
 
 std::expected<std::string, std::error_code> asyncio::http::URL::scheme() const {
@@ -72,7 +72,7 @@ std::expected<std::string, std::error_code> asyncio::http::URL::scheme() const {
         return curl_url_get(mURL.get(), CURLUPART_SCHEME, &scheme, 0);
     }));
 
-    return std::unique_ptr<char, decltype(curl_free) *>(scheme, curl_free).get();
+    return std::unique_ptr<char, decltype(&curl_free)>(scheme, curl_free).get();
 }
 
 std::expected<std::string, std::error_code> asyncio::http::URL::user() const {
@@ -82,7 +82,7 @@ std::expected<std::string, std::error_code> asyncio::http::URL::user() const {
         return curl_url_get(mURL.get(), CURLUPART_USER, &user, 0);
     }));
 
-    return std::unique_ptr<char, decltype(curl_free) *>(user, curl_free).get();
+    return std::unique_ptr<char, decltype(&curl_free)>(user, curl_free).get();
 }
 
 std::expected<std::string, std::error_code> asyncio::http::URL::password() const {
@@ -92,7 +92,7 @@ std::expected<std::string, std::error_code> asyncio::http::URL::password() const
         return curl_url_get(mURL.get(), CURLUPART_PASSWORD, &password, 0);
     }));
 
-    return std::unique_ptr<char, decltype(curl_free) *>(password, curl_free).get();
+    return std::unique_ptr<char, decltype(&curl_free)>(password, curl_free).get();
 }
 
 std::expected<std::string, std::error_code> asyncio::http::URL::host() const {
@@ -102,7 +102,7 @@ std::expected<std::string, std::error_code> asyncio::http::URL::host() const {
         return curl_url_get(mURL.get(), CURLUPART_HOST, &host, 0);
     }));
 
-    return std::unique_ptr<char, decltype(curl_free) *>(host, curl_free).get();
+    return std::unique_ptr<char, decltype(&curl_free)>(host, curl_free).get();
 }
 
 std::expected<std::string, std::error_code> asyncio::http::URL::path() const {
@@ -112,7 +112,7 @@ std::expected<std::string, std::error_code> asyncio::http::URL::path() const {
         return curl_url_get(mURL.get(), CURLUPART_PATH, &path, 0);
     }));
 
-    return std::unique_ptr<char, decltype(curl_free) *>(path, curl_free).get();
+    return std::unique_ptr<char, decltype(&curl_free)>(path, curl_free).get();
 }
 
 std::expected<std::string, std::error_code> asyncio::http::URL::query() const {
@@ -122,7 +122,7 @@ std::expected<std::string, std::error_code> asyncio::http::URL::query() const {
         return curl_url_get(mURL.get(), CURLUPART_QUERY, &query, 0);
     }));
 
-    return std::unique_ptr<char, decltype(curl_free) *>(query, curl_free).get();
+    return std::unique_ptr<char, decltype(&curl_free)>(query, curl_free).get();
 }
 
 std::expected<unsigned short, std::error_code> asyncio::http::URL::port() const {
@@ -133,7 +133,7 @@ std::expected<unsigned short, std::error_code> asyncio::http::URL::port() const 
     }));
 
     const auto n = zero::strings::toNumber<unsigned short>(
-        std::unique_ptr<char, decltype(curl_free) *>(port, curl_free).get()
+        std::unique_ptr<char, decltype(&curl_free)>(port, curl_free).get()
     );
     EXPECT(n);
 

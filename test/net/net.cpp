@@ -98,6 +98,7 @@ TEST_CASE("network components", "[net]") {
 
 #if __unix__ || __APPLE__
     SECTION("UNIX") {
+        using namespace std::string_view_literals;
         const asyncio::net::Address address = asyncio::net::UnixAddress{"/tmp/test.sock"};
 
         REQUIRE(address == asyncio::net::UnixAddress{"/tmp/test.sock"});
@@ -109,12 +110,12 @@ TEST_CASE("network components", "[net]") {
 
         const auto socketAddress = socketAddressFrom(address);
         REQUIRE(socketAddress);
-        REQUIRE(socketAddress->second == sizeof(sa_family_t) + strlen("/tmp/test.sock") + 1);
+        REQUIRE(socketAddress->second == sizeof(sa_family_t) + "/tmp/test.sock"sv.size() + 1);
 
         const auto addr = reinterpret_cast<const sockaddr_un *>(socketAddress->first.get());
 
         REQUIRE(addr->sun_family == AF_UNIX);
-        REQUIRE(strcmp(addr->sun_path, "/tmp/test.sock") == 0);
+        REQUIRE(addr->sun_path == "/tmp/test.sock"sv);
     }
 #endif
 }

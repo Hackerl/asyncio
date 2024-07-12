@@ -5,17 +5,30 @@ asyncio::Pipe::Pipe(uv::Handle<uv_stream_t> stream) : Stream(std::move(stream)) 
 }
 
 std::expected<asyncio::Pipe, std::error_code> asyncio::Pipe::from(const uv_file file) {
-    auto pipe = std::make_unique<uv_pipe_t>();
+    std::unique_ptr<uv_pipe_t, decltype(&std::free)> pipe(
+        static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
+        std::free
+    );
+
+    if (!pipe)
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
+    uv::Handle handle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(pipe.release()),
+            std::free
+        }
+    );
+
     EXPECT(uv::expected([&] {
-        return uv_pipe_open(pipe.get(), file);
+        return uv_pipe_open(reinterpret_cast<uv_pipe_t *>(handle.raw()), file);
     }));
 
-    return Pipe{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}}};
+    return Pipe{std::move(handle)};
 }
 
 std::expected<std::string, std::error_code> asyncio::Pipe::localAddress() const {

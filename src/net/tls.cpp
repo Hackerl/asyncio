@@ -7,7 +7,7 @@ std::error_code asyncio::net::tls::openSSLError() {
 
 std::expected<asyncio::net::tls::Certificate, std::error_code>
 asyncio::net::tls::Certificate::load(const std::string_view content) {
-    const std::unique_ptr<BIO, decltype(BIO_free) *> bio(
+    const std::unique_ptr<BIO, decltype(&BIO_free)> bio(
         BIO_new_mem_buf(content.data(), static_cast<int>(content.length())),
         BIO_free
     );
@@ -36,7 +36,7 @@ asyncio::net::tls::Certificate::loadFile(const std::filesystem::path &path) {
 
 std::expected<asyncio::net::tls::PrivateKey, std::error_code>
 asyncio::net::tls::PrivateKey::load(const std::string_view content) {
-    const std::unique_ptr<BIO, decltype(BIO_free) *> bio(
+    const std::unique_ptr<BIO, decltype(&BIO_free)> bio(
         BIO_new_mem_buf(content.data(), static_cast<int>(content.length())),
         BIO_free
     );

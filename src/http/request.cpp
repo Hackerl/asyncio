@@ -270,7 +270,7 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
         });
     });
 
-    std::unique_ptr<CURLM, decltype(curl_multi_cleanup) *> multi(curl_multi_init(), curl_multi_cleanup);
+    std::unique_ptr<CURLM, decltype(&curl_multi_cleanup)> multi(curl_multi_init(), curl_multi_cleanup);
 
     if (!multi)
         return std::unexpected(std::error_code(errno, std::generic_category()));
@@ -335,7 +335,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     const auto u = url.string();
     EXPECT(u);
 
-    std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy(curl_easy_init(), curl_easy_cleanup);
+    std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy(curl_easy_init(), curl_easy_cleanup);
 
     if (!easy)
         return std::unexpected(std::error_code(errno, std::generic_category()));
@@ -506,7 +506,7 @@ asyncio::http::Requests::request(
     auto connection = prepare(std::move(method), url, options);
     CO_EXPECT(connection);
 
-    std::unique_ptr<curl_mime, decltype(curl_mime_free) *> form(
+    std::unique_ptr<curl_mime, decltype(&curl_mime_free)> form(
         curl_mime_init(connection.value()->easy.get()),
         curl_mime_free
     );
@@ -538,7 +538,7 @@ asyncio::http::Requests::request(
     auto connection = prepare(std::move(method), url, options);
     CO_EXPECT(connection);
 
-    std::unique_ptr<curl_mime, decltype(curl_mime_free) *> form(
+    std::unique_ptr<curl_mime, decltype(&curl_mime_free)> form(
         curl_mime_init(connection.value()->easy.get()),
         curl_mime_free
     );

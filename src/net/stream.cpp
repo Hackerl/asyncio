@@ -9,13 +9,26 @@ asyncio::net::TCPStream::TCPStream(Stream stream) : mStream(std::move(stream)) {
 // ReSharper disable once CppParameterMayBeConst
 asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
 asyncio::net::TCPStream::connect(SocketAddress address) {
-    auto tcp = std::make_unique<uv_tcp_t>();
+    std::unique_ptr<uv_tcp_t, decltype(&std::free)> tcp(
+        static_cast<uv_tcp_t *>(std::malloc(sizeof(uv_tcp_t))),
+        std::free
+    );
+
+    if (!tcp)
+        co_return std::unexpected(std::error_code(errno, std::generic_category()));
 
     CO_EXPECT(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
     }));
 
-    Stream stream(uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}});
+    Stream stream(
+        uv::Handle{
+            std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+                reinterpret_cast<uv_stream_t *>(tcp.release()),
+                std::free
+            }
+        }
+    );
 
     Promise<void, std::error_code> promise;
     uv_connect_t request = {.data = &promise};
@@ -44,17 +57,30 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
 }
 
 std::expected<asyncio::net::TCPStream, std::error_code> asyncio::net::TCPStream::from(const uv_os_sock_t socket) {
-    auto tcp = std::make_unique<uv_tcp_t>();
+    std::unique_ptr<uv_tcp_t, decltype(&std::free)> tcp(
+        static_cast<uv_tcp_t *>(std::malloc(sizeof(uv_tcp_t))),
+        std::free
+    );
+
+    if (!tcp)
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     EXPECT(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
     }));
 
+    uv::Handle handle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(tcp.release()),
+            std::free
+        }
+    );
+
     EXPECT(uv::expected([&] {
-        return uv_tcp_open(tcp.get(), socket);
+        return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(handle.raw()), socket);
     }));
 
-    return TCPStream{Stream{uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}}}};
+    return TCPStream{Stream{std::move(handle)}};
 }
 
 asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
@@ -164,19 +190,30 @@ asyncio::net::TCPListener::TCPListener(Listener listener) : mListener(std::move(
 
 std::expected<asyncio::net::TCPListener, std::error_code>
 asyncio::net::TCPListener::listen(const SocketAddress &address) {
-    auto tcp = std::make_unique<uv_tcp_t>();
+    std::unique_ptr<uv_tcp_t, decltype(&std::free)> tcp(
+        static_cast<uv_tcp_t *>(std::malloc(sizeof(uv_tcp_t))),
+        std::free
+    );
+
+    if (!tcp)
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     EXPECT(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
     }));
 
+    uv::Handle handle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(tcp.release()),
+            std::free
+        }
+    );
+
     EXPECT(uv::expected([&] {
-        return uv_tcp_bind(tcp.get(), address.first.get(), 0);
+        return uv_tcp_bind(reinterpret_cast<uv_tcp_t *>(handle.raw()), address.first.get(), 0);
     }));
 
-    auto listener = Listener::make(
-        uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}}
-    );
+    auto listener = Listener::make(std::move(handle));
     EXPECT(listener);
 
     return TCPListener{*std::move(listener)};
@@ -207,21 +244,27 @@ asyncio::net::TCPListener::listen(const IPv6Address &address) {
 
 asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
 asyncio::net::TCPListener::accept() {
-    auto tcp = std::make_unique<uv_tcp_t>();
+    std::unique_ptr<uv_tcp_t, decltype(&std::free)> tcp(
+        static_cast<uv_tcp_t *>(std::malloc(sizeof(uv_tcp_t))),
+        std::free
+    );
+
+    if (!tcp)
+        co_return std::unexpected(std::error_code(errno, std::generic_category()));
 
     CO_EXPECT(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
     }));
 
-    CO_EXPECT(co_await mListener.accept(reinterpret_cast<uv_stream_t *>(tcp.get())));
-
-    co_return TCPStream{
-        Stream{
-            uv::Handle{
-                std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(tcp.release())}
-            }
+    uv::Handle handle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(tcp.release()),
+            std::free
         }
-    };
+    );
+
+    CO_EXPECT(co_await mListener.accept(handle.raw()));
+    co_return TCPStream{Stream{std::move(handle)}};
 }
 
 #ifdef _WIN32
@@ -230,13 +273,26 @@ asyncio::net::NamedPipeStream::NamedPipeStream(Pipe pipe) : mPipe(std::move(pipe
 
 asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code>
 asyncio::net::NamedPipeStream::connect(const std::string name) {
-    auto pipe = std::make_unique<uv_pipe_t>();
+    std::unique_ptr<uv_pipe_t, decltype(&std::free)> pipe(
+        static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
+        std::free
+    );
+
+    if (!pipe)
+        co_return std::unexpected(std::error_code(errno, std::generic_category()));
 
     CO_EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
-    Pipe stream(uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}});
+    Pipe stream(
+        uv::Handle{
+            std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+                reinterpret_cast<uv_stream_t *>(pipe.release()),
+                std::free
+            }
+        }
+    );
 
     Promise<void, std::error_code> promise;
     uv_connect_t request = {.data = &promise};
@@ -286,40 +342,62 @@ asyncio::net::NamedPipeListener::NamedPipeListener(Listener listener) : mListene
 
 std::expected<asyncio::net::NamedPipeListener, std::error_code>
 asyncio::net::NamedPipeListener::listen(const std::string &name) {
-    auto pipe = std::make_unique<uv_pipe_t>();
+    std::unique_ptr<uv_pipe_t, decltype(&std::free)> pipe(
+        static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
+        std::free
+    );
+
+    if (!pipe)
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
+    uv::Handle handle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(pipe.release()),
+            std::free
+        }
+    );
+
     EXPECT(uv::expected([&] {
-        return uv_pipe_bind2(pipe.get(), name.c_str(), name.length(), UV_PIPE_NO_TRUNCATE);
+        return uv_pipe_bind2(
+            reinterpret_cast<uv_pipe_t *>(handle.raw()),
+            name.c_str(),
+            name.length(),
+            UV_PIPE_NO_TRUNCATE
+        );
     }));
 
-    auto listener = Listener::make(
-        uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}}
-    );
+    auto listener = Listener::make(std::move(handle));
     EXPECT(listener);
 
     return NamedPipeListener{*std::move(listener)};
 }
 
 asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code> asyncio::net::NamedPipeListener::accept() {
-    auto pipe = std::make_unique<uv_pipe_t>();
+    std::unique_ptr<uv_pipe_t, decltype(&std::free)> pipe(
+        static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
+        std::free
+    );
+
+    if (!pipe)
+        co_return std::unexpected(std::error_code(errno, std::generic_category()));
 
     CO_EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
-    CO_EXPECT(co_await mListener.accept(reinterpret_cast<uv_stream_t *>(pipe.get())));
-
-    co_return NamedPipeStream{
-        Pipe{
-            uv::Handle{
-                std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}
-            }
+    uv::Handle handle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(pipe.release()),
+            std::free
         }
-    };
+    );
+
+    CO_EXPECT(co_await mListener.accept(handle.raw()));
+    co_return NamedPipeStream{Pipe{std::move(handle)}};
 }
 #else
 asyncio::net::UnixStream::UnixStream(Pipe pipe) : mPipe(std::move(pipe)) {
@@ -338,7 +416,13 @@ asyncio::net::UnixStream::connect(std::string path) {
     if (path.front() == '@')
         path.front() = '\0';
 
-    auto pipe = std::make_unique<uv_pipe_t>();
+    std::unique_ptr<uv_pipe_t, decltype(&std::free)> pipe(
+        static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
+        std::free
+    );
+
+    if (!pipe)
+        co_return std::unexpected(std::error_code(errno, std::generic_category()));
 
     CO_EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
@@ -439,39 +523,61 @@ std::expected<asyncio::net::UnixListener, std::error_code> asyncio::net::UnixLis
     if (path.front() == '@')
         path.front() = '\0';
 
-    auto pipe = std::make_unique<uv_pipe_t>();
+    std::unique_ptr<uv_pipe_t, decltype(&std::free)> pipe(
+        static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
+        std::free
+    );
+
+    if (!pipe)
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
     EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
+    uv::Handle handle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(pipe.release()),
+            std::free
+        }
+    );
+
     EXPECT(uv::expected([&] {
-        return uv_pipe_bind2(pipe.get(), path.c_str(), path.length(), UV_PIPE_NO_TRUNCATE);
+        return uv_pipe_bind2(
+            reinterpret_cast<uv_pipe_t *>(handle.raw()),
+            path.c_str(),
+            path.length(),
+            UV_PIPE_NO_TRUNCATE
+        );
     }));
 
-    auto listener = Listener::make(
-        uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}}
-    );
+    auto listener = Listener::make(std::move(handle));
     EXPECT(listener);
 
     return UnixListener{*std::move(listener)};
 }
 
 asyncio::task::Task<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixListener::accept() {
-    auto pipe = std::make_unique<uv_pipe_t>();
+    std::unique_ptr<uv_pipe_t, decltype(&std::free)> pipe(
+        static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
+        std::free
+    );
+
+    if (!pipe)
+        co_return std::unexpected(std::error_code(errno, std::generic_category()));
 
     CO_EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
-    CO_EXPECT(co_await mListener.accept(reinterpret_cast<uv_stream_t *>(pipe.get())));
-
-    co_return UnixStream{
-        Pipe{
-            uv::Handle{
-                std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}
-            }
+    uv::Handle handle(
+        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+            reinterpret_cast<uv_stream_t *>(pipe.release()),
+            std::free
         }
-    };
+    );
+
+    CO_EXPECT(co_await mListener.accept(handle.raw()));
+    co_return UnixStream{Pipe{std::move(handle)}};
 }
 #endif
