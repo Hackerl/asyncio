@@ -135,12 +135,29 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
 #endif
 }
 
-asyncio::uv::Handle<uv_stream_s> &asyncio::Stream::handle() {
-    return mStream;
-}
+asyncio::task::Task<void, std::error_code> asyncio::Stream::shutdown() {
+    Promise<void, std::error_code> promise;
+    uv_shutdown_t request = {.data = &promise};
 
-const asyncio::uv::Handle<uv_stream_s> &asyncio::Stream::handle() const {
-    return mStream;
+    CO_EXPECT(uv::expected([&] {
+        return uv_shutdown(
+            &request,
+            mStream.raw(),
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_shutdown_t *req, const int status) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
+
+                if (status < 0) {
+                    p->reject(static_cast<uv::Error>(status));
+                    return;
+                }
+
+                p->resolve();
+            }
+        );
+    }));
+
+    co_return co_await promise.getFuture();
 }
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const std::span<std::byte> data) {
@@ -209,7 +226,8 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
             mStream.raw(),
             &buffer,
             1,
-            [](const auto req, const int status) {
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_write_t *req, const int status) {
                 const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (status < 0) {
@@ -237,7 +255,20 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::Stream::close() {
-    mStream.close();
+    const auto handle = mStream.release();
+
+    Promise<void> promise;
+    handle->data = &promise;
+
+    uv_close(
+        reinterpret_cast<uv_handle_t *>(handle.get()),
+        // ReSharper disable once CppParameterMayBeConstPtrOrRef
+        [](uv_handle_t *h) {
+            static_cast<Promise<void> *>(h->data)->resolve();
+        }
+    );
+
+    co_await promise.getFuture();
     co_return {};
 }
 

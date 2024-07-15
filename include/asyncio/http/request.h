@@ -22,7 +22,7 @@ namespace asyncio::http {
 
         Pipe reader;
         Pipe writer;
-        std::unique_ptr<CURL, decltype(curl_easy_cleanup) *> easy;
+        std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy;
         Promise<void, std::error_code> promise;
         std::list<std::function<void()>> defers;
         std::optional<std::error_code> error;
@@ -102,7 +102,7 @@ namespace asyncio::http {
             int running{};
             Options options;
             uv::Handle<uv_timer_t> timer;
-            std::unique_ptr<CURLM, decltype(curl_multi_cleanup) *> multi;
+            std::unique_ptr<CURLM, decltype(&curl_multi_cleanup)> multi;
 
             void recycle();
             std::expected<void, std::error_code> setTimer(long ms);

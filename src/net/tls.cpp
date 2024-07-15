@@ -149,7 +149,7 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Se
 
     SSL_CTX_set_verify(
         context.get(),
-        verifyClient ? (SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT) : SSL_VERIFY_NONE,
+        verifyClient ? SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT : SSL_VERIFY_NONE,
         nullptr
     );
 

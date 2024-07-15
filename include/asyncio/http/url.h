@@ -16,7 +16,7 @@ namespace asyncio::http {
         )
 
         URL();
-        explicit URL(std::unique_ptr<CURLU, decltype(curl_url_cleanup) *> url);
+        explicit URL(std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url);
         URL(const URL &rhs);
         URL(URL &&rhs) noexcept;
 
@@ -66,7 +66,7 @@ namespace asyncio::http {
         }
 
     private:
-        std::unique_ptr<CURLU, decltype(curl_url_cleanup) *> mURL;
+        std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> mURL;
     };
 }
 

@@ -46,7 +46,7 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
     CO_EXPECT(uv::expected([&] {
         return uv_tcp_connect(
             &request,
-            reinterpret_cast<uv_tcp_t *>(stream.handle().raw()),
+            reinterpret_cast<uv_tcp_t *>(stream.mStream.raw()),
             address.first.get(),
             // ReSharper disable once CppParameterMayBeConstPtrOrRef
             [](uv_connect_t *req, const int status) {
@@ -135,7 +135,7 @@ asyncio::net::TCPStream::connect(const IPv6Address address) {
 }
 
 asyncio::FileDescriptor asyncio::net::TCPStream::fd() const {
-    const auto fd = mStream.handle().fd();
+    const auto fd = mStream.mStream.fd();
     assert(fd);
     return *fd;
 }
@@ -146,7 +146,7 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::TCPStream::l
 
     EXPECT(uv::expected([&] {
         return uv_tcp_getsockname(
-            reinterpret_cast<const uv_tcp_t *>(mStream.handle().raw()),
+            reinterpret_cast<const uv_tcp_t *>(mStream.mStream.raw()),
             reinterpret_cast<sockaddr *>(&storage),
             &length
         );
@@ -161,13 +161,62 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::TCPStream::r
 
     EXPECT(uv::expected([&] {
         return uv_tcp_getpeername(
-            reinterpret_cast<const uv_tcp_t *>(mStream.handle().raw()),
+            reinterpret_cast<const uv_tcp_t *>(mStream.mStream.raw()),
             reinterpret_cast<sockaddr *>(&storage),
             &length
         );
     }));
 
     return addressFrom(reinterpret_cast<const sockaddr *>(&storage), length);
+}
+
+std::expected<void, std::error_code> asyncio::net::TCPStream::noDelay(const bool enable) {
+    EXPECT(uv::expected([&] {
+        return uv_tcp_nodelay(reinterpret_cast<uv_tcp_t *>(mStream.mStream.raw()), enable);
+    }));
+    return {};
+}
+
+std::expected<void, std::error_code>
+asyncio::net::TCPStream::keepalive(const bool enable, const std::optional<std::chrono::seconds> delay) {
+    using namespace std::chrono_literals;
+    EXPECT(uv::expected([&] {
+        return uv_tcp_keepalive(
+            reinterpret_cast<uv_tcp_t *>(mStream.mStream.raw()),
+            enable,
+            delay.value_or(0s).count()
+        );
+    }));
+    return {};
+}
+
+std::expected<void, std::error_code> asyncio::net::TCPStream::simultaneousAccepts(const bool enable) {
+    EXPECT(uv::expected([&] {
+        return uv_tcp_simultaneous_accepts(reinterpret_cast<uv_tcp_t *>(mStream.mStream.raw()), enable);
+    }));
+    return {};
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::net::TCPStream::shutdown() {
+    co_return co_await mStream.shutdown();
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::net::TCPStream::closeReset() {
+    const auto handle = mStream.mStream.release();
+
+    Promise<void> promise;
+    handle->data = &promise;
+
+    uv_tcp_close_reset(
+        reinterpret_cast<uv_tcp_t *>(handle.get()),
+        // ReSharper disable once CppParameterMayBeConstPtrOrRef
+        [](uv_handle_t *h) {
+            static_cast<Promise<void> *>(h->data)->resolve();
+        }
+    );
+
+    co_await promise.getFuture();
+    co_return {};
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
@@ -197,7 +246,20 @@ asyncio::net::TCPStream::writeTo(const std::span<const std::byte> data, const Ad
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::net::TCPStream::close() {
-    mStream.handle().close();
+    const auto handle = mStream.mStream.release();
+
+    Promise<void> promise;
+    handle->data = &promise;
+
+    uv_close(
+        reinterpret_cast<uv_handle_t *>(handle.get()),
+        // ReSharper disable once CppParameterMayBeConstPtrOrRef
+        [](uv_handle_t *h) {
+            static_cast<Promise<void> *>(h->data)->resolve();
+        }
+    );
+
+    co_await promise.getFuture();
     co_return {};
 }
 
@@ -316,7 +378,7 @@ asyncio::net::NamedPipeStream::connect(const std::string name) {
     CO_EXPECT(uv::expected([&] {
         return uv_pipe_connect2(
             &request,
-            reinterpret_cast<uv_pipe_t *>(stream.handle().raw()),
+            reinterpret_cast<uv_pipe_t *>(stream.mStream.raw()),
             name.c_str(),
             name.length(),
             UV_PIPE_NO_TRUNCATE,
@@ -377,7 +439,20 @@ asyncio::net::NamedPipeStream::write(const std::span<const std::byte> data) {
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::net::NamedPipeStream::close() {
-    mPipe.handle().close();
+    const auto handle = mPipe.mStream.release();
+
+    Promise<void> promise;
+    handle->data = &promise;
+
+    uv_close(
+        reinterpret_cast<uv_handle_t *>(handle.get()),
+        // ReSharper disable once CppParameterMayBeConstPtrOrRef
+        [](uv_handle_t *h) {
+            static_cast<Promise<void> *>(h->data)->resolve();
+        }
+    );
+
+    co_await promise.getFuture();
     co_return {};
 }
 
@@ -472,7 +547,14 @@ asyncio::net::UnixStream::connect(std::string path) {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
-    Pipe stream(uv::Handle{std::unique_ptr<uv_stream_t>{reinterpret_cast<uv_stream_t *>(pipe.release())}});
+    Pipe stream(
+        uv::Handle{
+            std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+                reinterpret_cast<uv_stream_t *>(pipe.release()),
+                std::free
+            }
+        }
+    );
 
     Promise<void, std::error_code> promise;
     uv_connect_t request = {.data = &promise};
@@ -480,7 +562,7 @@ asyncio::net::UnixStream::connect(std::string path) {
     CO_EXPECT(uv::expected([&] {
         return uv_pipe_connect2(
             &request,
-            reinterpret_cast<uv_pipe_t *>(stream.handle().raw()),
+            reinterpret_cast<uv_pipe_t *>(stream.mStream.raw()),
             path.c_str(),
             path.length(),
             UV_PIPE_NO_TRUNCATE,
@@ -573,6 +655,10 @@ std::expected<void, std::error_code> asyncio::net::UnixStream::chmod(const int m
     return mPipe.chmod(mode);
 }
 
+asyncio::task::Task<void, std::error_code> asyncio::net::UnixStream::shutdown() {
+    co_return co_await mPipe.shutdown();
+}
+
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UnixStream::read(const std::span<std::byte> data) {
     co_return co_await mPipe.read(data);
@@ -600,7 +686,20 @@ asyncio::net::UnixStream::writeTo(const std::span<const std::byte> data, const A
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::net::UnixStream::close() {
-    mPipe.handle().close();
+    const auto handle = mPipe.mStream.release();
+
+    Promise<void> promise;
+    handle->data = &promise;
+
+    uv_close(
+        reinterpret_cast<uv_handle_t *>(handle.get()),
+        // ReSharper disable once CppParameterMayBeConstPtrOrRef
+        [](uv_handle_t *h) {
+            static_cast<Promise<void> *>(h->data)->resolve();
+        }
+    );
+
+    co_await promise.getFuture();
     co_return {};
 }
 

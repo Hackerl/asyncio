@@ -2,7 +2,6 @@
 #include <asyncio/thread.h>
 
 #ifdef _WIN32
-#include <io.h>
 #include <zero/os/nt/error.h>
 #else
 #include <unistd.h>
@@ -138,7 +137,7 @@ asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
 
         EXPECT(zero::os::nt::expected([&] {
             return SetFilePointerEx(
-                reinterpret_cast<HANDLE>(uv_get_osfhandle(mFile)),
+                uv_get_osfhandle(mFile),
                 LARGE_INTEGER{.QuadPart = offset},
                 &pos,
                 whence == Whence::BEGIN ? FILE_BEGIN : whence == Whence::CURRENT ? FILE_CURRENT : FILE_END

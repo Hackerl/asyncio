@@ -64,20 +64,32 @@ namespace asyncio::uv {
     class Handle {
     public:
         template<typename Deleter>
-        explicit Handle(std::unique_ptr<T, Deleter> handle) : mHandle{
-            handle.release(),
-            [deleter = std::move(handle.get_deleter())](T *ptr) {
-                ptr->data = new Deleter(deleter);
-                uv_close(
-                    reinterpret_cast<uv_handle_t *>(ptr),
-                    [](uv_handle_t *h) {
-                        const auto del = static_cast<Deleter *>(h->data);
-                        (*del)(reinterpret_cast<T *>(h));
-                        delete del;
-                    }
-                );
-            }
-        } {
+        explicit Handle(std::unique_ptr<T, Deleter> handle) : mHandle(std::move(handle)) {
+        }
+
+        Handle(Handle &&rhs) noexcept : mHandle(std::move(rhs.mHandle)) {
+        }
+
+        Handle &operator=(Handle &&rhs) noexcept {
+            mHandle = std::move(rhs.mHandle);
+            return *this;
+        }
+
+        ~Handle() {
+            if (!mHandle)
+                return;
+
+            const auto handle = mHandle.release();
+            handle->data = new std::function<void(T *)>(std::move(mHandle.get_deleter()));
+
+            uv_close(
+                reinterpret_cast<uv_handle_t *>(handle),
+                [](uv_handle_t *h) {
+                    const auto del = static_cast<std::function<void(T *)> *>(h->data);
+                    (*del)(reinterpret_cast<T *>(h));
+                    delete del;
+                }
+            );
         }
 
         [[nodiscard]] std::expected<uv_os_fd_t, std::error_code> fd() const {
@@ -114,8 +126,8 @@ namespace asyncio::uv {
             return mHandle.get();
         }
 
-        void close() {
-            mHandle.reset();
+        std::unique_ptr<T, std::function<void(T *)>> release() {
+            return std::move(mHandle);
         }
 
     private:

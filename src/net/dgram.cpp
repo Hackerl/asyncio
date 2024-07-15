@@ -154,7 +154,8 @@ asyncio::net::UDPSocket::write(const std::span<const std::byte> data) {
             &buffer,
             1,
             nullptr,
-            [](const auto req, const int status) {
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_udp_send_t *req, const int status) {
                 const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (status < 0) {
@@ -245,7 +246,8 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, const Ad
             &buffer,
             1,
             socketAddress->first.get(),
-            [](const auto req, const int status) {
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_udp_send_t *req, const int status) {
                 const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (status < 0) {
@@ -263,6 +265,19 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, const Ad
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::net::UDPSocket::close() {
-    mUDP.close();
+    const auto handle = mUDP.release();
+
+    Promise<void> promise;
+    handle->data = &promise;
+
+    uv_close(
+        reinterpret_cast<uv_handle_t *>(handle.get()),
+        // ReSharper disable once CppParameterMayBeConstPtrOrRef
+        [](uv_handle_t *h) {
+            static_cast<Promise<void> *>(h->data)->resolve();
+        }
+    );
+
+    co_await promise.getFuture();
     co_return {};
 }

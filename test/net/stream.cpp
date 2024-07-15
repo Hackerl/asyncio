@@ -125,7 +125,7 @@ TEST_CASE("stream network connection", "[net]") {
                         REQUIRE(credential);
                         REQUIRE(credential->uid == getuid());
                         REQUIRE(credential->gid == getgid());
-                        REQUIRE(credential->pid == getpid());
+                        REQUIRE(*credential->pid == getpid());
 
                         auto res = co_await stream->writeAll(std::as_bytes(std::span{MESSAGE}));
                         REQUIRE(res);
@@ -149,7 +149,7 @@ TEST_CASE("stream network connection", "[net]") {
                         REQUIRE(credential);
                         REQUIRE(credential->uid == getuid());
                         REQUIRE(credential->gid == getgid());
-                        REQUIRE(credential->pid == getpid());
+                        REQUIRE(*credential->pid == getpid());
 
                         std::string message;
                         message.resize(MESSAGE.size());

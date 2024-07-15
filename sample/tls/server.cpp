@@ -32,7 +32,7 @@ asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream
 }
 
 asyncio::task::Task<void, std::error_code>
-serve(asyncio::net::TCPListener listener, asyncio::net::tls::Context context) {
+serve(asyncio::net::TCPListener listener, const asyncio::net::tls::Context context) {
     while (true) {
         auto stream = co_await listener.accept();
         CO_EXPECT(stream);

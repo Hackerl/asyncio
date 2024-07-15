@@ -14,12 +14,20 @@ namespace asyncio {
         explicit Pipe(uv::Handle<uv_stream_t> stream);
         static std::expected<Pipe, std::error_code> from(uv_file file);
 
+    private:
+        std::expected<void, std::error_code> chmod(int mode);
+
+    public:
         [[nodiscard]] FileDescriptor fd() const override;
 
         [[nodiscard]] std::expected<std::string, std::error_code> localAddress() const;
         [[nodiscard]] std::expected<std::string, std::error_code> remoteAddress() const;
 
-        std::expected<void, std::error_code> chmod(int mode);
+#ifdef _WIN32
+        friend class net::NamedPipeStream;
+#else
+        friend class net::UnixStream;
+#endif
     };
 
     std::expected<std::array<Pipe, 2>, std::error_code> pipe();

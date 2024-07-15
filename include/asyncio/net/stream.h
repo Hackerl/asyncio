@@ -24,6 +24,16 @@ namespace asyncio::net {
         [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;
         [[nodiscard]] std::expected<Address, std::error_code> remoteAddress() const override;
 
+        std::expected<void, std::error_code> noDelay(bool enable);
+
+        std::expected<void, std::error_code>
+        keepalive(bool enable, std::optional<std::chrono::seconds> delay = std::nullopt);
+
+        std::expected<void, std::error_code> simultaneousAccepts(bool enable);
+
+        task::Task<void, std::error_code> shutdown();
+        task::Task<void, std::error_code> closeReset();
+
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 
@@ -111,6 +121,7 @@ namespace asyncio::net {
         [[nodiscard]] std::expected<Credential, std::error_code> peerCredential() const;
 
         std::expected<void, std::error_code> chmod(int mode);
+        task::Task<void, std::error_code> shutdown();
 
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;

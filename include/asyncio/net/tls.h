@@ -93,7 +93,7 @@ namespace asyncio::net::tls {
         requires (Trait<T, IReader> && Trait<T, IWriter> && Trait<T, ICloseable>)
     class TLS final : public IReader, public IWriter, public ICloseable {
     public:
-        TLS(T stream, std::unique_ptr<SSL, decltype(SSL_free) *> ssl)
+        TLS(T stream, std::unique_ptr<SSL, decltype(&SSL_free)> ssl)
             : mStream(std::move(stream)), mSSL(std::move(ssl)) {
         }
 
@@ -262,7 +262,7 @@ namespace asyncio::net::tls {
 
     private:
         T mStream;
-        std::unique_ptr<SSL, decltype(SSL_free) *> mSSL;
+        std::unique_ptr<SSL, decltype(&SSL_free)> mSSL;
         std::array<sync::Mutex, 2> mMutexes;
     };
 
@@ -273,7 +273,7 @@ namespace asyncio::net::tls {
         const Context context,
         const std::optional<std::string> serverName = std::nullopt
     ) {
-        std::unique_ptr<SSL, decltype(SSL_free) *> ssl(SSL_new(context.get()), SSL_free);
+        std::unique_ptr<SSL, decltype(&SSL_free)> ssl(SSL_new(context.get()), SSL_free);
 
         if (!ssl)
             co_return std::unexpected(openSSLError());
@@ -287,12 +287,12 @@ namespace asyncio::net::tls {
             }));
         }
 
-        std::unique_ptr<BIO, decltype(BIO_free) *> readBIO(BIO_new(BIO_s_mem()), BIO_free);
+        std::unique_ptr<BIO, decltype(&BIO_free)> readBIO(BIO_new(BIO_s_mem()), BIO_free);
 
         if (!readBIO)
             co_return std::unexpected(openSSLError());
 
-        std::unique_ptr<BIO, decltype(BIO_free) *> writeBIO(BIO_new(BIO_s_mem()), BIO_free);
+        std::unique_ptr<BIO, decltype(&BIO_free)> writeBIO(BIO_new(BIO_s_mem()), BIO_free);
 
         if (!writeBIO)
             co_return std::unexpected(openSSLError());
@@ -308,17 +308,17 @@ namespace asyncio::net::tls {
     template<typename T>
         requires (Trait<T, IReader> && Trait<T, IWriter> && Trait<T, ICloseable>)
     task::Task<TLS<T>, std::error_code> accept(T stream, const Context context) {
-        std::unique_ptr<SSL, decltype(SSL_free) *> ssl(SSL_new(context.get()), SSL_free);
+        std::unique_ptr<SSL, decltype(&SSL_free)> ssl(SSL_new(context.get()), SSL_free);
 
         if (!ssl)
             co_return std::unexpected(openSSLError());
 
-        std::unique_ptr<BIO, decltype(BIO_free) *> readBIO(BIO_new(BIO_s_mem()), BIO_free);
+        std::unique_ptr<BIO, decltype(&BIO_free)> readBIO(BIO_new(BIO_s_mem()), BIO_free);
 
         if (!readBIO)
             co_return std::unexpected(openSSLError());
 
-        std::unique_ptr<BIO, decltype(BIO_free) *> writeBIO(BIO_new(BIO_s_mem()), BIO_free);
+        std::unique_ptr<BIO, decltype(&BIO_free)> writeBIO(BIO_new(BIO_s_mem()), BIO_free);
 
         if (!writeBIO)
             co_return std::unexpected(openSSLError());

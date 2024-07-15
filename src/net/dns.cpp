@@ -13,7 +13,8 @@ asyncio::net::dns::getAddressInfo(
         return uv_getaddrinfo(
             getEventLoop()->raw(),
             &request,
-            [](const auto req, const int status, addrinfo *res) {
+            // ReSharper disable once CppParameterMayBeConstPtrOrRef
+            [](uv_getaddrinfo_t *req, const int status, addrinfo *res) {
                 const auto p = static_cast<Promise<std::vector<Address>, uv::Error> *>(req->data);
 
                 if (status < 0) {
