@@ -1,6 +1,5 @@
 #include <asyncio/fs.h>
 #include <asyncio/thread.h>
-#include <zero/defer.h>
 
 #ifdef _WIN32
 #include <io.h>
@@ -129,7 +128,7 @@ asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
 
 asyncio::task::Task<std::uint64_t, std::error_code>
 asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
-    co_return co_await toThread([&]() -> std::expected<std::uint64_t, std::error_code> {
+    co_return co_await toThreadPool([&]() -> std::expected<std::uint64_t, std::error_code> {
 #ifdef _WIN32
         LARGE_INTEGER pos;
 
@@ -159,7 +158,7 @@ asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
 
         return *pos;
 #endif
-    }).transformError([](const ToThreadError error) {
+    }).transformError([](const ToThreadPoolError error) {
         return make_error_code(error);
     }).andThen([](const auto &result) -> std::expected<std::uint64_t, std::error_code> {
         if (!result)

@@ -87,7 +87,6 @@ TEST_CASE("asyncio channel", "[channel]") {
                     return future.get();
                 });
                 REQUIRE(r);
-                REQUIRE(*r);
             }
 
             REQUIRE(*counters[0] == *counters[1]);

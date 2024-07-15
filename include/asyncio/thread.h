@@ -2,17 +2,70 @@
 #define ASYNCIO_THREAD_H
 
 #include "task.h"
+#include <thread>
+#include <zero/defer.h>
 
 namespace asyncio {
+    template<typename F>
+    task::Task<std::invoke_result_t<F>>
+    toThread(F f) {
+        using T = std::invoke_result_t<F>;
+
+        Promise<T> promise;
+
+        std::thread thread([&] {
+            if constexpr (std::is_void_v<T>) {
+                f();
+                promise.resolve();
+            }
+            else {
+                promise.resolve(f());
+            }
+        });
+        DEFER(thread.join());
+
+        co_return *co_await promise.getFuture();
+    }
+
+    template<typename F, typename C>
+        requires std::is_same_v<
+            std::invoke_result_t<C, std::thread::native_handle_type>,
+            std::expected<void, std::error_code>
+        >
+    task::Task<std::invoke_result_t<F>>
+    toThread(F f, C cancel) {
+        using T = std::invoke_result_t<F>;
+
+        Promise<T> promise;
+
+        std::thread thread([&] {
+            if constexpr (std::is_void_v<T>) {
+                f();
+                promise.resolve();
+            }
+            else {
+                promise.resolve(f());
+            }
+        });
+        DEFER(thread.join());
+
+        co_return *co_await task::Cancellable{
+            promise.getFuture(),
+            [&]() -> std::expected<void, std::error_code> {
+                return cancel(thread.native_handle());
+            }
+        };
+    }
+
     DEFINE_ERROR_CODE_EX(
-        ToThreadError,
-        "asyncio::toThread",
+        ToThreadPoolError,
+        "asyncio::toThreadPool",
         CANCELLED, "request has been cancelled", std::errc::operation_canceled
     )
 
     template<typename F>
-    task::Task<std::invoke_result_t<F>, ToThreadError>
-    toThread(F f) {
+    task::Task<std::invoke_result_t<F>, ToThreadPoolError>
+    toThreadPool(F f) {
         using T = std::invoke_result_t<F>;
 
         if constexpr (std::is_void_v<T>) {
@@ -46,7 +99,7 @@ namespace asyncio {
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected(ToThreadError::CANCELLED);
+                co_return std::unexpected(ToThreadPoolError::CANCELLED);
             }
 
             co_return {};
@@ -84,7 +137,7 @@ namespace asyncio {
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected(ToThreadError::CANCELLED);
+                co_return std::unexpected(ToThreadPoolError::CANCELLED);
             }
 
             co_return std::move(*context.result);
