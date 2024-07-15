@@ -1,6 +1,16 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/dns.h>
 
+#ifdef _WIN32
+#include <zero/os/nt/error.h>
+#elif __linux__
+#include <zero/os/unix/error.h>
+#elif __APPLE__
+#include <unistd.h>
+#include <sys/un.h>
+#include <zero/os/unix/error.h>
+#endif
+
 asyncio::net::TCPStream::TCPStream(Stream stream) : mStream(std::move(stream)) {
 }
 
@@ -322,6 +332,32 @@ asyncio::net::NamedPipeStream::connect(const std::string name) {
     co_return NamedPipeStream{std::move(stream)};
 }
 
+std::expected<DWORD, std::error_code> asyncio::net::NamedPipeStream::clientProcessID() const {
+    const auto fd = mPipe.handle().fd();
+    EXPECT(fd);
+
+    DWORD pid;
+
+    EXPECT(zero::os::nt::expected([&] {
+        return GetNamedPipeClientProcessId(*fd, &pid);
+    }));
+
+    return pid;
+}
+
+std::expected<DWORD, std::error_code> asyncio::net::NamedPipeStream::serverProcessID() const {
+    const auto fd = mPipe.handle().fd();
+    EXPECT(fd);
+
+    DWORD pid;
+
+    EXPECT(zero::os::nt::expected([&] {
+        return GetNamedPipeServerProcessId(*fd, &pid);
+    }));
+
+    return pid;
+}
+
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::NamedPipeStream::read(const std::span<std::byte> data) {
     co_return co_await mPipe.read(data);
@@ -481,6 +517,48 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::UnixStream::
         address->front() = '@';
 
     return UnixAddress{*std::move(address)};
+}
+
+std::expected<asyncio::net::UnixStream::Credential, std::error_code> asyncio::net::UnixStream::peerCredential() const {
+    const auto fd = mPipe.handle().fd();
+    EXPECT(fd);
+
+#ifdef __linux__
+    ucred cred = {};
+    socklen_t length = sizeof(cred);
+
+    EXPECT(zero::os::unix::expected([&] {
+        return getsockopt(*fd, SOL_SOCKET, SO_PEERCRED, &cred, &length);
+    }));
+
+    if (length != sizeof(cred))
+        return std::unexpected(std::error_code(errno, std::system_category()));
+
+    return Credential{cred.uid, cred.gid, cred.pid};
+#elif __APPLE__
+    Credential credential;
+
+    EXPECT(zero::os::unix::expected([&] {
+        return getpeereid(*fd, &credential.uid, &credential.gid);
+    }));
+
+    pid_t pid;
+    socklen_t length = sizeof(pid);
+
+    EXPECT(zero::os::unix::expected([&] {
+        return getsockopt(*fd, SOL_LOCAL, LOCAL_PEERPID, &pid, &length);
+    }));
+
+    if (length != sizeof(pid))
+        return std::unexpected(std::error_code(errno, std::system_category()));
+
+    credential.pid = pid;
+    return credential;
+#else
+#error "unsupported platform"
+#endif
+
+    return {};
 }
 
 asyncio::task::Task<std::size_t, std::error_code>

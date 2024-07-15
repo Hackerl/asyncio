@@ -61,6 +61,9 @@ namespace asyncio::net {
         explicit NamedPipeStream(Pipe pipe);
         static task::Task<NamedPipeStream, std::error_code> connect(std::string name);
 
+        [[nodiscard]] std::expected<DWORD, std::error_code> clientProcessID() const;
+        [[nodiscard]] std::expected<DWORD, std::error_code> serverProcessID() const;
+
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 
@@ -83,6 +86,12 @@ namespace asyncio::net {
 #else
     class UnixStream final : public ISocket {
     public:
+        struct Credential {
+            uid_t uid{};
+            gid_t gid{};
+            std::optional<pid_t> pid;
+        };
+
         explicit UnixStream(Pipe pipe);
 
         static std::expected<UnixStream, std::error_code> from(uv_os_sock_t socket);
@@ -90,6 +99,8 @@ namespace asyncio::net {
 
         [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;
         [[nodiscard]] std::expected<Address, std::error_code> remoteAddress() const override;
+
+        [[nodiscard]] std::expected<Credential, std::error_code> peerCredential() const;
 
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;

@@ -7,6 +7,7 @@
 #include <expected>
 #include <functional>
 #include <zero/error.h>
+#include <zero/expect.h>
 
 namespace asyncio::uv {
     DEFINE_ERROR_TRANSFORMER_EX(
@@ -79,19 +80,37 @@ namespace asyncio::uv {
         } {
         }
 
+        [[nodiscard]] std::expected<uv_os_fd_t, std::error_code> fd() const {
+            uv_os_fd_t fd;
+
+            EXPECT(expected([&] {
+                return uv_fileno(rawHandle(), &fd);
+            }));
+
+            return fd;
+        }
+
         T *raw() {
             return mHandle.get();
         }
 
-        const T *raw() const {
+        [[nodiscard]] const T *raw() const {
             return mHandle.get();
+        }
+
+        uv_handle_t *rawHandle() {
+            return reinterpret_cast<uv_handle_t *>(mHandle.get());
+        }
+
+        [[nodiscard]] const uv_handle_t *rawHandle() const {
+            return reinterpret_cast<const uv_handle_t *>(mHandle.get());
         }
 
         T *operator->() {
             return mHandle.get();
         }
 
-        const T *operator->() const {
+        [[nodiscard]] const T *operator->() const {
             return mHandle.get();
         }
 

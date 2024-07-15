@@ -5,7 +5,6 @@
 #include <mutex>
 #include <queue>
 #include <cassert>
-#include <zero/expect.h>
 #include <zero/detail/type_traits.h>
 
 namespace asyncio {

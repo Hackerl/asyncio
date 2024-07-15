@@ -1,6 +1,10 @@
 #include <asyncio/net/stream.h>
 #include <catch2/catch_test_macros.hpp>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 constexpr std::string_view MESSAGE = "hello world";
 
 TEST_CASE("stream network connection", "[net]") {
@@ -70,6 +74,10 @@ TEST_CASE("stream network connection", "[net]") {
                     auto res = co_await stream->writeAll(std::as_bytes(std::span{MESSAGE}));
                     REQUIRE(res);
 
+                    const auto pid = stream->clientProcessID();
+                    REQUIRE(pid);
+                    REQUIRE(*pid == GetCurrentProcessId());
+
                     std::string message;
                     message.resize(MESSAGE.size());
 
@@ -80,6 +88,10 @@ TEST_CASE("stream network connection", "[net]") {
                 []() -> asyncio::task::Task<void> {
                     auto stream = co_await asyncio::net::NamedPipeStream::connect(R"(\\.\pipe\asyncio-test)");
                     REQUIRE(stream);
+
+                    const auto pid = stream->serverProcessID();
+                    REQUIRE(pid);
+                    REQUIRE(*pid == GetCurrentProcessId());
 
                     std::string message;
                     message.resize(MESSAGE.size());
@@ -109,6 +121,12 @@ TEST_CASE("stream network connection", "[net]") {
                         REQUIRE(localAddress);
                         REQUIRE(fmt::to_string(*localAddress).find("asyncio-test.sock") != std::string::npos);
 
+                        const auto credential = stream->peerCredential();
+                        REQUIRE(credential);
+                        REQUIRE(credential->uid == getuid());
+                        REQUIRE(credential->gid == getgid());
+                        REQUIRE(credential->pid == getpid());
+
                         auto res = co_await stream->writeAll(std::as_bytes(std::span{MESSAGE}));
                         REQUIRE(res);
 
@@ -126,6 +144,12 @@ TEST_CASE("stream network connection", "[net]") {
                         const auto remoteAddress = stream->remoteAddress();
                         REQUIRE(remoteAddress);
                         REQUIRE(fmt::to_string(*remoteAddress).find("asyncio-test.sock") != std::string::npos);
+
+                        const auto credential = stream->peerCredential();
+                        REQUIRE(credential);
+                        REQUIRE(credential->uid == getuid());
+                        REQUIRE(credential->gid == getgid());
+                        REQUIRE(credential->pid == getpid());
 
                         std::string message;
                         message.resize(MESSAGE.size());
