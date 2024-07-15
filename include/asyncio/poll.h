@@ -1,10 +1,10 @@
 #ifndef ASYNCIO_POLL_H
 #define ASYNCIO_POLL_H
 
-#include "task.h"
+#include "io.h"
 
 namespace asyncio {
-    class Poll {
+    class Poll final : public IFileDescriptor {
     public:
         enum Event {
             READABLE = UV_READABLE,
@@ -18,6 +18,8 @@ namespace asyncio {
 #ifdef _WIN32
         static std::expected<Poll, std::error_code> make(SOCKET socket);
 #endif
+
+        [[nodiscard]] FileDescriptor fd() const override;
 
         task::Task<int, std::error_code> on(int events);
 

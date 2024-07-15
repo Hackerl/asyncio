@@ -31,6 +31,12 @@ std::expected<asyncio::Pipe, std::error_code> asyncio::Pipe::from(const uv_file 
     return Pipe{std::move(handle)};
 }
 
+asyncio::FileDescriptor asyncio::Pipe::fd() const {
+    const auto fd = mStream.fd();
+    assert(fd);
+    return *fd;
+}
+
 std::expected<std::string, std::error_code> asyncio::Pipe::localAddress() const {
     std::size_t size = 1024;
     std::string address;

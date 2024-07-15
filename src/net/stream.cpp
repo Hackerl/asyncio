@@ -134,6 +134,12 @@ asyncio::net::TCPStream::connect(const IPv6Address address) {
     co_return co_await connect(*std::move(socketAddress));
 }
 
+asyncio::FileDescriptor asyncio::net::TCPStream::fd() const {
+    const auto fd = mStream.handle().fd();
+    assert(fd);
+    return *fd;
+}
+
 std::expected<asyncio::net::Address, std::error_code> asyncio::net::TCPStream::localAddress() const {
     sockaddr_storage storage = {};
     int length = sizeof(sockaddr_storage);
@@ -332,30 +338,32 @@ asyncio::net::NamedPipeStream::connect(const std::string name) {
     co_return NamedPipeStream{std::move(stream)};
 }
 
-std::expected<DWORD, std::error_code> asyncio::net::NamedPipeStream::clientProcessID() const {
-    const auto fd = mPipe.handle().fd();
-    EXPECT(fd);
+asyncio::FileDescriptor asyncio::net::NamedPipeStream::fd() const {
+    return mPipe.fd();
+}
 
+std::expected<DWORD, std::error_code> asyncio::net::NamedPipeStream::clientProcessID() const {
     DWORD pid;
 
     EXPECT(zero::os::nt::expected([&] {
-        return GetNamedPipeClientProcessId(*fd, &pid);
+        return GetNamedPipeClientProcessId(mPipe.fd(), &pid);
     }));
 
     return pid;
 }
 
 std::expected<DWORD, std::error_code> asyncio::net::NamedPipeStream::serverProcessID() const {
-    const auto fd = mPipe.handle().fd();
-    EXPECT(fd);
-
     DWORD pid;
 
     EXPECT(zero::os::nt::expected([&] {
-        return GetNamedPipeServerProcessId(*fd, &pid);
+        return GetNamedPipeServerProcessId(mPipe.fd(), &pid);
     }));
 
     return pid;
+}
+
+std::expected<void, std::error_code> asyncio::net::NamedPipeStream::chmod(const int mode) {
+    return mPipe.chmod(mode);
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
@@ -499,6 +507,10 @@ asyncio::net::UnixListener::listen(const UnixAddress &address) {
     return listen(address.path);
 }
 
+asyncio::FileDescriptor asyncio::net::UnixStream::fd() const {
+    return mPipe.fd();
+}
+
 std::expected<asyncio::net::Address, std::error_code> asyncio::net::UnixStream::localAddress() const {
     auto address = mPipe.localAddress();
     EXPECT(address);
@@ -520,15 +532,12 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::UnixStream::
 }
 
 std::expected<asyncio::net::UnixStream::Credential, std::error_code> asyncio::net::UnixStream::peerCredential() const {
-    const auto fd = mPipe.handle().fd();
-    EXPECT(fd);
-
 #ifdef __linux__
     ucred cred = {};
     socklen_t length = sizeof(cred);
 
     EXPECT(zero::os::unix::expected([&] {
-        return getsockopt(*fd, SOL_SOCKET, SO_PEERCRED, &cred, &length);
+        return getsockopt(mPipe.fd(), SOL_SOCKET, SO_PEERCRED, &cred, &length);
     }));
 
     if (length != sizeof(cred))
@@ -537,16 +546,17 @@ std::expected<asyncio::net::UnixStream::Credential, std::error_code> asyncio::ne
     return Credential{cred.uid, cred.gid, cred.pid};
 #elif __APPLE__
     Credential credential;
+    const auto fd = mPipe.fd();
 
     EXPECT(zero::os::unix::expected([&] {
-        return getpeereid(*fd, &credential.uid, &credential.gid);
+        return getpeereid(fd, &credential.uid, &credential.gid);
     }));
 
     pid_t pid;
     socklen_t length = sizeof(pid);
 
     EXPECT(zero::os::unix::expected([&] {
-        return getsockopt(*fd, SOL_LOCAL, LOCAL_PEERPID, &pid, &length);
+        return getsockopt(fd, SOL_LOCAL, LOCAL_PEERPID, &pid, &length);
     }));
 
     if (length != sizeof(pid))
@@ -557,8 +567,10 @@ std::expected<asyncio::net::UnixStream::Credential, std::error_code> asyncio::ne
 #else
 #error "unsupported platform"
 #endif
+}
 
-    return {};
+std::expected<void, std::error_code> asyncio::net::UnixStream::chmod(const int mode) {
+    return mPipe.chmod(mode);
 }
 
 asyncio::task::Task<std::size_t, std::error_code>

@@ -26,6 +26,12 @@ std::expected<asyncio::Poll, std::error_code> asyncio::Poll::make(const SOCKET s
 }
 #endif
 
+asyncio::FileDescriptor asyncio::Poll::fd() const {
+    const auto fd = mPoll.fd();
+    assert(fd);
+    return *fd;
+}
+
 asyncio::task::Task<int, std::error_code> asyncio::Poll::on(const int events) {
     Promise<int, std::error_code> promise;
     mPoll->data = &promise;

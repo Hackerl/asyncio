@@ -102,6 +102,12 @@ asyncio::net::UDPSocket::connect(const IPv6Address &address) {
     return connect(*std::move(socketAddress));
 }
 
+asyncio::FileDescriptor asyncio::net::UDPSocket::fd() const {
+    const auto fd = mUDP.fd();
+    assert(fd);
+    return *fd;
+}
+
 std::expected<asyncio::net::Address, std::error_code> asyncio::net::UDPSocket::localAddress() const {
     sockaddr_storage storage = {};
     int length = sizeof(sockaddr_storage);

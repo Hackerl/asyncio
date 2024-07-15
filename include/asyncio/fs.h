@@ -5,12 +5,14 @@
 #include <filesystem>
 
 namespace asyncio::fs {
-    class File final : public IReader, public IWriter, public ICloseable, public ISeekable {
+    class File final : public IFileDescriptor, public IReader, public IWriter, public ICloseable, public ISeekable {
     public:
         explicit File(uv_file file);
         File(File &&rhs) noexcept;
         File &operator=(File &&rhs) noexcept;
         ~File() override;
+
+        [[nodiscard]] FileDescriptor fd() const override;
 
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;

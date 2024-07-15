@@ -7,11 +7,23 @@
 #include <zero/interface.h>
 
 namespace asyncio {
+    template<typename T, typename I>
+    concept Trait = std::derived_from<T, I> ||
+        std::is_convertible_v<std::remove_const_t<T>, std::shared_ptr<I>> ||
+        std::is_convertible_v<std::remove_const_t<T>, std::unique_ptr<I>>;
+
     DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
         UNEXPECTED_EOF, "unexpected end of file"
     )
+
+    using FileDescriptor = uv_os_fd_t;
+
+    class IFileDescriptor : public virtual zero::Interface {
+    public:
+        [[nodiscard]] virtual FileDescriptor fd() const = 0;
+    };
 
     class ICloseable : public virtual zero::Interface {
     public:
@@ -36,11 +48,6 @@ namespace asyncio {
         virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
         virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
     };
-
-    template<typename T, typename I>
-    concept Trait = std::derived_from<T, I> ||
-        std::is_convertible_v<std::remove_const_t<T>, std::shared_ptr<I>> ||
-        std::is_convertible_v<std::remove_const_t<T>, std::unique_ptr<I>>;
 
     class ISeekable : public virtual zero::Interface {
     public:

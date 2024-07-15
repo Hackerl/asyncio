@@ -4,7 +4,7 @@
 #include "stream.h"
 
 namespace asyncio {
-    class Pipe final : public Stream {
+    class Pipe final : public IFileDescriptor, public Stream {
     public:
         enum Mode {
             READABLE = UV_READABLE,
@@ -13,6 +13,8 @@ namespace asyncio {
 
         explicit Pipe(uv::Handle<uv_stream_t> stream);
         static std::expected<Pipe, std::error_code> from(uv_file file);
+
+        [[nodiscard]] FileDescriptor fd() const override;
 
         [[nodiscard]] std::expected<std::string, std::error_code> localAddress() const;
         [[nodiscard]] std::expected<std::string, std::error_code> remoteAddress() const;

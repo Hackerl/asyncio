@@ -31,6 +31,10 @@ asyncio::fs::File::~File() {
     uv_fs_req_cleanup(&request);
 }
 
+asyncio::FileDescriptor asyncio::fs::File::fd() const {
+    return uv_get_osfhandle(mFile);
+}
+
 asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const std::span<std::byte> data) {
     Promise<std::size_t, std::error_code> promise;
     uv_fs_t request = {.data = &promise};
@@ -134,7 +138,7 @@ asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
 
         EXPECT(zero::os::nt::expected([&] {
             return SetFilePointerEx(
-                reinterpret_cast<HANDLE>(_get_osfhandle(mFile)),
+                reinterpret_cast<HANDLE>(uv_get_osfhandle(mFile)),
                 LARGE_INTEGER{.QuadPart = offset},
                 &pos,
                 whence == Whence::BEGIN ? FILE_BEGIN : whence == Whence::CURRENT ? FILE_CURRENT : FILE_END

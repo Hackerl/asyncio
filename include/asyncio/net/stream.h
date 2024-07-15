@@ -19,6 +19,8 @@ namespace asyncio::net {
         static task::Task<TCPStream, std::error_code> connect(IPv4Address address);
         static task::Task<TCPStream, std::error_code> connect(IPv6Address address);
 
+        [[nodiscard]] FileDescriptor fd() const override;
+
         [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;
         [[nodiscard]] std::expected<Address, std::error_code> remoteAddress() const override;
 
@@ -56,13 +58,17 @@ namespace asyncio::net {
     };
 
 #ifdef _WIN32
-    class NamedPipeStream final : public IReader, public IWriter, public ICloseable {
+    class NamedPipeStream final : public IFileDescriptor, public IReader, public IWriter, public ICloseable {
     public:
         explicit NamedPipeStream(Pipe pipe);
         static task::Task<NamedPipeStream, std::error_code> connect(std::string name);
 
+        [[nodiscard]] FileDescriptor fd() const override;
+
         [[nodiscard]] std::expected<DWORD, std::error_code> clientProcessID() const;
         [[nodiscard]] std::expected<DWORD, std::error_code> serverProcessID() const;
+
+        std::expected<void, std::error_code> chmod(int mode);
 
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
@@ -97,10 +103,14 @@ namespace asyncio::net {
         static std::expected<UnixStream, std::error_code> from(uv_os_sock_t socket);
         static task::Task<UnixStream, std::error_code> connect(std::string path);
 
+        [[nodiscard]] FileDescriptor fd() const override;
+
         [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;
         [[nodiscard]] std::expected<Address, std::error_code> remoteAddress() const override;
 
         [[nodiscard]] std::expected<Credential, std::error_code> peerCredential() const;
+
+        std::expected<void, std::error_code> chmod(int mode);
 
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;

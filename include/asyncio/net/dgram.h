@@ -23,6 +23,8 @@ namespace asyncio::net {
         static std::expected<UDPSocket, std::error_code> connect(const IPv4Address &address);
         static std::expected<UDPSocket, std::error_code> connect(const IPv6Address &address);
 
+        [[nodiscard]] FileDescriptor fd() const override;
+
         [[nodiscard]] std::expected<Address, std::error_code> localAddress() const override;
         [[nodiscard]] std::expected<Address, std::error_code> remoteAddress() const override;
 
