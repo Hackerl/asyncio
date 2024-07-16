@@ -3,9 +3,9 @@
 
 #ifdef _WIN32
 #include <zero/os/nt/error.h>
-#elif __linux__
+#elif defined(__linux__)
 #include <zero/os/unix/error.h>
-#elif __APPLE__
+#elif defined(__APPLE__)
 #include <unistd.h>
 #include <sys/un.h>
 #include <zero/os/unix/error.h>
@@ -632,7 +632,7 @@ std::expected<asyncio::net::UnixStream::Credential, std::error_code> asyncio::ne
         return std::unexpected(std::error_code(errno, std::system_category()));
 
     return Credential{cred.uid, cred.gid, cred.pid};
-#elif __APPLE__
+#elif defined(__APPLE__)
     Credential credential;
     const auto fd = mPipe.fd();
 

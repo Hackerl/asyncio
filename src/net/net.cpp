@@ -2,14 +2,15 @@
 
 #ifdef _WIN32
 #include <netioapi.h>
-#elif __linux__
+#include <zero/strings/strings.h>
+#elif defined(__linux__)
 #include <net/if.h>
 #include <netinet/in.h>
-#elif __APPLE__
+#elif defined(__APPLE__)
 #include <net/if.h>
 #endif
 
-#if __unix__ || __APPLE__
+#if defined(__unix__) || defined(__APPLE__)
 #include <sys/un.h>
 #endif
 
@@ -99,7 +100,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
             break;
         }
 
-        std::array<char, IF_NAMESIZE> name = {};
+        std::array<char, IF_NAMESIZE + 1> name = {};
 
         if (!if_indextoname(address->sin6_scope_id, name.data())) {
             result = std::unexpected(std::error_code(errno, std::generic_category()));
@@ -112,7 +113,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
         break;
     }
 
-#if __unix__ || __APPLE__
+#if defined(__unix__) || defined(__APPLE__)
     case AF_UNIX: {
         if (length < sizeof(sa_family_t)) {
             result = std::unexpected<std::error_code>(ParseAddressError::INVALID_ARGUMENT);
@@ -187,7 +188,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
                 ptr->sin6_scope_id = index;
                 return SocketAddress{std::move(addr), static_cast<socklen_t>(sizeof(sockaddr_in6))};
             }
-#if __unix__ || __APPLE__
+#if defined(__unix__) || defined(__APPLE__)
             else if constexpr (std::is_same_v<T, UnixAddress>) {
                 const auto ptr = reinterpret_cast<sockaddr_un *>(addr.get());
                 const auto &path = arg.path;

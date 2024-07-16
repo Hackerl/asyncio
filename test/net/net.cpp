@@ -4,14 +4,14 @@
 
 #ifdef _WIN32
 #include <netioapi.h>
-#elif __linux__
+#elif defined(__linux__)
 #include <net/if.h>
 #include <netinet/in.h>
-#elif __APPLE__
+#elif defined(__APPLE__)
 #include <net/if.h>
 #endif
 
-#if __unix__ || __APPLE__
+#if defined(__unix__) || defined(__APPLE__)
 #include <sys/un.h>
 #endif
 
@@ -58,14 +58,19 @@ TEST_CASE("network components", "[net]") {
     }
 
     SECTION("IPv6") {
-        std::array<char, IF_NAMESIZE> name = {};
-        REQUIRE(if_indextoname(1, name.data()));
+        const auto interfaces = zero::os::net::interfaces();
+        REQUIRE(interfaces);
+        REQUIRE(!interfaces->empty());
 
-        const asyncio::net::Address address = asyncio::net::IPv6Address{80, {}, name.data()};
+        const auto &zone = std::views::keys(*interfaces).front();
+        const unsigned int index = if_nametoindex(zone.c_str());
+        REQUIRE(index);
 
-        REQUIRE(address == asyncio::net::IPv6Address{80, {}, name.data()});
+        const asyncio::net::Address address = asyncio::net::IPv6Address{80, {}, zone};
+
+        REQUIRE(address == asyncio::net::IPv6Address{80, {}, zone});
         REQUIRE(address != asyncio::net::IPv6Address{80, {}});
-        REQUIRE(address != asyncio::net::IPv6Address{80, {std::byte{127}}, name.data()});
+        REQUIRE(address != asyncio::net::IPv6Address{80, {std::byte{127}}, zone});
         REQUIRE(address != asyncio::net::IPv4Address{});
         REQUIRE(address != asyncio::net::UnixAddress{});
 
@@ -73,8 +78,8 @@ TEST_CASE("network components", "[net]") {
 
         REQUIRE(*asyncio::net::addressFrom("::", 80) != address);
         REQUIRE(*asyncio::net::IPv6Address::from("::", 80) != address);
-        REQUIRE(*asyncio::net::addressFrom(fmt::format("::%{}", name.data()), 80) == address);
-        REQUIRE(*asyncio::net::IPv6Address::from(fmt::format("::%{}", name.data()), 80) == address);
+        REQUIRE(*asyncio::net::addressFrom(fmt::format("::%{}", zone), 80) == address);
+        REQUIRE(*asyncio::net::IPv6Address::from(fmt::format("::%{}", zone), 80) == address);
 
         const auto socketAddress = socketAddressFrom(address);
         REQUIRE(socketAddress);
@@ -84,7 +89,7 @@ TEST_CASE("network components", "[net]") {
 
         REQUIRE(addr->sin6_family == AF_INET6);
         REQUIRE(addr->sin6_port == htons(80));
-        REQUIRE(addr->sin6_scope_id == 1);
+        REQUIRE(addr->sin6_scope_id == index);
         REQUIRE(
             std::all_of(
                 (const std::byte *) &addr->sin6_addr,
@@ -96,7 +101,7 @@ TEST_CASE("network components", "[net]") {
         );
     }
 
-#if __unix__ || __APPLE__
+#if defined(__unix__) || defined(__APPLE__)
     SECTION("UNIX") {
         using namespace std::string_view_literals;
         const asyncio::net::Address address = asyncio::net::UnixAddress{"/tmp/test.sock"};

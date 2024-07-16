@@ -12,6 +12,7 @@ add_executable(
         promise.cpp
         channel.cpp
         event_loop.cpp
+        task/error.cpp
         net/net.cpp
         net/dns.cpp
         net/tls.cpp

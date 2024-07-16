@@ -4,7 +4,7 @@
 
 #ifdef _WIN32
 #include <zero/defer.h>
-#elif __unix__ || __APPLE__
+#elif defined(__unix__) || defined(__APPLE__)
 #include <csignal>
 #endif
 
@@ -21,7 +21,7 @@ int main(const int argc, char *argv[]) {
         if (WSACleanup() != 0)
             throw std::system_error(WSAGetLastError(), std::system_category())
     );
-#elif __unix__ || __APPLE__
+#elif defined(__unix__) || defined(__APPLE__)
     signal(SIGPIPE, SIG_IGN);
 #endif
 
