@@ -112,7 +112,7 @@ std::optional<std::string> asyncio::http::Response::header(const std::string &na
 }
 
 asyncio::task::Task<std::string, std::error_code> asyncio::http::Response::string() {
-    co_return co_await readAll().transform([](const auto data) {
+    co_return co_await readAll().transform([](const auto &data) {
         return std::string{reinterpret_cast<const char *>(data.data()), data.size()};
     });
 }
@@ -388,7 +388,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
             connection->easy.get(),
             CURLOPT_COOKIE,
             to_string(fmt::join(
-                cookies | std::views::transform([](const auto it) { return it.first + "=" + it.second; }),
+                cookies | std::views::transform([](const auto &it) { return it.first + "=" + it.second; }),
                 "; "
             )).c_str()
         );
@@ -488,7 +488,7 @@ asyncio::http::Requests::request(
         connection.value()->easy.get(),
         CURLOPT_COPYPOSTFIELDS,
         to_string(fmt::join(
-            payload | std::views::transform([](const auto it) { return it.first + "=" + it.second; }),
+            payload | std::views::transform([](const auto &it) { return it.first + "=" + it.second; }),
             "&"
         )).c_str()
     );

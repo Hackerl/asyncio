@@ -45,7 +45,7 @@ namespace asyncio::http::ws {
         void mask(bool mask);
 
     private:
-        std::byte mBytes[2]{};
+        std::array<std::byte, 2> mBytes{};
     };
 
     struct Frame {

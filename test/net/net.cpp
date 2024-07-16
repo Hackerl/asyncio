@@ -58,14 +58,14 @@ TEST_CASE("network components", "[net]") {
     }
 
     SECTION("IPv6") {
-        char name[IF_NAMESIZE];
-        REQUIRE(if_indextoname(1, name));
+        std::array<char, IF_NAMESIZE> name = {};
+        REQUIRE(if_indextoname(1, name.data()));
 
-        const asyncio::net::Address address = asyncio::net::IPv6Address{80, {}, name};
+        const asyncio::net::Address address = asyncio::net::IPv6Address{80, {}, name.data()};
 
-        REQUIRE(address == asyncio::net::IPv6Address{80, {}, name});
+        REQUIRE(address == asyncio::net::IPv6Address{80, {}, name.data()});
         REQUIRE(address != asyncio::net::IPv6Address{80, {}});
-        REQUIRE(address != asyncio::net::IPv6Address{80, {std::byte{127}}, name});
+        REQUIRE(address != asyncio::net::IPv6Address{80, {std::byte{127}}, name.data()});
         REQUIRE(address != asyncio::net::IPv4Address{});
         REQUIRE(address != asyncio::net::UnixAddress{});
 
@@ -73,8 +73,8 @@ TEST_CASE("network components", "[net]") {
 
         REQUIRE(*asyncio::net::addressFrom("::", 80) != address);
         REQUIRE(*asyncio::net::IPv6Address::from("::", 80) != address);
-        REQUIRE(*asyncio::net::addressFrom(fmt::format("::%{}", name), 80) == address);
-        REQUIRE(*asyncio::net::IPv6Address::from(fmt::format("::%{}", name), 80) == address);
+        REQUIRE(*asyncio::net::addressFrom(fmt::format("::%{}", name.data()), 80) == address);
+        REQUIRE(*asyncio::net::IPv6Address::from(fmt::format("::%{}", name.data()), 80) == address);
 
         const auto socketAddress = socketAddressFrom(address);
         REQUIRE(socketAddress);

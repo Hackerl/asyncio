@@ -122,7 +122,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
     std::mt19937 gen(rd());
     std::uniform_int_distribution dist(0, 255);
 
-    std::byte secret[16];
+    std::array<std::byte, 16> secret = {};
 
     for (auto &b: secret)
         b = static_cast<std::byte>(dist(gen));
@@ -183,10 +183,14 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
     if (it == headers.end())
         co_return std::unexpected(Error::NO_ACCEPT_HEADER);
 
-    std::byte digest[SHA_DIGEST_LENGTH];
+    std::array<std::byte, SHA_DIGEST_LENGTH> digest = {};
     const std::string data = key + WS_MAGIC;
 
-    SHA1(reinterpret_cast<const unsigned char *>(data.data()), data.size(), reinterpret_cast<unsigned char *>(digest));
+    SHA1(
+        reinterpret_cast<const unsigned char *>(data.data()),
+        data.size(),
+        reinterpret_cast<unsigned char *>(digest.data())
+    );
 
     if (it->second != zero::encoding::base64::encode(digest))
         co_return std::unexpected(Error::HASH_MISMATCH);
@@ -295,7 +299,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) cons
     std::mt19937 gen(rd());
     std::uniform_int_distribution dist(0, 255);
 
-    std::byte key[MASKING_KEY_LENGTH];
+    std::array<std::byte, MASKING_KEY_LENGTH> key = {};
 
     for (auto &b: key)
         b = static_cast<std::byte>(dist(gen));

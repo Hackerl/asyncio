@@ -99,14 +99,14 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
             break;
         }
 
-        char name[IF_NAMESIZE];
+        std::array<char, IF_NAMESIZE> name = {};
 
-        if (!if_indextoname(address->sin6_scope_id, name)) {
+        if (!if_indextoname(address->sin6_scope_id, name.data())) {
             result = std::unexpected(std::error_code(errno, std::generic_category()));
             break;
         }
 
-        ipv6.zone = name;
+        ipv6.zone = name.data();
         result = ipv6;
 
         break;
