@@ -71,6 +71,8 @@ namespace asyncio::net {
     class NamedPipeStream final : public IFileDescriptor, public IReader, public IWriter, public ICloseable {
     public:
         explicit NamedPipeStream(Pipe pipe);
+
+        static std::expected<NamedPipeStream, std::error_code> from(int fd);
         static task::Task<NamedPipeStream, std::error_code> connect(std::string name);
 
         [[nodiscard]] FileDescriptor fd() const override;
@@ -110,7 +112,7 @@ namespace asyncio::net {
 
         explicit UnixStream(Pipe pipe);
 
-        static std::expected<UnixStream, std::error_code> from(uv_os_sock_t socket);
+        static std::expected<UnixStream, std::error_code> from(int socket);
         static task::Task<UnixStream, std::error_code> connect(std::string path);
 
         [[nodiscard]] FileDescriptor fd() const override;

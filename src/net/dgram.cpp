@@ -38,6 +38,22 @@ asyncio::net::UDPSocket::connect(const SocketAddress &address) {
     return std::move(socket);
 }
 
+std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::from(const uv_os_sock_t socket) {
+    auto udp = std::make_unique<uv_udp_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_udp_init(getEventLoop()->raw(), udp.get());
+    }));
+
+    UDPSocket udpSocket(uv::Handle{std::move(udp)});
+
+    EXPECT(uv::expected([&] {
+        return uv_udp_open(udpSocket.mUDP.raw(), socket);
+    }));
+
+    return std::move(udpSocket);
+}
+
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::bind(const std::string &ip, const unsigned short port) {
     const auto address = addressFrom(ip, port);
@@ -128,6 +144,77 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::UDPSocket::r
     }));
 
     return addressFrom(reinterpret_cast<const sockaddr *>(&storage), length);
+}
+
+std::expected<void, std::error_code>
+asyncio::net::UDPSocket::setMembership(
+    const std::string &multicastAddress,
+    const std::string &interfaceAddress,
+    const Membership membership
+) {
+    EXPECT(uv::expected([&] {
+        return uv_udp_set_membership(
+            mUDP.raw(),
+            multicastAddress.c_str(),
+            interfaceAddress.c_str(),
+            static_cast<uv_membership>(membership)
+        );
+    }));
+    return {};
+}
+
+std::expected<void, std::error_code> asyncio::net::UDPSocket::setSourceMembership(
+    const std::string &multicastAddress,
+    const std::string &interfaceAddress,
+    const std::string &sourceAddress,
+    const Membership membership
+) {
+    EXPECT(uv::expected([&] {
+        return uv_udp_set_source_membership(
+            mUDP.raw(),
+            multicastAddress.c_str(),
+            interfaceAddress.c_str(),
+            sourceAddress.c_str(),
+            static_cast<uv_membership>(membership)
+        );
+    }));
+    return {};
+}
+
+std::expected<void, std::error_code> asyncio::net::UDPSocket::setMulticastLoop(const bool on) {
+    EXPECT(uv::expected([&] {
+        return uv_udp_set_multicast_loop(mUDP.raw(), on);
+    }));
+    return {};
+}
+
+std::expected<void, std::error_code> asyncio::net::UDPSocket::setMulticastTTL(const int ttl) {
+    EXPECT(uv::expected([&] {
+        return uv_udp_set_multicast_ttl(mUDP.raw(), ttl);
+    }));
+    return {};
+}
+
+std::expected<void, std::error_code>
+asyncio::net::UDPSocket::setMulticastInterface(const std::string &interfaceAddress) {
+    EXPECT(uv::expected([&] {
+        return uv_udp_set_multicast_interface(mUDP.raw(), interfaceAddress.c_str());
+    }));
+    return {};
+}
+
+std::expected<void, std::error_code> asyncio::net::UDPSocket::setBroadcast(const bool on) {
+    EXPECT(uv::expected([&] {
+        return uv_udp_set_broadcast(mUDP.raw(), on);
+    }));
+    return {};
+}
+
+std::expected<void, std::error_code> asyncio::net::UDPSocket::setTTL(const int ttl) {
+    EXPECT(uv::expected([&] {
+        return uv_udp_set_ttl(mUDP.raw(), ttl);
+    }));
+    return {};
 }
 
 asyncio::task::Task<std::size_t, std::error_code>

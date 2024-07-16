@@ -349,6 +349,12 @@ asyncio::net::TCPListener::accept() {
 asyncio::net::NamedPipeStream::NamedPipeStream(Pipe pipe) : mPipe(std::move(pipe)) {
 }
 
+std::expected<asyncio::net::NamedPipeStream, std::error_code> asyncio::net::NamedPipeStream::from(const int fd) {
+    auto pipe = Pipe::from(fd);
+    EXPECT(pipe);
+    return NamedPipeStream{*std::move(pipe)};
+}
+
 asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code>
 asyncio::net::NamedPipeStream::connect(const std::string name) {
     std::unique_ptr<uv_pipe_t, decltype(&std::free)> pipe(
@@ -522,7 +528,7 @@ asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code> asyncio::net
 asyncio::net::UnixStream::UnixStream(Pipe pipe) : mPipe(std::move(pipe)) {
 }
 
-std::expected<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixStream::from(const uv_os_sock_t socket) {
+std::expected<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixStream::from(const int socket) {
     auto pipe = Pipe::from(socket);
     EXPECT(pipe);
     return UnixStream{*std::move(pipe)};
