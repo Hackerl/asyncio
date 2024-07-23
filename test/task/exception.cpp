@@ -1,38 +1,40 @@
 #include <asyncio/task.h>
 #include <catch2/catch_test_macros.hpp>
 
-TEST_CASE("task with error", "[task]") {
+TEST_CASE("task with exception", "[task]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         SECTION("success") {
-            asyncio::Promise<int, std::error_code> promise;
+            asyncio::Promise<int, std::exception_ptr> promise;
             auto task = asyncio::task::from(promise.getFuture());
             promise.resolve(10);
 
             const auto &res = co_await task;
-            REQUIRE(res);
-            REQUIRE(*res == 10);
+            REQUIRE(res == 10);
         }
 
         SECTION("failure") {
-            asyncio::Promise<int, std::error_code> promise;
+            asyncio::Promise<int, std::exception_ptr> promise;
 
             auto task = asyncio::task::from(promise.getFuture());
-            promise.reject(make_error_code(std::errc::invalid_argument));
+            promise.reject(std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
-            const auto &res = co_await task;
-            REQUIRE(!res);
-            REQUIRE(res.error() == std::errc::invalid_argument);
+            try {
+                co_await task;
+            }
+            catch (const std::system_error &error) {
+                REQUIRE(error.code() == std::errc::invalid_argument);
+            }
         }
 
         SECTION("cancel") {
-            asyncio::Promise<int, std::error_code> promise;
+            asyncio::Promise<int, std::exception_ptr> promise;
             auto task = from(asyncio::task::Cancellable{
                 promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise.isFulfilled())
                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                    promise.reject(asyncio::task::Error::CANCELLED);
+                    promise.reject(std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                     return {};
                 }
             });
@@ -40,13 +42,16 @@ TEST_CASE("task with error", "[task]") {
             REQUIRE(task.cancel());
             REQUIRE(task.cancelled());
 
-            const auto &res = co_await task;
-            REQUIRE(!res);
-            REQUIRE(res.error() == std::errc::operation_canceled);
+            try {
+                co_await task;
+            }
+            catch (const std::system_error &error) {
+                REQUIRE(error.code() == std::errc::operation_canceled);
+            }
         }
 
         SECTION("check cancelled") {
-            const auto promise = std::make_shared<asyncio::Promise<int, std::error_code>>();
+            const auto promise = std::make_shared<asyncio::Promise<int, std::exception_ptr>>();
 
             auto task = [](auto p) -> asyncio::task::Task<void> {
                 bool cancelled = co_await asyncio::task::cancelled;
@@ -55,12 +60,18 @@ TEST_CASE("task with error", "[task]") {
                 const auto res = co_await asyncio::task::Cancellable{
                     p->getFuture(),
                     [&]() -> std::expected<void, std::error_code> {
-                        p->reject(asyncio::task::Error::CANCELLED);
+                        p->reject(std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                         return {};
                     }
                 };
                 REQUIRE(!res);
-                REQUIRE(res.error() == std::errc::operation_canceled);
+
+                try {
+                    std::rethrow_exception(res.error());
+                }
+                catch (const std::system_error &error) {
+                    REQUIRE(error.code() == std::errc::operation_canceled);
+                }
 
                 cancelled = co_await asyncio::task::cancelled;
                 REQUIRE(cancelled);
@@ -73,8 +84,8 @@ TEST_CASE("task with error", "[task]") {
         }
 
         SECTION("lock") {
-            const auto promise1 = std::make_shared<asyncio::Promise<int, std::error_code>>();
-            const auto promise2 = std::make_shared<asyncio::Promise<int, std::error_code>>();
+            const auto promise1 = std::make_shared<asyncio::Promise<int, std::exception_ptr>>();
+            const auto promise2 = std::make_shared<asyncio::Promise<int, std::exception_ptr>>();
 
             auto task = [](auto p1, auto p2) -> asyncio::task::Task<void> {
                 bool cancelled = co_await asyncio::task::cancelled;
@@ -85,7 +96,7 @@ TEST_CASE("task with error", "[task]") {
                 auto res = co_await asyncio::task::Cancellable{
                     p1->getFuture(),
                     [&]() -> std::expected<void, std::error_code> {
-                        p1->reject(asyncio::task::Error::CANCELLED);
+                        p1->reject(std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                         return {};
                     }
                 };
@@ -100,12 +111,18 @@ TEST_CASE("task with error", "[task]") {
                 res = co_await asyncio::task::Cancellable{
                     p2->getFuture(),
                     [&]() -> std::expected<void, std::error_code> {
-                        p2->reject(asyncio::task::Error::CANCELLED);
+                        p2->reject(std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                         return {};
                     }
                 };
                 REQUIRE(!res);
-                REQUIRE(res.error() == std::errc::operation_canceled);
+
+                try {
+                    std::rethrow_exception(res.error());
+                }
+                catch (const std::system_error &error) {
+                    REQUIRE(error.code() == std::errc::operation_canceled);
+                }
 
                 cancelled = co_await asyncio::task::cancelled;
                 REQUIRE(cancelled);
@@ -123,7 +140,7 @@ TEST_CASE("task with error", "[task]") {
         }
 
         SECTION("traceback") {
-            asyncio::Promise<int, std::error_code> promise;
+            asyncio::Promise<int, std::exception_ptr> promise;
             auto task = asyncio::task::from(promise.getFuture());
 
             const auto callstack = task.traceback();
@@ -134,14 +151,13 @@ TEST_CASE("task with error", "[task]") {
 
             const auto &res = co_await task;
             REQUIRE(task.traceback().empty());
-            REQUIRE(res);
-            REQUIRE(*res == 10);
+            REQUIRE(res == 10);
         }
 
         SECTION("ranges") {
             SECTION("void") {
-                asyncio::Promise<void, std::error_code> promise1;
-                asyncio::Promise<void, std::error_code> promise2;
+                asyncio::Promise<void, std::exception_ptr> promise1;
+                asyncio::Promise<void, std::exception_ptr> promise2;
 
                 SECTION("all") {
                     auto task = all(std::array{
@@ -151,7 +167,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -161,7 +178,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -170,26 +188,31 @@ TEST_CASE("task with error", "[task]") {
                     SECTION("success") {
                         promise1.resolve();
                         promise2.resolve();
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
+                        co_await task;
                     }
 
                     SECTION("failure") {
                         promise1.resolve();
-                        promise2.reject(make_error_code(std::errc::invalid_argument));
+                        promise2.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
                     }
 
                     SECTION("cancel") {
                         REQUIRE(task.cancel());
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 
@@ -201,7 +224,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -211,7 +235,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -228,12 +253,19 @@ TEST_CASE("task with error", "[task]") {
 
                     SECTION("failure") {
                         promise1.resolve();
-                        promise2.reject(make_error_code(std::errc::invalid_argument));
+                        promise2.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
                         const auto res = co_await task;
                         REQUIRE(res[0]);
                         REQUIRE(!res[1]);
-                        REQUIRE(res[1].error() == std::errc::invalid_argument);
+
+                        try {
+                            std::rethrow_exception(res[1].error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
                     }
 
                     SECTION("cancel") {
@@ -241,9 +273,22 @@ TEST_CASE("task with error", "[task]") {
 
                         const auto res = co_await task;
                         REQUIRE(!res[0]);
-                        REQUIRE(res[0].error() == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(res[0].error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
+
                         REQUIRE(!res[1]);
-                        REQUIRE(res[1].error() == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(res[1].error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 
@@ -255,7 +300,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -265,14 +311,16 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
                     });
 
                     SECTION("success") {
-                        promise1.reject(make_error_code(std::errc::invalid_argument));
+                        promise1.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
                         promise2.resolve();
 
                         const auto res = co_await task;
@@ -280,13 +328,27 @@ TEST_CASE("task with error", "[task]") {
                     }
 
                     SECTION("failure") {
-                        promise1.reject(make_error_code(std::errc::invalid_argument));
-                        promise2.reject(make_error_code(std::errc::io_error));
+                        promise1.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
+                        promise2.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
 
                         const auto res = co_await task;
                         REQUIRE(!res);
-                        REQUIRE(res.error()[0] == std::errc::invalid_argument);
-                        REQUIRE(res.error()[1] == std::errc::io_error);
+
+                        try {
+                            std::rethrow_exception(res.error()[0]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
+
+                        try {
+                            std::rethrow_exception(res.error()[1]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::io_error);
+                        }
                     }
 
                     SECTION("cancel") {
@@ -294,8 +356,20 @@ TEST_CASE("task with error", "[task]") {
 
                         const auto res = co_await task;
                         REQUIRE(!res);
-                        REQUIRE(res.error()[0] == std::errc::operation_canceled);
-                        REQUIRE(res.error()[1] == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(res.error()[0]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
+
+                        try {
+                            std::rethrow_exception(res.error()[1]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 
@@ -307,7 +381,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -317,7 +392,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -325,31 +401,37 @@ TEST_CASE("task with error", "[task]") {
 
                     SECTION("success") {
                         promise1.resolve();
-                        const auto res = co_await task;
-                        REQUIRE(res);
+                        co_await task;
                     }
 
                     SECTION("failure") {
-                        promise1.reject(make_error_code(std::errc::invalid_argument));
+                        promise1.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
                     }
 
                     SECTION("cancel") {
                         REQUIRE(task.cancel());
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
             }
 
             SECTION("not void") {
-                asyncio::Promise<int, std::error_code> promise1;
-                asyncio::Promise<int, std::error_code> promise2;
+                asyncio::Promise<int, std::exception_ptr> promise1;
+                asyncio::Promise<int, std::exception_ptr> promise2;
 
                 SECTION("all") {
                     auto task = all(std::array{
@@ -359,7 +441,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -369,7 +452,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -378,28 +462,31 @@ TEST_CASE("task with error", "[task]") {
                     SECTION("success") {
                         promise1.resolve(10);
                         promise2.resolve(100);
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(res->at(0) == 10);
-                        REQUIRE(res->at(1) == 100);
+                        co_await task;
                     }
 
                     SECTION("failure") {
                         promise1.resolve(10);
-                        promise2.reject(make_error_code(std::errc::invalid_argument));
+                        promise2.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
                     }
 
                     SECTION("cancel") {
                         REQUIRE(task.cancel());
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 
@@ -411,7 +498,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -421,7 +509,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -440,13 +529,20 @@ TEST_CASE("task with error", "[task]") {
 
                     SECTION("failure") {
                         promise1.resolve(10);
-                        promise2.reject(make_error_code(std::errc::invalid_argument));
+                        promise2.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
                         const auto res = co_await task;
                         REQUIRE(res[0]);
                         REQUIRE(*res[0] == 10);
                         REQUIRE(!res[1]);
-                        REQUIRE(res[1].error() == std::errc::invalid_argument);
+
+                        try {
+                            std::rethrow_exception(res[1].error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
                     }
 
                     SECTION("cancel") {
@@ -454,9 +550,22 @@ TEST_CASE("task with error", "[task]") {
 
                         const auto res = co_await task;
                         REQUIRE(!res[0]);
-                        REQUIRE(res[0].error() == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(res[0].error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
+
                         REQUIRE(!res[1]);
-                        REQUIRE(res[1].error() == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(res[1].error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 
@@ -468,7 +577,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -478,14 +588,16 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
                     });
 
                     SECTION("success") {
-                        promise1.reject(make_error_code(std::errc::invalid_argument));
+                        promise1.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
                         promise2.resolve(100);
 
                         const auto res = co_await task;
@@ -494,13 +606,27 @@ TEST_CASE("task with error", "[task]") {
                     }
 
                     SECTION("failure") {
-                        promise1.reject(make_error_code(std::errc::invalid_argument));
-                        promise2.reject(make_error_code(std::errc::io_error));
+                        promise1.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
+                        promise2.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
 
                         const auto res = co_await task;
                         REQUIRE(!res);
-                        REQUIRE(res.error()[0] == std::errc::invalid_argument);
-                        REQUIRE(res.error()[1] == std::errc::io_error);
+
+                        try {
+                            std::rethrow_exception(res.error()[0]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
+
+                        try {
+                            std::rethrow_exception(res.error()[1]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::io_error);
+                        }
                     }
 
                     SECTION("cancel") {
@@ -508,8 +634,20 @@ TEST_CASE("task with error", "[task]") {
 
                         const auto res = co_await task;
                         REQUIRE(!res);
-                        REQUIRE(res.error()[0] == std::errc::operation_canceled);
-                        REQUIRE(res.error()[1] == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(res.error()[0]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
+
+                        try {
+                            std::rethrow_exception(res.error()[1]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 
@@ -521,7 +659,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -531,7 +670,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -539,26 +679,31 @@ TEST_CASE("task with error", "[task]") {
 
                     SECTION("success") {
                         promise1.resolve(10);
-
                         const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(*res == 10);
+                        REQUIRE(res == 10);
                     }
 
                     SECTION("failure") {
-                        promise1.reject(make_error_code(std::errc::invalid_argument));
+                        promise1.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
                     }
 
                     SECTION("cancel") {
                         REQUIRE(task.cancel());
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
             }
@@ -567,8 +712,8 @@ TEST_CASE("task with error", "[task]") {
         SECTION("variadic") {
             SECTION("same types") {
                 SECTION("void") {
-                    asyncio::Promise<void, std::error_code> promise1;
-                    asyncio::Promise<void, std::error_code> promise2;
+                    asyncio::Promise<void, std::exception_ptr> promise1;
+                    asyncio::Promise<void, std::exception_ptr> promise2;
 
                     SECTION("all") {
                         auto task = all(
@@ -578,7 +723,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise1.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise1.reject(asyncio::task::Error::CANCELLED);
+                                    promise1.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             }),
@@ -588,7 +734,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise2.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise2.reject(asyncio::task::Error::CANCELLED);
+                                    promise2.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             })
@@ -597,26 +744,32 @@ TEST_CASE("task with error", "[task]") {
                         SECTION("success") {
                             promise1.resolve();
                             promise2.resolve();
-
-                            const auto res = co_await task;
-                            REQUIRE(res);
+                            co_await task;
                         }
 
                         SECTION("failure") {
                             promise1.resolve();
-                            promise2.reject(make_error_code(std::errc::invalid_argument));
+                            promise2.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                            const auto res = co_await task;
-                            REQUIRE(!res);
-                            REQUIRE(res.error() == std::errc::invalid_argument);
+                            try {
+                                co_await task;
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::invalid_argument);
+                            }
                         }
 
                         SECTION("cancel") {
                             REQUIRE(task.cancel());
 
-                            const auto res = co_await task;
-                            REQUIRE(!res);
-                            REQUIRE(res.error() == std::errc::operation_canceled);
+                            try {
+                                co_await task;
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
                         }
                     }
 
@@ -628,7 +781,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise1.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise1.reject(asyncio::task::Error::CANCELLED);
+                                    promise1.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             }),
@@ -638,7 +792,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise2.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise2.reject(asyncio::task::Error::CANCELLED);
+                                    promise2.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             })
@@ -655,12 +810,20 @@ TEST_CASE("task with error", "[task]") {
 
                         SECTION("failure") {
                             promise1.resolve();
-                            promise2.reject(make_error_code(std::errc::invalid_argument));
+                            promise2.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
 
                             const auto res = co_await task;
                             REQUIRE(std::get<0>(res));
                             REQUIRE(!std::get<1>(res));
-                            REQUIRE(std::get<1>(res).error() == std::errc::invalid_argument);
+
+                            try {
+                                std::rethrow_exception(std::get<1>(res).error());
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::invalid_argument);
+                            }
                         }
 
                         SECTION("cancel") {
@@ -668,9 +831,22 @@ TEST_CASE("task with error", "[task]") {
 
                             const auto res = co_await task;
                             REQUIRE(!std::get<0>(res));
-                            REQUIRE(std::get<0>(res).error() == std::errc::operation_canceled);
+
+                            try {
+                                std::rethrow_exception(std::get<0>(res).error());
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
+
                             REQUIRE(!std::get<1>(res));
-                            REQUIRE(std::get<1>(res).error() == std::errc::operation_canceled);
+
+                            try {
+                                std::rethrow_exception(std::get<1>(res).error());
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
                         }
                     }
 
@@ -682,7 +858,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise1.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise1.reject(asyncio::task::Error::CANCELLED);
+                                    promise1.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             }),
@@ -692,14 +869,17 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise2.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise2.reject(asyncio::task::Error::CANCELLED);
+                                    promise2.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             })
                         );
 
                         SECTION("success") {
-                            promise1.reject(make_error_code(std::errc::invalid_argument));
+                            promise1.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
                             promise2.resolve();
 
                             const auto res = co_await task;
@@ -707,13 +887,28 @@ TEST_CASE("task with error", "[task]") {
                         }
 
                         SECTION("failure") {
-                            promise1.reject(make_error_code(std::errc::invalid_argument));
-                            promise2.reject(make_error_code(std::errc::io_error));
+                            promise1.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
+                            promise2.reject(
+                                std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
 
                             const auto res = co_await task;
                             REQUIRE(!res);
-                            REQUIRE(res.error()[0] == std::errc::invalid_argument);
-                            REQUIRE(res.error()[1] == std::errc::io_error);
+
+                            try {
+                                std::rethrow_exception(res.error()[0]);
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::invalid_argument);
+                            }
+
+                            try {
+                                std::rethrow_exception(res.error()[1]);
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::io_error);
+                            }
                         }
 
                         SECTION("cancel") {
@@ -721,8 +916,20 @@ TEST_CASE("task with error", "[task]") {
 
                             const auto res = co_await task;
                             REQUIRE(!res);
-                            REQUIRE(res.error()[0] == std::errc::operation_canceled);
-                            REQUIRE(res.error()[1] == std::errc::operation_canceled);
+
+                            try {
+                                std::rethrow_exception(res.error()[0]);
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
+
+                            try {
+                                std::rethrow_exception(res.error()[1]);
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
                         }
                     }
 
@@ -734,7 +941,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise1.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise1.reject(asyncio::task::Error::CANCELLED);
+                                    promise1.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             }),
@@ -744,7 +952,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise2.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise2.reject(asyncio::task::Error::CANCELLED);
+                                    promise2.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             })
@@ -752,31 +961,38 @@ TEST_CASE("task with error", "[task]") {
 
                         SECTION("success") {
                             promise1.resolve();
-                            const auto res = co_await task;
-                            REQUIRE(res);
+                            co_await task;
                         }
 
                         SECTION("failure") {
-                            promise1.reject(make_error_code(std::errc::invalid_argument));
+                            promise1.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                            const auto res = co_await task;
-                            REQUIRE(!res);
-                            REQUIRE(res.error() == std::errc::invalid_argument);
+                            try {
+                                co_await task;
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::invalid_argument);
+                            }
                         }
 
                         SECTION("cancel") {
                             REQUIRE(task.cancel());
 
-                            const auto res = co_await task;
-                            REQUIRE(!res);
-                            REQUIRE(res.error() == std::errc::operation_canceled);
+                            try {
+                                co_await task;
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
                         }
                     }
                 }
 
                 SECTION("not void") {
-                    asyncio::Promise<int, std::error_code> promise1;
-                    asyncio::Promise<int, std::error_code> promise2;
+                    asyncio::Promise<int, std::exception_ptr> promise1;
+                    asyncio::Promise<int, std::exception_ptr> promise2;
 
                     SECTION("all") {
                         auto task = all(
@@ -786,7 +1002,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise1.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise1.reject(asyncio::task::Error::CANCELLED);
+                                    promise1.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             }),
@@ -796,7 +1013,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise2.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise2.reject(asyncio::task::Error::CANCELLED);
+                                    promise2.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             })
@@ -807,26 +1025,33 @@ TEST_CASE("task with error", "[task]") {
                             promise2.resolve(100);
 
                             const auto res = co_await task;
-                            REQUIRE(res);
-                            REQUIRE(res->at(0) == 10);
-                            REQUIRE(res->at(1) == 100);
+                            REQUIRE(res.at(0) == 10);
+                            REQUIRE(res.at(1) == 100);
                         }
 
                         SECTION("failure") {
                             promise1.resolve(10);
-                            promise2.reject(make_error_code(std::errc::invalid_argument));
+                            promise2.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                            const auto res = co_await task;
-                            REQUIRE(!res);
-                            REQUIRE(res.error() == std::errc::invalid_argument);
+                            try {
+                                co_await task;
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::invalid_argument);
+                            }
                         }
 
                         SECTION("cancel") {
                             REQUIRE(task.cancel());
 
-                            const auto res = co_await task;
-                            REQUIRE(!res);
-                            REQUIRE(res.error() == std::errc::operation_canceled);
+                            try {
+                                co_await task;
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
                         }
                     }
 
@@ -838,7 +1063,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise1.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise1.reject(asyncio::task::Error::CANCELLED);
+                                    promise1.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             }),
@@ -848,7 +1074,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise2.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise2.reject(asyncio::task::Error::CANCELLED);
+                                    promise2.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             })
@@ -867,13 +1094,21 @@ TEST_CASE("task with error", "[task]") {
 
                         SECTION("failure") {
                             promise1.resolve(10);
-                            promise2.reject(make_error_code(std::errc::invalid_argument));
+                            promise2.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
 
                             const auto res = co_await task;
                             REQUIRE(res[0]);
                             REQUIRE(*res[0] == 10);
                             REQUIRE(!res[1]);
-                            REQUIRE(res[1].error() == std::errc::invalid_argument);
+
+                            try {
+                                std::rethrow_exception(res[1].error());
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::invalid_argument);
+                            }
                         }
 
                         SECTION("cancel") {
@@ -881,9 +1116,22 @@ TEST_CASE("task with error", "[task]") {
 
                             const auto res = co_await task;
                             REQUIRE(!res[0]);
-                            REQUIRE(res[0].error() == std::errc::operation_canceled);
+
+                            try {
+                                std::rethrow_exception(res[0].error());
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
+
                             REQUIRE(!res[1]);
-                            REQUIRE(res[1].error() == std::errc::operation_canceled);
+
+                            try {
+                                std::rethrow_exception(res[1].error());
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
                         }
                     }
 
@@ -895,7 +1143,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise1.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise1.reject(asyncio::task::Error::CANCELLED);
+                                    promise1.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             }),
@@ -905,14 +1154,17 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise2.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise2.reject(asyncio::task::Error::CANCELLED);
+                                    promise2.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             })
                         );
 
                         SECTION("success") {
-                            promise1.reject(make_error_code(std::errc::invalid_argument));
+                            promise1.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
                             promise2.resolve(100);
 
                             const auto res = co_await task;
@@ -921,13 +1173,28 @@ TEST_CASE("task with error", "[task]") {
                         }
 
                         SECTION("failure") {
-                            promise1.reject(make_error_code(std::errc::invalid_argument));
-                            promise2.reject(make_error_code(std::errc::io_error));
+                            promise1.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
+                            promise2.reject(
+                                std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
 
                             const auto res = co_await task;
                             REQUIRE(!res);
-                            REQUIRE(res.error()[0] == std::errc::invalid_argument);
-                            REQUIRE(res.error()[1] == std::errc::io_error);
+
+                            try {
+                                std::rethrow_exception(res.error()[0]);
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::invalid_argument);
+                            }
+
+                            try {
+                                std::rethrow_exception(res.error()[1]);
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::io_error);
+                            }
                         }
 
                         SECTION("cancel") {
@@ -935,8 +1202,20 @@ TEST_CASE("task with error", "[task]") {
 
                             const auto res = co_await task;
                             REQUIRE(!res);
-                            REQUIRE(res.error()[0] == std::errc::operation_canceled);
-                            REQUIRE(res.error()[1] == std::errc::operation_canceled);
+
+                            try {
+                                std::rethrow_exception(res.error()[0]);
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
+
+                            try {
+                                std::rethrow_exception(res.error()[1]);
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
                         }
                     }
 
@@ -948,7 +1227,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise1.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise1.reject(asyncio::task::Error::CANCELLED);
+                                    promise1.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             }),
@@ -958,7 +1238,8 @@ TEST_CASE("task with error", "[task]") {
                                     if (promise2.isFulfilled())
                                         return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                    promise2.reject(asyncio::task::Error::CANCELLED);
+                                    promise2.reject(
+                                        std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                     return {};
                                 }
                             })
@@ -966,35 +1247,41 @@ TEST_CASE("task with error", "[task]") {
 
                         SECTION("success") {
                             promise1.resolve(10);
-
                             const auto res = co_await task;
-                            REQUIRE(res);
-                            REQUIRE(*res == 10);
+                            REQUIRE(res == 10);
                         }
 
                         SECTION("failure") {
-                            promise1.reject(make_error_code(std::errc::invalid_argument));
+                            promise1.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                            const auto res = co_await task;
-                            REQUIRE(!res);
-                            REQUIRE(res.error() == std::errc::invalid_argument);
+                            try {
+                                co_await task;
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::invalid_argument);
+                            }
                         }
 
                         SECTION("cancel") {
                             REQUIRE(task.cancel());
 
-                            const auto res = co_await task;
-                            REQUIRE(!res);
-                            REQUIRE(res.error() == std::errc::operation_canceled);
+                            try {
+                                co_await task;
+                            }
+                            catch (const std::system_error &error) {
+                                REQUIRE(error.code() == std::errc::operation_canceled);
+                            }
                         }
                     }
                 }
             }
 
             SECTION("different types") {
-                asyncio::Promise<int, std::error_code> promise1;
-                asyncio::Promise<void, std::error_code> promise2;
-                asyncio::Promise<long, std::error_code> promise3;
+                asyncio::Promise<int, std::exception_ptr> promise1;
+                asyncio::Promise<void, std::exception_ptr> promise2;
+                asyncio::Promise<long, std::exception_ptr> promise3;
 
                 SECTION("all") {
                     auto task = all(
@@ -1004,7 +1291,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -1014,7 +1302,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -1024,7 +1313,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise3.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise3.reject(asyncio::task::Error::CANCELLED);
+                                promise3.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -1036,27 +1326,33 @@ TEST_CASE("task with error", "[task]") {
                         promise3.resolve(1000);
 
                         const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(std::get<0>(*res) == 10);
-                        REQUIRE(std::get<1>(*res) == 1000);
+                        REQUIRE(std::get<0>(res) == 10);
+                        REQUIRE(std::get<1>(res) == 1000);
                     }
 
                     SECTION("failure") {
                         promise1.resolve(100);
                         promise2.resolve();
-                        promise3.reject(make_error_code(std::errc::invalid_argument));
+                        promise3.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
                     }
 
                     SECTION("cancel") {
                         REQUIRE(task.cancel());
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 
@@ -1068,7 +1364,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -1078,7 +1375,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -1088,7 +1386,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise3.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise3.reject(asyncio::task::Error::CANCELLED);
+                                promise3.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -1110,14 +1409,21 @@ TEST_CASE("task with error", "[task]") {
                     SECTION("failure") {
                         promise1.resolve(10);
                         promise2.resolve();
-                        promise3.reject(make_error_code(std::errc::invalid_argument));
+                        promise3.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
                         const auto res = co_await task;
                         REQUIRE(std::get<0>(res));
                         REQUIRE(*std::get<0>(res) == 10);
                         REQUIRE(std::get<1>(res));
                         REQUIRE(!std::get<2>(res));
-                        REQUIRE(std::get<2>(res).error() == std::errc::invalid_argument);
+
+                        try {
+                            std::rethrow_exception(std::get<2>(res).error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
                     }
 
                     SECTION("cancel") {
@@ -1125,11 +1431,31 @@ TEST_CASE("task with error", "[task]") {
 
                         const auto res = co_await task;
                         REQUIRE(!std::get<0>(res));
-                        REQUIRE(std::get<0>(res).error() == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(std::get<0>(res).error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
+
                         REQUIRE(!std::get<1>(res));
-                        REQUIRE(std::get<1>(res).error() == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(std::get<1>(res).error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
+
                         REQUIRE(!std::get<2>(res));
-                        REQUIRE(std::get<2>(res).error() == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(std::get<2>(res).error());
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 
@@ -1142,7 +1468,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -1152,7 +1479,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -1162,7 +1490,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise3.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise3.reject(asyncio::task::Error::CANCELLED);
+                                promise3.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -1170,7 +1499,9 @@ TEST_CASE("task with error", "[task]") {
 
                     SECTION("success") {
                         SECTION("no value") {
-                            promise1.reject(make_error_code(std::errc::invalid_argument));
+                            promise1.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
                             promise2.resolve();
 
                             const auto res = co_await task;
@@ -1179,8 +1510,11 @@ TEST_CASE("task with error", "[task]") {
                         }
 
                         SECTION("has value") {
-                            promise1.reject(make_error_code(std::errc::invalid_argument));
-                            promise2.reject(make_error_code(std::errc::io_error));
+                            promise1.reject(
+                                std::make_exception_ptr(
+                                    std::system_error(make_error_code(std::errc::invalid_argument))));
+                            promise2.reject(
+                                std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
                             promise3.resolve(1000);
 
                             const auto res = co_await task;
@@ -1195,15 +1529,36 @@ TEST_CASE("task with error", "[task]") {
                     }
 
                     SECTION("failure") {
-                        promise1.reject(make_error_code(std::errc::io_error));
-                        promise2.reject(make_error_code(std::errc::invalid_argument));
-                        promise3.reject(make_error_code(std::errc::bad_message));
+                        promise1.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
+                        promise2.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
+                        promise3.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::bad_message))));
 
                         const auto res = co_await task;
                         REQUIRE(!res);
-                        REQUIRE(res.error()[0] == std::errc::io_error);
-                        REQUIRE(res.error()[1] == std::errc::invalid_argument);
-                        REQUIRE(res.error()[2] == std::errc::bad_message);
+
+                        try {
+                            std::rethrow_exception(res.error()[0]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::io_error);
+                        }
+
+                        try {
+                            std::rethrow_exception(res.error()[1]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
+
+                        try {
+                            std::rethrow_exception(res.error()[2]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::bad_message);
+                        }
                     }
 
                     SECTION("cancel") {
@@ -1211,9 +1566,27 @@ TEST_CASE("task with error", "[task]") {
 
                         const auto res = co_await task;
                         REQUIRE(!res);
-                        REQUIRE(res.error()[0] == std::errc::operation_canceled);
-                        REQUIRE(res.error()[1] == std::errc::operation_canceled);
-                        REQUIRE(res.error()[2] == std::errc::operation_canceled);
+
+                        try {
+                            std::rethrow_exception(res.error()[0]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
+
+                        try {
+                            std::rethrow_exception(res.error()[1]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
+
+                        try {
+                            std::rethrow_exception(res.error()[2]);
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 
@@ -1225,7 +1598,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise1.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise1.reject(asyncio::task::Error::CANCELLED);
+                                promise1.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -1235,7 +1609,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise2.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise2.reject(asyncio::task::Error::CANCELLED);
+                                promise2.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         }),
@@ -1245,7 +1620,8 @@ TEST_CASE("task with error", "[task]") {
                                 if (promise3.isFulfilled())
                                     return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
 
-                                promise3.reject(asyncio::task::Error::CANCELLED);
+                                promise3.reject(
+                                    std::make_exception_ptr(std::system_error(asyncio::task::Error::CANCELLED)));
                                 return {};
                             }
                         })
@@ -1254,467 +1630,47 @@ TEST_CASE("task with error", "[task]") {
                     SECTION("success") {
                         SECTION("no value") {
                             promise2.resolve();
-
                             const auto res = co_await task;
-                            REQUIRE(res);
-                            REQUIRE(!res->has_value());
+                            REQUIRE(!res.has_value());
                         }
 
                         SECTION("has value") {
                             promise1.resolve(10);
 
                             const auto res = co_await task;
-                            REQUIRE(res);
-                            REQUIRE(res->has_value());
+                            REQUIRE(res.has_value());
 
 #if defined(_CPPRTTI) || defined(__GXX_RTTI)
-                            REQUIRE(res->type() == typeid(int));
+                            REQUIRE(res.type() == typeid(int));
 #endif
-                            REQUIRE(std::any_cast<int>(*res) == 10);
+                            REQUIRE(std::any_cast<int>(res) == 10);
                         }
                     }
 
                     SECTION("failure") {
-                        promise1.reject(make_error_code(std::errc::invalid_argument));
+                        promise1.reject(
+                            std::make_exception_ptr(std::system_error(make_error_code(std::errc::invalid_argument))));
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::invalid_argument);
+                        }
                     }
 
                     SECTION("cancel") {
                         REQUIRE(task.cancel());
 
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
+                        try {
+                            co_await task;
+                        }
+                        catch (const std::system_error &error) {
+                            REQUIRE(error.code() == std::errc::operation_canceled);
+                        }
                     }
                 }
 #endif
-            }
-        }
-
-        SECTION("monadic operations") {
-            SECTION("and then") {
-                SECTION("normal") {
-                    SECTION("success") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .andThen([](const int value) -> std::expected<int, std::error_code> {
-                                return value * 10;
-                            });
-
-                        promise.resolve(10);
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(*res == 100);
-                    }
-
-                    SECTION("failure") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .andThen([](const int value) -> std::expected<int, std::error_code> {
-                                return value * 10;
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
-                    }
-
-                    SECTION("cancel") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = from(asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
-                                if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
-
-                                promise.reject(asyncio::task::Error::CANCELLED);
-                                return {};
-                            }
-                        }).andThen([](const int value) -> std::expected<int, std::error_code> {
-                            return value * 10;
-                        });
-                        REQUIRE(task.cancel());
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
-                    }
-                }
-
-                SECTION("coroutine") {
-                    SECTION("success") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .andThen([](const int value) -> asyncio::task::Task<int, std::error_code> {
-                                co_return value * 10;
-                            });
-
-                        promise.resolve(10);
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(*res == 100);
-                    }
-
-                    SECTION("failure") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .andThen([](const int value) -> asyncio::task::Task<int, std::error_code> {
-                                co_return value * 10;
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
-                    }
-
-                    SECTION("cancel") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = from(asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
-                                if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
-
-                                promise.reject(asyncio::task::Error::CANCELLED);
-                                return {};
-                            }
-                        }).andThen([](const int value) -> asyncio::task::Task<int, std::error_code> {
-                            co_return value * 10;
-                        });
-                        REQUIRE(task.cancel());
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
-                    }
-                }
-            }
-
-            SECTION("transform") {
-                SECTION("normal") {
-                    SECTION("success") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .transform([](const int value) {
-                                return value * 10;
-                            });
-
-                        promise.resolve(10);
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(*res == 100);
-                    }
-
-                    SECTION("failure") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .transform([](const int value) {
-                                return value * 10;
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
-                    }
-
-                    SECTION("cancel") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = from(asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
-                                if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
-
-                                promise.reject(asyncio::task::Error::CANCELLED);
-                                return {};
-                            }
-                        }).transform([](const int value) {
-                            return value * 10;
-                        });
-                        REQUIRE(task.cancel());
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
-                    }
-                }
-
-                SECTION("coroutine") {
-                    SECTION("success") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .transform([](const int value) -> asyncio::task::Task<int> {
-                                co_return value * 10;
-                            });
-
-                        promise.resolve(10);
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(*res == 100);
-                    }
-
-                    SECTION("failure") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .transform([](const int value) -> asyncio::task::Task<int> {
-                                co_return value * 10;
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
-                    }
-
-                    SECTION("cancel") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = from(asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
-                                if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
-
-                                promise.reject(asyncio::task::Error::CANCELLED);
-                                return {};
-                            }
-                        }).transform([](const int value) -> asyncio::task::Task<int> {
-                            co_return value * 10;
-                        });
-                        REQUIRE(task.cancel());
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::operation_canceled);
-                    }
-                }
-            }
-
-            SECTION("or else") {
-                SECTION("normal") {
-                    SECTION("success") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .orElse([](const std::error_code &ec) -> std::expected<int, std::error_code> {
-                                REQUIRE(ec == std::errc::invalid_argument);
-                                return 1000;
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(*res == 1000);
-                    }
-
-                    SECTION("failure") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .orElse([](const std::error_code &ec) -> std::expected<int, std::error_code> {
-                                REQUIRE(ec == std::errc::invalid_argument);
-                                return std::unexpected(make_error_code(std::errc::io_error));
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::io_error);
-                    }
-
-                    SECTION("cancel") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = from(asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
-                                if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
-
-                                promise.reject(asyncio::task::Error::CANCELLED);
-                                return {};
-                            }
-                        }).orElse([](const std::error_code &ec) -> std::expected<int, std::error_code> {
-                            REQUIRE(ec == std::errc::operation_canceled);
-                            return std::unexpected(make_error_code(std::errc::invalid_argument));
-                        });
-                        REQUIRE(task.cancel());
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
-                    }
-                }
-
-                SECTION("coroutine") {
-                    SECTION("success") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .orElse([](const std::error_code &ec) -> asyncio::task::Task<int, std::error_code> {
-                                REQUIRE(ec == std::errc::invalid_argument);
-                                co_return 1000;
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(*res == 1000);
-                    }
-
-                    SECTION("failure") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .orElse([](const std::error_code &ec) -> asyncio::task::Task<int, std::error_code> {
-                                REQUIRE(ec == std::errc::invalid_argument);
-                                co_return std::unexpected(make_error_code(std::errc::io_error));
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::io_error);
-                    }
-
-                    SECTION("cancel") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = from(asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
-                                if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
-
-                                promise.reject(asyncio::task::Error::CANCELLED);
-                                return {};
-                            }
-                        }).orElse([](const std::error_code &ec) -> asyncio::task::Task<int, std::error_code> {
-                            REQUIRE(ec == std::errc::operation_canceled);
-                            co_return std::unexpected(make_error_code(std::errc::invalid_argument));
-                        });
-                        REQUIRE(task.cancel());
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
-                    }
-                }
-            }
-
-            SECTION("transform error") {
-                SECTION("normal") {
-                    SECTION("success") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .transformError([](const std::error_code &ec) {
-                                return ec.value();
-                            });
-
-                        promise.resolve(10);
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(*res == 10);
-                    }
-
-                    SECTION("failure") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .transformError([](const std::error_code &ec) {
-                                return ec.value();
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::to_underlying(std::errc::invalid_argument));
-                    }
-
-                    SECTION("cancel") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = from(asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
-                                if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
-
-                                promise.reject(asyncio::task::Error::CANCELLED);
-                                return {};
-                            }
-                        }).transformError([](const std::error_code &ec) {
-                            return ec.value();
-                        });
-                        REQUIRE(task.cancel());
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::to_underlying(asyncio::task::Error::CANCELLED));
-                    }
-                }
-
-                SECTION("coroutine") {
-                    SECTION("success") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .transformError([](const std::error_code &ec) -> asyncio::task::Task<int> {
-                                co_return ec.value();
-                            });
-
-                        promise.resolve(10);
-
-                        const auto res = co_await task;
-                        REQUIRE(res);
-                        REQUIRE(*res == 10);
-                    }
-
-                    SECTION("failure") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = asyncio::task::from(promise.getFuture())
-                            .transformError([](const std::error_code &ec) -> asyncio::task::Task<int> {
-                                co_return ec.value();
-                            });
-
-                        promise.reject(make_error_code(std::errc::invalid_argument));
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::to_underlying(std::errc::invalid_argument));
-                    }
-
-                    SECTION("cancel") {
-                        asyncio::Promise<int, std::error_code> promise;
-                        auto task = from(asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
-                                if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
-
-                                promise.reject(asyncio::task::Error::CANCELLED);
-                                return {};
-                            }
-                        }).transformError([](const std::error_code &ec) -> asyncio::task::Task<int> {
-                            co_return ec.value();
-                        });
-                        REQUIRE(task.cancel());
-
-                        const auto res = co_await task;
-                        REQUIRE(!res);
-                        REQUIRE(res.error() == std::to_underlying(asyncio::task::Error::CANCELLED));
-                    }
-                }
             }
         }
     });

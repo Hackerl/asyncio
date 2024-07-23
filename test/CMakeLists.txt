@@ -13,6 +13,7 @@ add_executable(
         channel.cpp
         event_loop.cpp
         task/error.cpp
+        task/exception.cpp
         net/net.cpp
         net/dns.cpp
         net/tls.cpp
