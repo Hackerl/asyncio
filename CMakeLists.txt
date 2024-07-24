@@ -28,6 +28,7 @@ add_library(
         src/pipe.cpp
         src/signal.cpp
         src/stream.cpp
+        src/process.cpp
         src/event_loop.cpp
         src/net/net.cpp
         src/net/dns.cpp

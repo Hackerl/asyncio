@@ -4,7 +4,7 @@
 #include "stream.h"
 
 namespace asyncio {
-    class Pipe final : public IFileDescriptor, public Stream {
+    class Pipe : public IFileDescriptor, public Stream {
     public:
         enum Mode {
             READABLE = UV_READABLE,

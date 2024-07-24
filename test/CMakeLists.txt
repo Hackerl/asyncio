@@ -11,6 +11,7 @@ add_executable(
         binary.cpp
         promise.cpp
         channel.cpp
+        process.cpp
         event_loop.cpp
         task/error.cpp
         task/exception.cpp
