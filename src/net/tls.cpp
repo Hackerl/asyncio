@@ -1,6 +1,47 @@
 #include <asyncio/net/tls.h>
 #include <zero/filesystem/file.h>
 
+#ifdef _WIN32
+std::expected<void, std::error_code> loadSystemCerts(X509_STORE *store, const std::string &name) {
+    const auto systemStore = CertOpenSystemStoreA(0, name.c_str());
+
+    if (!systemStore)
+        return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+
+    DEFER(CertCloseStore(systemStore, 0));
+
+    PCCERT_CONTEXT ctx = nullptr;
+
+    DEFER(
+        if (ctx)
+            CertFreeCertificateContext(ctx);
+    );
+
+    while (true) {
+        ctx = CertEnumCertificatesInStore(systemStore, ctx);
+
+        if (!ctx)
+            break;
+
+        X509 *cert = d2i_X509(
+            nullptr,
+            const_cast<const unsigned char **>(&ctx->pbCertEncoded),
+            static_cast<long>(ctx->cbCertEncoded)
+        );
+
+        if (!cert)
+            return std::unexpected(asyncio::net::tls::openSSLError());
+
+        DEFER(X509_free(cert));
+        EXPECT(asyncio::net::tls::expected([&] {
+            return X509_STORE_add_cert(store, cert);
+        }));
+    }
+
+    return {};
+}
+#endif
+
 std::error_code asyncio::net::tls::openSSLError() {
     return static_cast<OpenSSLError>(ERR_get_error());
 }
@@ -78,9 +119,20 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Cl
     }));
 
     if (rootCAs.empty()) {
+#ifdef _WIN32
+        X509_STORE *store = SSL_CTX_get_cert_store(context.get());
+
+        if (!store)
+            return std::unexpected(openSSLError());
+
+        EXPECT(loadSystemCerts(store, "CA"));
+        EXPECT(loadSystemCerts(store, "AuthRoot"));
+        EXPECT(loadSystemCerts(store, "ROOT"));
+#else
         EXPECT(expected([&] {
             return SSL_CTX_set_default_verify_paths(context.get());
         }));
+#endif
     } else {
         X509_STORE *store = SSL_CTX_get_cert_store(context.get());
 
@@ -122,9 +174,20 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Se
     }));
 
     if (rootCAs.empty()) {
+#ifdef _WIN32
+        X509_STORE *store = SSL_CTX_get_cert_store(context.get());
+
+        if (!store)
+            return std::unexpected(openSSLError());
+
+        EXPECT(loadSystemCerts(store, "CA"));
+        EXPECT(loadSystemCerts(store, "AuthRoot"));
+        EXPECT(loadSystemCerts(store, "ROOT"));
+#else
         EXPECT(expected([&] {
             return SSL_CTX_set_default_verify_paths(context.get());
         }));
+#endif
     } else {
         X509_STORE *store = SSL_CTX_get_cert_store(context.get());
 

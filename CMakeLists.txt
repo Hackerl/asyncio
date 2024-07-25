@@ -58,6 +58,7 @@ target_link_libraries(
         OpenSSL::Crypto
         CURL::libcurl
         nlohmann_json::nlohmann_json
+        $<$<PLATFORM_ID:Windows>:Crypt32>
         $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
 )
 
