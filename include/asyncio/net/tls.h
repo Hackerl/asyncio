@@ -108,7 +108,7 @@ namespace asyncio::net::tls {
             if (locked)
                 co_return {};
 
-            std::array<std::byte, 10240> data = {};
+            std::array<std::byte, 10240> data; // NOLINT(*-pro-type-member-init)
             const auto n = co_await std::invoke(&IReader::read, mStream, data);
             CO_EXPECT(n);
 
@@ -126,7 +126,7 @@ namespace asyncio::net::tls {
             CO_EXPECT(co_await mutex.lock());
             DEFER(mutex.unlock());
 
-            std::array<std::byte, 10240> data = {};
+            std::array<std::byte, 10240> data; // NOLINT(*-pro-type-member-init)
 
             if (const int n = BIO_read(SSL_get_wbio(mSSL.get()), data.data(), data.size()); n > 0) {
                 CO_EXPECT(co_await std::invoke(

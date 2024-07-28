@@ -27,7 +27,7 @@ asyncio::task::Task<std::vector<std::byte>, std::error_code> asyncio::IReader::r
     std::expected<std::vector<std::byte>, std::error_code> result;
 
     while (true) {
-        std::array<std::byte, 10240> data = {};
+        std::array<std::byte, 10240> data; // NOLINT(*-pro-type-member-init)
         const auto n = co_await read(data);
 
         if (!n) {
