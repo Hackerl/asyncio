@@ -351,6 +351,30 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, const Ad
     co_return data.size();
 }
 
+asyncio::task::Task<std::size_t, std::error_code>
+asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, std::string host, const unsigned short port) {
+    addrinfo hints = {};
+
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    auto addresses = co_await dns::getAddressInfo(std::move(host), std::to_string(port), hints);
+    CO_EXPECT(addresses);
+    assert(!addresses->empty());
+
+    auto it = addresses->begin();
+
+    while (true) {
+        const auto result = co_await writeTo(data, *it);
+
+        if (result)
+            co_return *result;
+
+        if (++it == addresses->end())
+            co_return std::unexpected(result.error());
+    }
+}
+
 asyncio::task::Task<void, std::error_code> asyncio::net::UDPSocket::close() {
     const auto handle = mUDP.release();
 

@@ -59,7 +59,6 @@ asyncio::net::dns::lookupIP(std::string host) {
 
     hints.ai_flags = AI_ADDRCONFIG;
     hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
 
     co_return (co_await getAddressInfo(std::move(host), std::nullopt, hints))
         .transform([](std::span<const Address> addresses) {
@@ -83,7 +82,6 @@ asyncio::net::dns::lookupIPv4(std::string host) {
 
     hints.ai_flags = AI_ADDRCONFIG;
     hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
 
     co_return co_await getAddressInfo(std::move(host), std::nullopt, hints)
         .transform([](std::span<const Address> addresses) {
@@ -104,7 +102,6 @@ asyncio::net::dns::lookupIPv6(std::string host) {
 
     hints.ai_flags = AI_ADDRCONFIG;
     hints.ai_family = AF_INET6;
-    hints.ai_socktype = SOCK_STREAM;
 
     co_return co_await getAddressInfo(std::move(host), std::nullopt, hints)
         .transform([](std::span<const Address> addresses) {

@@ -61,6 +61,9 @@ namespace asyncio::net {
         task::Task<std::size_t, std::error_code>
         writeTo(std::span<const std::byte> data, Address address) override;
 
+        task::Task<std::size_t, std::error_code>
+        writeTo(std::span<const std::byte> data, std::string host, unsigned short port);
+
         task::Task<void, std::error_code> close() override;
 
     private:

@@ -34,10 +34,11 @@ TEST_CASE("datagram network connection", "[net]") {
                     auto socket = asyncio::net::UDPSocket::bind("127.0.0.1", 30001);
                     REQUIRE(socket);
 
-                    const auto address = asyncio::net::IPv4Address::from("127.0.0.1", 30000);
-                    REQUIRE(address);
-
-                    const auto n = co_await socket->writeTo(std::as_bytes(std::span{"hello world"sv}), *address);
+                    const auto n = co_await socket->writeTo(
+                        std::as_bytes(std::span{"hello world"sv}),
+                        "127.0.0.1",
+                        30000
+                    );
                     REQUIRE(n);
                     REQUIRE(*n == MESSAGE.size());
 
