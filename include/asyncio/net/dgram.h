@@ -18,6 +18,7 @@ namespace asyncio::net {
         static std::expected<UDPSocket, std::error_code> connect(const SocketAddress &address);
 
     public:
+        static std::expected<UDPSocket, std::error_code> make();
         static std::expected<UDPSocket, std::error_code> from(uv_os_sock_t socket);
 
         static std::expected<UDPSocket, std::error_code> bind(const std::string &ip, unsigned short port);

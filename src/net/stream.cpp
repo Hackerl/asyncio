@@ -14,31 +14,38 @@
 asyncio::net::TCPStream::TCPStream(Stream stream) : mStream(std::move(stream)) {
 }
 
-// TODO
-// except for MSVC, adding const will fail to compile.
-// ReSharper disable once CppParameterMayBeConst
-asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
-asyncio::net::TCPStream::connect(SocketAddress address) {
+std::expected<asyncio::net::TCPStream, std::error_code> asyncio::net::TCPStream::make() {
     std::unique_ptr<uv_tcp_t, decltype(&std::free)> tcp(
         static_cast<uv_tcp_t *>(std::malloc(sizeof(uv_tcp_t))),
         std::free
     );
 
     if (!tcp)
-        co_return std::unexpected(std::error_code(errno, std::generic_category()));
+        return std::unexpected(std::error_code(errno, std::generic_category()));
 
-    CO_EXPECT(uv::expected([&] {
+    EXPECT(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
     }));
 
-    Stream stream(
-        uv::Handle{
-            std::unique_ptr<uv_stream_t, decltype(&std::free)>{
-                reinterpret_cast<uv_stream_t *>(tcp.release()),
-                std::free
+    return TCPStream{
+        Stream{
+            uv::Handle{
+                std::unique_ptr<uv_stream_t, decltype(&std::free)>{
+                    reinterpret_cast<uv_stream_t *>(tcp.release()),
+                    std::free
+                }
             }
         }
-    );
+    };
+}
+
+// TODO
+// except for MSVC, adding const will fail to compile.
+// ReSharper disable once CppParameterMayBeConst
+asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
+asyncio::net::TCPStream::connect(SocketAddress address) {
+    auto tcp = make();
+    CO_EXPECT(tcp);
 
     Promise<void, std::error_code> promise;
     uv_connect_t request = {.data = &promise};
@@ -46,7 +53,7 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
     CO_EXPECT(uv::expected([&] {
         return uv_tcp_connect(
             &request,
-            reinterpret_cast<uv_tcp_t *>(stream.mStream.raw()),
+            reinterpret_cast<uv_tcp_t *>(tcp->mStream.mStream.raw()),
             address.first.get(),
             // ReSharper disable once CppParameterMayBeConstPtrOrRef
             [](uv_connect_t *req, const int status) {
@@ -63,34 +70,18 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
     }));
 
     CO_EXPECT(co_await promise.getFuture());
-    co_return TCPStream{std::move(stream)};
+    co_return *std::move(tcp);
 }
 
 std::expected<asyncio::net::TCPStream, std::error_code> asyncio::net::TCPStream::from(const uv_os_sock_t socket) {
-    std::unique_ptr<uv_tcp_t, decltype(&std::free)> tcp(
-        static_cast<uv_tcp_t *>(std::malloc(sizeof(uv_tcp_t))),
-        std::free
-    );
-
-    if (!tcp)
-        return std::unexpected(std::error_code(errno, std::generic_category()));
+    auto tcp = make();
+    EXPECT(tcp);
 
     EXPECT(uv::expected([&] {
-        return uv_tcp_init(getEventLoop()->raw(), tcp.get());
+        return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(tcp->mStream.mStream.raw()), socket);
     }));
 
-    uv::Handle handle(
-        std::unique_ptr<uv_stream_t, decltype(&std::free)>{
-            reinterpret_cast<uv_stream_t *>(tcp.release()),
-            std::free
-        }
-    );
-
-    EXPECT(uv::expected([&] {
-        return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(handle.raw()), socket);
-    }));
-
-    return TCPStream{Stream{std::move(handle)}};
+    return *std::move(tcp);
 }
 
 asyncio::task::Task<asyncio::net::TCPStream, std::error_code>

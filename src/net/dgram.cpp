@@ -6,52 +6,47 @@ asyncio::net::UDPSocket::UDPSocket(uv::Handle<uv_udp_t> udp) : mUDP(std::move(ud
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::bind(const SocketAddress &address) {
-    auto udp = std::make_unique<uv_udp_t>();
+    auto udp = make();
+    EXPECT(udp);
 
     EXPECT(uv::expected([&] {
-        return uv_udp_init(getEventLoop()->raw(), udp.get());
+        return uv_udp_bind(udp->mUDP.raw(), address.first.get(), 0);
     }));
 
-    UDPSocket socket(uv::Handle{std::move(udp)});
-
-    EXPECT(uv::expected([&] {
-        return uv_udp_bind(socket.mUDP.raw(), address.first.get(), 0);
-    }));
-
-    return std::move(socket);
+    return *std::move(udp);
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::connect(const SocketAddress &address) {
+    auto udp = make();
+    EXPECT(udp);
+
+    EXPECT(uv::expected([&] {
+        return uv_udp_connect(udp->mUDP.raw(), address.first.get());
+    }));
+
+    return *std::move(udp);
+}
+
+std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::make() {
     auto udp = std::make_unique<uv_udp_t>();
 
     EXPECT(uv::expected([&] {
         return uv_udp_init(getEventLoop()->raw(), udp.get());
     }));
 
-    UDPSocket socket(uv::Handle{std::move(udp)});
-
-    EXPECT(uv::expected([&] {
-        return uv_udp_connect(socket.mUDP.raw(), address.first.get());
-    }));
-
-    return std::move(socket);
+    return UDPSocket{uv::Handle{std::move(udp)}};
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::from(const uv_os_sock_t socket) {
-    auto udp = std::make_unique<uv_udp_t>();
+    auto udp = make();
+    EXPECT(udp);
 
     EXPECT(uv::expected([&] {
-        return uv_udp_init(getEventLoop()->raw(), udp.get());
+        return uv_udp_open(udp->mUDP.raw(), socket);
     }));
 
-    UDPSocket udpSocket(uv::Handle{std::move(udp)});
-
-    EXPECT(uv::expected([&] {
-        return uv_udp_open(udpSocket.mUDP.raw(), socket);
-    }));
-
-    return std::move(udpSocket);
+    return *std::move(udp);
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
