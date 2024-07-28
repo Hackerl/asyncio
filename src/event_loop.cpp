@@ -83,15 +83,24 @@ void asyncio::EventLoop::stop() {
     uv_stop(mLoop.get());
 }
 
+// ReSharper disable once CppMemberFunctionMayBeConst
 void asyncio::EventLoop::run() {
     const auto result = uv_run(mLoop.get(), UV_RUN_DEFAULT);
     assert(result != 0);
 
-    mTaskQueue.reset();
-
     while (true) {
         if (uv_run(mLoop.get(), UV_RUN_NOWAIT) == 0)
             break;
+
+        if (mLoop->active_handles > 1)
+            continue;
+
+        std::lock_guard guard(mTaskQueue->mutex);
+
+        if (!mTaskQueue->queue.empty())
+            continue;
+
+        mTaskQueue->async.close();
     }
 }
 

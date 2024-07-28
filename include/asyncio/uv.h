@@ -320,17 +320,7 @@ namespace asyncio::uv {
             if (!mHandle)
                 return;
 
-            const auto handle = mHandle.release();
-            handle->data = new std::function<void(T *)>(std::move(mHandle.get_deleter()));
-
-            uv_close(
-                reinterpret_cast<uv_handle_t *>(handle),
-                [](uv_handle_t *h) {
-                    const auto del = static_cast<std::function<void(T *)> *>(h->data);
-                    (*del)(reinterpret_cast<T *>(h));
-                    delete del;
-                }
-            );
+            close();
         }
 
         [[nodiscard]] std::expected<uv_os_fd_t, std::error_code> fd() const {
@@ -369,6 +359,20 @@ namespace asyncio::uv {
 
         std::unique_ptr<T, std::function<void(T *)>> release() {
             return std::move(mHandle);
+        }
+
+        void close() {
+            const auto handle = mHandle.release();
+            handle->data = new std::function<void(T *)>(std::move(mHandle.get_deleter()));
+
+            uv_close(
+                reinterpret_cast<uv_handle_t *>(handle),
+                [](uv_handle_t *h) {
+                    const auto del = static_cast<std::function<void(T *)> *>(h->data);
+                    (*del)(reinterpret_cast<T *>(h));
+                    delete del;
+                }
+            );
         }
 
     private:
