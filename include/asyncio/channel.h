@@ -67,7 +67,7 @@ namespace asyncio {
 
     DEFINE_ERROR_CODE_EX(
         SendError,
-        "asyncio::Sender::sendSync",
+        "asyncio::Sender::send",
         DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
         CANCELLED, "send operation has been cancelled", std::errc::operation_canceled
     )
@@ -267,7 +267,7 @@ namespace asyncio {
 
     DEFINE_ERROR_CODE_EX(
         ReceiveSyncError,
-        "asyncio::Sender::receive",
+        "asyncio::Sender::receiveSync",
         DISCONNECTED, "channel is empty and disconnected", DEFAULT_ERROR_CONDITION,
         TIMEOUT, "timed out waiting on receive operation", std::errc::timed_out
     )

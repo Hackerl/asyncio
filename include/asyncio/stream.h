@@ -27,6 +27,8 @@ namespace asyncio {
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
         task::Task<void, std::error_code> close() override;
 
+        std::expected<std::size_t, std::error_code> tryWrite(std::span<const std::byte> data);
+
     protected:
         uv::Handle<uv_stream_t> mStream;
 

@@ -145,4 +145,6 @@ namespace asyncio {
     }
 }
 
+DECLARE_ERROR_CODE(asyncio::ToThreadPoolError)
+
 #endif //ASYNCIO_THREAD_H

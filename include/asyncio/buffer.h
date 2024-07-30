@@ -44,7 +44,7 @@ namespace asyncio {
 
             const std::size_t size = (std::min)(available(), data.size());
 
-            std::copy_n(mBuffer.get() + mHead, size, data.data());
+            std::copy_n(mBuffer.get() + mHead, size, data.begin());
             mHead += size;
 
             co_return size;
@@ -123,7 +123,7 @@ namespace asyncio {
             }
 
             assert(available() >= data.size());
-            std::copy_n(mBuffer.get() + mHead, data.size(), data.data());
+            std::copy_n(mBuffer.get() + mHead, data.size(), data.begin());
             co_return {};
         }
 
@@ -168,11 +168,11 @@ namespace asyncio {
                     continue;
                 }
 
-                const std::size_t n = (std::min)(mCapacity - mPending, data.size() - *result);
-                std::copy_n(data.data() + *result, n, mBuffer.get() + mPending);
+                const std::size_t size = (std::min)(mCapacity - mPending, data.size() - *result);
+                std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(*result), size, mBuffer.get() + mPending);
 
-                mPending += n;
-                *result += n;
+                mPending += size;
+                *result += size;
             }
 
             co_return result;

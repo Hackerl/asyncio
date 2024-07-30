@@ -272,6 +272,17 @@ asyncio::task::Task<void, std::error_code> asyncio::Stream::close() {
     co_return {};
 }
 
+std::expected<std::size_t, std::error_code> asyncio::Stream::tryWrite(const std::span<const std::byte> data) {
+    return uv::expected([&] {
+        uv_buf_t buffer;
+
+        buffer.base = reinterpret_cast<char *>(const_cast<std::byte *>(data.data()));
+        buffer.len = static_cast<decltype(uv_buf_t::len)>(data.size());
+
+        return uv_try_write(mStream.raw(), &buffer, 1);
+    });
+}
+
 asyncio::Listener::Listener(std::unique_ptr<Core> core) : mCore(std::move(core)) {
 }
 

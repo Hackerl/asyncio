@@ -2,26 +2,10 @@
 #include <zero/formatter.h>
 #include <fmt/std.h>
 
-#ifdef _WIN32
-#include <zero/defer.h>
-#elif defined(__unix__) || defined(__APPLE__)
-#include <csignal>
-#endif
-
 asyncio::task::Task<void, std::error_code> asyncMain(int argc, char *argv[]);
 
 int main(const int argc, char *argv[]) {
-#ifdef _WIN32
-    WSADATA wsaData;
-
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-        throw std::system_error(WSAGetLastError(), std::system_category());
-
-    DEFER(
-        if (WSACleanup() != 0)
-            throw std::system_error(WSAGetLastError(), std::system_category())
-    );
-#elif defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__)
     signal(SIGPIPE, SIG_IGN);
 #endif
 

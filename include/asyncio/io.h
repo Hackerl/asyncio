@@ -86,7 +86,7 @@ namespace asyncio {
                 break;
             }
 
-            std::array<std::byte, 10240> data; // NOLINT(*-pro-type-member-init)
+            std::array<std::byte, 20480> data; // NOLINT(*-pro-type-member-init)
             const auto n = co_await std::invoke(&IReader::read, reader, data);
 
             if (!n) {

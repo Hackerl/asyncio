@@ -4,29 +4,25 @@
 #include "url.h"
 #include <map>
 #include <variant>
-#include <asyncio/pipe.h>
+#include <asyncio/io.h>
 #include <nlohmann/json.hpp>
 
 namespace asyncio::http {
     struct Connection {
-        enum class Status {
-            NOT_STARTED,
-            PAUSED,
-            TRANSFERRING
-        };
-
         ~Connection() {
             for (const auto &defer: defers)
                 defer();
         }
 
-        Pipe reader;
-        Pipe writer;
         std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy;
+        bool finished;
+        bool transferring;
+        std::size_t skip;
         Promise<void, std::error_code> promise;
+        std::span<std::byte> buffer;
+        std::optional<Promise<std::size_t, std::error_code>> dataPromise;
         std::list<std::function<void()>> defers;
         std::optional<std::error_code> error;
-        Status status;
     };
 
     class Requests;
@@ -89,6 +85,7 @@ namespace asyncio::http {
         std::optional<std::chrono::seconds> connectTimeout;
         std::optional<std::string> userAgent;
         TLSConfig tls;
+        std::list<std::function<std::expected<void, std::error_code>(Connection &)>> hooks;
     };
 
     class Requests {

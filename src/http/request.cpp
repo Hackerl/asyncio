@@ -26,26 +26,39 @@ std::expected<void, std::error_code> expected(F &&f) {
 }
 
 std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_t n, void *userdata) {
+    const auto total = size * n;
     const auto connection = static_cast<asyncio::http::Connection *>(userdata);
 
-    if (connection->status == asyncio::http::Connection::Status::NOT_STARTED) {
-        connection->status = asyncio::http::Connection::Status::TRANSFERRING;
+    if (!connection->transferring) {
+        connection->transferring = true;
         connection->promise.resolve();
     }
-    else if (connection->status == asyncio::http::Connection::Status::PAUSED) {
-        connection->status = asyncio::http::Connection::Status::TRANSFERRING;
-        return size * n;
-    }
 
-    if (auto task = connection->writer.writeAll(std::as_bytes(std::span{buffer, size * n})); !task.done()) {
-        connection->status = asyncio::http::Connection::Status::PAUSED;
-        task.future().then([=] {
-            curl_easy_pause(connection->easy.get(), CURLPAUSE_CONT);
-        });
+    if (total == 0)
+        return 0;
+
+    if (!connection->dataPromise)
+        return CURL_WRITEFUNC_PAUSE;
+
+    const auto need = total - connection->skip;
+
+    if (connection->buffer.size() < need) {
+        std::memcpy(
+            connection->buffer.data(),
+            reinterpret_cast<const std::byte *>(buffer) + connection->skip,
+            connection->buffer.size()
+        );
+
+        std::exchange(connection->dataPromise, std::nullopt)->resolve(connection->buffer.size());
+        connection->skip += connection->buffer.size();
         return CURL_WRITEFUNC_PAUSE;
     }
 
-    return size * n;
+    std::memcpy(connection->buffer.data(), reinterpret_cast<const std::byte *>(buffer) + connection->skip, need);
+    std::exchange(connection->dataPromise, std::nullopt)->resolve(need);
+
+    connection->skip = 0;
+    return total;
 }
 
 asyncio::http::Response::Response(Requests *requests, std::unique_ptr<Connection> connection)
@@ -139,14 +152,36 @@ asyncio::task::Task<nlohmann::json, std::error_code> asyncio::http::Response::js
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::http::Response::read(const std::span<std::byte> data) {
-    co_return co_await mConnection->reader.read(data).andThen(
-        [this](const std::size_t n) -> std::expected<std::size_t, std::error_code> {
-            if (n == 0 && mConnection->error)
-                return std::unexpected(*mConnection->error);
+    if (mConnection->finished) {
+        if (mConnection->error)
+            co_return std::unexpected(*mConnection->error);
 
-            return n;
+        co_return 0;
+    }
+
+    mConnection->buffer = data;
+    mConnection->dataPromise.emplace();
+
+    auto future = mConnection->dataPromise->getFuture();
+
+    CO_EXPECT(expected([&] {
+        return curl_easy_pause(mConnection->easy.get(), CURLPAUSE_RECV_CONT);
+    }));
+
+    co_return co_await task::Cancellable{
+        std::move(future),
+        [this]() -> std::expected<void, std::error_code> {
+            if (!mConnection->dataPromise)
+                return std::unexpected(task::Error::WILL_BE_DONE);
+
+            EXPECT(expected([&] {
+                return curl_easy_pause(mConnection->easy.get(), CURLPAUSE_RECV);
+            }));
+
+            std::exchange(mConnection->dataPromise, std::nullopt)->reject(task::Error::CANCELLED);
+            return {};
         }
-    );
+    };
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
@@ -160,22 +195,32 @@ void asyncio::http::Requests::Core::recycle() {
         Connection *connection;
         curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &connection);
 
-        connection->writer.close();
+        connection->finished = true;
 
         if (msg->data.result != CURLE_OK) {
             connection->error = static_cast<CURLError>(msg->data.result);
 
-            if (connection->status != Connection::Status::NOT_STARTED)
+            if (!connection->transferring) {
+                connection->promise.reject(*connection->error);
+                continue;
+            }
+
+            if (!connection->dataPromise)
                 continue;
 
-            connection->promise.reject(static_cast<CURLError>(msg->data.result));
+            std::exchange(connection->dataPromise, std::nullopt)->reject(*connection->error);
             continue;
         }
 
-        if (connection->status != Connection::Status::NOT_STARTED)
+        if (!connection->transferring) {
+            connection->promise.resolve();
+            continue;
+        }
+
+        if (!connection->dataPromise)
             continue;
 
-        connection->promise.resolve();
+        std::exchange(connection->dataPromise, std::nullopt)->resolve(0);
     }
 }
 
@@ -194,7 +239,7 @@ std::expected<void, std::error_code> asyncio::http::Requests::Core::setTimer(con
                 curl_multi_socket_action(core.multi.get(), CURL_SOCKET_TIMEOUT, 0, &core.running);
                 core.recycle();
             },
-            ms ? ms : 1,
+            ms,
             0
         );
     }));
@@ -340,12 +385,18 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     if (!easy)
         return std::unexpected(std::error_code(errno, std::generic_category()));
 
-    auto pipes = pipe();
-    EXPECT(pipes);
+    const auto [
+        proxy,
+        headers,
+        cookies,
+        timeout,
+        connectTimeout,
+        userAgent,
+        tls,
+        hooks
+    ] = options.value_or(mCore->options);
 
-    const auto [proxy, headers, cookies, timeout, connectTimeout, userAgent, tls] = options.value_or(mCore->options);
-
-    auto connection = std::make_unique<Connection>(std::move(pipes->at(0)), std::move(pipes->at(1)), std::move(easy));
+    auto connection = std::make_unique<Connection>(std::move(easy));
 
     method = zero::strings::toupper(method);
 
@@ -422,6 +473,10 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
 
     if (password)
         curl_easy_setopt(connection->easy.get(), CURLOPT_KEYPASSWD, password->c_str());
+
+    for (const auto &hook: hooks) {
+        EXPECT(hook(*connection));
+    }
 
     return connection;
 }
