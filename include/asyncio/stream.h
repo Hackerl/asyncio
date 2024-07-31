@@ -40,7 +40,7 @@ namespace asyncio {
 #endif
     };
 
-    class Listener {
+    class Listener final : public ICloseable {
         struct Core {
             uv::Handle<uv_stream_t> stream;
             sync::Event event;
@@ -55,6 +55,7 @@ namespace asyncio {
         [[nodiscard]] const uv::Handle<uv_stream_t> &handle() const;
 
         task::Task<void, std::error_code> accept(uv_stream_t *stream);
+        task::Task<void, std::error_code> close() override;
 
     private:
         std::unique_ptr<Core> mCore;

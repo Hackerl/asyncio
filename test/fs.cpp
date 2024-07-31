@@ -11,7 +11,7 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
         REQUIRE(zero::filesystem::writeString(path, CONTENT));
 
         SECTION("read only") {
-            auto file = co_await asyncio::fs::open(path, UV_FS_O_RDONLY);
+            auto file = co_await asyncio::fs::open(path, O_RDONLY);
             REQUIRE(file);
 
             std::string content;
@@ -28,7 +28,7 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
         }
 
         SECTION("write only") {
-            auto file = co_await asyncio::fs::open(path, UV_FS_O_WRONLY);
+            auto file = co_await asyncio::fs::open(path, O_WRONLY);
             REQUIRE(file);
 
             const std::string replace = zero::strings::toupper(CONTENT);
@@ -41,7 +41,7 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
         }
 
         SECTION("read and write") {
-            auto file = co_await asyncio::fs::open(path, UV_FS_O_RDWR);
+            auto file = co_await asyncio::fs::open(path, O_RDWR);
             REQUIRE(file);
 
             std::string content;
@@ -65,7 +65,7 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
         }
 
         SECTION("append") {
-            auto file = co_await asyncio::fs::open(path, UV_FS_O_RDWR | UV_FS_O_APPEND);
+            auto file = co_await asyncio::fs::open(path, O_RDWR | O_APPEND);
             REQUIRE(file);
 
             auto pos = co_await file->position();
@@ -107,13 +107,13 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
         SECTION("create") {
             REQUIRE(std::filesystem::remove(path));
 
-            const auto file = co_await asyncio::fs::open(path, UV_FS_O_RDONLY | UV_FS_O_CREAT);
+            const auto file = co_await asyncio::fs::open(path, O_RDONLY | O_CREAT);
             REQUIRE(file);
             REQUIRE(std::filesystem::exists(path));
         }
 
         SECTION("truncate") {
-            auto file = co_await asyncio::fs::open(path, UV_FS_O_RDONLY | UV_FS_O_CREAT | UV_FS_O_TRUNC);
+            auto file = co_await asyncio::fs::open(path, O_RDONLY | O_CREAT | O_TRUNC);
             REQUIRE(file);
 
             const auto length = co_await file->length();
@@ -125,20 +125,20 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
             SECTION("success") {
                 REQUIRE(std::filesystem::remove(path));
 
-                const auto file = co_await asyncio::fs::open(path, UV_FS_O_WRONLY | UV_FS_O_CREAT | UV_FS_O_EXCL);
+                const auto file = co_await asyncio::fs::open(path, O_WRONLY | O_CREAT | O_EXCL);
                 REQUIRE(file);
                 REQUIRE(std::filesystem::exists(path));
             }
 
             SECTION("failure") {
-                const auto file = co_await asyncio::fs::open(path, UV_FS_O_WRONLY | UV_FS_O_CREAT | UV_FS_O_EXCL);
+                const auto file = co_await asyncio::fs::open(path, O_WRONLY | O_CREAT | O_EXCL);
                 REQUIRE(!file);
                 REQUIRE(file.error() == std::errc::file_exists);
             }
         }
 
         SECTION("close") {
-            auto file = co_await asyncio::fs::open(path, UV_FS_O_RDONLY);
+            auto file = co_await asyncio::fs::open(path, O_RDONLY);
             REQUIRE(file);
 
             const auto res = co_await file->close();

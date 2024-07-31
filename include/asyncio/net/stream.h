@@ -50,7 +50,7 @@ namespace asyncio::net {
         Stream mStream;
     };
 
-    class TCPListener {
+    class TCPListener final : public ICloseable {
     public:
         explicit TCPListener(Listener listener);
 
@@ -63,6 +63,7 @@ namespace asyncio::net {
         static std::expected<TCPListener, std::error_code> listen(const IPv6Address &address);
 
         task::Task<TCPStream, std::error_code> accept();
+        task::Task<void, std::error_code> close() override;
 
     private:
         Listener mListener;
@@ -92,12 +93,13 @@ namespace asyncio::net {
         Pipe mPipe;
     };
 
-    class NamedPipeListener {
+    class NamedPipeListener final : public ICloseable {
     public:
         explicit NamedPipeListener(Listener listener);
         static std::expected<NamedPipeListener, std::error_code> listen(const std::string &name);
 
         task::Task<NamedPipeStream, std::error_code> accept();
+        task::Task<void, std::error_code> close() override;
 
     private:
         Listener mListener;
@@ -141,7 +143,7 @@ namespace asyncio::net {
         Pipe mPipe;
     };
 
-    class UnixListener {
+    class UnixListener final : public ICloseable {
     public:
         explicit UnixListener(Listener listener);
 
@@ -149,6 +151,7 @@ namespace asyncio::net {
         static std::expected<UnixListener, std::error_code> listen(const UnixAddress &address);
 
         task::Task<UnixStream, std::error_code> accept();
+        task::Task<void, std::error_code> close() override;
 
     private:
         Listener mListener;

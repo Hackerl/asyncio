@@ -133,7 +133,7 @@ asyncio::task::Task<std::string, std::error_code> asyncio::http::Response::strin
 // ReSharper disable once CppMemberFunctionMayBeConst
 asyncio::task::Task<void, std::error_code>
 asyncio::http::Response::output(std::filesystem::path path) {
-    auto file = co_await fs::open(std::move(path), UV_FS_O_WRONLY | UV_FS_O_CREAT | UV_FS_O_TRUNC);
+    auto file = co_await fs::open(std::move(path), O_WRONLY | O_CREAT | O_TRUNC);
     CO_EXPECT(file);
     co_return co_await copy(*this, *file);
 }

@@ -337,3 +337,22 @@ asyncio::task::Task<void, std::error_code> asyncio::Listener::accept(uv_stream_t
             co_return std::unexpected(*mCore->ec);
     }
 }
+
+asyncio::task::Task<void, std::error_code> asyncio::Listener::close() {
+    const auto handle = mCore->stream.release();
+    mCore.reset();
+
+    Promise<void> promise;
+    handle->data = &promise;
+
+    uv_close(
+        reinterpret_cast<uv_handle_t *>(handle.get()),
+        // ReSharper disable once CppParameterMayBeConstPtrOrRef
+        [](uv_handle_t *h) {
+            static_cast<Promise<void> *>(h->data)->resolve();
+        }
+    );
+
+    co_await promise.getFuture();
+    co_return {};
+}
