@@ -98,7 +98,7 @@ namespace asyncio::net::tls {
         }
 
     private:
-        task::Task<std::size_t, std::error_code> transferIn() {
+        task::Task<void, std::error_code> transferIn() {
             auto &mutex = mMutexes[0];
             const bool locked = mutex.locked();
 
@@ -120,7 +120,7 @@ namespace asyncio::net::tls {
             co_return {};
         }
 
-        task::Task<std::size_t, std::error_code> transferOut() {
+        task::Task<void, std::error_code> transferOut() {
             auto &mutex = mMutexes[1];
 
             CO_EXPECT(co_await mutex.lock());
@@ -128,7 +128,12 @@ namespace asyncio::net::tls {
 
             std::array<std::byte, 10240> data; // NOLINT(*-pro-type-member-init)
 
-            if (const int n = BIO_read(SSL_get_wbio(mSSL.get()), data.data(), data.size()); n > 0) {
+            while (true) {
+                const int n = BIO_read(SSL_get_wbio(mSSL.get()), data.data(), data.size());
+
+                if (n <= 0)
+                    break;
+
                 CO_EXPECT(co_await std::invoke(
                     &IWriter::writeAll,
                     mStream,
