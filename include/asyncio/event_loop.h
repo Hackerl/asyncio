@@ -21,6 +21,11 @@ namespace asyncio {
             std::unique_ptr<TaskQueue> taskQueue
         );
 
+        EventLoop(EventLoop &&rhs) = default;
+        EventLoop &operator=(EventLoop &&rhs) noexcept = default;
+
+        ~EventLoop();
+
         static std::expected<EventLoop, std::error_code> make();
 
         uv_loop_t *raw();

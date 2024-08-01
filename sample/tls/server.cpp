@@ -7,7 +7,7 @@ asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream
     const auto address = stream.remoteAddress();
     CO_EXPECT(address);
 
-    fmt::print("new connection[{}]\n", fmt::to_string(*address));
+    fmt::print("connection[{}]\n", *address);
 
     auto tls = co_await asyncio::net::tls::accept(std::move(stream), std::move(context));
     CO_EXPECT(tls);

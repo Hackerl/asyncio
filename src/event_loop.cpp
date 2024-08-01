@@ -8,6 +8,18 @@ asyncio::EventLoop::EventLoop(
 ): mLoop(std::move(loop)), mTaskQueue(std::move(taskQueue)) {
 }
 
+asyncio::EventLoop::~EventLoop() {
+    if (!mLoop)
+        return;
+
+    mTaskQueue.reset();
+
+    while (true) {
+        if (uv_run(mLoop.get(), UV_RUN_NOWAIT) == 0)
+            break;
+    }
+}
+
 uv_loop_t *asyncio::EventLoop::raw() {
     return mLoop.get();
 }
@@ -85,23 +97,7 @@ void asyncio::EventLoop::stop() {
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 void asyncio::EventLoop::run() {
-    const auto result = uv_run(mLoop.get(), UV_RUN_DEFAULT);
-    assert(result != 0);
-
-    while (true) {
-        if (uv_run(mLoop.get(), UV_RUN_NOWAIT) == 0)
-            break;
-
-        if (mLoop->active_handles > 1)
-            continue;
-
-        std::lock_guard guard(mTaskQueue->mutex);
-
-        if (!mTaskQueue->queue.empty())
-            continue;
-
-        mTaskQueue->async.close();
-    }
+    uv_run(mLoop.get(), UV_RUN_DEFAULT);
 }
 
 std::shared_ptr<asyncio::EventLoop> asyncio::getEventLoop() {

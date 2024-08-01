@@ -357,6 +357,10 @@ namespace asyncio::uv {
             return mHandle.get();
         }
 
+        [[nodiscard]] explicit operator bool() const {
+            return mHandle.operator bool();
+        }
+
         std::unique_ptr<T, std::function<void(T *)>> release() {
             return std::move(mHandle);
         }
