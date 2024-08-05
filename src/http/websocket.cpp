@@ -96,7 +96,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         writer = *stream;
         closeable = *std::move(stream);
     }
-    else if (*scheme == WS_SCHEME) {
+    else if (*scheme == WS_SECURE_SCHEME) {
         auto stream = co_await net::TCPStream::connect(*host, *port);
         CO_EXPECT(stream);
 
@@ -336,7 +336,7 @@ asyncio::http::ws::WebSocket::readMessage() const {
             CO_EXPECT(co_await mCloseable->close());
 
             if (message->data.size() < 2)
-                co_return std::unexpected(CloseCode::NO_STATUS_RCVD);
+                co_return std::unexpected(CloseCode::NORMAL_CLOSURE);
 
             co_return std::unexpected(
                 static_cast<CloseCode>(ntohs(*reinterpret_cast<const unsigned short *>(message->data.data())))

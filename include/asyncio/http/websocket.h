@@ -69,24 +69,101 @@ namespace asyncio::http::ws {
             NOT_CONNECTED, "websocket not connected"
         )
 
-        DEFINE_ERROR_CODE_INNER(
-            CloseCode,
-            "asyncio::http::ws::WebSocket::close",
-            NORMAL_CLOSURE, "normal closure",
-            GOING_AWAY, "going away",
-            PROTOCOL_ERROR, "protocol error",
-            UNSUPPORTED_DATA, "unsupported data",
-            NO_STATUS_RCVD, "no status received",
-            ABNORMAL_CLOSURE, "abnormal closure",
-            INVALID_TEXT, "invalid text",
-            POLICY_VIOLATION, "policy violation",
-            MESSAGE_TOO_BIG, "message too big",
-            MANDATORY_EXTENSION, "mandatory extension",
-            INTERNAL_ERROR, "internal error",
-            SERVICE_RESTART, "service restart",
-            TRY_AGAIN_LATER, "try again later",
-            BAD_GATEWAY, "bad gateway"
-        )
+        enum class CloseCode {
+            NORMAL_CLOSURE = 1000,
+            GOING_AWAY,
+            PROTOCOL_ERROR,
+            UNSUPPORTED_DATA,
+            NO_STATUS_RECEIVED = 1005,
+            ABNORMAL_CLOSURE,
+            INVALID_FRAME_PAYLOAD_DATA,
+            POLICY_VIOLATION,
+            MESSAGE_TOO_BIG,
+            MANDATORY_EXTENSION,
+            INTERNAL_ERROR,
+            SERVICE_RESTART,
+            TRY_AGAIN_LATER,
+            BAD_GATEWAY
+        };
+
+        class CloseCodeCategory final : public std::error_category {
+        public:
+            [[nodiscard]] const char *name() const noexcept override {
+                return "asyncio::http::ws::WebSocket::close";
+            }
+
+            [[nodiscard]] std::string message(const int value) const override {
+                std::string msg;
+
+                switch (static_cast<CloseCode>(value)) {
+                case CloseCode::NORMAL_CLOSURE:
+                    msg = "normal closure";
+                    break;
+
+                case CloseCode::GOING_AWAY:
+                    msg = "going away";
+                    break;
+
+                case CloseCode::PROTOCOL_ERROR:
+                    msg = "protocol error";
+                    break;
+
+                case CloseCode::UNSUPPORTED_DATA:
+                    msg = "unsupported data";
+                    break;
+
+                case CloseCode::NO_STATUS_RECEIVED:
+                    msg = "no status received";
+                    break;
+
+                case CloseCode::ABNORMAL_CLOSURE:
+                    msg = "abnormal closure";
+                    break;
+
+                case CloseCode::INVALID_FRAME_PAYLOAD_DATA:
+                    msg = "invalid frame payload data";
+                    break;
+
+                case CloseCode::POLICY_VIOLATION:
+                    msg = "policy violation";
+                    break;
+
+                case CloseCode::MESSAGE_TOO_BIG:
+                    msg = "message too big";
+                    break;
+
+                case CloseCode::MANDATORY_EXTENSION:
+                    msg = "mandatory extension";
+                    break;
+
+                case CloseCode::INTERNAL_ERROR:
+                    msg = "internal error";
+                    break;
+
+                case CloseCode::SERVICE_RESTART:
+                    msg = "service restart";
+                    break;
+
+                case CloseCode::TRY_AGAIN_LATER:
+                    msg = "try again later";
+                    break;
+
+                case CloseCode::BAD_GATEWAY:
+                    msg = "bad gateway";
+                    break;
+
+                default:
+                    msg = "unknown";
+                    break;
+                }
+
+                return msg;
+            }
+        };
+
+        friend std::error_code make_error_code(const CloseCode e) {
+            return {std::to_underlying(e), errorCategoryInstance<ErrorCategory>()};
+        }
 
         WebSocket(
             std::shared_ptr<IReader> reader,
