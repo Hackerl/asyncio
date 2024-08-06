@@ -76,15 +76,15 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                             auto res = co_await r.readUntil(std::byte{'\1'});
                             REQUIRE(res);
                             REQUIRE(
-                                std::string_view{reinterpret_cast<const char *>(res->data()), res->size()} ==
-                                "hello world hello world"
+                                std::string_view{reinterpret_cast<const char *>(res->data()), res->size()}
+                                == "hello world hello world"
                             );
 
                             res = co_await r.readUntil(std::byte{'\1'});
                             REQUIRE(res);
                             REQUIRE(
-                                std::string_view{reinterpret_cast<const char *>(res->data()), res->size()} ==
-                                "hello hello world hello world"
+                                std::string_view{reinterpret_cast<const char *>(res->data()), res->size()}
+                                == "hello hello world hello world"
                             );
 
                             res = co_await r.readUntil(std::byte{'\1'});

@@ -17,7 +17,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
         auto message = co_await ws->readMessage();
 
         if (!message) {
-            if (message.error() != asyncio::http::ws::WebSocket::CloseCode::NORMAL_CLOSURE)
+            if (message.error() != asyncio::http::ws::CloseCode::NORMAL_CLOSURE)
                 co_return std::unexpected(message.error());
 
             break;

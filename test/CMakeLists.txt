@@ -22,6 +22,7 @@ add_executable(
         net/stream.cpp
         http/url.cpp
         http/request.cpp
+        http/websocket.cpp
         sync/mutex.cpp
         sync/event.cpp
         sync/condition.cpp
