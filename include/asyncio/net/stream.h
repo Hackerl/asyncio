@@ -17,8 +17,7 @@ namespace asyncio::net {
         static std::expected<TCPStream, std::error_code> from(uv_os_sock_t socket);
 
         static task::Task<TCPStream, std::error_code> connect(std::string host, unsigned short port);
-        static task::Task<TCPStream, std::error_code> connect(IPv4Address address);
-        static task::Task<TCPStream, std::error_code> connect(IPv6Address address);
+        static task::Task<TCPStream, std::error_code> connect(IPAddress address);
 
         [[nodiscard]] FileDescriptor fd() const override;
 
@@ -50,7 +49,7 @@ namespace asyncio::net {
         Stream mStream;
     };
 
-    class TCPListener final : public ICloseable {
+    class TCPListener final : public IFileDescriptor, public ICloseable {
     public:
         explicit TCPListener(Listener listener);
 
@@ -59,8 +58,10 @@ namespace asyncio::net {
 
     public:
         static std::expected<TCPListener, std::error_code> listen(const std::string &ip, unsigned short port);
-        static std::expected<TCPListener, std::error_code> listen(const IPv4Address &address);
-        static std::expected<TCPListener, std::error_code> listen(const IPv6Address &address);
+        static std::expected<TCPListener, std::error_code> listen(const IPAddress &address);
+
+        [[nodiscard]] FileDescriptor fd() const override;
+        [[nodiscard]] std::expected<IPAddress, std::error_code> address() const;
 
         task::Task<TCPStream, std::error_code> accept();
         task::Task<void, std::error_code> close() override;
@@ -82,8 +83,6 @@ namespace asyncio::net {
         [[nodiscard]] std::expected<DWORD, std::error_code> clientProcessID() const;
         [[nodiscard]] std::expected<DWORD, std::error_code> serverProcessID() const;
 
-        std::expected<void, std::error_code> chmod(int mode);
-
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 
@@ -93,16 +92,21 @@ namespace asyncio::net {
         Pipe mPipe;
     };
 
-    class NamedPipeListener final : public ICloseable {
+    class NamedPipeListener final : public IFileDescriptor, public ICloseable {
     public:
-        explicit NamedPipeListener(Listener listener);
+        explicit NamedPipeListener(PipeListener listener);
         static std::expected<NamedPipeListener, std::error_code> listen(const std::string &name);
+
+        [[nodiscard]] FileDescriptor fd() const override;
+        [[nodiscard]] std::expected<std::string, std::error_code> address() const;
+
+        std::expected<void, std::error_code> chmod(int mode);
 
         task::Task<NamedPipeStream, std::error_code> accept();
         task::Task<void, std::error_code> close() override;
 
     private:
-        Listener mListener;
+        PipeListener mListener;
     };
 #else
     class UnixStream final : public ISocket {
@@ -125,7 +129,6 @@ namespace asyncio::net {
 
         [[nodiscard]] std::expected<Credential, std::error_code> peerCredential() const;
 
-        std::expected<void, std::error_code> chmod(int mode);
         task::Task<void, std::error_code> shutdown();
 
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
@@ -143,18 +146,23 @@ namespace asyncio::net {
         Pipe mPipe;
     };
 
-    class UnixListener final : public ICloseable {
+    class UnixListener final : public IFileDescriptor, public ICloseable {
     public:
-        explicit UnixListener(Listener listener);
+        explicit UnixListener(PipeListener listener);
 
         static std::expected<UnixListener, std::error_code> listen(std::string path);
         static std::expected<UnixListener, std::error_code> listen(const UnixAddress &address);
+
+        [[nodiscard]] FileDescriptor fd() const override;
+        [[nodiscard]] std::expected<std::string, std::error_code> address() const;
+
+        std::expected<void, std::error_code> chmod(int mode);
 
         task::Task<UnixStream, std::error_code> accept();
         task::Task<void, std::error_code> close() override;
 
     private:
-        Listener mListener;
+        PipeListener mListener;
     };
 #endif
 }

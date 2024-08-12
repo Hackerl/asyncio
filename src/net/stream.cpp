@@ -112,15 +112,13 @@ asyncio::net::TCPStream::connect(const std::string host, const unsigned short po
 }
 
 asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
-asyncio::net::TCPStream::connect(const IPv4Address address) {
-    auto socketAddress = socketAddressFrom(address);
-    CO_EXPECT(socketAddress);
-    co_return co_await connect(*std::move(socketAddress));
-}
-
-asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
-asyncio::net::TCPStream::connect(const IPv6Address address) {
-    auto socketAddress = socketAddressFrom(address);
+asyncio::net::TCPStream::connect(const IPAddress address) {
+    auto socketAddress = std::visit(
+        [](const auto &arg) {
+            return socketAddressFrom(arg);
+        },
+        address
+    );
     CO_EXPECT(socketAddress);
     co_return co_await connect(*std::move(socketAddress));
 }
@@ -284,17 +282,49 @@ asyncio::net::TCPListener::listen(const std::string &ip, const unsigned short po
 }
 
 std::expected<asyncio::net::TCPListener, std::error_code>
-asyncio::net::TCPListener::listen(const IPv4Address &address) {
-    auto socketAddress = socketAddressFrom(address);
+asyncio::net::TCPListener::listen(const IPAddress &address) {
+    auto socketAddress = std::visit(
+        [](const auto &arg) {
+            return socketAddressFrom(arg);
+        },
+        address
+    );
     EXPECT(socketAddress);
     return listen(*std::move(socketAddress));
 }
 
-std::expected<asyncio::net::TCPListener, std::error_code>
-asyncio::net::TCPListener::listen(const IPv6Address &address) {
-    auto socketAddress = socketAddressFrom(address);
-    EXPECT(socketAddress);
-    return listen(*std::move(socketAddress));
+asyncio::FileDescriptor asyncio::net::TCPListener::fd() const {
+    const auto fd = mListener.mCore->stream.fd();
+    assert(fd);
+    return *fd;
+}
+
+std::expected<asyncio::net::IPAddress, std::error_code> asyncio::net::TCPListener::address() const {
+    sockaddr_storage storage = {};
+    int length = sizeof(sockaddr_storage);
+
+    EXPECT(uv::expected([&] {
+        return uv_tcp_getsockname(
+            reinterpret_cast<const uv_tcp_t *>(mListener.mCore->stream.raw()),
+            reinterpret_cast<sockaddr *>(&storage),
+            &length
+        );
+    }));
+
+    auto address = addressFrom(reinterpret_cast<const sockaddr *>(&storage), length);
+    EXPECT(address);
+
+    return std::visit(
+        []<typename T>(T arg) -> IPAddress {
+            if constexpr (!std::is_same_v<T, UnixAddress>) {
+                return std::move(arg);
+            }
+            else {
+                std::abort();
+            }
+        },
+        *std::move(address)
+    );
 }
 
 asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
@@ -411,10 +441,6 @@ std::expected<DWORD, std::error_code> asyncio::net::NamedPipeStream::serverProce
     return pid;
 }
 
-std::expected<void, std::error_code> asyncio::net::NamedPipeStream::chmod(const int mode) {
-    return mPipe.chmod(mode);
-}
-
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::NamedPipeStream::read(const std::span<std::byte> data) {
     co_return co_await mPipe.read(data);
@@ -429,7 +455,7 @@ asyncio::task::Task<void, std::error_code> asyncio::net::NamedPipeStream::close(
     co_return co_await mPipe.close();
 }
 
-asyncio::net::NamedPipeListener::NamedPipeListener(Listener listener) : mListener(std::move(listener)) {
+asyncio::net::NamedPipeListener::NamedPipeListener(PipeListener listener) : mListener(std::move(listener)) {
 }
 
 std::expected<asyncio::net::NamedPipeListener, std::error_code>
@@ -465,7 +491,19 @@ asyncio::net::NamedPipeListener::listen(const std::string &name) {
     auto listener = Listener::make(std::move(handle));
     EXPECT(listener);
 
-    return NamedPipeListener{*std::move(listener)};
+    return NamedPipeListener{PipeListener{*std::move(listener)}};
+}
+
+asyncio::FileDescriptor asyncio::net::NamedPipeListener::fd() const {
+    return mListener.fd();
+}
+
+std::expected<std::string, std::error_code> asyncio::net::NamedPipeListener::address() const {
+    return mListener.address();
+}
+
+std::expected<void, std::error_code> asyncio::net::NamedPipeListener::chmod(const int mode) {
+    return mListener.chmod(mode);
 }
 
 asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code> asyncio::net::NamedPipeListener::accept() {
@@ -561,11 +599,6 @@ asyncio::net::UnixStream::connect(std::string path) {
     co_return UnixStream{std::move(stream)};
 }
 
-std::expected<asyncio::net::UnixListener, std::error_code>
-asyncio::net::UnixListener::listen(const UnixAddress &address) {
-    return listen(address.path);
-}
-
 asyncio::FileDescriptor asyncio::net::UnixStream::fd() const {
     return mPipe.fd();
 }
@@ -628,10 +661,6 @@ std::expected<asyncio::net::UnixStream::Credential, std::error_code> asyncio::ne
 #endif
 }
 
-std::expected<void, std::error_code> asyncio::net::UnixStream::chmod(const int mode) {
-    return mPipe.chmod(mode);
-}
-
 asyncio::task::Task<void, std::error_code> asyncio::net::UnixStream::shutdown() {
     co_return co_await mPipe.shutdown();
 }
@@ -666,7 +695,7 @@ asyncio::task::Task<void, std::error_code> asyncio::net::UnixStream::close() {
     co_return co_await mPipe.close();
 }
 
-asyncio::net::UnixListener::UnixListener(Listener listener) : mListener(std::move(listener)) {
+asyncio::net::UnixListener::UnixListener(PipeListener listener) : mListener(std::move(listener)) {
 }
 
 std::expected<asyncio::net::UnixListener, std::error_code> asyncio::net::UnixListener::listen(std::string path) {
@@ -706,7 +735,26 @@ std::expected<asyncio::net::UnixListener, std::error_code> asyncio::net::UnixLis
     auto listener = Listener::make(std::move(handle));
     EXPECT(listener);
 
-    return UnixListener{*std::move(listener)};
+    return UnixListener{PipeListener{*std::move(listener)}};
+}
+
+std::expected<asyncio::net::UnixListener, std::error_code>
+asyncio::net::UnixListener::listen(const UnixAddress &address) {
+    return listen(address.path);
+}
+
+asyncio::FileDescriptor asyncio::net::UnixListener::fd() const {
+    const auto fd = mListener.mCore->stream.fd();
+    assert(fd);
+    return *fd;
+}
+
+std::expected<std::string, std::error_code> asyncio::net::UnixListener::address() const {
+    return mListener.address();
+}
+
+std::expected<void, std::error_code> asyncio::net::UnixListener::chmod(const int mode) {
+    return mListener.chmod(mode);
 }
 
 asyncio::task::Task<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixListener::accept() {

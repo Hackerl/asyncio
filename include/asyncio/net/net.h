@@ -34,8 +34,20 @@ namespace asyncio::net {
         bool operator==(const UnixAddress &) const = default;
     };
 
+    using IPAddress = std::variant<IPv4Address, IPv6Address>;
     using Address = std::variant<IPv4Address, IPv6Address, UnixAddress>;
     using SocketAddress = std::pair<std::unique_ptr<sockaddr, decltype(&std::free)>, socklen_t>;
+
+    template<typename T>
+        requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address>)
+    bool operator==(const IPAddress &lhs, const T &rhs) {
+        if constexpr (std::is_same_v<T, IPv4Address>) {
+            return std::holds_alternative<IPv4Address>(lhs) && std::get<IPv4Address>(lhs) == rhs;
+        }
+        else {
+            return std::holds_alternative<IPv6Address>(lhs) && std::get<IPv6Address>(lhs) == rhs;
+        }
+    }
 
     template<typename T>
         requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address> || std::is_same_v<T, UnixAddress>)

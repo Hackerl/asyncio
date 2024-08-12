@@ -93,13 +93,6 @@ std::expected<std::string, std::error_code> asyncio::Pipe::remoteAddress() const
     return address;
 }
 
-std::expected<void, std::error_code> asyncio::Pipe::chmod(const int mode) {
-    EXPECT(uv::expected([&] {
-        return uv_pipe_chmod(reinterpret_cast<uv_pipe_t *>(mStream.raw()), mode);
-    }));
-    return {};
-}
-
 std::expected<std::array<asyncio::Pipe, 2>, std::error_code> asyncio::pipe() {
     std::array<uv_file, 2> fds = {};
 
@@ -127,4 +120,49 @@ std::expected<std::array<asyncio::Pipe, 2>, std::error_code> asyncio::pipe() {
     fds[1] = -1;
 
     return std::array{*std::move(reader), *std::move(writer)};
+}
+
+asyncio::PipeListener::PipeListener(Listener listener) : Listener(std::move(listener)) {
+}
+
+asyncio::FileDescriptor asyncio::PipeListener::fd() const {
+    const auto fd = mCore->stream.fd();
+    assert(fd);
+    return *fd;
+}
+
+std::expected<std::string, std::error_code> asyncio::PipeListener::address() const {
+    std::size_t size = 1024;
+    std::string address;
+
+    address.resize(size);
+
+    const auto result = uv::expected([&] {
+        return uv_pipe_getsockname(reinterpret_cast<const uv_pipe_t *>(mCore->stream.raw()), address.data(), &size);
+    });
+
+    if (result) {
+        address.resize(size);
+        return address;
+    }
+
+    if (result.error() != std::errc::no_buffer_space)
+        return std::unexpected(result.error());
+
+    address.resize(size);
+
+    EXPECT(uv::expected([&] {
+        return uv_pipe_getsockname(reinterpret_cast<const uv_pipe_t *>(mCore->stream.raw()), address.data(), &size);
+    }));
+
+    assert(address.size() == size);
+    return address;
+}
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+std::expected<void, std::error_code> asyncio::PipeListener::chmod(const int mode) {
+    EXPECT(uv::expected([&] {
+        return uv_pipe_chmod(reinterpret_cast<uv_pipe_t *>(mCore->stream.raw()), mode);
+    }));
+    return {};
 }

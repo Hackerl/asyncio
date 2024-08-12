@@ -7,10 +7,13 @@
 namespace asyncio {
     namespace net {
         class TCPStream;
+        class TCPListener;
 #ifdef _WIN32
         class NamedPipeStream;
+        class NamedPipeListener;
 #else
         class UnixStream;
+        class UnixListener;
 #endif
     }
 
@@ -40,7 +43,7 @@ namespace asyncio {
 #endif
     };
 
-    class Listener final : public ICloseable {
+    class Listener : public ICloseable {
         struct Core {
             uv::Handle<uv_stream_t> stream;
             sync::Event event;
@@ -51,14 +54,18 @@ namespace asyncio {
         explicit Listener(std::unique_ptr<Core> core);
         static std::expected<Listener, std::error_code> make(uv::Handle<uv_stream_t> stream);
 
-        uv::Handle<uv_stream_t> &handle();
-        [[nodiscard]] const uv::Handle<uv_stream_t> &handle() const;
-
         task::Task<void, std::error_code> accept(uv_stream_t *stream);
         task::Task<void, std::error_code> close() override;
 
-    private:
+    protected:
         std::unique_ptr<Core> mCore;
+
+        friend class net::TCPListener;
+#ifdef _WIN32
+        friend class net::NamedPipeListener;
+#else
+        friend class net::UnixListener;
+#endif
     };
 }
 

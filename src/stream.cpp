@@ -309,14 +309,6 @@ std::expected<asyncio::Listener, std::error_code> asyncio::Listener::make(uv::Ha
     return Listener{std::move(context)};
 }
 
-asyncio::uv::Handle<uv_stream_s> &asyncio::Listener::handle() {
-    return mCore->stream;
-}
-
-const asyncio::uv::Handle<uv_stream_s> &asyncio::Listener::handle() const {
-    return mCore->stream;
-}
-
 // ReSharper disable once CppMemberFunctionMayBeConst
 asyncio::task::Task<void, std::error_code> asyncio::Listener::accept(uv_stream_t *stream) {
     while (true) {
