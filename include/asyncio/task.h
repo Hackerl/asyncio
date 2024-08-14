@@ -2,6 +2,7 @@
 #define ASYNCIO_TASK_H
 
 #include "promise.h"
+#include <list>
 #include <algorithm>
 #include <coroutine>
 #include <exception>

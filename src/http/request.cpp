@@ -138,18 +138,6 @@ asyncio::http::Response::output(std::filesystem::path path) {
     co_return co_await copy(*this, *file);
 }
 
-asyncio::task::Task<nlohmann::json, std::error_code> asyncio::http::Response::json() {
-    auto content = co_await string();
-    CO_EXPECT(content);
-
-    try {
-        co_return nlohmann::json::parse(*std::move(content));
-    }
-    catch (const nlohmann::json::exception &) {
-        co_return std::unexpected(Error::INVALID_JSON);
-    }
-}
-
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::http::Response::read(const std::span<std::byte> data) {
     if (mConnection->finished) {

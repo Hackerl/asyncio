@@ -187,7 +187,9 @@ TEST_CASE("http requests", "[http]") {
                         auto response = co_await requests->get(*url);
                         REQUIRE(response);
 
-                        const auto people = co_await response->json<People>();
+                        const auto people = co_await response->string().transform([](const std::string &content) {
+                            return nlohmann::json::parse(content).get<People>();
+                        });
                         REQUIRE(people);
                         REQUIRE(people->name == "rose");
                         REQUIRE(people->age == 17);

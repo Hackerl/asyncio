@@ -28,6 +28,7 @@ TEST_CASE("http url", "[http]") {
            .query("name=jack&age=12");
 
         REQUIRE(*url.string() == "https://root:123456@localhost/file/abc?name=jack&age=12");
+        REQUIRE(fmt::to_string(url) == "expected(https://root:123456@localhost/file/abc?name=jack&age=12)");
 
         url.scheme("https")
            .host("example.com")
@@ -41,17 +42,20 @@ TEST_CASE("http url", "[http]") {
            .appendQuery("age", 12);
 
         REQUIRE(*url.string() == "https://root:123456@example.com:444/file/bcd?name=jack&age=12");
+        REQUIRE(fmt::to_string(url) == "expected(https://root:123456@example.com:444/file/bcd?name=jack&age=12)");
 
         url.host("127.0.0.1")
            .port(std::nullopt)
            .user(std::nullopt);
 
         REQUIRE(*url.string() == "https://:123456@127.0.0.1/file/bcd?name=jack&age=12");
+        REQUIRE(fmt::to_string(url) == "expected(https://:123456@127.0.0.1/file/bcd?name=jack&age=12)");
 
         url.password(std::nullopt)
            .path(std::nullopt)
            .query(std::nullopt);
 
         REQUIRE(*url.string() == "https://127.0.0.1/");
+        REQUIRE(fmt::to_string(url) == "expected(https://127.0.0.1/)");
     }
 }

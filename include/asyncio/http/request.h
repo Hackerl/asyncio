@@ -29,12 +29,6 @@ namespace asyncio::http {
 
     class Response final : public IReader {
     public:
-        DEFINE_ERROR_CODE_INNER(
-            Error,
-            "asyncio::http::Response",
-            INVALID_JSON, "invalid json message"
-        )
-
         Response(Requests *requests, std::unique_ptr<Connection> connection);
         Response(Response &&) = default;
         ~Response() override;
@@ -47,20 +41,6 @@ namespace asyncio::http {
 
         task::Task<std::string, std::error_code> string();
         task::Task<void, std::error_code> output(std::filesystem::path path);
-        task::Task<nlohmann::json, std::error_code> json();
-
-        template<typename T>
-        task::Task<T, std::error_code> json() {
-            const auto j = co_await json();
-            CO_EXPECT(j);
-
-            try {
-                co_return j->template get<T>();
-            }
-            catch (const nlohmann::json::exception &) {
-                co_return std::unexpected(Error::INVALID_JSON);
-            }
-        }
 
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
 
@@ -236,7 +216,6 @@ namespace asyncio::http {
 }
 
 DECLARE_ERROR_CODES(
-    asyncio::http::Response::Error,
     asyncio::http::Requests::CURLError,
     asyncio::http::Requests::CURLMError
 )

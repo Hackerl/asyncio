@@ -5,6 +5,8 @@
 #include <curl/curl.h>
 #include <zero/cmdline.h>
 #include <zero/error.h>
+#include <zero/formatter.h>
+#include <fmt/std.h>
 
 namespace asyncio::http {
     class URL {
@@ -74,5 +76,18 @@ DECLARE_ERROR_CODE(asyncio::http::URL::Error)
 
 template<>
 std::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input);
+
+template<typename Char>
+struct fmt::formatter<asyncio::http::URL, Char> {
+    template<typename ParseContext>
+    static constexpr auto parse(ParseContext &ctx) {
+        return ctx.begin();
+    }
+
+    template<typename FmtContext>
+    static auto format(const asyncio::http::URL &url, FmtContext &ctx) {
+        return std::ranges::copy(fmt::to_string(url.string()), ctx.out()).out;
+    }
+};
 
 #endif //ASYNCIO_URL_H

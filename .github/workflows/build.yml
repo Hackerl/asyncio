@@ -88,7 +88,7 @@ jobs:
           CXX: ${{ env.LLVM_HOME }}/bin/clang++
           CFLAGS: -fsanitize=address
           CXXFLAGS: -fsanitize=address
-          LDFLAGS: -fsanitize=address -L${{ env.LLVM_HOME }}/lib/c++ -Wl,-rpath,${{ env.LLVM_HOME }}/lib/c++
+          LDFLAGS: -fsanitize=address -L${{ env.LLVM_HOME }}/lib/c++ -L${{ env.LLVM_HOME }}/lib -lunwind -Wl,-rpath,${{ env.LLVM_HOME }}/lib/c++ -Wl,-rpath,${{ env.LLVM_HOME }}/lib
       - name: Test
         run: ctest --output-on-failure --test-dir build
 
