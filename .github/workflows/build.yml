@@ -1,7 +1,7 @@
 name: asyncio
 on: [ push ]
 jobs:
-  linux-amd64:
+  linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
           # https://github.com/llvm/llvm-project/issues/59432
           ASAN_OPTIONS: alloc_dealloc_mismatch=0
 
-  linux-static-amd64:
+  linux-static:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
       - name: Test
         run: ctest --output-on-failure --test-dir build
 
-  windows-amd64:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,8 @@ jobs:
           set(VCPKG_C_FLAGS $Env:CFLAGS)
           set(VCPKG_CXX_FLAGS $Env:CXXFLAGS)
           "@
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+          cmake -B build `
+            -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_OVERLAY_TRIPLETS="$(pwd)" `
             -DVCPKG_TARGET_TRIPLET="x64-windows-static-sanitizer" `
             -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug
@@ -71,7 +72,36 @@ jobs:
       - name: Test
         run: ctest --output-on-failure --test-dir build -E "^asynchronous io$"
 
-  macos-amd64:
+  windows-32:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
+      - name: Build
+        # https://github.com/microsoft/vcpkg/issues/29132
+        run: |
+          Set-Content x86-windows-static-sanitizer.cmake @"
+          set(VCPKG_TARGET_ARCHITECTURE x86)
+          set(VCPKG_CRT_LINKAGE static)
+          set(VCPKG_LIBRARY_LINKAGE static)
+          set(VCPKG_C_FLAGS $Env:CFLAGS)
+          set(VCPKG_CXX_FLAGS $Env:CXXFLAGS)
+          "@
+          cmake -B build -A Win32 `
+            -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_OVERLAY_TRIPLETS="$(pwd)" `
+            -DVCPKG_TARGET_TRIPLET="x86-windows-static-sanitizer" `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug
+          cmake --build build -j $Env:NUMBER_OF_PROCESSORS
+        env:
+          CFLAGS: -fsanitize=address
+          CXXFLAGS: -fsanitize=address
+      - name: Test
+        run: ctest --output-on-failure --test-dir build -E "^asynchronous io$"
+
+  macos:
     runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
@@ -92,7 +122,7 @@ jobs:
       - name: Test
         run: ctest --output-on-failure --test-dir build
 
-  android-arm64:
+  android:
     runs-on: ubuntu-latest
     strategy:
       matrix:
