@@ -36,3 +36,5 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         }
     };
 }
+
+DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::TimeoutError)

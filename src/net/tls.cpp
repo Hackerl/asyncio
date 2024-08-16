@@ -218,3 +218,5 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Se
 
     return context;
 }
+
+DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::net::tls::OpenSSLError, asyncio::net::tls::TLSError)

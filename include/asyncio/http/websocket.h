@@ -26,6 +26,8 @@ namespace asyncio::http::ws {
 
     class CloseCodeCategory final : public std::error_category {
     public:
+        static const std::error_category &instance();
+
         [[nodiscard]] const char *name() const noexcept override {
             return "asyncio::http::ws::WebSocket::close";
         }

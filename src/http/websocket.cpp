@@ -415,3 +415,5 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(c
     CO_EXPECT(co_await mCloseable->close());
     co_return {};
 }
+
+DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::http::ws::WebSocket::Error, asyncio::http::ws::CloseCode)

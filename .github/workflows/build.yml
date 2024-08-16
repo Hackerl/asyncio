@@ -3,6 +3,9 @@ on: [ push ]
 jobs:
   linux:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shared: [ ON, OFF ]
     steps:
       - uses: actions/checkout@v4
       - name: Install LLVM
@@ -13,7 +16,10 @@ jobs:
           sudo apt install -y libc++abi-18-dev libc++-18-dev
       - name: Build
         run: |
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET="x64-linux-dynamic" \
+            -DBUILD_SHARED_LIBS=${{ matrix.shared }}
           cmake --build build -j$(nproc)
         env:
           CC: clang-18
@@ -103,6 +109,9 @@ jobs:
 
   macos:
     runs-on: macos-13
+    strategy:
+      matrix:
+        shared: [ ON, OFF ]
     steps:
       - uses: actions/checkout@v4
       - name: Install LLVM
@@ -111,7 +120,10 @@ jobs:
           echo "LLVM_HOME=$(brew --prefix llvm)" >> $GITHUB_ENV
       - name: Build
         run: |
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET="x64-osx-dynamic" \
+            -DBUILD_SHARED_LIBS=${{ matrix.shared }}
           cmake --build build -j$(sysctl -n hw.physicalcpu)
         env:
           CC: ${{ env.LLVM_HOME }}/bin/clang

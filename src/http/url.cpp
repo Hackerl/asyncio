@@ -236,3 +236,5 @@ template<>
 std::expected<asyncio::http::URL, std::error_code> zero::scan(const std::string_view input) {
     return asyncio::http::URL::from({input.begin(), input.end()});
 }
+
+DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::http::URL::Error)

@@ -87,3 +87,8 @@ asyncio::task::Task<std::uint64_t, std::error_code> asyncio::ISeekable::length()
 asyncio::task::Task<std::uint64_t, std::error_code> asyncio::ISeekable::position() {
     return seek(0, Whence::CURRENT);
 }
+
+DEFINE_ERROR_CATEGORY_INSTANCES(
+    asyncio::IOError,
+    asyncio::IReader::ReadExactlyError
+)

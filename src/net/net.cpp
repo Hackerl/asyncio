@@ -215,3 +215,5 @@ asyncio::net::socketAddressFrom(const Address &address) {
         address
     );
 }
+
+DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::net::ParseAddressError, asyncio::net::ConvertToSocketAddressError)

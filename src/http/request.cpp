@@ -610,3 +610,5 @@ asyncio::http::Requests::request(
 
     co_return co_await perform(*std::move(connection));
 }
+
+DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::http::Requests::CURLError, asyncio::http::Requests::CURLMError)

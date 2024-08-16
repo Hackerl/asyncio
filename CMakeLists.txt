@@ -2,11 +2,15 @@ cmake_minimum_required(VERSION 3.17)
 project(asyncio)
 
 set(CMAKE_CXX_STANDARD 23)
-
-option(BUILD_SAMPLES "Build asyncio samples" ON)
-
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(ASYNCIO_VERSION 1.0.3)
+
+option(BUILD_SAMPLES "Build asyncio samples" ON)
+option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
+
+if (BUILD_SHARED_LIBS AND MSVC)
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif ()
 
 include(CTest)
 include(GNUInstallDirs)
@@ -20,15 +24,19 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 add_library(
         asyncio
-        STATIC
+        src/uv.cpp
         src/io.cpp
         src/fs.cpp
         src/time.cpp
         src/poll.cpp
         src/pipe.cpp
+        src/thread.cpp
         src/signal.cpp
         src/stream.cpp
+        src/buffer.cpp
+        src/channel.cpp
         src/process.cpp
+        src/task.cpp
         src/event_loop.cpp
         src/net/net.cpp
         src/net/dns.cpp
@@ -52,13 +60,14 @@ target_include_directories(
 
 target_link_libraries(
         asyncio
+        PRIVATE
+        $<$<PLATFORM_ID:Windows>:Crypt32>
         PUBLIC
         zero::zero
         OpenSSL::SSL
         OpenSSL::Crypto
         CURL::libcurl
         nlohmann_json::nlohmann_json
-        $<$<PLATFORM_ID:Windows>:Crypt32>
         $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
 )
 
@@ -76,6 +85,8 @@ install(
         TARGETS asyncio
         EXPORT ${PROJECT_NAME}Targets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 install(
