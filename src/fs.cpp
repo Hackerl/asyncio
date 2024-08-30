@@ -203,3 +203,134 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
 
     co_return File{*file};
 }
+
+asyncio::task::Task<void, std::error_code> asyncio::fs::unlink(const std::filesystem::path path) {
+    Promise<void, std::error_code> promise;
+    uv_fs_t request = {.data = &promise};
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_fs_unlink(
+            getEventLoop()->raw(),
+            &request,
+            path.string().c_str(),
+            [](uv_fs_t *req) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
+
+                if (req->result < 0) {
+                    p->reject(static_cast<uv::Error>(req->result));
+                    return;
+                }
+
+                p->resolve();
+            }
+        );
+    }));
+    DEFER(uv_fs_req_cleanup(&request));
+
+    co_return co_await promise.getFuture();
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::fs::rmdir(const std::filesystem::path path) {
+    Promise<void, std::error_code> promise;
+    uv_fs_t request = {.data = &promise};
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_fs_rmdir(
+            getEventLoop()->raw(),
+            &request,
+            path.string().c_str(),
+            [](uv_fs_t *req) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
+
+                if (req->result < 0) {
+                    p->reject(static_cast<uv::Error>(req->result));
+                    return;
+                }
+
+                p->resolve();
+            }
+        );
+    }));
+    DEFER(uv_fs_req_cleanup(&request));
+
+    co_return co_await promise.getFuture();
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::fs::mkdir(const std::filesystem::path path, const int mode) {
+    Promise<void, std::error_code> promise;
+    uv_fs_t request = {.data = &promise};
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_fs_mkdir(
+            getEventLoop()->raw(),
+            &request,
+            path.string().c_str(),
+            mode,
+            [](uv_fs_t *req) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
+
+                if (req->result < 0) {
+                    p->reject(static_cast<uv::Error>(req->result));
+                    return;
+                }
+
+                p->resolve();
+            }
+        );
+    }));
+    DEFER(uv_fs_req_cleanup(&request));
+
+    co_return co_await promise.getFuture();
+}
+
+asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::mkdtemp(const std::string tpl) {
+    Promise<std::filesystem::path, std::error_code> promise;
+    uv_fs_t request = {.data = &promise};
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_fs_mkdtemp(
+            getEventLoop()->raw(),
+            &request,
+            tpl.c_str(),
+            [](uv_fs_t *req) {
+                const auto p = static_cast<Promise<std::filesystem::path, std::error_code> *>(req->data);
+
+                if (req->result < 0) {
+                    p->reject(static_cast<uv::Error>(req->result));
+                    return;
+                }
+
+                p->resolve(req->path);
+            }
+        );
+    }));
+    DEFER(uv_fs_req_cleanup(&request));
+
+    co_return co_await promise.getFuture();
+}
+
+asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::mkstemp(const std::string tpl) {
+    Promise<std::filesystem::path, std::error_code> promise;
+    uv_fs_t request = {.data = &promise};
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_fs_mkstemp(
+            getEventLoop()->raw(),
+            &request,
+            tpl.c_str(),
+            [](uv_fs_t *req) {
+                const auto p = static_cast<Promise<std::filesystem::path, std::error_code> *>(req->data);
+
+                if (req->result < 0) {
+                    p->reject(static_cast<uv::Error>(req->result));
+                    return;
+                }
+
+                p->resolve(req->path);
+            }
+        );
+    }));
+    DEFER(uv_fs_req_cleanup(&request));
+
+    co_return co_await promise.getFuture();
+}

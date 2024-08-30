@@ -25,6 +25,13 @@ namespace asyncio::fs {
     };
 
     task::Task<File, std::error_code> open(std::filesystem::path path, int flags, int mode = 0644);
+
+    task::Task<void, std::error_code> unlink(std::filesystem::path path);
+    task::Task<void, std::error_code> rmdir(std::filesystem::path path);
+    task::Task<void, std::error_code> mkdir(std::filesystem::path path, int mode = 0644);
+
+    task::Task<std::filesystem::path, std::error_code> mkdtemp(std::string tpl);
+    task::Task<std::filesystem::path, std::error_code> mkstemp(std::string tpl);
 }
 
 #endif //ASYNCIO_FS_H
