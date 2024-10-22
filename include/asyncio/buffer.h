@@ -17,8 +17,8 @@ namespace asyncio {
 
     public:
         explicit BufReader(T reader, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY)
-            : mReader(std::move(reader)), mCapacity(capacity), mHead(0), mTail(0),
-              mBuffer(std::make_unique<std::byte[]>(capacity)) {
+            : mReader{std::move(reader)}, mCapacity{capacity}, mHead{0}, mTail{0},
+              mBuffer{std::make_unique<std::byte[]>(capacity)} {
         }
 
         [[nodiscard]] std::size_t capacity() const {
@@ -42,7 +42,7 @@ namespace asyncio {
                 mTail = *n;
             }
 
-            const std::size_t size = (std::min)(available(), data.size());
+            const auto size = (std::min)(available(), data.size());
 
             std::copy_n(mBuffer.get() + mHead, size, data.begin());
             mHead += size;
@@ -65,19 +65,19 @@ namespace asyncio {
         }
 
         task::Task<std::vector<std::byte>, std::error_code> readUntil(const std::byte byte) override {
-            std::expected<std::vector<std::byte>, std::error_code> result;
+            std::vector<std::byte> data;
 
             while (true) {
                 const auto first = mBuffer.get() + mHead;
                 const auto last = mBuffer.get() + mTail;
 
                 if (const auto it = std::find(first, last, byte); it != last) {
-                    std::copy(first, it, std::back_inserter(*result));
+                    data.insert(data.end(), first, it);
                     mHead += std::distance(first, it) + 1;
-                    break;
+                    co_return data;
                 }
 
-                std::copy(first, last, std::back_inserter(*result));
+                data.insert(data.end(), first, last);
 
                 mHead = 0;
                 mTail = 0;
@@ -85,22 +85,18 @@ namespace asyncio {
                 const auto n = co_await std::invoke(&IReader::read, mReader, std::span{mBuffer.get(), mCapacity});
                 CO_EXPECT(n);
 
-                if (*n == 0) {
-                    result = std::unexpected(make_error_code(BufReaderError::UNEXPECTED_EOF));
-                    break;
-                }
+                if (*n == 0)
+                    co_return std::unexpected{make_error_code(BufReaderError::UNEXPECTED_EOF)};
 
                 mTail = *n;
             }
-
-            co_return result;
         }
 
         task::Task<void, std::error_code> peek(const std::span<std::byte> data) override {
             if (data.size() > mCapacity)
-                co_return std::unexpected(make_error_code(BufReaderError::INVALID_ARGUMENT));
+                co_return std::unexpected{make_error_code(BufReaderError::INVALID_ARGUMENT)};
 
-            if (const std::size_t available = this->available(); available < data.size()) {
+            if (const auto available = this->available(); available < data.size()) {
                 if (mHead > 0) {
                     std::copy(mBuffer.get() + mHead, mBuffer.get() + mTail, mBuffer.get());
                     mHead = 0;
@@ -116,7 +112,7 @@ namespace asyncio {
                     CO_EXPECT(n);
 
                     if (*n == 0)
-                        co_return std::unexpected(make_error_code(BufReaderError::UNEXPECTED_EOF));
+                        co_return std::unexpected{make_error_code(BufReaderError::UNEXPECTED_EOF)};
 
                     mTail += *n;
                 }
@@ -141,8 +137,8 @@ namespace asyncio {
 
     public:
         explicit BufWriter(T writer, const std::size_t capacity = DEFAULT_BUFFER_CAPACITY)
-            : mWriter(std::move(writer)), mCapacity(capacity), mPending(0),
-              mBuffer(std::make_unique<std::byte[]>(capacity)) {
+            : mWriter{std::move(writer)}, mCapacity{capacity}, mPending{0},
+              mBuffer{std::make_unique<std::byte[]>(capacity)} {
         }
 
         [[nodiscard]] std::size_t capacity() const {
@@ -151,31 +147,30 @@ namespace asyncio {
 
         task::Task<std::size_t, std::error_code>
         write(const std::span<const std::byte> data) override {
-            std::expected<std::size_t, std::error_code> result;
+            std::size_t n{0};
 
-            while (*result < data.size()) {
+            while (n < data.size()) {
                 assert(mPending <= mCapacity);
 
                 if (mPending == mCapacity) {
-                    if (const auto res = co_await flush(); !res) {
-                        if (*result > 0)
+                    if (const auto result = co_await flush(); !result) {
+                        if (n > 0)
                             break;
 
-                        result = std::unexpected(res.error());
-                        break;
+                        co_return std::unexpected{result.error()};
                     }
 
                     continue;
                 }
 
-                const std::size_t size = (std::min)(mCapacity - mPending, data.size() - *result);
-                std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(*result), size, mBuffer.get() + mPending);
+                const auto size = (std::min)(mCapacity - mPending, data.size() - n);
+                std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(n), size, mBuffer.get() + mPending);
 
                 mPending += size;
-                *result += size;
+                n += size;
             }
 
-            co_return result;
+            co_return n;
         }
 
         [[nodiscard]] std::size_t pending() const override {
@@ -183,25 +178,18 @@ namespace asyncio {
         }
 
         task::Task<void, std::error_code> flush() override {
-            std::expected<void, std::error_code> result;
-            std::size_t offset = 0;
+            std::size_t offset{0};
 
             while (offset < mPending) {
-                if (co_await task::cancelled) {
-                    result = std::unexpected<std::error_code>(task::Error::CANCELLED);
-                    break;
-                }
+                if (co_await task::cancelled)
+                    co_return std::unexpected{task::Error::CANCELLED};
 
                 const auto n = co_await std::invoke(
                     &IWriter::write,
                     mWriter,
                     std::span{mBuffer.get() + offset, mPending - offset}
                 );
-
-                if (!n) {
-                    result = std::unexpected(n.error());
-                    break;
-                }
+                CO_EXPECT(n);
 
                 offset += *n;
             }
@@ -210,7 +198,7 @@ namespace asyncio {
                 std::copy(mBuffer.get() + offset, mBuffer.get() + mPending, mBuffer.get());
 
             mPending -= offset;
-            co_return result;
+            co_return {};
         }
 
     private:

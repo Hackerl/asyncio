@@ -8,18 +8,18 @@ namespace asyncio {
     template<typename T, typename E = std::nullptr_t>
     class Promise : public zero::async::promise::Promise<T, E> {
     public:
-        Promise() : mEventLoop(getEventLoop()) {
+        Promise() : mEventLoop{getEventLoop()} {
         }
 
-        explicit Promise(std::shared_ptr<EventLoop> eventLoop): mEventLoop(std::move(eventLoop)) {
+        explicit Promise(std::shared_ptr<EventLoop> eventLoop): mEventLoop{std::move(eventLoop)} {
         }
 
         explicit Promise(zero::async::promise::Promise<T, E> &&rhs)
-            : zero::async::promise::Promise<T, E>(std::move(rhs)), mEventLoop(getEventLoop()) {
+            : zero::async::promise::Promise<T, E>{std::move(rhs)}, mEventLoop{getEventLoop()} {
         }
 
         Promise(zero::async::promise::Promise<T, E> &&rhs, std::shared_ptr<EventLoop> eventLoop)
-            : zero::async::promise::Promise<T, E>(std::move(rhs)), mEventLoop(std::move(eventLoop)) {
+            : zero::async::promise::Promise<T, E>{std::move(rhs)}, mEventLoop{std::move(eventLoop)} {
         }
 
         template<typename... Ts>
@@ -34,7 +34,7 @@ namespace asyncio {
             else
                 this->mCore->result.emplace(std::in_place, std::forward<Ts>(args)...);
 
-            zero::async::promise::State state = this->mCore->state;
+            auto state = this->mCore->state.load();
 
             if (state == zero::async::promise::State::PENDING &&
                 this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
@@ -44,7 +44,7 @@ namespace asyncio {
 
             if (state != zero::async::promise::State::ONLY_CALLBACK ||
                 !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
-                throw std::logic_error(fmt::format("unexpected state: {}", std::to_underlying(state)));
+                throw std::logic_error{fmt::format("unexpected state: {}", std::to_underlying(state))};
 
             this->mCore->event.set();
 
@@ -62,7 +62,7 @@ namespace asyncio {
             assert(this->mCore->state != zero::async::promise::State::DONE);
 
             this->mCore->result.emplace(std::unexpected<E>(std::in_place, std::forward<Ts>(args)...));
-            zero::async::promise::State state = this->mCore->state;
+            auto state = this->mCore->state.load();
 
             if (state == zero::async::promise::State::PENDING &&
                 this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
@@ -72,7 +72,7 @@ namespace asyncio {
 
             if (state != zero::async::promise::State::ONLY_CALLBACK ||
                 !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
-                throw std::logic_error(fmt::format("unexpected state: {}", std::to_underlying(state)));
+                throw std::logic_error{fmt::format("unexpected state: {}", std::to_underlying(state))};
 
             this->mCore->event.set();
 

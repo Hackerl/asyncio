@@ -32,7 +32,7 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
         auto stream = co_await listener.accept();
         CO_EXPECT(stream);
 
-        handle(*std::move(stream)).future().fail([](const std::error_code &ec) {
+        handle(*std::move(stream)).future().fail([](const auto &ec) {
             fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
         });
     }

@@ -1,5 +1,5 @@
 #include <asyncio/fs.h>
-#include <zero/filesystem/file.h>
+#include <zero/filesystem/fs.h>
 #include <zero/strings/strings.h>
 #include <catch2/catch_test_macros.hpp>
 
@@ -8,7 +8,7 @@ constexpr std::string_view CONTENT = "hello world";
 TEST_CASE("asynchronous filesystem", "[fs]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         const auto path = std::filesystem::temp_directory_path() / "asyncio-fs";
-        REQUIRE(zero::filesystem::writeString(path, CONTENT));
+        REQUIRE(zero::filesystem::write(path, CONTENT));
 
         SECTION("read only") {
             auto file = co_await asyncio::fs::open(path, O_RDONLY);
@@ -31,7 +31,7 @@ TEST_CASE("asynchronous filesystem", "[fs]") {
             auto file = co_await asyncio::fs::open(path, O_WRONLY);
             REQUIRE(file);
 
-            const std::string replace = zero::strings::toupper(CONTENT);
+            const auto replace = zero::strings::toupper(CONTENT);
             const auto res = co_await file->writeAll(std::as_bytes(std::span{replace}));
             REQUIRE(res);
 

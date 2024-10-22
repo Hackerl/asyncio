@@ -30,7 +30,7 @@ TEST_CASE("task with error", "[task]") {
                 promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise.isFulfilled())
-                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                     promise.reject(asyncio::task::Error::CANCELLED);
                     return {};
@@ -149,7 +149,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -159,7 +159,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -199,7 +199,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -209,7 +209,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -253,7 +253,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -263,7 +263,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -305,7 +305,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -315,7 +315,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -357,7 +357,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -367,7 +367,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -409,7 +409,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -419,7 +419,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -466,7 +466,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -476,7 +476,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -519,7 +519,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -529,7 +529,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -576,7 +576,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise1.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise1.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise1.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -586,7 +586,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise2.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise2.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise2.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -626,7 +626,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise1.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise1.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise1.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -636,7 +636,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise2.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise2.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise2.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -680,7 +680,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise1.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise1.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise1.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -690,7 +690,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise2.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise2.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise2.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -732,7 +732,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise1.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise1.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise1.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -742,7 +742,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise2.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise2.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise2.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -784,7 +784,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise1.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise1.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise1.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -794,7 +794,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise2.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise2.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise2.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -836,7 +836,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise1.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise1.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise1.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -846,7 +846,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise2.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise2.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise2.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -893,7 +893,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise1.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise1.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise1.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -903,7 +903,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise2.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise2.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise2.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -946,7 +946,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise1.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise1.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise1.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -956,7 +956,7 @@ TEST_CASE("task with error", "[task]") {
                                 promise2.getFuture(),
                                 [&]() -> std::expected<void, std::error_code> {
                                     if (promise2.isFulfilled())
-                                        return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                     promise2.reject(asyncio::task::Error::CANCELLED);
                                     return {};
@@ -1002,7 +1002,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1012,7 +1012,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1022,7 +1022,7 @@ TEST_CASE("task with error", "[task]") {
                             promise3.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise3.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise3.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1038,7 +1038,7 @@ TEST_CASE("task with error", "[task]") {
                         const auto res = co_await task;
                         REQUIRE(res);
                         REQUIRE(std::get<0>(*res) == 10);
-                        REQUIRE(std::get<1>(*res) == 1000);
+                        REQUIRE(std::get<2>(*res) == 1000);
                     }
 
                     SECTION("failure") {
@@ -1066,7 +1066,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1076,7 +1076,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1086,7 +1086,7 @@ TEST_CASE("task with error", "[task]") {
                             promise3.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise3.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise3.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1140,7 +1140,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1150,7 +1150,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1160,7 +1160,7 @@ TEST_CASE("task with error", "[task]") {
                             promise3.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise3.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise3.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1223,7 +1223,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise1.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise1.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1233,7 +1233,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise2.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise2.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1243,7 +1243,7 @@ TEST_CASE("task with error", "[task]") {
                             promise3.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise3.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise3.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1331,7 +1331,7 @@ TEST_CASE("task with error", "[task]") {
                             promise.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1382,7 +1382,7 @@ TEST_CASE("task with error", "[task]") {
                             promise.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1435,7 +1435,7 @@ TEST_CASE("task with error", "[task]") {
                             promise.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1486,7 +1486,7 @@ TEST_CASE("task with error", "[task]") {
                             promise.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1525,7 +1525,7 @@ TEST_CASE("task with error", "[task]") {
                         auto task = asyncio::task::from(promise.getFuture())
                             .orElse([](const std::error_code &ec) -> std::expected<int, std::error_code> {
                                 REQUIRE(ec == std::errc::invalid_argument);
-                                return std::unexpected(make_error_code(std::errc::io_error));
+                                return std::unexpected{make_error_code(std::errc::io_error)};
                             });
 
                         promise.reject(make_error_code(std::errc::invalid_argument));
@@ -1541,14 +1541,14 @@ TEST_CASE("task with error", "[task]") {
                             promise.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise.reject(asyncio::task::Error::CANCELLED);
                                 return {};
                             }
                         }).orElse([](const std::error_code &ec) -> std::expected<int, std::error_code> {
                             REQUIRE(ec == std::errc::operation_canceled);
-                            return std::unexpected(make_error_code(std::errc::invalid_argument));
+                            return std::unexpected{make_error_code(std::errc::invalid_argument)};
                         });
                         REQUIRE(task.cancel());
 
@@ -1579,7 +1579,7 @@ TEST_CASE("task with error", "[task]") {
                         auto task = asyncio::task::from(promise.getFuture())
                             .orElse([](const std::error_code &ec) -> asyncio::task::Task<int, std::error_code> {
                                 REQUIRE(ec == std::errc::invalid_argument);
-                                co_return std::unexpected(make_error_code(std::errc::io_error));
+                                co_return std::unexpected{make_error_code(std::errc::io_error)};
                             });
 
                         promise.reject(make_error_code(std::errc::invalid_argument));
@@ -1595,14 +1595,14 @@ TEST_CASE("task with error", "[task]") {
                             promise.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise.reject(asyncio::task::Error::CANCELLED);
                                 return {};
                             }
                         }).orElse([](const std::error_code &ec) -> asyncio::task::Task<int, std::error_code> {
                             REQUIRE(ec == std::errc::operation_canceled);
-                            co_return std::unexpected(make_error_code(std::errc::invalid_argument));
+                            co_return std::unexpected{make_error_code(std::errc::invalid_argument)};
                         });
                         REQUIRE(task.cancel());
 
@@ -1649,7 +1649,7 @@ TEST_CASE("task with error", "[task]") {
                             promise.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise.reject(asyncio::task::Error::CANCELLED);
                                 return {};
@@ -1700,7 +1700,7 @@ TEST_CASE("task with error", "[task]") {
                             promise.getFuture(),
                             [&]() -> std::expected<void, std::error_code> {
                                 if (promise.isFulfilled())
-                                    return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
 
                                 promise.reject(asyncio::task::Error::CANCELLED);
                                 return {};

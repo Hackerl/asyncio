@@ -15,9 +15,9 @@ namespace asyncio::http {
         }
 
         std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy;
-        bool finished;
-        bool transferring;
-        std::size_t skip;
+        bool finished{};
+        bool transferring{};
+        std::size_t skip{};
         Promise<void, std::error_code> promise;
         std::span<std::byte> buffer;
         std::optional<Promise<std::size_t, std::error_code>> dataPromise;
@@ -34,7 +34,7 @@ namespace asyncio::http {
         ~Response() override;
 
         [[nodiscard]] long statusCode() const;
-        [[nodiscard]] std::optional<curl_off_t> contentLength() const;
+        [[nodiscard]] std::optional<std::uint64_t> contentLength() const;
         [[nodiscard]] std::optional<std::string> contentType() const;
         [[nodiscard]] std::vector<std::string> cookies() const;
         [[nodiscard]] std::optional<std::string> header(const std::string &name) const;
@@ -72,8 +72,8 @@ namespace asyncio::http {
         struct Core {
             struct Context {
                 uv::Handle<uv_poll_t> poll;
-                Core *core;
-                curl_socket_t s;
+                Core *core{};
+                curl_socket_t s{};
             };
 
             int running{};
@@ -152,7 +152,7 @@ namespace asyncio::http {
             const std::optional<Options> options,
             T payload
         ) {
-            Options opt = options.value_or(mCore->options);
+            auto opt = options.value_or(mCore->options);
             opt.headers["Content-Type"] = "application/json";
 
             auto connection = prepare(std::move(method), url, std::move(opt));
@@ -160,12 +160,10 @@ namespace asyncio::http {
 
             std::string body;
 
-            if constexpr (std::is_same_v<T, nlohmann::json>) {
+            if constexpr (std::is_same_v<T, nlohmann::json>)
                 body = payload.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
-            }
-            else {
+            else
                 body = nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
-            }
 
             curl_easy_setopt(
                 connection->get()->easy.get(),

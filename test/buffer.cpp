@@ -129,7 +129,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                     }
 
                     SECTION("invalid argument") {
-                        std::array<std::byte, 17> data = {};
+                        std::array<std::byte, 17> data{};
                         const auto res = co_await reader.peek(data);
                         REQUIRE(!res);
                         REQUIRE(res.error() == std::errc::invalid_argument);

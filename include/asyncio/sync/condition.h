@@ -6,12 +6,10 @@
 namespace asyncio::sync {
     class Condition {
     public:
-        Condition();
-
         task::Task<void, std::error_code> wait(Mutex &mutex);
 
         template<typename F>
-            requires std::is_invocable_v<F>
+            requires std::is_same_v<std::invoke_result_t<F>, bool>
         task::Task<void, std::error_code> wait(Mutex &mutex, F predicate) {
             while (!predicate()) {
                 CO_EXPECT(co_await wait(mutex));
@@ -24,7 +22,7 @@ namespace asyncio::sync {
         void broadcast();
 
     private:
-        int mCounter;
+        int mCounter{};
         std::list<std::shared_ptr<Promise<void, std::error_code>>> mPending;
     };
 }

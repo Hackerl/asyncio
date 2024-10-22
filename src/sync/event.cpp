@@ -1,8 +1,5 @@
 #include <asyncio/sync/event.h>
 
-asyncio::sync::Event::Event() : mValue(false) {
-}
-
 asyncio::task::Task<void, std::error_code> asyncio::sync::Event::wait() {
     if (mValue)
         co_return {};
@@ -14,7 +11,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Event::wait() {
         promise->getFuture(),
         [=, this]() -> std::expected<void, std::error_code> {
             if (mPending.remove(promise) == 0)
-                return std::unexpected(task::Error::WILL_BE_DONE);
+                return std::unexpected{task::Error::WILL_BE_DONE};
 
             promise->reject(task::Error::CANCELLED);
             return {};

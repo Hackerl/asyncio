@@ -14,7 +14,7 @@ int main(const int argc, char *argv[]) {
     });
 
     if (!result)
-        throw std::system_error(result.error());
+        throw std::system_error{result.error()};
 
     if (!*result) {
         fmt::print(stderr, "Error: {} ({})\n", result->error().message(), result->error());

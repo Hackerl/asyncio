@@ -4,12 +4,14 @@
 TEST_CASE("DNS query", "[net]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         SECTION("get address info") {
-            addrinfo hints = {};
-
-            hints.ai_family = AF_UNSPEC;
-            hints.ai_socktype = SOCK_STREAM;
-
-            const auto res = co_await asyncio::net::dns::getAddressInfo("localhost", "http", hints);
+            const auto res = co_await asyncio::net::dns::getAddressInfo(
+                "localhost",
+                "http",
+                addrinfo{
+                    .ai_family = AF_UNSPEC,
+                    .ai_socktype = SOCK_STREAM
+                }
+            );
             REQUIRE(res);
 
             REQUIRE(

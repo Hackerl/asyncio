@@ -12,7 +12,7 @@ namespace asyncio {
     template<typename T>
     struct ChannelCore {
         explicit ChannelCore(std::shared_ptr<EventLoop> e, const std::size_t capacity)
-            : eventLoop(std::move(e)), buffer(capacity) {
+            : eventLoop{std::move(e)}, buffer{capacity} {
         }
 
         std::mutex mutex;
@@ -23,7 +23,7 @@ namespace asyncio {
         std::array<std::atomic<std::size_t>, 2> counters;
 
         void trigger(const std::size_t index) {
-            std::lock_guard guard(mutex);
+            std::lock_guard guard{mutex};
 
             if (pending[index].empty())
                 return;
@@ -38,7 +38,7 @@ namespace asyncio {
 
         void close() {
             {
-                std::lock_guard guard(mutex);
+                std::lock_guard guard{mutex};
 
                 if (closed)
                     return;
@@ -75,11 +75,11 @@ namespace asyncio {
     template<typename T>
     class Sender {
     public:
-        explicit Sender(std::shared_ptr<ChannelCore<T>> core) : mCore(std::move(core)) {
+        explicit Sender(std::shared_ptr<ChannelCore<T>> core) : mCore{std::move(core)} {
             ++mCore->counters[SENDER];
         }
 
-        Sender(const Sender &rhs) : mCore(rhs.mCore) {
+        Sender(const Sender &rhs) : mCore{rhs.mCore} {
             ++mCore->counters[SENDER];
         }
 
@@ -106,12 +106,12 @@ namespace asyncio {
         template<typename U = T>
         std::expected<void, TrySendError> trySend(U &&element) {
             if (mCore->closed)
-                return std::unexpected(TrySendError::DISCONNECTED);
+                return std::unexpected{TrySendError::DISCONNECTED};
 
             const auto index = mCore->buffer.reserve();
 
             if (!index)
-                return std::unexpected(TrySendError::FULL);
+                return std::unexpected{TrySendError::FULL};
 
             mCore->buffer[*index] = std::forward<U>(element);
             mCore->buffer.commit(*index);
@@ -124,110 +124,92 @@ namespace asyncio {
         std::expected<void, SendSyncError>
         sendSync(U &&element, const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
             if (mCore->closed)
-                return std::unexpected(SendSyncError::DISCONNECTED);
-
-            std::expected<void, SendSyncError> result;
+                return std::unexpected{SendSyncError::DISCONNECTED};
 
             while (true) {
                 const auto index = mCore->buffer.reserve();
 
-                if (!index) {
-                    mCore->mutex.lock();
+                if (index) {
+                    mCore->buffer[*index] = std::forward<U>(element);
+                    mCore->buffer.commit(*index);
+                    mCore->trigger(RECEIVER);
+                    return {};
+                }
 
-                    if (mCore->closed) {
-                        mCore->mutex.unlock();
-                        result = std::unexpected(SendSyncError::DISCONNECTED);
-                        break;
-                    }
+                mCore->mutex.lock();
 
-                    if (!mCore->buffer.full()) {
-                        mCore->mutex.unlock();
-                        continue;
-                    }
-
-                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
-                    const auto future = promise->getFuture();
-
-                    mCore->pending[SENDER].push_back(promise);
+                if (mCore->closed) {
                     mCore->mutex.unlock();
+                    return std::unexpected{SendSyncError::DISCONNECTED};
+                }
 
-                    if (const auto res = future.wait(timeout); !res) {
-                        assert(res.error() == std::errc::timed_out);
-                        std::lock_guard guard(mCore->mutex);
-                        mCore->pending[SENDER].remove(promise);
-                        result = std::unexpected(SendSyncError::TIMEOUT);
-                        break;
-                    }
-
+                if (!mCore->buffer.full()) {
+                    mCore->mutex.unlock();
                     continue;
                 }
 
-                mCore->buffer[*index] = std::forward<U>(element);
-                mCore->buffer.commit(*index);
-                mCore->trigger(RECEIVER);
+                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+                const auto future = promise->getFuture();
 
-                break;
+                mCore->pending[SENDER].push_back(promise);
+                mCore->mutex.unlock();
+
+                if (const auto result = future.wait(timeout); !result) {
+                    assert(result.error() == std::errc::timed_out);
+                    std::lock_guard guard{mCore->mutex};
+                    mCore->pending[SENDER].remove(promise);
+                    return std::unexpected{SendSyncError::TIMEOUT};
+                }
             }
-
-            return result;
         }
 
         task::Task<void, SendError> send(T element) {
             if (mCore->closed)
-                co_return std::unexpected(SendError::DISCONNECTED);
-
-            std::expected<void, SendError> result;
+                co_return std::unexpected{SendError::DISCONNECTED};
 
             while (true) {
                 const auto index = mCore->buffer.reserve();
 
-                if (!index) {
-                    mCore->mutex.lock();
+                if (index) {
+                    mCore->buffer[*index] = std::move(element);
+                    mCore->buffer.commit(*index);
+                    mCore->trigger(RECEIVER);
+                    co_return {};
+                }
 
-                    if (mCore->closed) {
-                        mCore->mutex.unlock();
-                        result = std::unexpected(SendError::DISCONNECTED);
-                        break;
-                    }
+                mCore->mutex.lock();
 
-                    if (!mCore->buffer.full()) {
-                        mCore->mutex.unlock();
-                        continue;
-                    }
-
-                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
-
-                    mCore->pending[SENDER].push_back(promise);
+                if (mCore->closed) {
                     mCore->mutex.unlock();
+                    co_return std::unexpected{SendError::DISCONNECTED};
+                }
 
-                    if (const auto res = co_await task::Cancellable{
-                        promise->getFuture(),
-                        [=]() -> std::expected<void, std::error_code> {
-                            if (promise->isFulfilled())
-                                return std::unexpected(task::Error::WILL_BE_DONE);
-
-                            promise->reject(task::Error::CANCELLED);
-                            return {};
-                        }
-                    }; !res) {
-                        assert(res.error() == std::errc::operation_canceled);
-                        std::lock_guard guard(mCore->mutex);
-                        mCore->pending[SENDER].remove(promise);
-                        result = std::unexpected(SendError::CANCELLED);
-                        break;
-                    }
-
+                if (!mCore->buffer.full()) {
+                    mCore->mutex.unlock();
                     continue;
                 }
 
-                mCore->buffer[*index] = std::move(element);
-                mCore->buffer.commit(*index);
-                mCore->trigger(RECEIVER);
+                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
 
-                break;
+                mCore->pending[SENDER].push_back(promise);
+                mCore->mutex.unlock();
+
+                if (const auto result = co_await task::Cancellable{
+                    promise->getFuture(),
+                    [=]() -> std::expected<void, std::error_code> {
+                        if (promise->isFulfilled())
+                            return std::unexpected{task::Error::WILL_BE_DONE};
+
+                        promise->reject(task::Error::CANCELLED);
+                        return {};
+                    }
+                }; !result) {
+                    assert(result.error() == std::errc::operation_canceled);
+                    std::lock_guard guard{mCore->mutex};
+                    mCore->pending[SENDER].remove(promise);
+                    co_return std::unexpected{SendError::CANCELLED};
+                }
             }
-
-            co_return result;
         }
 
         void close() {
@@ -282,11 +264,11 @@ namespace asyncio {
     template<typename T>
     class Receiver {
     public:
-        explicit Receiver(std::shared_ptr<ChannelCore<T>> core) : mCore(std::move(core)) {
+        explicit Receiver(std::shared_ptr<ChannelCore<T>> core) : mCore{std::move(core)} {
             ++mCore->counters[RECEIVER];
         }
 
-        Receiver(const Receiver &rhs) : mCore(rhs.mCore) {
+        Receiver(const Receiver &rhs) : mCore{rhs.mCore} {
             ++mCore->counters[RECEIVER];
         }
 
@@ -314,9 +296,9 @@ namespace asyncio {
             const auto index = mCore->buffer.acquire();
 
             if (!index)
-                return std::unexpected(mCore->closed ? TryReceiveError::DISCONNECTED : TryReceiveError::EMPTY);
+                return std::unexpected{mCore->closed ? TryReceiveError::DISCONNECTED : TryReceiveError::EMPTY};
 
-            T element = std::move(mCore->buffer[*index]);
+            auto element = std::move(mCore->buffer[*index]);
 
             mCore->buffer.release(*index);
             mCore->trigger(SENDER);
@@ -326,105 +308,87 @@ namespace asyncio {
 
         std::expected<T, ReceiveSyncError>
         receiveSync(const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
-            std::expected<T, ReceiveSyncError> result = std::unexpected(ReceiveSyncError::DISCONNECTED);
-
             while (true) {
                 const auto index = mCore->buffer.acquire();
 
-                if (!index) {
-                    mCore->mutex.lock();
+                if (index) {
+                    auto element = std::move(mCore->buffer[*index]);
+                    mCore->buffer.release(*index);
+                    mCore->trigger(SENDER);
+                    return element;
+                }
 
-                    if (!mCore->buffer.empty()) {
-                        mCore->mutex.unlock();
-                        continue;
-                    }
+                mCore->mutex.lock();
 
-                    if (mCore->closed) {
-                        mCore->mutex.unlock();
-                        break;
-                    }
-
-                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
-                    const auto future = promise->getFuture();
-
-                    mCore->pending[RECEIVER].push_back(promise);
+                if (!mCore->buffer.empty()) {
                     mCore->mutex.unlock();
-
-                    if (const auto res = future.wait(timeout); !res) {
-                        assert(res.error() == std::errc::timed_out);
-                        std::lock_guard guard(mCore->mutex);
-                        mCore->pending[RECEIVER].remove(promise);
-                        result = std::unexpected(ReceiveSyncError::TIMEOUT);
-                        break;
-                    }
-
                     continue;
                 }
 
-                result = std::move(mCore->buffer[*index]);
+                if (mCore->closed) {
+                    mCore->mutex.unlock();
+                    return std::unexpected{ReceiveSyncError::DISCONNECTED};
+                }
 
-                mCore->buffer.release(*index);
-                mCore->trigger(SENDER);
+                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+                const auto future = promise->getFuture();
 
-                break;
+                mCore->pending[RECEIVER].push_back(promise);
+                mCore->mutex.unlock();
+
+                if (const auto result = future.wait(timeout); !result) {
+                    assert(result.error() == std::errc::timed_out);
+                    std::lock_guard guard{mCore->mutex};
+                    mCore->pending[RECEIVER].remove(promise);
+                    return std::unexpected{ReceiveSyncError::TIMEOUT};
+                }
             }
-
-            return result;
         }
 
         task::Task<T, ReceiveError> receive() {
-            std::expected<T, ReceiveError> result = std::unexpected(ReceiveError::DISCONNECTED);
-
             while (true) {
                 const auto index = mCore->buffer.acquire();
 
-                if (!index) {
-                    mCore->mutex.lock();
+                if (index) {
+                    auto element = std::move(mCore->buffer[*index]);
+                    mCore->buffer.release(*index);
+                    mCore->trigger(SENDER);
+                    co_return element;
+                }
 
-                    if (!mCore->buffer.empty()) {
-                        mCore->mutex.unlock();
-                        continue;
-                    }
+                mCore->mutex.lock();
 
-                    if (mCore->closed) {
-                        mCore->mutex.unlock();
-                        break;
-                    }
-
-                    const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
-
-                    mCore->pending[RECEIVER].push_back(promise);
+                if (!mCore->buffer.empty()) {
                     mCore->mutex.unlock();
-
-                    if (const auto res = co_await task::Cancellable{
-                        promise->getFuture(),
-                        [=]() -> std::expected<void, std::error_code> {
-                            if (promise->isFulfilled())
-                                return std::unexpected(task::Error::WILL_BE_DONE);
-
-                            promise->reject(task::Error::CANCELLED);
-                            return {};
-                        }
-                    }; !res) {
-                        assert(res.error() == std::errc::operation_canceled);
-                        std::lock_guard guard(mCore->mutex);
-                        mCore->pending[RECEIVER].remove(promise);
-                        result = std::unexpected(ReceiveError::CANCELLED);
-                        break;
-                    }
-
                     continue;
                 }
 
-                result = std::move(mCore->buffer[*index]);
+                if (mCore->closed) {
+                    mCore->mutex.unlock();
+                    co_return std::unexpected{ReceiveError::DISCONNECTED};
+                }
 
-                mCore->buffer.release(*index);
-                mCore->trigger(SENDER);
+                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
 
-                break;
+                mCore->pending[RECEIVER].push_back(promise);
+                mCore->mutex.unlock();
+
+                if (const auto result = co_await task::Cancellable{
+                    promise->getFuture(),
+                    [=]() -> std::expected<void, std::error_code> {
+                        if (promise->isFulfilled())
+                            return std::unexpected{task::Error::WILL_BE_DONE};
+
+                        promise->reject(task::Error::CANCELLED);
+                        return {};
+                    }
+                }; !result) {
+                    assert(result.error() == std::errc::operation_canceled);
+                    std::lock_guard guard{mCore->mutex};
+                    mCore->pending[RECEIVER].remove(promise);
+                    co_return std::unexpected{ReceiveError::CANCELLED};
+                }
             }
-
-            co_return result;
         }
 
         [[nodiscard]] std::size_t size() const {

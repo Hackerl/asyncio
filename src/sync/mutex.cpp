@@ -1,8 +1,5 @@
 #include <asyncio/sync/mutex.h>
 
-asyncio::sync::Mutex::Mutex() : mLocked(false) {
-}
-
 void asyncio::sync::Mutex::wakeup() const {
     if (mPending.empty())
         return;
@@ -24,7 +21,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Mutex::lock() {
         promise->getFuture(),
         [=]() -> std::expected<void, std::error_code> {
             if (promise->isFulfilled())
-                return std::unexpected(task::Error::WILL_BE_DONE);
+                return std::unexpected{task::Error::WILL_BE_DONE};
 
             promise->reject(task::Error::CANCELLED);
             return {};
@@ -37,7 +34,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Mutex::lock() {
         if (!mLocked)
             wakeup();
 
-        co_return std::unexpected(result.error());
+        co_return std::unexpected{result.error()};
     }
 
     assert(!mLocked);

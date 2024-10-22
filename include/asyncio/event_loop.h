@@ -50,10 +50,10 @@ namespace asyncio {
     }
 
     template<typename F, typename T = std::invoke_result_t<F>>
-        requires zero::detail::is_specialization<T, task::Task>
+        requires zero::detail::is_specialization_v<T, task::Task>
     std::expected<std::expected<typename T::value_type, typename T::error_type>, std::error_code> run(F &&f) {
-        const auto eventLoop = EventLoop::make().transform([](EventLoop &&rhs) {
-            return std::make_shared<EventLoop>(std::move(rhs));
+        const auto eventLoop = EventLoop::make().transform([](EventLoop &&value) {
+            return std::make_shared<EventLoop>(std::move(value));
         });
         EXPECT(eventLoop);
 

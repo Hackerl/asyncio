@@ -18,7 +18,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 
         if (!message) {
             if (message.error() != asyncio::http::ws::CloseCode::NORMAL_CLOSURE)
-                co_return std::unexpected(message.error());
+                co_return std::unexpected{message.error()};
 
             break;
         }

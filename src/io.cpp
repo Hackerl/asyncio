@@ -1,71 +1,54 @@
 #include <asyncio/io.h>
 
 asyncio::task::Task<void, std::error_code> asyncio::IReader::readExactly(const std::span<std::byte> data) {
-    std::expected<void, std::error_code> result;
-    std::size_t offset = 0;
+    std::size_t offset{0};
 
     while (offset < data.size()) {
         const auto n = co_await read(data.subspan(offset));
+        CO_EXPECT(n);
 
-        if (!n) {
-            result = std::unexpected(n.error());
-            break;
-        }
-
-        if (*n == 0) {
-            result = std::unexpected<std::error_code>(ReadExactlyError::UNEXPECTED_EOF);
-            break;
-        }
+        if (*n == 0)
+            co_return std::unexpected{ReadExactlyError::UNEXPECTED_EOF};
 
         offset += *n;
     }
 
-    co_return result;
+    co_return {};
 }
 
 asyncio::task::Task<std::vector<std::byte>, std::error_code> asyncio::IReader::readAll() {
-    std::expected<std::vector<std::byte>, std::error_code> result;
+    std::vector<std::byte> data;
 
     while (true) {
-        std::array<std::byte, 10240> data; // NOLINT(*-pro-type-member-init)
-        const auto n = co_await read(data);
+        std::array<std::byte, 10240> buffer; // NOLINT(*-pro-type-member-init)
 
-        if (!n) {
-            result = std::unexpected(n.error());
-            break;
-        }
+        const auto n = co_await read(buffer);
+        CO_EXPECT(n);
 
         if (*n == 0)
             break;
 
-        std::copy_n(data.begin(), *n, std::back_inserter(*result));
+        data.insert(data.end(), buffer.begin(), buffer.begin() + *n);
     }
 
-    co_return result;
+    co_return data;
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std::span<const std::byte> data) {
-    std::expected<void, std::error_code> result;
-    std::size_t offset = 0;
+    std::size_t offset{0};
 
     while (offset < data.size()) {
-        if (co_await task::cancelled) {
-            result = std::unexpected<std::error_code>(task::Error::CANCELLED);
-            break;
-        }
+        if (co_await task::cancelled)
+            co_return std::unexpected{task::Error::CANCELLED};
 
         const auto n = co_await write(data.subspan(offset));
-
-        if (!n) {
-            result = std::unexpected(n.error());
-            break;
-        }
+        CO_EXPECT(n);
 
         assert(*n != 0);
         offset += *n;
     }
 
-    co_return result;
+    co_return {};
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::ISeekable::rewind() {

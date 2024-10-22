@@ -77,11 +77,12 @@ void asyncio::http::ws::Header::mask(const bool mask) {
 
 asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::WebSocket::connect(const URL url) {
     const auto scheme = url.scheme();
-    const auto host = url.host();
-    const auto port = url.port();
-
     CO_EXPECT(scheme);
+
+    const auto host = url.host();
     CO_EXPECT(host);
+
+    const auto port = url.port();
     CO_EXPECT(port);
 
     std::shared_ptr<IReader> reader;
@@ -90,8 +91,8 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
 
     if (*scheme == WS_SCHEME) {
         auto stream = co_await net::TCPStream::connect(*host, *port)
-            .transform([](net::TCPStream &&rhs) {
-                return std::make_shared<net::TCPStream>(std::move(rhs));
+            .transform([](net::TCPStream &&value) {
+                return std::make_shared<net::TCPStream>(std::move(value));
             });
         CO_EXPECT(stream);
         reader = *stream;
@@ -106,8 +107,8 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         CO_EXPECT(context);
 
         auto tls = co_await net::tls::connect(*std::move(stream), *std::move(context), *host)
-            .transform([](net::tls::TLS<net::TCPStream> &&rhs) {
-                return std::make_shared<net::tls::TLS<net::TCPStream>>(std::move(rhs));
+            .transform([](net::tls::TLS<net::TCPStream> &&value) {
+                return std::make_shared<net::tls::TLS<net::TCPStream>>(std::move(value));
             });
         CO_EXPECT(tls);
         reader = *tls;
@@ -115,21 +116,21 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         closeable = *std::move(tls);
     }
     else {
-        co_return std::unexpected(Error::UNSUPPORTED_SCHEME);
+        co_return std::unexpected{Error::UNSUPPORTED_SCHEME};
     }
 
-    BufReader bufReader(reader);
+    BufReader bufReader{reader};
 
     std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution dist(0, 255);
+    std::mt19937 gen{rd()};
+    std::uniform_int_distribution dist{0, 255};
 
-    std::array<std::byte, 16> secret = {};
+    std::array<std::byte, 16> secret{};
 
     for (auto &b: secret)
         b = static_cast<std::byte>(dist(gen));
 
-    const std::string key = zero::encoding::base64::encode(secret);
+    const auto key = zero::encoding::base64::encode(secret);
     const auto path = url.path().value_or("/");
     const auto query = url.query();
 
@@ -155,13 +156,13 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
     auto tokens = zero::strings::split(*line);
 
     if (tokens.size() < 2)
-        co_return std::unexpected(Error::INVALID_RESPONSE);
+        co_return std::unexpected{Error::INVALID_RESPONSE};
 
     const auto code = zero::strings::toNumber<int>(tokens[1]);
     CO_EXPECT(code);
 
     if (code != SWITCHING_PROTOCOLS_STATUS)
-        co_return std::unexpected(Error::UNEXPECTED_STATUS_CODE);
+        co_return std::unexpected{Error::UNEXPECTED_STATUS_CODE};
 
     std::map<std::string, std::string> headers;
 
@@ -175,7 +176,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         tokens = zero::strings::split(*line, ":", 1);
 
         if (tokens.size() != 2)
-            co_return std::unexpected(Error::INVALID_HTTP_HEADER);
+            co_return std::unexpected{Error::INVALID_HTTP_HEADER};
 
         headers[tokens[0]] = zero::strings::trim(tokens[1]);
     }
@@ -183,10 +184,10 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
     const auto it = headers.find("Sec-WebSocket-Accept");
 
     if (it == headers.end())
-        co_return std::unexpected(Error::NO_ACCEPT_HEADER);
+        co_return std::unexpected{Error::NO_ACCEPT_HEADER};
 
-    std::array<std::byte, SHA_DIGEST_LENGTH> digest = {};
-    const std::string data = key + WS_MAGIC;
+    std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
+    const auto data = key + WS_MAGIC;
 
     SHA1(
         reinterpret_cast<const unsigned char *>(data.data()),
@@ -195,7 +196,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
     );
 
     if (it->second != zero::encoding::base64::encode(digest))
-        co_return std::unexpected(Error::HASH_MISMATCH);
+        co_return std::unexpected{Error::HASH_MISMATCH};
 
     co_return WebSocket{
         std::make_shared<BufReader<std::shared_ptr<IReader>>>(std::move(bufReader)),
@@ -208,8 +209,8 @@ asyncio::http::ws::WebSocket::WebSocket(
     std::shared_ptr<IReader> reader,
     std::shared_ptr<IWriter> writer,
     std::shared_ptr<ICloseable> closeable
-) : mState(State::CONNECTED), mMutex(std::make_unique<sync::Mutex>()),
-    mReader(std::move(reader)), mWriter(std::move(writer)), mCloseable(std::move(closeable)) {
+) : mState{State::CONNECTED}, mMutex{std::make_unique<sync::Mutex>()},
+    mReader{std::move(reader)}, mWriter{std::move(writer)}, mCloseable{std::move(closeable)} {
 }
 
 asyncio::task::Task<asyncio::http::ws::Frame, std::error_code>
@@ -219,7 +220,7 @@ asyncio::http::ws::WebSocket::readFrame() {
     CO_EXPECT(co_await mReader->readExactly({reinterpret_cast<std::byte *>(&header), sizeof(Header)}));
 
     if (header.mask())
-        co_return std::unexpected(Error::UNSUPPORTED_MASKED_FRAME);
+        co_return std::unexpected{Error::UNSUPPORTED_MASKED_FRAME};
 
     std::vector<std::byte> data;
 
@@ -255,7 +256,7 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
         auto fragment = co_await readFrame();
         CO_EXPECT(fragment);
 
-        std::ranges::copy(fragment->data, std::back_inserter(frame->data));
+        frame->data.insert(frame->data.end(), fragment->data.begin(), fragment->data.end());
 
         if (fragment->header.final())
             break;
@@ -276,8 +277,8 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     header.final(true);
     header.mask(true);
 
-    std::size_t extendedBytes = 0;
-    const std::size_t length = message.data.size();
+    std::size_t extendedBytes{};
+    const auto length = message.data.size();
 
     if (length > MAX_TWO_BYTE_PAYLOAD_LENGTH) {
         extendedBytes = 8;
@@ -301,17 +302,17 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     }
 
     std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution dist(0, 255);
+    std::mt19937 gen{rd()};
+    std::uniform_int_distribution dist{0, 255};
 
-    std::array<std::byte, MASKING_KEY_LENGTH> key = {};
+    std::array<std::byte, MASKING_KEY_LENGTH> key{};
 
     for (auto &b: key)
         b = static_cast<std::byte>(dist(gen));
 
     CO_EXPECT(co_await mWriter->writeAll(key));
 
-    for (std::size_t i = 0; i < length; ++i)
+    for (std::size_t i{0}; i < length; ++i)
         message.data[i] ^= key[i % 4];
 
     co_return co_await mWriter->writeAll(message.data);
@@ -343,14 +344,14 @@ asyncio::http::ws::WebSocket::readMessage() {
             mState = State::CLOSED;
 
             if (message->data.size() < 2)
-                co_return std::unexpected(CloseCode::NORMAL_CLOSURE);
+                co_return std::unexpected{CloseCode::NORMAL_CLOSURE};
 
-            co_return std::unexpected(
+            co_return std::unexpected{
                 static_cast<CloseCode>(ntohs(*reinterpret_cast<const unsigned short *>(message->data.data())))
-            );
+            };
         }
         else {
-            co_return std::unexpected(Error::UNSUPPORTED_OPCODE);
+            co_return std::unexpected{Error::UNSUPPORTED_OPCODE};
         }
     }
 }
@@ -359,7 +360,7 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMe
     assert(message.opcode == Opcode::TEXT || message.opcode == Opcode::BINARY);
 
     if (mState != State::CONNECTED)
-        co_return std::unexpected(Error::CONNECTION_CLOSED);
+        co_return std::unexpected{Error::CONNECTION_CLOSED};
 
     if (message.opcode == Opcode::TEXT) {
         const auto &text = std::get<std::string>(message.data);

@@ -8,9 +8,10 @@
 
 namespace asyncio {
     template<typename T, typename I>
-    concept Trait = std::derived_from<T, I> ||
-        std::is_convertible_v<std::remove_const_t<T>, std::shared_ptr<I>> ||
-        std::is_convertible_v<std::remove_const_t<T>, std::unique_ptr<I>>;
+    concept Trait = std::is_convertible_v<std::remove_cvref_t<T>, std::shared_ptr<I>> || (
+        std::derived_from<std::remove_cvref_t<T>, std::remove_const_t<I>> &&
+        std::is_convertible_v<std::add_lvalue_reference_t<T>, I &>
+    );
 
     DEFINE_ERROR_CONDITION(
         IOError,
@@ -78,36 +79,24 @@ namespace asyncio {
     };
 
     task::Task<void, std::error_code> copy(Trait<IReader> auto &reader, Trait<IWriter> auto &writer) {
-        std::expected<void, std::error_code> result;
-
         while (true) {
-            if (co_await task::cancelled) {
-                result = std::unexpected<std::error_code>(task::Error::CANCELLED);
-                break;
-            }
+            if (co_await task::cancelled)
+                co_return std::unexpected{task::Error::CANCELLED};
 
             std::array<std::byte, 20480> data; // NOLINT(*-pro-type-member-init)
-            const auto n = co_await std::invoke(&IReader::read, reader, data);
 
-            if (!n) {
-                result = std::unexpected(n.error());
-                break;
-            }
+            const auto n = co_await std::invoke(&IReader::read, reader, data);
+            CO_EXPECT(n);
 
             if (*n == 0)
                 break;
 
             co_await task::lock;
-
-            if (const auto res = co_await std::invoke(&IWriter::writeAll, writer, std::span{data.data(), *n}); !res) {
-                result = std::unexpected(res.error());
-                break;
-            }
-
+            CO_EXPECT(co_await std::invoke(&IWriter::writeAll, writer, std::span{data.data(), *n}));
             co_await task::unlock;
         }
 
-        co_return result;
+        co_return {};
     }
 
     template<typename T, typename U>

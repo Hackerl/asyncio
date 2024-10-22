@@ -6,8 +6,6 @@
 namespace asyncio::sync {
     class Event {
     public:
-        Event();
-
         task::Task<void, std::error_code> wait();
 
         void set();
@@ -16,7 +14,7 @@ namespace asyncio::sync {
         [[nodiscard]] bool isSet() const;
 
     private:
-        bool mValue;
+        bool mValue{false};
         std::list<std::shared_ptr<Promise<void, std::error_code>>> mPending;
     };
 }

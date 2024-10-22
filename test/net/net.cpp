@@ -63,7 +63,7 @@ TEST_CASE("network components", "[net]") {
         REQUIRE(!interfaces->empty());
 
         const auto &zone = std::views::keys(*interfaces).front();
-        const unsigned int index = if_nametoindex(zone.c_str());
+        const auto index = if_nametoindex(zone.c_str());
         REQUIRE(index);
 
         const asyncio::net::Address address = asyncio::net::IPv6Address{80, {}, zone};

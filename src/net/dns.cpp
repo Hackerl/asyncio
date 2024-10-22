@@ -7,14 +7,13 @@ asyncio::net::dns::getAddressInfo(
     const std::optional<addrinfo> hints
 ) {
     Promise<std::vector<Address>, uv::Error> promise;
-    uv_getaddrinfo_t request = {.data = &promise};
+    uv_getaddrinfo_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         return uv_getaddrinfo(
             getEventLoop()->raw(),
             &request,
-            // ReSharper disable once CppParameterMayBeConstPtrOrRef
-            [](uv_getaddrinfo_t *req, const int status, addrinfo *res) {
+            [](auto *req, const int status, addrinfo *result) {
                 const auto p = static_cast<Promise<std::vector<Address>, uv::Error> *>(req->data);
 
                 if (status < 0) {
@@ -24,8 +23,8 @@ asyncio::net::dns::getAddressInfo(
 
                 std::vector<Address> addresses;
 
-                for (auto i = res; i; i = i->ai_next) {
-                    auto address = addressFrom(i->ai_addr, static_cast<socklen_t>(i->ai_addrlen));
+                for (const auto *ptr = result; ptr; ptr = ptr->ai_next) {
+                    auto address = addressFrom(ptr->ai_addr, static_cast<socklen_t>(ptr->ai_addrlen));
 
                     if (!address)
                         continue;
@@ -33,7 +32,7 @@ asyncio::net::dns::getAddressInfo(
                     addresses.push_back(*std::move(address));
                 }
 
-                uv_freeaddrinfo(res);
+                uv_freeaddrinfo(result);
                 p->resolve(std::move(addresses));
             },
             node.c_str(),
@@ -55,63 +54,63 @@ asyncio::net::dns::getAddressInfo(
 
 asyncio::task::Task<std::vector<asyncio::net::IP>, std::error_code>
 asyncio::net::dns::lookupIP(std::string host) {
-    addrinfo hints = {};
+    co_return co_await getAddressInfo(
+        std::move(host),
+        std::nullopt,
+        addrinfo{
+            .ai_flags = AI_ADDRCONFIG,
+            .ai_family = AF_UNSPEC
+        }
+    ).transform([](const auto &addresses) {
+        return addresses
+            | std::views::transform(
+                [](const auto &address) -> IP {
+                    if (std::holds_alternative<IPv4Address>(address))
+                        return std::get<IPv4Address>(address).ip;
 
-    hints.ai_flags = AI_ADDRCONFIG;
-    hints.ai_family = AF_UNSPEC;
-
-    co_return (co_await getAddressInfo(std::move(host), std::nullopt, hints))
-        .transform([](std::span<const Address> addresses) {
-            const auto v = addresses
-                | std::views::transform(
-                    [](const Address &address) -> IP {
-                        if (std::holds_alternative<IPv4Address>(address))
-                            return std::get<IPv4Address>(address).ip;
-
-                        return std::get<IPv6Address>(address).ip;
-                    }
-                );
-
-            return std::vector<IP>{v.begin(), v.end()};
-        });
+                    return std::get<IPv6Address>(address).ip;
+                }
+            )
+            | std::ranges::to<std::vector>();
+    });
 }
 
 asyncio::task::Task<std::vector<asyncio::net::IPv4>, std::error_code>
 asyncio::net::dns::lookupIPv4(std::string host) {
-    addrinfo hints = {};
-
-    hints.ai_flags = AI_ADDRCONFIG;
-    hints.ai_family = AF_INET;
-
-    co_return co_await getAddressInfo(std::move(host), std::nullopt, hints)
-        .transform([](std::span<const Address> addresses) {
-            const auto v = addresses
-                | std::views::transform(
-                    [](const Address &address) {
-                        return std::get<IPv4Address>(address).ip;
-                    }
-                );
-
-            return std::vector<IPv4>{v.begin(), v.end()};
-        });
+    co_return co_await getAddressInfo(
+        std::move(host),
+        std::nullopt,
+        addrinfo{
+            .ai_flags = AI_ADDRCONFIG,
+            .ai_family = AF_INET
+        }
+    ).transform([](const auto &addresses) {
+        return addresses
+            | std::views::transform(
+                [](const auto &address) {
+                    return std::get<IPv4Address>(address).ip;
+                }
+            )
+            | std::ranges::to<std::vector>();
+    });
 }
 
 asyncio::task::Task<std::vector<asyncio::net::IPv6>, std::error_code>
 asyncio::net::dns::lookupIPv6(std::string host) {
-    addrinfo hints = {};
-
-    hints.ai_flags = AI_ADDRCONFIG;
-    hints.ai_family = AF_INET6;
-
-    co_return co_await getAddressInfo(std::move(host), std::nullopt, hints)
-        .transform([](std::span<const Address> addresses) {
-            const auto v = addresses
-                | std::views::transform(
-                    [](const Address &address) {
-                        return std::get<IPv6Address>(address).ip;
-                    }
-                );
-
-            return std::vector<IPv6>{v.begin(), v.end()};
-        });
+    co_return co_await getAddressInfo(
+        std::move(host),
+        std::nullopt,
+        addrinfo{
+            .ai_flags = AI_ADDRCONFIG,
+            .ai_family = AF_INET6
+        }
+    ).transform([](std::span<const Address> addresses) {
+        return addresses
+            | std::views::transform(
+                [](const auto &address) {
+                    return std::get<IPv6Address>(address).ip;
+                }
+            )
+            | std::ranges::to<std::vector>();
+    });
 }

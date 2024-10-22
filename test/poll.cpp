@@ -8,10 +8,10 @@
 
 TEST_CASE("poll events", "[poll]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        std::array<uv_os_sock_t, 2> sockets = {};
+        std::array<uv_os_sock_t, 2> sockets{};
         REQUIRE(uv_socketpair(SOCK_STREAM, 0, sockets.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE) == 0);
 
-        std::array polls = {
+        std::array polls{
             asyncio::Poll::make(sockets[0]),
             asyncio::Poll::make(sockets[1])
         };
@@ -27,7 +27,7 @@ TEST_CASE("poll events", "[poll]") {
                     REQUIRE(res);
                     REQUIRE(*res & asyncio::Poll::Event::READABLE);
 
-                    std::array<char, 1024> buffer = {};
+                    std::array<char, 1024> buffer{};
                     REQUIRE(recv(socket, buffer.data(), buffer.size(), 0) == 11);
                     REQUIRE(buffer.data() == "hello world"sv);
                 }(sockets[0], *std::move(polls[0])),

@@ -1,6 +1,6 @@
 #include <asyncio/poll.h>
 
-asyncio::Poll::Poll(uv::Handle<uv_poll_t> poll) : mPoll(std::move(poll)) {
+asyncio::Poll::Poll(uv::Handle<uv_poll_t> poll) : mPoll{std::move(poll)} {
 
 }
 
@@ -40,7 +40,7 @@ asyncio::task::Task<int, std::error_code> asyncio::Poll::on(const int events) {
         return uv_poll_start(
             mPoll.raw(),
             events,
-            [](uv_poll_t *handle, const int status, const int e) {
+            [](auto *handle, const int status, const int e) {
                 uv_poll_stop(handle);
                 const auto p = static_cast<Promise<int, std::error_code> *>(handle->data);
 
@@ -58,7 +58,7 @@ asyncio::task::Task<int, std::error_code> asyncio::Poll::on(const int events) {
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected(task::Error::WILL_BE_DONE);
+                return std::unexpected{task::Error::WILL_BE_DONE};
 
             uv_poll_stop(mPoll.raw());
             promise.reject(task::Error::CANCELLED);

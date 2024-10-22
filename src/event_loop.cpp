@@ -5,7 +5,7 @@ thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 asyncio::EventLoop::EventLoop(
     std::unique_ptr<uv_loop_t, void(*)(uv_loop_t *)> loop,
     std::unique_ptr<TaskQueue> taskQueue
-): mLoop(std::move(loop)), mTaskQueue(std::move(taskQueue)) {
+): mLoop{std::move(loop)}, mTaskQueue{std::move(taskQueue)} {
 }
 
 asyncio::EventLoop::~EventLoop() {
@@ -41,8 +41,7 @@ std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
         return uv_async_init(
             loop.get(),
             async.get(),
-            // ReSharper disable once CppParameterMayBeConstPtrOrRef
-            [](uv_async_t *handle) {
+            [](auto *handle) {
                 auto &[async, mutex, queue] = *static_cast<TaskQueue *>(handle->data);
 
                 while (true) {
@@ -80,7 +79,7 @@ std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 std::expected<void, std::error_code> asyncio::EventLoop::post(std::function<void()> function) {
-    std::lock_guard guard(mTaskQueue->mutex);
+    std::lock_guard guard{mTaskQueue->mutex};
     mTaskQueue->queue.push(std::move(function));
 
     EXPECT(uv::expected([this] {

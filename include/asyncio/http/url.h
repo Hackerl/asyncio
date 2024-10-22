@@ -9,6 +9,9 @@
 #include <fmt/std.h>
 
 namespace asyncio::http {
+    std::expected<std::string, std::error_code> urlEncode(const std::string &str);
+    std::expected<std::string, std::error_code> urlDecode(const std::string &str);
+
     class URL {
     public:
         DEFINE_ERROR_TRANSFORMER_INNER(
@@ -34,6 +37,7 @@ namespace asyncio::http {
         [[nodiscard]] std::expected<std::string, std::error_code> host() const;
         [[nodiscard]] std::expected<std::string, std::error_code> path() const;
         [[nodiscard]] std::expected<std::string, std::error_code> query() const;
+        [[nodiscard]] std::expected<std::string, std::error_code> fragment() const;
         [[nodiscard]] std::expected<unsigned short, std::error_code> port() const;
 
         URL &scheme(const std::optional<std::string> &scheme);
@@ -42,20 +46,22 @@ namespace asyncio::http {
         URL &host(const std::optional<std::string> &host);
         URL &path(const std::optional<std::string> &path);
         URL &query(const std::optional<std::string> &query);
+        URL &fragment(const std::optional<std::string> &fragment);
         URL &port(std::optional<unsigned short> port);
 
         URL &appendQuery(const std::string &query);
         URL &appendQuery(const std::string &key, const std::string &value);
 
+        // char * is implicitly converted to bool, not std::string.
         template<typename T>
             requires std::is_same_v<T, bool>
-        URL &appendQuery(const std::string &key, T value) {
+        URL &appendQuery(const std::string &key, const T value) {
             return appendQuery(key, value ? "true" : "false");
         }
 
         template<typename T>
-            requires std::is_arithmetic_v<T>
-        URL &appendQuery(const std::string &key, T value) {
+            requires (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
+        URL &appendQuery(const std::string &key, const T value) {
             return appendQuery(key, std::to_string(value));
         }
 

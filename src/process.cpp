@@ -3,14 +3,14 @@
 
 #ifdef _WIN32
 #include <zero/defer.h>
-#include <zero/os/nt/error.h>
+#include <zero/os/windows/error.h>
 #else
 #include <sys/wait.h>
 #include <zero/os/unix/error.h>
 #endif
 
 asyncio::process::ChildProcess::ChildProcess(Process process, std::array<std::optional<Pipe>, 3> stdio)
-    : Process(std::move(process)), mStdio(std::move(stdio)) {
+    : Process{std::move(process)}, mStdio{std::move(stdio)} {
 }
 
 std::optional<asyncio::Pipe> &asyncio::process::ChildProcess::stdInput() {
@@ -31,29 +31,29 @@ asyncio::task::Task<zero::os::process::ExitStatus, std::error_code> asyncio::pro
     const auto event = CreateEventA(nullptr, false, false, nullptr);
 
     if (!event)
-        co_return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+        co_return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
 
     DEFER(CloseHandle(event));
 
     co_return co_await toThread(
         [&]() -> std::expected<ExitStatus, std::error_code> {
             const auto &impl = this->impl();
-            const std::array handles = {impl.handle(), event};
+            const std::array handles{impl.handle(), event};
 
-            const DWORD result = WaitForMultipleObjects(handles.size(), handles.data(), false, INFINITE);
+            const auto result = WaitForMultipleObjects(handles.size(), handles.data(), false, INFINITE);
 
             if (result >= WAIT_OBJECT_0 + handles.size())
-                return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+                return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
 
             if (result == WAIT_OBJECT_0 + 1)
-                return std::unexpected(make_error_code(std::errc::operation_canceled));
+                return std::unexpected{make_error_code(std::errc::operation_canceled)};
 
-            return impl.exitCode().transform([](const DWORD code) {
+            return impl.exitCode().transform([](const auto &code) {
                 return ExitStatus{code};
             });
         },
         [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
-            return zero::os::nt::expected([&] {
+            return zero::os::windows::expected([&] {
                 return SetEvent(event);
             });
         }
@@ -61,9 +61,9 @@ asyncio::task::Task<zero::os::process::ExitStatus, std::error_code> asyncio::pro
 #else
     co_return co_await toThread(
         [this]() -> std::expected<ExitStatus, std::error_code> {
-            int s;
+            int s{};
 
-            const pid_t pid = this->pid();
+            const auto pid = this->impl().pid();
             const auto id = zero::os::unix::ensure([&] {
                 return waitpid(pid, &s, 0);
             });
@@ -87,16 +87,16 @@ std::expected<std::optional<asyncio::process::ExitStatus>, std::error_code> asyn
         if (result.error() == std::errc::timed_out)
             return std::nullopt;
 
-        return std::unexpected(result.error());
+        return std::unexpected{result.error()};
     }
 
-    return impl.exitCode().transform([](const DWORD code) {
+    return impl.exitCode().transform([](const auto &code) {
         return ExitStatus{code};
     });
 #else
-    const pid_t pid = this->pid();
-    int s;
+    int s{};
 
+    const auto pid = this->impl().pid();
     const auto id = zero::os::unix::expected([&] {
         return waitpid(pid, &s, WNOHANG);
     });
@@ -109,16 +109,16 @@ std::expected<std::optional<asyncio::process::ExitStatus>, std::error_code> asyn
 #endif
 }
 
-asyncio::process::PseudoConsole::Pipe::Pipe(asyncio::Pipe pipe) : asyncio::Pipe(std::move(pipe)) {
+asyncio::process::PseudoConsole::Pipe::Pipe(asyncio::Pipe pipe) : asyncio::Pipe{std::move(pipe)} {
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::process::PseudoConsole::Pipe::read(const std::span<std::byte> data) {
 #ifdef __linux__
     co_return co_await asyncio::Pipe::read(data)
-        .orElse([](const std::error_code &ec) -> std::expected<std::size_t, std::error_code> {
+        .orElse([](const auto &ec) -> std::expected<std::size_t, std::error_code> {
             if (ec != std::errc::io_error)
-                return std::unexpected(ec);
+                return std::unexpected{ec};
 
             return 0;
         });
@@ -128,7 +128,7 @@ asyncio::process::PseudoConsole::Pipe::read(const std::span<std::byte> data) {
 }
 
 asyncio::process::PseudoConsole::PseudoConsole(zero::os::process::PseudoConsole pc, Pipe pipe)
-    : mPseudoConsole(std::move(pc)), mPipe(std::move(pipe)) {
+    : mPseudoConsole{std::move(pc)}, mPipe{std::move(pipe)} {
 }
 
 std::expected<asyncio::process::PseudoConsole, std::error_code>
@@ -152,17 +152,17 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     auto pipe = asyncio::Pipe::from(*fd);
 
     if (!pipe) {
-        uv_fs_t request;
+        uv_fs_t request{};
         uv_fs_close(nullptr, &request, *fd, nullptr);
         uv_fs_req_cleanup(&request);
-        return std::unexpected(pipe.error());
+        return std::unexpected{pipe.error()};
     }
 
     if (!pipe) {
-        uv_fs_t request;
+        uv_fs_t request{};
         uv_fs_close(nullptr, &request, *fd, nullptr);
         uv_fs_req_cleanup(&request);
-        return std::unexpected(pipe.error());
+        return std::unexpected{pipe.error()};
     }
 
     return PseudoConsole{*std::move(pc), Pipe{*std::move(pipe)}};
@@ -180,8 +180,8 @@ std::expected<void, std::error_code> asyncio::process::PseudoConsole::resize(con
 
 std::expected<asyncio::process::ChildProcess, std::error_code>
 asyncio::process::PseudoConsole::spawn(const Command &command) {
-    return mPseudoConsole.spawn(command.mCommand).transform([](zero::os::process::ChildProcess &&rhs) {
-        return ChildProcess{zero::os::process::Process{std::move(rhs.impl())}, {}};
+    return mPseudoConsole.spawn(command.mCommand).transform([](zero::os::process::ChildProcess &&process) {
+        return ChildProcess{zero::os::process::Process{std::move(process.impl())}, {}};
     });
 }
 
@@ -189,7 +189,7 @@ asyncio::process::PseudoConsole::Pipe &asyncio::process::PseudoConsole::pipe() {
     return mPipe;
 }
 
-asyncio::process::Command::Command(std::filesystem::path path) : mCommand(std::move(path)) {
+asyncio::process::Command::Command(std::filesystem::path path) : mCommand{std::move(path)} {
 }
 
 std::expected<asyncio::process::ChildProcess, std::error_code>
@@ -199,13 +199,13 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
 
     std::array<std::optional<Pipe>, 3> stdio;
 
-    constexpr std::array memberPointers = {
+    constexpr std::array memberPointers{
         &zero::os::process::ChildProcess::stdInput,
         &zero::os::process::ChildProcess::stdOutput,
         &zero::os::process::ChildProcess::stdError
     };
 
-    for (int i = 0; i < 3; ++i) {
+    for (int i{0}; i < 3; ++i) {
         auto &fd = (*child.*memberPointers[i])();
 
         if (!fd)
@@ -218,7 +218,7 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
         if (!file) {
             std::ignore = child->kill();
             std::ignore = child->wait();
-            return std::unexpected(file.error());
+            return std::unexpected{file.error()};
         }
 
         fd.reset();
@@ -229,11 +229,11 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
             std::ignore = child->kill();
             std::ignore = child->wait();
 
-            uv_fs_t request;
+            uv_fs_t request{};
             uv_fs_close(nullptr, &request, *file, nullptr);
             uv_fs_req_cleanup(&request);
 
-            return std::unexpected(pipe.error());
+            return std::unexpected{pipe.error()};
         }
 
         stdio[i].emplace(*std::move(pipe));
@@ -347,7 +347,7 @@ asyncio::task::Task<zero::os::process::Output, std::error_code> asyncio::process
     if (!result) {
         std::ignore = child->kill();
         co_await child->wait();
-        co_return std::unexpected(result.error());
+        co_return std::unexpected{result.error()};
     }
 
     const auto status = co_await child->wait();

@@ -1,6 +1,6 @@
 #include <asyncio/signal.h>
 
-asyncio::Signal::Signal(uv::Handle<uv_signal_t> signal) : mSignal(std::move(signal)) {
+asyncio::Signal::Signal(uv::Handle<uv_signal_t> signal) : mSignal{std::move(signal)} {
 }
 
 std::expected<asyncio::Signal, std::error_code> asyncio::Signal::make() {
@@ -20,8 +20,7 @@ asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
     CO_EXPECT(uv::expected([&] {
         return uv_signal_start_oneshot(
             mSignal.raw(),
-            // ReSharper disable once CppParameterMayBeConstPtrOrRef
-            [](uv_signal_t *handle, const int s) {
+            [](auto *handle, const int s) {
                 static_cast<Promise<int, std::error_code> *>(handle->data)->resolve(s);
             },
             sig
@@ -32,7 +31,7 @@ asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected(task::Error::WILL_BE_DONE);
+                return std::unexpected{task::Error::WILL_BE_DONE};
 
             uv_signal_stop(mSignal.raw());
             promise.reject(task::Error::CANCELLED);

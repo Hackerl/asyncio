@@ -51,7 +51,7 @@ TEST_CASE("time", "[time]") {
                     from(asyncio::task::Cancellable{
                         promise->getFuture(),
                         [=]() -> std::expected<void, std::error_code> {
-                            return std::unexpected(asyncio::task::Error::WILL_BE_DONE);
+                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
                         }
                     }),
                     20ms

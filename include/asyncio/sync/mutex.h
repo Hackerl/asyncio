@@ -5,18 +5,16 @@
 
 namespace asyncio::sync {
     class Mutex {
-        void wakeup()const;
+        void wakeup() const;
 
     public:
-        Mutex();
-
         task::Task<void, std::error_code> lock();
         void unlock();
 
         [[nodiscard]] bool locked() const;
 
     private:
-        bool mLocked;
+        bool mLocked{false};
         std::list<std::shared_ptr<Promise<void, std::error_code>>> mPending;
     };
 }

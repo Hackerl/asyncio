@@ -19,7 +19,7 @@ TEST_CASE("event loop", "[event loop]") {
             const auto result = asyncio::run([]() -> asyncio::task::Task<void, std::error_code> {
                 using namespace std::chrono_literals;
                 co_await asyncio::sleep(10ms);
-                co_return std::unexpected(make_error_code(std::errc::invalid_argument));
+                co_return std::unexpected{make_error_code(std::errc::invalid_argument)};
             });
             REQUIRE(result);
             REQUIRE(!*result);
@@ -43,7 +43,7 @@ TEST_CASE("event loop", "[event loop]") {
             const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
                 using namespace std::chrono_literals;
                 co_await asyncio::sleep(10ms);
-                throw std::system_error(make_error_code(std::errc::invalid_argument));
+                throw std::system_error{make_error_code(std::errc::invalid_argument)};
             });
             REQUIRE(result);
             REQUIRE(!*result);

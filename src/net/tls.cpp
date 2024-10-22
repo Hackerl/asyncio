@@ -1,16 +1,16 @@
 #include <asyncio/net/tls.h>
-#include <zero/filesystem/file.h>
+#include <zero/filesystem/fs.h>
 
 #ifdef _WIN32
 std::expected<void, std::error_code> loadSystemCerts(X509_STORE *store, const std::string &name) {
     const auto systemStore = CertOpenSystemStoreA(0, name.c_str());
 
     if (!systemStore)
-        return std::unexpected(std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+        return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
 
     DEFER(CertCloseStore(systemStore, 0));
 
-    PCCERT_CONTEXT ctx = nullptr;
+    PCCERT_CONTEXT ctx{};
 
     DEFER(
         if (ctx)
@@ -21,24 +21,22 @@ std::expected<void, std::error_code> loadSystemCerts(X509_STORE *store, const st
         ctx = CertEnumCertificatesInStore(systemStore, ctx);
 
         if (!ctx)
-            break;
+            return {};
 
-        X509 *cert = d2i_X509(
+        const auto cert = d2i_X509(
             nullptr,
             const_cast<const unsigned char **>(&ctx->pbCertEncoded),
             static_cast<long>(ctx->cbCertEncoded)
         );
 
         if (!cert)
-            return std::unexpected(asyncio::net::tls::openSSLError());
+            return std::unexpected{asyncio::net::tls::openSSLError()};
 
         DEFER(X509_free(cert));
         EXPECT(asyncio::net::tls::expected([&] {
             return X509_STORE_add_cert(store, cert);
         }));
     }
-
-    return {};
 }
 #endif
 
@@ -48,21 +46,21 @@ std::error_code asyncio::net::tls::openSSLError() {
 
 std::expected<asyncio::net::tls::Certificate, std::error_code>
 asyncio::net::tls::Certificate::load(const std::string_view content) {
-    const std::unique_ptr<BIO, decltype(&BIO_free)> bio(
+    const std::unique_ptr<BIO, decltype(&BIO_free)> bio{
         BIO_new_mem_buf(content.data(), static_cast<int>(content.length())),
         BIO_free
-    );
+    };
 
     if (!bio)
-        return std::unexpected(openSSLError());
+        return std::unexpected{openSSLError()};
 
-    std::shared_ptr<X509> cert(
+    std::shared_ptr<X509> cert{
         PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr),
         X509_free
-    );
+    };
 
     if (!cert)
-        return std::unexpected(openSSLError());
+        return std::unexpected{openSSLError()};
 
     return Certificate{std::move(cert)};
 }
@@ -77,21 +75,21 @@ asyncio::net::tls::Certificate::loadFile(const std::filesystem::path &path) {
 
 std::expected<asyncio::net::tls::PrivateKey, std::error_code>
 asyncio::net::tls::PrivateKey::load(const std::string_view content) {
-    const std::unique_ptr<BIO, decltype(&BIO_free)> bio(
+    const std::unique_ptr<BIO, decltype(&BIO_free)> bio{
         BIO_new_mem_buf(content.data(), static_cast<int>(content.length())),
         BIO_free
-    );
+    };
 
     if (!bio)
-        return std::unexpected(openSSLError());
+        return std::unexpected{openSSLError()};
 
-    std::shared_ptr<EVP_PKEY> key(
+    std::shared_ptr<EVP_PKEY> key{
         PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr),
         EVP_PKEY_free
-    );
+    };
 
     if (!key)
-        return std::unexpected(openSSLError());
+        return std::unexpected{openSSLError()};
 
     return PrivateKey{std::move(key)};
 }
@@ -105,10 +103,10 @@ asyncio::net::tls::PrivateKey::loadFile(const std::filesystem::path &path) {
 }
 
 std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::ClientConfig::build() const {
-    Context context(SSL_CTX_new(TLS_method()), SSL_CTX_free);
+    Context context{SSL_CTX_new(TLS_method()), SSL_CTX_free};
 
     if (!context)
-        return std::unexpected(openSSLError());
+        return std::unexpected{openSSLError()};
 
     EXPECT(expected([&] {
         return SSL_CTX_set_min_proto_version(context.get(), std::to_underlying(minVersion));
@@ -120,10 +118,10 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Cl
 
     if (rootCAs.empty()) {
 #ifdef _WIN32
-        X509_STORE *store = SSL_CTX_get_cert_store(context.get());
+        const auto store = SSL_CTX_get_cert_store(context.get());
 
         if (!store)
-            return std::unexpected(openSSLError());
+            return std::unexpected{openSSLError()};
 
         EXPECT(loadSystemCerts(store, "CA"));
         EXPECT(loadSystemCerts(store, "AuthRoot"));
@@ -134,10 +132,10 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Cl
         }));
 #endif
     } else {
-        X509_STORE *store = SSL_CTX_get_cert_store(context.get());
+        const auto store = SSL_CTX_get_cert_store(context.get());
 
         if (!store)
-            return std::unexpected(openSSLError());
+            return std::unexpected{openSSLError()};
 
         for (const auto &[cert]: rootCAs) {
             EXPECT(expected([&] {
@@ -160,10 +158,10 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Cl
 }
 
 std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::ServerConfig::build() const {
-    Context context(SSL_CTX_new(TLS_method()), SSL_CTX_free);
+    Context context{SSL_CTX_new(TLS_method()), SSL_CTX_free};
 
     if (!context)
-        return std::unexpected(openSSLError());
+        return std::unexpected{openSSLError()};
 
     EXPECT(expected([&] {
         return SSL_CTX_set_min_proto_version(context.get(), std::to_underlying(minVersion));
@@ -175,10 +173,10 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Se
 
     if (rootCAs.empty()) {
 #ifdef _WIN32
-        X509_STORE *store = SSL_CTX_get_cert_store(context.get());
+        const auto store = SSL_CTX_get_cert_store(context.get());
 
         if (!store)
-            return std::unexpected(openSSLError());
+            return std::unexpected{openSSLError()};
 
         EXPECT(loadSystemCerts(store, "CA"));
         EXPECT(loadSystemCerts(store, "AuthRoot"));
@@ -189,10 +187,10 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Se
         }));
 #endif
     } else {
-        X509_STORE *store = SSL_CTX_get_cert_store(context.get());
+        const auto store = SSL_CTX_get_cert_store(context.get());
 
         if (!store)
-            return std::unexpected(openSSLError());
+            return std::unexpected{openSSLError()};
 
         for (const auto &[cert]: rootCAs) {
             EXPECT(expected([&] {

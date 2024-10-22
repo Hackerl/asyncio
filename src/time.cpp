@@ -7,7 +7,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         return uv_timer_init(getEventLoop()->raw(), ptr.get());
     }));
 
-    uv::Handle timer(std::move(ptr));
+    uv::Handle timer{std::move(ptr)};
 
     Promise<void, std::error_code> promise;
     timer->data = &promise;
@@ -15,7 +15,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
     CO_EXPECT(uv::expected([&] {
         return uv_timer_start(
             timer.raw(),
-            [](uv_timer_t *handle) {
+            [](auto *handle) {
                 uv_timer_stop(handle);
                 static_cast<Promise<void, std::error_code> *>(handle->data)->resolve();
             },
@@ -28,7 +28,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected(task::Error::WILL_BE_DONE);
+                return std::unexpected{task::Error::WILL_BE_DONE};
 
             uv_timer_stop(timer.raw());
             promise.reject(task::Error::CANCELLED);

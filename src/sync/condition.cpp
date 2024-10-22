@@ -1,10 +1,7 @@
 #include <asyncio/sync/condition.h>
 
-asyncio::sync::Condition::Condition() : mCounter(0) {
-}
-
 asyncio::task::Task<void, std::error_code> asyncio::sync::Condition::wait(Mutex &mutex) {
-    const int counter = mCounter;
+    const auto counter = mCounter;
 
     assert(mutex.locked());
     mutex.unlock();
@@ -16,7 +13,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Condition::wait(Mutex 
         promise->getFuture(),
         [=, this]() -> std::expected<void, std::error_code> {
             if (mPending.remove(promise) == 0)
-                return std::unexpected(task::Error::WILL_BE_DONE);
+                return std::unexpected{task::Error::WILL_BE_DONE};
 
             promise->reject(task::Error::CANCELLED);
             return {};
@@ -36,7 +33,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Condition::wait(Mutex 
         if (counter != mCounter)
             notify();
 
-        co_return std::unexpected(result.error());
+        co_return std::unexpected{result.error()};
     }
 
     co_return {};

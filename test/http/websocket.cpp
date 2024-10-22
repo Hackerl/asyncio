@@ -20,8 +20,8 @@ TEST_CASE("websocket", "[http]") {
                 [](auto l) -> asyncio::task::Task<void> {
                     using namespace std::string_view_literals;
 
-                    auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                        return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                    auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                        return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                     });
                     REQUIRE(stream);
 
@@ -48,8 +48,8 @@ TEST_CASE("websocket", "[http]") {
                     const auto it = headers.find("Sec-WebSocket-Key");
                     REQUIRE(it != headers.end());
 
-                    std::array<std::byte, SHA_DIGEST_LENGTH> digest = {};
-                    const std::string data = it->second + WS_MAGIC;
+                    std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
+                    const auto data = it->second + WS_MAGIC;
 
                     SHA1(
                         reinterpret_cast<const unsigned char *>(data.data()),
@@ -57,7 +57,7 @@ TEST_CASE("websocket", "[http]") {
                         reinterpret_cast<unsigned char *>(digest.data())
                     );
 
-                    const std::string response = fmt::format(
+                    const auto response = fmt::format(
                         "HTTP/1.1 101 Switching Protocols\r\n"
                         "Upgrade: websocket\r\n"
                         "Connection: Upgrade\r\n"
@@ -74,7 +74,7 @@ TEST_CASE("websocket", "[http]") {
                     REQUIRE(res);
                     REQUIRE(header.opcode() == asyncio::http::ws::Opcode::TEXT);
 
-                    std::array<std::byte, MASKING_KEY_LENGTH> key = {};
+                    std::array<std::byte, MASKING_KEY_LENGTH> key{};
                     res = co_await reader.readExactly(key);
                     REQUIRE(res);
 
@@ -84,7 +84,7 @@ TEST_CASE("websocket", "[http]") {
                     res = co_await reader.readExactly(payload);
                     REQUIRE(res);
 
-                    for (std::size_t i = 0; i < length; ++i)
+                    for (std::size_t i{0}; i < length; ++i)
                         payload[i] ^= key[i % 4];
 
                     REQUIRE(
@@ -118,7 +118,7 @@ TEST_CASE("websocket", "[http]") {
                     res = co_await reader.readExactly(payload);
                     REQUIRE(res);
 
-                    for (std::size_t i = 0; i < length; ++i)
+                    for (std::size_t i{0}; i < length; ++i)
                         payload[i] ^= key[i % 4];
 
                     REQUIRE(

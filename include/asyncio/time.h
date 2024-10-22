@@ -30,7 +30,7 @@ namespace asyncio {
             if (!future.result())
                 co_return std::expected<std::expected<T, E>, TimeoutError>{std::move(result)};
 
-            co_return std::unexpected(TimeoutError::ELAPSED);
+            co_return std::unexpected{TimeoutError::ELAPSED};
         }
 
         std::ignore = timer.cancel();

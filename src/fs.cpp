@@ -2,17 +2,17 @@
 #include <asyncio/thread.h>
 
 #ifdef _WIN32
-#include <zero/os/nt/error.h>
+#include <zero/os/windows/error.h>
 #else
 #include <unistd.h>
 #include <zero/os/unix/error.h>
 #endif
 
-asyncio::fs::File::File(const uv_file file): mFile(file), mEventLoop(getEventLoop()) {
+asyncio::fs::File::File(const uv_file file): mFile(file), mEventLoop{getEventLoop()} {
 }
 
 asyncio::fs::File::File(File &&rhs) noexcept
-    : mFile(std::exchange(rhs.mFile, -1)), mEventLoop(std::move(rhs.mEventLoop)) {
+    : mFile{std::exchange(rhs.mFile, -1)}, mEventLoop{std::move(rhs.mEventLoop)} {
 }
 
 asyncio::fs::File &asyncio::fs::File::operator=(File &&rhs) noexcept {
@@ -25,7 +25,7 @@ asyncio::fs::File::~File() {
     if (mFile == -1)
         return;
 
-    uv_fs_t request;
+    uv_fs_t request{};
     uv_fs_close(nullptr, &request, mFile, nullptr);
     uv_fs_req_cleanup(&request);
 }
@@ -36,7 +36,7 @@ asyncio::FileDescriptor asyncio::fs::File::fd() const {
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const std::span<std::byte> data) {
     Promise<std::size_t, std::error_code> promise;
-    uv_fs_t request = {.data = &promise};
+    uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         uv_buf_t buffer;
@@ -51,7 +51,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const 
             &buffer,
             1,
             -1,
-            [](uv_fs_t *req) {
+            [](auto *req) {
                 const auto p = static_cast<Promise<std::size_t, std::error_code> *>(req->data);
 
                 if (req->result < 0) {
@@ -70,7 +70,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const 
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const std::span<const std::byte> data) {
     Promise<std::size_t, std::error_code> promise(mEventLoop);
-    uv_fs_t request = {.data = &promise};
+    uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         uv_buf_t buffer;
@@ -85,7 +85,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const
             &buffer,
             1,
             -1,
-            [](uv_fs_t *req) {
+            [](auto *req) {
                 const auto p = static_cast<Promise<std::size_t, std::error_code> *>(req->data);
 
                 if (req->result < 0) {
@@ -104,14 +104,14 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
     Promise<void, std::error_code> promise(mEventLoop);
-    uv_fs_t request = {.data = &promise};
+    uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         return uv_fs_close(
             mEventLoop->raw(),
             &request,
             mFile,
-            [](uv_fs_t *req) {
+            [](auto *req) {
                 const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (req->result < 0) {
@@ -133,9 +133,9 @@ asyncio::task::Task<std::uint64_t, std::error_code>
 asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
     co_return co_await toThreadPool([&]() -> std::expected<std::uint64_t, std::error_code> {
 #ifdef _WIN32
-        LARGE_INTEGER pos;
+        LARGE_INTEGER pos{};
 
-        EXPECT(zero::os::nt::expected([&] {
+        EXPECT(zero::os::windows::expected([&] {
             return SetFilePointerEx(
                 uv_get_osfhandle(mFile),
                 LARGE_INTEGER{.QuadPart = offset},
@@ -165,7 +165,7 @@ asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
         return make_error_code(error);
     }).andThen([](const auto &result) -> std::expected<std::uint64_t, std::error_code> {
         if (!result)
-            return std::unexpected(result.error());
+            return std::unexpected{result.error()};
 
         return *result;
     });
@@ -175,7 +175,7 @@ asyncio::task::Task<asyncio::fs::File, std::error_code>
 asyncio::fs::open(const std::filesystem::path path, const int flags, const int mode) {
     Promise<uv_file, std::error_code> promise;
 
-    uv_fs_t request = {.data = &promise};
+    uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         return uv_fs_open(
@@ -184,7 +184,7 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
             path.string().c_str(),
             flags,
             mode,
-            [](uv_fs_t *req) {
+            [](auto *req) {
                 const auto p = static_cast<Promise<uv_file, std::error_code> *>(req->data);
 
                 if (req->result < 0) {
@@ -206,14 +206,14 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::unlink(const std::filesystem::path path) {
     Promise<void, std::error_code> promise;
-    uv_fs_t request = {.data = &promise};
+    uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         return uv_fs_unlink(
             getEventLoop()->raw(),
             &request,
             path.string().c_str(),
-            [](uv_fs_t *req) {
+            [](auto *req) {
                 const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (req->result < 0) {
@@ -232,14 +232,14 @@ asyncio::task::Task<void, std::error_code> asyncio::fs::unlink(const std::filesy
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::rmdir(const std::filesystem::path path) {
     Promise<void, std::error_code> promise;
-    uv_fs_t request = {.data = &promise};
+    uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         return uv_fs_rmdir(
             getEventLoop()->raw(),
             &request,
             path.string().c_str(),
-            [](uv_fs_t *req) {
+            [](auto *req) {
                 const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (req->result < 0) {
@@ -258,7 +258,7 @@ asyncio::task::Task<void, std::error_code> asyncio::fs::rmdir(const std::filesys
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::mkdir(const std::filesystem::path path, const int mode) {
     Promise<void, std::error_code> promise;
-    uv_fs_t request = {.data = &promise};
+    uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         return uv_fs_mkdir(
@@ -266,7 +266,7 @@ asyncio::task::Task<void, std::error_code> asyncio::fs::mkdir(const std::filesys
             &request,
             path.string().c_str(),
             mode,
-            [](uv_fs_t *req) {
+            [](auto *req) {
                 const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
                 if (req->result < 0) {
@@ -285,14 +285,14 @@ asyncio::task::Task<void, std::error_code> asyncio::fs::mkdir(const std::filesys
 
 asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::mkdtemp(const std::string tpl) {
     Promise<std::filesystem::path, std::error_code> promise;
-    uv_fs_t request = {.data = &promise};
+    uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         return uv_fs_mkdtemp(
             getEventLoop()->raw(),
             &request,
             tpl.c_str(),
-            [](uv_fs_t *req) {
+            [](auto *req) {
                 const auto p = static_cast<Promise<std::filesystem::path, std::error_code> *>(req->data);
 
                 if (req->result < 0) {
@@ -311,14 +311,14 @@ asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::mkdtemp
 
 asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::mkstemp(const std::string tpl) {
     Promise<std::filesystem::path, std::error_code> promise;
-    uv_fs_t request = {.data = &promise};
+    uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
         return uv_fs_mkstemp(
             getEventLoop()->raw(),
             &request,
             tpl.c_str(),
-            [](uv_fs_t *req) {
+            [](auto *req) {
                 const auto p = static_cast<Promise<std::filesystem::path, std::error_code> *>(req->data);
 
                 if (req->result < 0) {

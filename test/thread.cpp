@@ -35,7 +35,7 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
                     auto task = asyncio::toThread(
                         [&]() -> std::expected<void, std::error_code> {
                             if (event.wait(50ms))
-                                return std::unexpected(asyncio::task::Error::CANCELLED);
+                                return std::unexpected{asyncio::task::Error::CANCELLED};
 
                             return {};
                         },
@@ -68,7 +68,7 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
                     auto task = asyncio::toThread(
                         [&]() -> std::expected<int, std::error_code> {
                             if (event.wait(50ms))
-                                return std::unexpected(asyncio::task::Error::CANCELLED);
+                                return std::unexpected{asyncio::task::Error::CANCELLED};
 
                             return 1024;
                         },

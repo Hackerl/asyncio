@@ -289,7 +289,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
   asyncio::run([]() -> asyncio::task::Task<void> {
       auto result = co_await asyncio::toThread([]() -> std::expected<void, std::error_code> {
           std::this_thread::sleep_for(10ms);
-          return std::unexpected(make_error_code(std::errc::bad_message));
+          return std::unexpected{make_error_code(std::errc::bad_message)};
       });
 
       REQUIRE(!result);
@@ -309,7 +309,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
               [](auto channel) -> asyncio::task::Task<void, std::error_code> {
                   std::expected<void, std::error_code> result;
 
-                  for (int i = 0; i < 1000; i++) {
+                  for (int i{0}; i < 1000; i++) {
                       auto res = co_await channel->send(i);
 
                       if (!res) {
@@ -352,7 +352,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
               [](auto channel) -> asyncio::task::Task<void, std::error_code> {
                   std::expected<void, std::error_code> result;
 
-                  for (int i = 0; i < 1000; i++) {
+                  for (int i{0}; i < 1000; i++) {
                       auto res = co_await channel->send(i);
 
                       if (!res) {

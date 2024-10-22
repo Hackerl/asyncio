@@ -26,9 +26,9 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     const auto certFile = cmdline.getOptional<std::filesystem::path>("cert");
     const auto keyFile = cmdline.getOptional<std::filesystem::path>("key");
 
-    const bool insecure = cmdline.exist("insecure");
+    const auto insecure = cmdline.exist("insecure");
 
-    asyncio::net::tls::ClientConfig config = {
+    asyncio::net::tls::ClientConfig config{
         .insecure = insecure
     };
 

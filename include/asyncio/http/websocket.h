@@ -33,71 +33,52 @@ namespace asyncio::http::ws {
         }
 
         [[nodiscard]] std::string message(const int value) const override {
-            std::string msg;
-
             switch (static_cast<CloseCode>(value)) {
             case CloseCode::NORMAL_CLOSURE:
-                msg = "normal closure";
-                break;
+                return "normal closure";
 
             case CloseCode::GOING_AWAY:
-                msg = "going away";
-                break;
+                return "going away";
 
             case CloseCode::PROTOCOL_ERROR:
-                msg = "protocol error";
-                break;
+                return "protocol error";
 
             case CloseCode::UNSUPPORTED_DATA:
-                msg = "unsupported data";
-                break;
+                return "unsupported data";
 
             case CloseCode::NO_STATUS_RECEIVED:
-                msg = "no status received";
-                break;
+                return "no status received";
 
             case CloseCode::ABNORMAL_CLOSURE:
-                msg = "abnormal closure";
-                break;
+                return "abnormal closure";
 
             case CloseCode::INVALID_FRAME_PAYLOAD_DATA:
-                msg = "invalid frame payload data";
-                break;
+                return "invalid frame payload data";
 
             case CloseCode::POLICY_VIOLATION:
-                msg = "policy violation";
-                break;
+                return "policy violation";
 
             case CloseCode::MESSAGE_TOO_BIG:
-                msg = "message too big";
-                break;
+                return "message too big";
 
             case CloseCode::MANDATORY_EXTENSION:
-                msg = "mandatory extension";
-                break;
+                return "mandatory extension";
 
             case CloseCode::INTERNAL_ERROR:
-                msg = "internal error";
-                break;
+                return "internal error";
 
             case CloseCode::SERVICE_RESTART:
-                msg = "service restart";
-                break;
+                return "service restart";
 
             case CloseCode::TRY_AGAIN_LATER:
-                msg = "try again later";
-                break;
+                return "try again later";
 
             case CloseCode::BAD_GATEWAY:
-                msg = "bad gateway";
-                break;
+                return "bad gateway";
 
             default:
-                msg = "unknown";
-                break;
+                return "unknown";
             }
-
-            return msg;
         }
     };
 
@@ -115,7 +96,7 @@ namespace asyncio::http::ws {
     };
 
     struct InternalMessage {
-        Opcode opcode;
+        Opcode opcode{};
         std::vector<std::byte> data;
     };
 

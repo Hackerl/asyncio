@@ -1,7 +1,7 @@
 #include <asyncio/http/request.h>
 #include <asyncio/net/stream.h>
 #include <asyncio/buffer.h>
-#include <zero/filesystem/file.h>
+#include <zero/filesystem/fs.h>
 #include <catch2/catch_test_macros.hpp>
 
 constexpr auto URL = "http://localhost:30000/object?id=0";
@@ -24,8 +24,8 @@ TEST_CASE("http requests", "[http]") {
                     [](auto l) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                         });
                         REQUIRE(stream);
 
@@ -96,8 +96,8 @@ TEST_CASE("http requests", "[http]") {
                     [](auto l) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                         });
                         REQUIRE(stream);
 
@@ -147,8 +147,8 @@ TEST_CASE("http requests", "[http]") {
                     [](auto l) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                         });
                         REQUIRE(stream);
 
@@ -187,8 +187,8 @@ TEST_CASE("http requests", "[http]") {
                         auto response = co_await requests->get(*url);
                         REQUIRE(response);
 
-                        const auto people = co_await response->string().transform([](const std::string &content) {
-                            return nlohmann::json::parse(content).get<People>();
+                        const auto people = co_await response->string().transform([](const auto &content) {
+                            return nlohmann::json::parse(content).template get<People>();
                         });
                         REQUIRE(people);
                         REQUIRE(people->name == "rose");
@@ -204,8 +204,8 @@ TEST_CASE("http requests", "[http]") {
                     [](auto l) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                         });
                         REQUIRE(stream);
 
@@ -275,8 +275,8 @@ TEST_CASE("http requests", "[http]") {
                     [](auto l) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                         });
                         REQUIRE(stream);
 
@@ -331,7 +331,7 @@ TEST_CASE("http requests", "[http]") {
                         auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
-                        const std::map<std::string, std::string> payload = {{"name", "jack"}};
+                        const std::map<std::string, std::string> payload{{"name", "jack"}};
                         auto response = co_await requests->post(*url, payload);
                         REQUIRE(response);
 
@@ -347,8 +347,8 @@ TEST_CASE("http requests", "[http]") {
                     [](auto l) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                         });
                         REQUIRE(stream);
 
@@ -397,7 +397,7 @@ TEST_CASE("http requests", "[http]") {
                     }(*std::move(listener)),
                     []() -> asyncio::task::Task<void> {
                         const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
-                        REQUIRE(zero::filesystem::writeString(path, "hello world"));
+                        REQUIRE(zero::filesystem::write(path, "hello world"));
 
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
@@ -405,7 +405,7 @@ TEST_CASE("http requests", "[http]") {
                         auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
-                        const std::map<std::string, std::filesystem::path> payload = {{"file", path}};
+                        const std::map<std::string, std::filesystem::path> payload{{"file", path}};
                         auto response = co_await requests->post(*url, payload);
                         REQUIRE(response);
 
@@ -423,8 +423,8 @@ TEST_CASE("http requests", "[http]") {
                     [](auto l) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                         });
                         REQUIRE(stream);
 
@@ -473,7 +473,7 @@ TEST_CASE("http requests", "[http]") {
                     }(*std::move(listener)),
                     []() -> asyncio::task::Task<void> {
                         const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
-                        REQUIRE(zero::filesystem::writeString(path, "hello world"));
+                        REQUIRE(zero::filesystem::write(path, "hello world"));
 
                         const auto url = asyncio::http::URL::from(URL);
                         REQUIRE(url);
@@ -481,7 +481,7 @@ TEST_CASE("http requests", "[http]") {
                         auto requests = asyncio::http::Requests::make();
                         REQUIRE(requests);
 
-                        const std::map<std::string, std::variant<std::string, std::filesystem::path>> payload = {
+                        const std::map<std::string, std::variant<std::string, std::filesystem::path>> payload{
                             {"name", std::string{"jack"}},
                             {"file", path}
                         };
@@ -503,8 +503,8 @@ TEST_CASE("http requests", "[http]") {
                     [](auto l) -> asyncio::task::Task<void> {
                         using namespace std::string_view_literals;
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                         });
                         REQUIRE(stream);
 
@@ -582,8 +582,8 @@ TEST_CASE("http requests", "[http]") {
                 [](auto l) -> asyncio::task::Task<void> {
                     using namespace std::string_view_literals;
 
-                    auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&rhs) {
-                        return std::make_shared<asyncio::net::TCPStream>(std::move(rhs));
+                    auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
+                        return std::make_shared<asyncio::net::TCPStream>(std::move(value));
                     });
                     REQUIRE(stream);
 

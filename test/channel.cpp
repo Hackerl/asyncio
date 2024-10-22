@@ -33,7 +33,7 @@ consume(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::atom
     while (true) {
         if (const auto result = co_await receiver.receive(); !result) {
             if (result.error() != asyncio::ReceiveError::DISCONNECTED)
-                co_return std::unexpected(result.error());
+                co_return std::unexpected{result.error()};
 
             co_return {};
         }
@@ -47,7 +47,7 @@ consumeSync(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::
     while (true) {
         if (const auto result = receiver.receiveSync(); !result) {
             if (result.error() != asyncio::ReceiveSyncError::DISCONNECTED)
-                return std::unexpected(result.error());
+                return std::unexpected{result.error()};
 
             return {};
         }
@@ -58,7 +58,7 @@ consumeSync(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::
 
 TEST_CASE("asyncio channel", "[channel]") {
     const auto result = asyncio::run([&]() -> asyncio::task::Task<void> {
-        const std::array counters = {
+        const std::array counters{
             std::make_shared<std::atomic<int>>(),
             std::make_shared<std::atomic<int>>()
         };
@@ -67,7 +67,7 @@ TEST_CASE("asyncio channel", "[channel]") {
             using namespace std::chrono_literals;
             auto [sender, receiver] = asyncio::channel<std::string>(100);
 
-            std::array futures = {
+            std::array futures{
                 std::async(produceSync, sender, counters[0]),
                 std::async(produceSync, sender, counters[0]),
                 std::async(produceSync, sender, counters[0]),

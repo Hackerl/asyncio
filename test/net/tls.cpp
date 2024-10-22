@@ -144,7 +144,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                 auto key = asyncio::net::tls::PrivateKey::load(SERVER_KEY);
                 REQUIRE(key);
 
-                const asyncio::net::tls::ServerConfig config = {
+                const asyncio::net::tls::ServerConfig config{
                     .verifyClient = true,
                     .rootCAs = {*std::move(ca)},
                     .certKeyPairs = {{*std::move(cert), *std::move(key)}}
@@ -182,7 +182,7 @@ TEST_CASE("ssl stream network connection", "[net]") {
                 auto key = asyncio::net::tls::PrivateKey::load(SERVER_KEY);
                 REQUIRE(key);
 
-                const asyncio::net::tls::ClientConfig config = {
+                const asyncio::net::tls::ClientConfig config{
                     .rootCAs = {*std::move(ca)},
                     .certKeyPairs = {{*std::move(cert), *std::move(key)}}
                 };

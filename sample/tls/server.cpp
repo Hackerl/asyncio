@@ -37,7 +37,7 @@ serve(asyncio::net::TCPListener listener, const asyncio::net::tls::Context conte
         auto stream = co_await listener.accept();
         CO_EXPECT(stream);
 
-        handle(*std::move(stream), context).future().fail([](const std::error_code &ec) {
+        handle(*std::move(stream), context).future().fail([](const auto &ec) {
             fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
         });
     }
@@ -63,7 +63,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     const auto certFile = cmdline.get<std::filesystem::path>("cert");
     const auto keyFile = cmdline.get<std::filesystem::path>("key");
 
-    const bool verifyClient = cmdline.exist("verify");
+    const auto verifyClient = cmdline.exist("verify");
 
     auto cert = asyncio::net::tls::Certificate::loadFile(certFile);
     CO_EXPECT(cert);
@@ -71,7 +71,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     auto key = asyncio::net::tls::PrivateKey::loadFile(keyFile);
     CO_EXPECT(key);
 
-    asyncio::net::tls::ServerConfig config = {
+    asyncio::net::tls::ServerConfig config{
         .verifyClient = verifyClient,
         .certKeyPairs = {{*std::move(cert), *std::move(key)}}
     };
