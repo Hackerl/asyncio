@@ -47,7 +47,7 @@ TEST_CASE("DNS query", "[net]") {
         SECTION("lookup IPv4") {
             const auto res = co_await asyncio::net::dns::lookupIPv4("localhost");
             REQUIRE(res);
-            REQUIRE(!res->empty());
+            REQUIRE_FALSE(res->empty());
             REQUIRE(
                 std::ranges::any_of(
                     *res,

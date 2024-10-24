@@ -60,7 +60,7 @@ TEST_CASE("network components", "[net]") {
     SECTION("IPv6") {
         const auto interfaces = zero::os::net::interfaces();
         REQUIRE(interfaces);
-        REQUIRE(!interfaces->empty());
+        REQUIRE_FALSE(interfaces->empty());
 
         const auto &zone = std::views::keys(*interfaces).front();
         const auto index = if_nametoindex(zone.c_str());

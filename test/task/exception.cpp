@@ -38,7 +38,7 @@ TEST_CASE("task with exception", "[task]") {
                     return {};
                 }
             });
-            REQUIRE(!task.cancelled());
+            REQUIRE_FALSE(task.cancelled());
             REQUIRE(task.cancel());
             REQUIRE(task.cancelled());
 
@@ -55,7 +55,7 @@ TEST_CASE("task with exception", "[task]") {
 
             auto task = [](auto p) -> asyncio::task::Task<void> {
                 bool cancelled = co_await asyncio::task::cancelled;
-                REQUIRE(!cancelled);
+                REQUIRE_FALSE(cancelled);
 
                 const auto res = co_await asyncio::task::Cancellable{
                     p->getFuture(),
@@ -64,7 +64,7 @@ TEST_CASE("task with exception", "[task]") {
                         return {};
                     }
                 };
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
 
                 try {
                     std::rethrow_exception(res.error());
@@ -76,7 +76,7 @@ TEST_CASE("task with exception", "[task]") {
                 cancelled = co_await asyncio::task::cancelled;
                 REQUIRE(cancelled);
             }(promise);
-            REQUIRE(!task.cancelled());
+            REQUIRE_FALSE(task.cancelled());
             REQUIRE(task.cancel());
             REQUIRE(task.cancelled());
 
@@ -89,7 +89,7 @@ TEST_CASE("task with exception", "[task]") {
 
             auto task = [](auto p1, auto p2) -> asyncio::task::Task<void> {
                 bool cancelled = co_await asyncio::task::cancelled;
-                REQUIRE(!cancelled);
+                REQUIRE_FALSE(cancelled);
 
                 co_await asyncio::task::lock;
 
@@ -115,7 +115,7 @@ TEST_CASE("task with exception", "[task]") {
                         return {};
                     }
                 };
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
 
                 try {
                     std::rethrow_exception(res.error());
@@ -128,10 +128,10 @@ TEST_CASE("task with exception", "[task]") {
                 REQUIRE(cancelled);
             }(promise1, promise2);
             REQUIRE(task.locked());
-            REQUIRE(!task.cancelled());
+            REQUIRE_FALSE(task.cancelled());
 
             const auto res = task.cancel();
-            REQUIRE(!res);
+            REQUIRE_FALSE(res);
             REQUIRE(res.error() == asyncio::task::Error::LOCKED);
             REQUIRE(task.cancelled());
 
@@ -144,7 +144,7 @@ TEST_CASE("task with exception", "[task]") {
             auto task = asyncio::task::from(promise.getFuture());
 
             const auto callstack = task.traceback();
-            REQUIRE(!callstack.empty());
+            REQUIRE_FALSE(callstack.empty());
             REQUIRE(std::strstr(callstack[0].function_name(), "from"));
 
             promise.resolve(10);
@@ -258,7 +258,7 @@ TEST_CASE("task with exception", "[task]") {
 
                         const auto res = co_await task;
                         REQUIRE(res[0]);
-                        REQUIRE(!res[1]);
+                        REQUIRE_FALSE(res[1]);
 
                         try {
                             std::rethrow_exception(res[1].error());
@@ -272,7 +272,7 @@ TEST_CASE("task with exception", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res[0]);
+                        REQUIRE_FALSE(res[0]);
 
                         try {
                             std::rethrow_exception(res[0].error());
@@ -281,7 +281,7 @@ TEST_CASE("task with exception", "[task]") {
                             REQUIRE(error.code() == std::errc::operation_canceled);
                         }
 
-                        REQUIRE(!res[1]);
+                        REQUIRE_FALSE(res[1]);
 
                         try {
                             std::rethrow_exception(res[1].error());
@@ -334,7 +334,7 @@ TEST_CASE("task with exception", "[task]") {
                             std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
 
                         try {
                             std::rethrow_exception(res.error()[0]);
@@ -355,7 +355,7 @@ TEST_CASE("task with exception", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
 
                         try {
                             std::rethrow_exception(res.error()[0]);
@@ -535,7 +535,7 @@ TEST_CASE("task with exception", "[task]") {
                         const auto res = co_await task;
                         REQUIRE(res[0]);
                         REQUIRE(*res[0] == 10);
-                        REQUIRE(!res[1]);
+                        REQUIRE_FALSE(res[1]);
 
                         try {
                             std::rethrow_exception(res[1].error());
@@ -549,7 +549,7 @@ TEST_CASE("task with exception", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res[0]);
+                        REQUIRE_FALSE(res[0]);
 
                         try {
                             std::rethrow_exception(res[0].error());
@@ -558,7 +558,7 @@ TEST_CASE("task with exception", "[task]") {
                             REQUIRE(error.code() == std::errc::operation_canceled);
                         }
 
-                        REQUIRE(!res[1]);
+                        REQUIRE_FALSE(res[1]);
 
                         try {
                             std::rethrow_exception(res[1].error());
@@ -612,7 +612,7 @@ TEST_CASE("task with exception", "[task]") {
                             std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
 
                         try {
                             std::rethrow_exception(res.error()[0]);
@@ -633,7 +633,7 @@ TEST_CASE("task with exception", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
 
                         try {
                             std::rethrow_exception(res.error()[0]);
@@ -816,7 +816,7 @@ TEST_CASE("task with exception", "[task]") {
 
                             const auto res = co_await task;
                             REQUIRE(std::get<0>(res));
-                            REQUIRE(!std::get<1>(res));
+                            REQUIRE_FALSE(std::get<1>(res));
 
                             try {
                                 std::rethrow_exception(std::get<1>(res).error());
@@ -830,7 +830,7 @@ TEST_CASE("task with exception", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!std::get<0>(res));
+                            REQUIRE_FALSE(std::get<0>(res));
 
                             try {
                                 std::rethrow_exception(std::get<0>(res).error());
@@ -839,7 +839,7 @@ TEST_CASE("task with exception", "[task]") {
                                 REQUIRE(error.code() == std::errc::operation_canceled);
                             }
 
-                            REQUIRE(!std::get<1>(res));
+                            REQUIRE_FALSE(std::get<1>(res));
 
                             try {
                                 std::rethrow_exception(std::get<1>(res).error());
@@ -894,7 +894,7 @@ TEST_CASE("task with exception", "[task]") {
                                 std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
 
                             try {
                                 std::rethrow_exception(res.error()[0]);
@@ -915,7 +915,7 @@ TEST_CASE("task with exception", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
 
                             try {
                                 std::rethrow_exception(res.error()[0]);
@@ -1101,7 +1101,7 @@ TEST_CASE("task with exception", "[task]") {
                             const auto res = co_await task;
                             REQUIRE(res[0]);
                             REQUIRE(*res[0] == 10);
-                            REQUIRE(!res[1]);
+                            REQUIRE_FALSE(res[1]);
 
                             try {
                                 std::rethrow_exception(res[1].error());
@@ -1115,7 +1115,7 @@ TEST_CASE("task with exception", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res[0]);
+                            REQUIRE_FALSE(res[0]);
 
                             try {
                                 std::rethrow_exception(res[0].error());
@@ -1124,7 +1124,7 @@ TEST_CASE("task with exception", "[task]") {
                                 REQUIRE(error.code() == std::errc::operation_canceled);
                             }
 
-                            REQUIRE(!res[1]);
+                            REQUIRE_FALSE(res[1]);
 
                             try {
                                 std::rethrow_exception(res[1].error());
@@ -1180,7 +1180,7 @@ TEST_CASE("task with exception", "[task]") {
                                 std::make_exception_ptr(std::system_error(make_error_code(std::errc::io_error))));
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
 
                             try {
                                 std::rethrow_exception(res.error()[0]);
@@ -1201,7 +1201,7 @@ TEST_CASE("task with exception", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
 
                             try {
                                 std::rethrow_exception(res.error()[0]);
@@ -1416,7 +1416,7 @@ TEST_CASE("task with exception", "[task]") {
                         REQUIRE(std::get<0>(res));
                         REQUIRE(*std::get<0>(res) == 10);
                         REQUIRE(std::get<1>(res));
-                        REQUIRE(!std::get<2>(res));
+                        REQUIRE_FALSE(std::get<2>(res));
 
                         try {
                             std::rethrow_exception(std::get<2>(res).error());
@@ -1430,7 +1430,7 @@ TEST_CASE("task with exception", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!std::get<0>(res));
+                        REQUIRE_FALSE(std::get<0>(res));
 
                         try {
                             std::rethrow_exception(std::get<0>(res).error());
@@ -1439,7 +1439,7 @@ TEST_CASE("task with exception", "[task]") {
                             REQUIRE(error.code() == std::errc::operation_canceled);
                         }
 
-                        REQUIRE(!std::get<1>(res));
+                        REQUIRE_FALSE(std::get<1>(res));
 
                         try {
                             std::rethrow_exception(std::get<1>(res).error());
@@ -1448,7 +1448,7 @@ TEST_CASE("task with exception", "[task]") {
                             REQUIRE(error.code() == std::errc::operation_canceled);
                         }
 
-                        REQUIRE(!std::get<2>(res));
+                        REQUIRE_FALSE(std::get<2>(res));
 
                         try {
                             std::rethrow_exception(std::get<2>(res).error());
@@ -1506,7 +1506,7 @@ TEST_CASE("task with exception", "[task]") {
 
                             const auto res = co_await task;
                             REQUIRE(res);
-                            REQUIRE(!res->has_value());
+                            REQUIRE_FALSE(res->has_value());
                         }
 
                         SECTION("has value") {
@@ -1537,7 +1537,7 @@ TEST_CASE("task with exception", "[task]") {
                             std::make_exception_ptr(std::system_error(make_error_code(std::errc::bad_message))));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
 
                         try {
                             std::rethrow_exception(res.error()[0]);
@@ -1565,7 +1565,7 @@ TEST_CASE("task with exception", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
 
                         try {
                             std::rethrow_exception(res.error()[0]);
@@ -1631,7 +1631,7 @@ TEST_CASE("task with exception", "[task]") {
                         SECTION("no value") {
                             promise2.resolve();
                             const auto res = co_await task;
-                            REQUIRE(!res.has_value());
+                            REQUIRE_FALSE(res.has_value());
                         }
 
                         SECTION("has value") {

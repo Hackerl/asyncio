@@ -98,14 +98,14 @@ TEST_CASE("asyncio channel", "[channel]") {
             SECTION("receive") {
                 using namespace std::chrono_literals;
                 const auto res = co_await timeout(receiver.receive(), 20ms);
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
                 REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
             }
 
             SECTION("receiveSync") {
                 using namespace std::chrono_literals;
                 const auto res = receiver.receiveSync(20ms);
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
                 REQUIRE(res.error() == asyncio::ReceiveSyncError::TIMEOUT);
             }
 
@@ -115,14 +115,14 @@ TEST_CASE("asyncio channel", "[channel]") {
             SECTION("send") {
                 using namespace std::chrono_literals;
                 const auto res = co_await timeout(sender.send("hello world"), 20ms);
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
                 REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
             }
 
             SECTION("sendSync") {
                 using namespace std::chrono_literals;
                 const auto res = sender.sendSync("hello world", 20ms);
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
                 REQUIRE(res.error() == asyncio::SendSyncError::TIMEOUT);
             }
         }

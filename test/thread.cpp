@@ -54,7 +54,7 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
                     SECTION("cancel") {
                         REQUIRE(task.cancel());
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                         REQUIRE(std::chrono::system_clock::now() - tp < 50ms);
                     }
@@ -88,7 +88,7 @@ TEST_CASE("asynchronously run in a separate thread", "[thread]") {
                     SECTION("cancel") {
                         REQUIRE(task.cancel());
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                         REQUIRE(std::chrono::system_clock::now() - tp < 50ms);
                     }

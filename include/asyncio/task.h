@@ -203,17 +203,15 @@ namespace asyncio::task {
                 std::is_same_v<typename callback_result_t<F, T>::error_type, std::exception_ptr>
             );
 
-#if defined(__GNUC__) && !defined(__clang__)
-            // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=112341
-            auto result = auto(co_await *this).transform(f);
-#else
-            auto result = (co_await *this).transform(f);
-#endif
+            auto result = co_await *this;
 
             if (!result)
                 co_return std::unexpected{std::move(result).error()};
 
-            co_return co_await *result;
+            if constexpr (std::is_void_v<T>)
+                co_return co_await f();
+            else
+                co_return co_await std::invoke(f, *std::move(result));
         }
 
         template<typename F>
@@ -237,16 +235,15 @@ namespace asyncio::task {
         Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) && {
             static_assert(std::is_same_v<typename callback_result_t<F, T>::error_type, E>);
 
-#if defined(__GNUC__) && !defined(__clang__)
-            auto result = auto(co_await *this).transform(f);
-#else
-            auto result = (co_await *this).transform(f);
-#endif
+            auto result = co_await *this;
 
             if (!result)
                 co_return std::unexpected{std::move(result).error()};
 
-            co_return co_await *result;
+            if constexpr (std::is_void_v<T>)
+                co_return co_await f();
+            else
+                co_return co_await std::invoke(f, *std::move(result));
         }
 
         template<typename F>
@@ -256,6 +253,7 @@ namespace asyncio::task {
             )
         Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) && {
 #if defined(__GNUC__) && !defined(__clang__)
+            // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=112341
             co_return auto(co_await *this).and_then(f);
 #else
             co_return (co_await *this).and_then(f);

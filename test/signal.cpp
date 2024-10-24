@@ -26,7 +26,7 @@ TEST_CASE("signal handler", "[signal]") {
         SECTION("timeout") {
             using namespace std::chrono_literals;
             const auto res = co_await asyncio::timeout(signal->on(SIGINT), 10ms);
-            REQUIRE(!res);
+            REQUIRE_FALSE(res);
             REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
         }
     });

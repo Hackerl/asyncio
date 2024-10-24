@@ -20,7 +20,7 @@ TEST_CASE("time", "[time]") {
             SECTION("timeout") {
                 using namespace std::chrono_literals;
                 const auto res = co_await asyncio::timeout(asyncio::sleep(20ms), 10ms);
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
                 REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
             }
 
@@ -39,7 +39,7 @@ TEST_CASE("time", "[time]") {
                 REQUIRE(task.cancel());
                 const auto res = co_await task;
                 REQUIRE(res);
-                REQUIRE(!*res);
+                REQUIRE_FALSE(*res);
                 REQUIRE(res->error() == std::errc::operation_canceled);
             }
 
@@ -72,7 +72,7 @@ TEST_CASE("time", "[time]") {
 
                     const auto &res = co_await task;
                     REQUIRE(res);
-                    REQUIRE(!*res);
+                    REQUIRE_FALSE(*res);
                     REQUIRE(res->error() == std::errc::invalid_argument);
                 }
             }

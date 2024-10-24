@@ -5,7 +5,7 @@
 TEST_CASE("asyncio mutex", "[sync]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         const auto mutex = std::make_shared<asyncio::sync::Mutex>();
-        REQUIRE(!mutex->locked());
+        REQUIRE_FALSE(mutex->locked());
 
         const auto res = co_await mutex->lock();
         REQUIRE(res);
@@ -34,18 +34,18 @@ TEST_CASE("asyncio mutex", "[sync]") {
                     m->unlock();
                 }(mutex)
             );
-            REQUIRE(!mutex->locked());
+            REQUIRE_FALSE(mutex->locked());
         }
 
         SECTION("fair scheduling") {
             auto task1 = mutex->lock();
-            REQUIRE(!task1.done());
+            REQUIRE_FALSE(task1.done());
 
             mutex->unlock();
-            REQUIRE(!task1.done());
+            REQUIRE_FALSE(task1.done());
 
             auto task2 = mutex->lock();
-            REQUIRE(!task2.done());
+            REQUIRE_FALSE(task2.done());
 
             auto r = co_await task1;
             REQUIRE(r);
@@ -60,7 +60,7 @@ TEST_CASE("asyncio mutex", "[sync]") {
                 [](auto m) -> asyncio::task::Task<void> {
                     using namespace std::chrono_literals;
                     const auto r = co_await asyncio::timeout(m->lock(), 10ms);
-                    REQUIRE(!r);
+                    REQUIRE_FALSE(r);
                     REQUIRE(r.error() == asyncio::TimeoutError::ELAPSED);
                 }(mutex),
                 [](auto m) -> asyncio::task::Task<void> {
@@ -79,24 +79,24 @@ TEST_CASE("asyncio mutex", "[sync]") {
                     m->unlock();
                 }(mutex)
             );
-            REQUIRE(!mutex->locked());
+            REQUIRE_FALSE(mutex->locked());
         }
 
         SECTION("cancel") {
             auto task = allSettled(
                 [](auto m) -> asyncio::task::Task<void> {
                     const auto r = co_await m->lock();
-                    REQUIRE(!r);
+                    REQUIRE_FALSE(r);
                     REQUIRE(r.error() == std::errc::operation_canceled);
                 }(mutex),
                 [](auto m) -> asyncio::task::Task<void> {
                     const auto r = co_await m->lock();
-                    REQUIRE(!r);
+                    REQUIRE_FALSE(r);
                     REQUIRE(r.error() == std::errc::operation_canceled);
                 }(mutex),
                 [](auto m) -> asyncio::task::Task<void> {
                     const auto r = co_await m->lock();
-                    REQUIRE(!r);
+                    REQUIRE_FALSE(r);
                     REQUIRE(r.error() == std::errc::operation_canceled);
                 }(mutex)
             );
@@ -108,13 +108,13 @@ TEST_CASE("asyncio mutex", "[sync]") {
 
         SECTION("cancel after unlock") {
             auto task1 = mutex->lock();
-            REQUIRE(!task1.done());
+            REQUIRE_FALSE(task1.done());
 
             mutex->unlock();
 
-            REQUIRE(!task1.cancel());
+            REQUIRE_FALSE(task1.cancel());
             auto task2 = mutex->lock();
-            REQUIRE(!task2.done());
+            REQUIRE_FALSE(task2.done());
 
             auto r = co_await task1;
             REQUIRE(r);
@@ -129,17 +129,17 @@ TEST_CASE("asyncio mutex", "[sync]") {
 
         SECTION("unlock after cancel") {
             auto task1 = mutex->lock();
-            REQUIRE(!task1.done());
+            REQUIRE_FALSE(task1.done());
             REQUIRE(task1.cancel());
-            REQUIRE(!task1.done());
+            REQUIRE_FALSE(task1.done());
 
             mutex->unlock();
 
             auto task2 = mutex->lock();
-            REQUIRE(!task2.done());
+            REQUIRE_FALSE(task2.done());
 
             auto r = co_await task1;
-            REQUIRE(!r);
+            REQUIRE_FALSE(r);
             REQUIRE(r.error() == std::errc::operation_canceled);
 
             r = co_await task2;

@@ -31,7 +31,7 @@ TEST_CASE("asynchronous io", "[io]") {
                     REQUIRE(message == MESSAGE);
 
                     res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                    REQUIRE(!res);
+                    REQUIRE_FALSE(res);
                     REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
                 }(std::move(streams2->at(1)))
             );
@@ -61,7 +61,7 @@ TEST_CASE("asynchronous io", "[io]") {
                     REQUIRE(message == MESSAGE);
 
                     res = co_await stream.readExactly(std::as_writable_bytes(std::span{message}));
-                    REQUIRE(!res);
+                    REQUIRE_FALSE(res);
                     REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
                 }(std::move(streams1->at(0))),
                 [](auto stream) -> asyncio::task::Task<void> {
@@ -146,7 +146,7 @@ TEST_CASE("asynchronous io", "[io]") {
                         message.resize(MESSAGE.size() * 3);
 
                         const auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
                     }(std::move(streams->at(1)))
                 );

@@ -5,14 +5,14 @@ TEST_CASE("asyncio promise", "[promise]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         asyncio::Promise<void> promise;
         const auto event = std::make_shared<asyncio::sync::Event>();
-        REQUIRE(!event->isSet());
+        REQUIRE_FALSE(event->isSet());
 
         promise.getFuture().then([=] {
             event->set();
         });
 
         promise.resolve();
-        REQUIRE(!event->isSet());
+        REQUIRE_FALSE(event->isSet());
         co_await event->wait();
     });
     REQUIRE(result);

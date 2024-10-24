@@ -20,7 +20,7 @@ TEST_CASE("task with error", "[task]") {
             promise.reject(make_error_code(std::errc::invalid_argument));
 
             const auto &res = co_await task;
-            REQUIRE(!res);
+            REQUIRE_FALSE(res);
             REQUIRE(res.error() == std::errc::invalid_argument);
         }
 
@@ -36,12 +36,12 @@ TEST_CASE("task with error", "[task]") {
                     return {};
                 }
             });
-            REQUIRE(!task.cancelled());
+            REQUIRE_FALSE(task.cancelled());
             REQUIRE(task.cancel());
             REQUIRE(task.cancelled());
 
             const auto &res = co_await task;
-            REQUIRE(!res);
+            REQUIRE_FALSE(res);
             REQUIRE(res.error() == std::errc::operation_canceled);
         }
 
@@ -50,7 +50,7 @@ TEST_CASE("task with error", "[task]") {
 
             auto task = [](auto p) -> asyncio::task::Task<void> {
                 bool cancelled = co_await asyncio::task::cancelled;
-                REQUIRE(!cancelled);
+                REQUIRE_FALSE(cancelled);
 
                 const auto res = co_await asyncio::task::Cancellable{
                     p->getFuture(),
@@ -59,13 +59,13 @@ TEST_CASE("task with error", "[task]") {
                         return {};
                     }
                 };
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
                 REQUIRE(res.error() == std::errc::operation_canceled);
 
                 cancelled = co_await asyncio::task::cancelled;
                 REQUIRE(cancelled);
             }(promise);
-            REQUIRE(!task.cancelled());
+            REQUIRE_FALSE(task.cancelled());
             REQUIRE(task.cancel());
             REQUIRE(task.cancelled());
 
@@ -78,7 +78,7 @@ TEST_CASE("task with error", "[task]") {
 
             auto task = [](auto p1, auto p2) -> asyncio::task::Task<void> {
                 bool cancelled = co_await asyncio::task::cancelled;
-                REQUIRE(!cancelled);
+                REQUIRE_FALSE(cancelled);
 
                 co_await asyncio::task::lock;
 
@@ -104,17 +104,17 @@ TEST_CASE("task with error", "[task]") {
                         return {};
                     }
                 };
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
                 REQUIRE(res.error() == std::errc::operation_canceled);
 
                 cancelled = co_await asyncio::task::cancelled;
                 REQUIRE(cancelled);
             }(promise1, promise2);
             REQUIRE(task.locked());
-            REQUIRE(!task.cancelled());
+            REQUIRE_FALSE(task.cancelled());
 
             const auto res = task.cancel();
-            REQUIRE(!res);
+            REQUIRE_FALSE(res);
             REQUIRE(res.error() == asyncio::task::Error::LOCKED);
             REQUIRE(task.cancelled());
 
@@ -127,7 +127,7 @@ TEST_CASE("task with error", "[task]") {
             auto task = asyncio::task::from(promise.getFuture());
 
             const auto callstack = task.traceback();
-            REQUIRE(!callstack.empty());
+            REQUIRE_FALSE(callstack.empty());
             REQUIRE(std::strstr(callstack[0].function_name(), "from"));
 
             promise.resolve(10);
@@ -180,7 +180,7 @@ TEST_CASE("task with error", "[task]") {
                         promise2.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -188,7 +188,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -232,7 +232,7 @@ TEST_CASE("task with error", "[task]") {
 
                         const auto res = co_await task;
                         REQUIRE(res[0]);
-                        REQUIRE(!res[1]);
+                        REQUIRE_FALSE(res[1]);
                         REQUIRE(res[1].error() == std::errc::invalid_argument);
                     }
 
@@ -240,9 +240,9 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res[0]);
+                        REQUIRE_FALSE(res[0]);
                         REQUIRE(res[0].error() == std::errc::operation_canceled);
-                        REQUIRE(!res[1]);
+                        REQUIRE_FALSE(res[1]);
                         REQUIRE(res[1].error() == std::errc::operation_canceled);
                     }
                 }
@@ -284,7 +284,7 @@ TEST_CASE("task with error", "[task]") {
                         promise2.reject(make_error_code(std::errc::io_error));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error()[0] == std::errc::invalid_argument);
                         REQUIRE(res.error()[1] == std::errc::io_error);
                     }
@@ -293,7 +293,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error()[0] == std::errc::operation_canceled);
                         REQUIRE(res.error()[1] == std::errc::operation_canceled);
                     }
@@ -333,7 +333,7 @@ TEST_CASE("task with error", "[task]") {
                         promise1.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -341,7 +341,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -390,7 +390,7 @@ TEST_CASE("task with error", "[task]") {
                         promise2.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -398,7 +398,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -445,7 +445,7 @@ TEST_CASE("task with error", "[task]") {
                         const auto res = co_await task;
                         REQUIRE(res[0]);
                         REQUIRE(*res[0] == 10);
-                        REQUIRE(!res[1]);
+                        REQUIRE_FALSE(res[1]);
                         REQUIRE(res[1].error() == std::errc::invalid_argument);
                     }
 
@@ -453,9 +453,9 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res[0]);
+                        REQUIRE_FALSE(res[0]);
                         REQUIRE(res[0].error() == std::errc::operation_canceled);
-                        REQUIRE(!res[1]);
+                        REQUIRE_FALSE(res[1]);
                         REQUIRE(res[1].error() == std::errc::operation_canceled);
                     }
                 }
@@ -498,7 +498,7 @@ TEST_CASE("task with error", "[task]") {
                         promise2.reject(make_error_code(std::errc::io_error));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error()[0] == std::errc::invalid_argument);
                         REQUIRE(res.error()[1] == std::errc::io_error);
                     }
@@ -507,7 +507,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error()[0] == std::errc::operation_canceled);
                         REQUIRE(res.error()[1] == std::errc::operation_canceled);
                     }
@@ -549,7 +549,7 @@ TEST_CASE("task with error", "[task]") {
                         promise1.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -557,7 +557,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -607,7 +607,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.reject(make_error_code(std::errc::invalid_argument));
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error() == std::errc::invalid_argument);
                         }
 
@@ -615,7 +615,7 @@ TEST_CASE("task with error", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error() == std::errc::operation_canceled);
                         }
                     }
@@ -659,7 +659,7 @@ TEST_CASE("task with error", "[task]") {
 
                             const auto res = co_await task;
                             REQUIRE(std::get<0>(res));
-                            REQUIRE(!std::get<1>(res));
+                            REQUIRE_FALSE(std::get<1>(res));
                             REQUIRE(std::get<1>(res).error() == std::errc::invalid_argument);
                         }
 
@@ -667,9 +667,9 @@ TEST_CASE("task with error", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!std::get<0>(res));
+                            REQUIRE_FALSE(std::get<0>(res));
                             REQUIRE(std::get<0>(res).error() == std::errc::operation_canceled);
-                            REQUIRE(!std::get<1>(res));
+                            REQUIRE_FALSE(std::get<1>(res));
                             REQUIRE(std::get<1>(res).error() == std::errc::operation_canceled);
                         }
                     }
@@ -711,7 +711,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.reject(make_error_code(std::errc::io_error));
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error()[0] == std::errc::invalid_argument);
                             REQUIRE(res.error()[1] == std::errc::io_error);
                         }
@@ -720,7 +720,7 @@ TEST_CASE("task with error", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error()[0] == std::errc::operation_canceled);
                             REQUIRE(res.error()[1] == std::errc::operation_canceled);
                         }
@@ -760,7 +760,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.reject(make_error_code(std::errc::invalid_argument));
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error() == std::errc::invalid_argument);
                         }
 
@@ -768,7 +768,7 @@ TEST_CASE("task with error", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error() == std::errc::operation_canceled);
                         }
                     }
@@ -817,7 +817,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.reject(make_error_code(std::errc::invalid_argument));
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error() == std::errc::invalid_argument);
                         }
 
@@ -825,7 +825,7 @@ TEST_CASE("task with error", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error() == std::errc::operation_canceled);
                         }
                     }
@@ -872,7 +872,7 @@ TEST_CASE("task with error", "[task]") {
                             const auto res = co_await task;
                             REQUIRE(res[0]);
                             REQUIRE(*res[0] == 10);
-                            REQUIRE(!res[1]);
+                            REQUIRE_FALSE(res[1]);
                             REQUIRE(res[1].error() == std::errc::invalid_argument);
                         }
 
@@ -880,9 +880,9 @@ TEST_CASE("task with error", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res[0]);
+                            REQUIRE_FALSE(res[0]);
                             REQUIRE(res[0].error() == std::errc::operation_canceled);
-                            REQUIRE(!res[1]);
+                            REQUIRE_FALSE(res[1]);
                             REQUIRE(res[1].error() == std::errc::operation_canceled);
                         }
                     }
@@ -925,7 +925,7 @@ TEST_CASE("task with error", "[task]") {
                             promise2.reject(make_error_code(std::errc::io_error));
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error()[0] == std::errc::invalid_argument);
                             REQUIRE(res.error()[1] == std::errc::io_error);
                         }
@@ -934,7 +934,7 @@ TEST_CASE("task with error", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error()[0] == std::errc::operation_canceled);
                             REQUIRE(res.error()[1] == std::errc::operation_canceled);
                         }
@@ -976,7 +976,7 @@ TEST_CASE("task with error", "[task]") {
                             promise1.reject(make_error_code(std::errc::invalid_argument));
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error() == std::errc::invalid_argument);
                         }
 
@@ -984,7 +984,7 @@ TEST_CASE("task with error", "[task]") {
                             REQUIRE(task.cancel());
 
                             const auto res = co_await task;
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error() == std::errc::operation_canceled);
                         }
                     }
@@ -1047,7 +1047,7 @@ TEST_CASE("task with error", "[task]") {
                         promise3.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -1055,7 +1055,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -1116,7 +1116,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(std::get<0>(res));
                         REQUIRE(*std::get<0>(res) == 10);
                         REQUIRE(std::get<1>(res));
-                        REQUIRE(!std::get<2>(res));
+                        REQUIRE_FALSE(std::get<2>(res));
                         REQUIRE(std::get<2>(res).error() == std::errc::invalid_argument);
                     }
 
@@ -1124,11 +1124,11 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!std::get<0>(res));
+                        REQUIRE_FALSE(std::get<0>(res));
                         REQUIRE(std::get<0>(res).error() == std::errc::operation_canceled);
-                        REQUIRE(!std::get<1>(res));
+                        REQUIRE_FALSE(std::get<1>(res));
                         REQUIRE(std::get<1>(res).error() == std::errc::operation_canceled);
-                        REQUIRE(!std::get<2>(res));
+                        REQUIRE_FALSE(std::get<2>(res));
                         REQUIRE(std::get<2>(res).error() == std::errc::operation_canceled);
                     }
                 }
@@ -1175,7 +1175,7 @@ TEST_CASE("task with error", "[task]") {
 
                             const auto res = co_await task;
                             REQUIRE(res);
-                            REQUIRE(!res->has_value());
+                            REQUIRE_FALSE(res->has_value());
                         }
 
                         SECTION("has value") {
@@ -1200,7 +1200,7 @@ TEST_CASE("task with error", "[task]") {
                         promise3.reject(make_error_code(std::errc::bad_message));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error()[0] == std::errc::io_error);
                         REQUIRE(res.error()[1] == std::errc::invalid_argument);
                         REQUIRE(res.error()[2] == std::errc::bad_message);
@@ -1210,7 +1210,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error()[0] == std::errc::operation_canceled);
                         REQUIRE(res.error()[1] == std::errc::operation_canceled);
                         REQUIRE(res.error()[2] == std::errc::operation_canceled);
@@ -1257,7 +1257,7 @@ TEST_CASE("task with error", "[task]") {
 
                             const auto res = co_await task;
                             REQUIRE(res);
-                            REQUIRE(!res->has_value());
+                            REQUIRE_FALSE(res->has_value());
                         }
 
                         SECTION("has value") {
@@ -1278,7 +1278,7 @@ TEST_CASE("task with error", "[task]") {
                         promise1.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -1286,7 +1286,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -1321,7 +1321,7 @@ TEST_CASE("task with error", "[task]") {
                         promise.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -1342,7 +1342,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -1372,7 +1372,7 @@ TEST_CASE("task with error", "[task]") {
                         promise.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -1393,7 +1393,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -1425,7 +1425,7 @@ TEST_CASE("task with error", "[task]") {
                         promise.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -1446,7 +1446,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -1476,7 +1476,7 @@ TEST_CASE("task with error", "[task]") {
                         promise.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
 
@@ -1497,7 +1497,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::operation_canceled);
                     }
                 }
@@ -1531,7 +1531,7 @@ TEST_CASE("task with error", "[task]") {
                         promise.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::io_error);
                     }
 
@@ -1553,7 +1553,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
                 }
@@ -1585,7 +1585,7 @@ TEST_CASE("task with error", "[task]") {
                         promise.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::io_error);
                     }
 
@@ -1607,7 +1607,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
                 }
@@ -1639,7 +1639,7 @@ TEST_CASE("task with error", "[task]") {
                         promise.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::to_underlying(std::errc::invalid_argument));
                     }
 
@@ -1660,7 +1660,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::to_underlying(asyncio::task::Error::CANCELLED));
                     }
                 }
@@ -1690,7 +1690,7 @@ TEST_CASE("task with error", "[task]") {
                         promise.reject(make_error_code(std::errc::invalid_argument));
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::to_underlying(std::errc::invalid_argument));
                     }
 
@@ -1711,7 +1711,7 @@ TEST_CASE("task with error", "[task]") {
                         REQUIRE(task.cancel());
 
                         const auto res = co_await task;
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::to_underlying(asyncio::task::Error::CANCELLED));
                     }
                 }

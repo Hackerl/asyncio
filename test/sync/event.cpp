@@ -5,7 +5,7 @@
 TEST_CASE("asyncio event", "[sync]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         const auto event = std::make_shared<asyncio::sync::Event>();
-        REQUIRE(!event->isSet());
+        REQUIRE_FALSE(event->isSet());
 
         SECTION("normal") {
             co_await allSettled(
@@ -27,7 +27,7 @@ TEST_CASE("asyncio event", "[sync]") {
                 [](auto e) -> asyncio::task::Task<void> {
                     using namespace std::chrono_literals;
                     co_await asyncio::sleep(20ms);
-                    REQUIRE(!e->isSet());
+                    REQUIRE_FALSE(e->isSet());
                     e->set();
                     REQUIRE(e->isSet());
                 }(event)
@@ -39,9 +39,9 @@ TEST_CASE("asyncio event", "[sync]") {
                 [](auto e) -> asyncio::task::Task<void> {
                     using namespace std::chrono_literals;
                     const auto res = co_await asyncio::timeout(e->wait(), 10ms);
-                    REQUIRE(!res);
+                    REQUIRE_FALSE(res);
                     REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
-                    REQUIRE(!e->isSet());
+                    REQUIRE_FALSE(e->isSet());
                 }(event),
                 [](auto e) -> asyncio::task::Task<void> {
                     const auto res = co_await e->wait();
@@ -56,7 +56,7 @@ TEST_CASE("asyncio event", "[sync]") {
                 [](auto e) -> asyncio::task::Task<void> {
                     using namespace std::chrono_literals;
                     co_await asyncio::sleep(20ms);
-                    REQUIRE(!e->isSet());
+                    REQUIRE_FALSE(e->isSet());
                     e->set();
                     REQUIRE(e->isSet());
                 }(event)
@@ -67,21 +67,21 @@ TEST_CASE("asyncio event", "[sync]") {
             auto task = allSettled(
                 [](auto e) -> asyncio::task::Task<void> {
                     const auto res = co_await e->wait();
-                    REQUIRE(!res);
+                    REQUIRE_FALSE(res);
                     REQUIRE(res.error() == std::errc::operation_canceled);
-                    REQUIRE(!e->isSet());
+                    REQUIRE_FALSE(e->isSet());
                 }(event),
                 [](auto e) -> asyncio::task::Task<void> {
                     const auto res = co_await e->wait();
-                    REQUIRE(!res);
+                    REQUIRE_FALSE(res);
                     REQUIRE(res.error() == std::errc::operation_canceled);
-                    REQUIRE(!e->isSet());
+                    REQUIRE_FALSE(e->isSet());
                 }(event),
                 [](auto e) -> asyncio::task::Task<void> {
                     const auto res = co_await e->wait();
-                    REQUIRE(!res);
+                    REQUIRE_FALSE(res);
                     REQUIRE(res.error() == std::errc::operation_canceled);
-                    REQUIRE(!e->isSet());
+                    REQUIRE_FALSE(e->isSet());
                 }(event)
             );
 

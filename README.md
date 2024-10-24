@@ -292,7 +292,7 @@ You can use `CMake` to compile and install based on the source code, or use `CMa
           return std::unexpected{make_error_code(std::errc::bad_message)};
       });
 
-      REQUIRE(!result);
+      REQUIRE_FALSE(result);
       REQUIRE(result.error() == std::errc::bad_message);
   });
   ```

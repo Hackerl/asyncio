@@ -6,7 +6,7 @@ TEST_CASE("asyncio condition variable", "[sync]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
         const auto condition = std::make_shared<asyncio::sync::Condition>();
         const auto mutex = std::make_shared<asyncio::sync::Mutex>();
-        REQUIRE(!mutex->locked());
+        REQUIRE_FALSE(mutex->locked());
 
         SECTION("notify") {
             co_await allSettled(
@@ -151,7 +151,7 @@ TEST_CASE("asyncio condition variable", "[sync]") {
                     REQUIRE(m->locked());
 
                     const auto r = co_await asyncio::timeout(c->wait(*m), 10ms);
-                    REQUIRE(!r);
+                    REQUIRE_FALSE(r);
                     REQUIRE(r.error() == asyncio::TimeoutError::ELAPSED);
                     REQUIRE(m->locked());
                     m->unlock();
@@ -176,7 +176,7 @@ TEST_CASE("asyncio condition variable", "[sync]") {
                 REQUIRE(m->locked());
 
                 res = co_await c->wait(*m);
-                REQUIRE(!res);
+                REQUIRE_FALSE(res);
                 REQUIRE(res.error() == std::errc::operation_canceled);
                 REQUIRE(m->locked());
                 m->unlock();
@@ -192,7 +192,7 @@ TEST_CASE("asyncio condition variable", "[sync]") {
             REQUIRE(mutex->locked());
 
             auto task = condition->wait(*mutex);
-            REQUIRE(!task.done());
+            REQUIRE_FALSE(task.done());
 
             res = co_await mutex->lock();
             REQUIRE(res);
@@ -201,11 +201,11 @@ TEST_CASE("asyncio condition variable", "[sync]") {
             condition->notify();
 
             res = task.cancel();
-            REQUIRE(!res);
+            REQUIRE_FALSE(res);
             REQUIRE(res.error() == asyncio::task::Error::WILL_BE_DONE);
 
             mutex->unlock();
-            REQUIRE(!mutex->locked());
+            REQUIRE_FALSE(mutex->locked());
 
             res = co_await task;
             REQUIRE(res);
@@ -218,9 +218,9 @@ TEST_CASE("asyncio condition variable", "[sync]") {
             REQUIRE(mutex->locked());
 
             auto task1 = condition->wait(*mutex);
-            REQUIRE(!task1.done());
+            REQUIRE_FALSE(task1.done());
             REQUIRE(task1.cancel());
-            REQUIRE(!task1.done());
+            REQUIRE_FALSE(task1.done());
 
             res = co_await mutex->lock();
             REQUIRE(res);
@@ -229,15 +229,15 @@ TEST_CASE("asyncio condition variable", "[sync]") {
             condition->notify();
 
             auto task2 = condition->wait(*mutex);
-            REQUIRE(!task2.done());
+            REQUIRE_FALSE(task2.done());
 
             res = co_await task1;
-            REQUIRE(!res);
+            REQUIRE_FALSE(res);
             REQUIRE(res.error() == std::errc::operation_canceled);
             REQUIRE(mutex->locked());
 
             mutex->unlock();
-            REQUIRE(!mutex->locked());
+            REQUIRE_FALSE(mutex->locked());
 
             res = co_await task2;
             REQUIRE(res);

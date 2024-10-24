@@ -47,7 +47,7 @@ TEST_CASE("poll events", "[poll]") {
         SECTION("timeout") {
             using namespace std::chrono_literals;
             const auto res = co_await asyncio::timeout(polls[0]->on(asyncio::Poll::Event::READABLE), 10ms);
-            REQUIRE(!res);
+            REQUIRE_FALSE(res);
             REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
         }
 

@@ -53,7 +53,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                             REQUIRE(*line == "hello hello world hello world");
 
                             line = co_await r.readLine();
-                            REQUIRE(!line);
+                            REQUIRE_FALSE(line);
                             REQUIRE(line.error() == asyncio::IOError::UNEXPECTED_EOF);
                         }(std::move(reader)),
                         [](auto writer) -> asyncio::task::Task<void> {
@@ -88,7 +88,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                             );
 
                             res = co_await r.readUntil(std::byte{'\1'});
-                            REQUIRE(!res);
+                            REQUIRE_FALSE(res);
                             REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
                         }(std::move(reader)),
                         [](auto writer) -> asyncio::task::Task<void> {
@@ -131,7 +131,7 @@ TEST_CASE("asyncio buffer", "[buffer]") {
                     SECTION("invalid argument") {
                         std::array<std::byte, 17> data{};
                         const auto res = co_await reader.peek(data);
-                        REQUIRE(!res);
+                        REQUIRE_FALSE(res);
                         REQUIRE(res.error() == std::errc::invalid_argument);
                     }
                 }

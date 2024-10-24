@@ -3,7 +3,7 @@
 
 TEST_CASE("http url", "[http]") {
     SECTION("parse") {
-        REQUIRE(!asyncio::http::URL::from(":/qq.com"));
+        REQUIRE_FALSE(asyncio::http::URL::from(":/qq.com"));
 
         const auto url = asyncio::http::URL::from("https://root:123456@localhost/file%20manager/abc?name=jack&age=12");
         REQUIRE(url);
@@ -34,7 +34,7 @@ TEST_CASE("http url", "[http]") {
     }
 
     asyncio::http::URL url;
-    REQUIRE(!url.string());
+    REQUIRE_FALSE(url.string());
 
     SECTION("modify") {
         url.scheme("https")

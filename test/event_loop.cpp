@@ -22,7 +22,7 @@ TEST_CASE("event loop", "[event loop]") {
                 co_return std::unexpected{make_error_code(std::errc::invalid_argument)};
             });
             REQUIRE(result);
-            REQUIRE(!*result);
+            REQUIRE_FALSE(*result);
             REQUIRE(result->error() == std::errc::invalid_argument);
         }
     }
@@ -46,7 +46,7 @@ TEST_CASE("event loop", "[event loop]") {
                 throw std::system_error{make_error_code(std::errc::invalid_argument)};
             });
             REQUIRE(result);
-            REQUIRE(!*result);
+            REQUIRE_FALSE(*result);
 
             try {
                 std::rethrow_exception(result->error());
