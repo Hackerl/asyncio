@@ -130,13 +130,6 @@ namespace asyncio::http {
             std::string method,
             URL url,
             std::optional<Options> options,
-            std::map<std::string, std::filesystem::path> payload
-        );
-
-        task::Task<Response, std::error_code> request(
-            std::string method,
-            URL url,
-            std::optional<Options> options,
             std::map<std::string, std::variant<std::string, std::filesystem::path>> payload
         );
 

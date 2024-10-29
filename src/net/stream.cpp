@@ -84,7 +84,7 @@ std::expected<asyncio::net::TCPStream, std::error_code> asyncio::net::TCPStream:
 }
 
 asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
-asyncio::net::TCPStream::connect(const std::string host, const unsigned short port) {
+asyncio::net::TCPStream::connect(const std::string host, const std::uint16_t port) {
     const auto addresses = co_await dns::getAddressInfo(
         host,
         std::to_string(port),
@@ -273,11 +273,18 @@ asyncio::net::TCPListener::listen(const SocketAddress &address) {
 }
 
 std::expected<asyncio::net::TCPListener, std::error_code>
-asyncio::net::TCPListener::listen(const std::string &ip, const unsigned short port) {
-    const auto address = addressFrom(ip, port);
+asyncio::net::TCPListener::listen(const std::string &ip, const std::uint16_t port) {
+    const auto address = ipAddressFrom(ip, port);
     EXPECT(address);
-    auto socketAddress = socketAddressFrom(*address);
+
+    auto socketAddress = std::visit(
+        [](const auto &arg) {
+            return socketAddressFrom(arg);
+        },
+        *address
+    );
     EXPECT(socketAddress);
+
     return listen(*std::move(socketAddress));
 }
 

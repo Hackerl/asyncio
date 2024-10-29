@@ -1,64 +1,52 @@
+#include "catch_extensions.h"
 #include <asyncio/poll.h>
-#include <asyncio/time.h>
+#include <zero/defer.h>
 #include <catch2/catch_test_macros.hpp>
 
 #ifndef _WIN32
 #include <unistd.h>
 #endif
 
-TEST_CASE("poll events", "[poll]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        std::array<uv_os_sock_t, 2> sockets{};
-        REQUIRE(uv_socketpair(SOCK_STREAM, 0, sockets.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE) == 0);
+constexpr std::string_view MESSAGE = "hello world";
 
-        std::array polls{
-            asyncio::Poll::make(sockets[0]),
-            asyncio::Poll::make(sockets[1])
-        };
-        REQUIRE(polls[0]);
-        REQUIRE(polls[1]);
-
-        SECTION("normal") {
-            co_await allSettled(
-                [](auto socket, auto poll) -> asyncio::task::Task<void> {
-                    using namespace std::string_view_literals;
-
-                    const auto res = co_await poll.on(asyncio::Poll::Event::READABLE);
-                    REQUIRE(res);
-                    REQUIRE(*res & asyncio::Poll::Event::READABLE);
-
-                    std::array<char, 1024> buffer{};
-                    REQUIRE(recv(socket, buffer.data(), buffer.size(), 0) == 11);
-                    REQUIRE(buffer.data() == "hello world"sv);
-                }(sockets[0], *std::move(polls[0])),
-                [](auto socket, auto poll) -> asyncio::task::Task<void> {
-                    using namespace std::string_view_literals;
-
-                    const auto res = co_await poll.on(asyncio::Poll::Event::WRITABLE);
-                    REQUIRE(res);
-                    REQUIRE(*res & asyncio::Poll::Event::WRITABLE);
-
-                    constexpr auto message = "hello world"sv;
-                    REQUIRE(send(socket, message.data(), message.size(), 0) == message.size());
-                }(sockets[1], *std::move(polls[1]))
-            );
-        }
-
-        SECTION("timeout") {
-            using namespace std::chrono_literals;
-            const auto res = co_await asyncio::timeout(polls[0]->on(asyncio::Poll::Event::READABLE), 10ms);
-            REQUIRE_FALSE(res);
-            REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
-        }
+ASYNC_TEST_CASE("poll events", "[poll]") {
+    std::array<uv_os_sock_t, 2> sockets{};
+    REQUIRE(uv_socketpair(SOCK_STREAM, 0, sockets.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE) == 0);
 
 #ifdef _WIN32
-        REQUIRE(closesocket(sockets[0]) == 0);
-        REQUIRE(closesocket(sockets[1]) == 0);
+    DEFER(REQUIRE(closesocket(sockets[0]) == 0));
+    DEFER(REQUIRE(closesocket(sockets[1]) == 0));
 #else
-        REQUIRE(close(sockets[0]) == 0);
-        REQUIRE(close(sockets[1]) == 0);
+    DEFER(REQUIRE(close(sockets[0]) == 0));
+    DEFER(REQUIRE(close(sockets[1]) == 0));
 #endif
-    });
-    REQUIRE(result);
-    REQUIRE(*result);
+
+    auto poll = asyncio::Poll::make(sockets[0]);
+    REQUIRE(poll);
+
+    SECTION("readable") {
+        REQUIRE(send(sockets[1], MESSAGE.data(), MESSAGE.size(), 0) == MESSAGE.size());
+
+        const auto events = co_await poll->on(asyncio::Poll::Event::READABLE);
+        REQUIRE(events);
+        REQUIRE(*events & asyncio::Poll::Event::READABLE);
+
+        std::string message;
+        message.resize(MESSAGE.size());
+
+        REQUIRE(recv(sockets[0], message.data(), message.size(), 0) == MESSAGE.size());
+        REQUIRE(message == MESSAGE);
+    }
+
+    SECTION("writable") {
+        const auto events = co_await poll->on(asyncio::Poll::Event::WRITABLE);
+        REQUIRE(events);
+        REQUIRE(*events & asyncio::Poll::Event::WRITABLE);
+    }
+
+    SECTION("cancel") {
+        auto task = poll->on(asyncio::Poll::Event::READABLE);
+        REQUIRE(task.cancel());
+        REQUIRE_ERROR(co_await task, std::errc::operation_canceled);
+    }
 }

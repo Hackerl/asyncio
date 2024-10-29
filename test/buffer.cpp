@@ -1,318 +1,133 @@
+#include "catch_extensions.h"
 #include <asyncio/buffer.h>
-#include <asyncio/pipe.h>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 
-TEST_CASE("asyncio buffer", "[buffer]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        auto pipes = asyncio::pipe();
-        REQUIRE(pipes);
+constexpr auto BUFFER_CAPACITY = 16;
+constexpr std::string_view MESSAGE = "hello world\r\n";
 
-        SECTION("reader") {
-            SECTION("instance") {
-                asyncio::BufReader reader(std::move(pipes->at(0)), 16);
-                REQUIRE(reader.capacity() == 16);
+ASYNC_TEST_CASE("buffer reader", "[buffer]") {
+    static_assert(MESSAGE.size() < BUFFER_CAPACITY);
+    asyncio::BufReader reader{asyncio::StringReader{std::string{MESSAGE}}, BUFFER_CAPACITY};
 
-                SECTION("read") {
-                    co_await allSettled(
-                        [](auto r) -> asyncio::task::Task<void> {
-                            std::string message;
-                            message.resize(6);
+    SECTION("capacity") {
+        REQUIRE(reader.capacity() == BUFFER_CAPACITY);
+    }
 
-                            auto res = co_await r.readExactly(std::as_writable_bytes(std::span{message}));
-                            REQUIRE(res);
-                            REQUIRE(message == "hello ");
-                            REQUIRE(r.available() == 5);
+    SECTION("available") {
+        REQUIRE(reader.available() == 0);
+    }
 
-                            message.resize(5);
-                            res = co_await r.readExactly(std::as_writable_bytes(std::span{message}));
-                            REQUIRE(res);
-                            REQUIRE(message == "world");
-                            REQUIRE(r.available() == 0);
+    SECTION("read") {
+        static_assert(MESSAGE.size() > 6);
 
-                            auto n = co_await r.read(std::as_writable_bytes(std::span{message}));
-                            REQUIRE(n);
-                            REQUIRE(*n == 0);
-                        }(std::move(reader)),
-                        [](auto writer) -> asyncio::task::Task<void> {
-                            using namespace std::string_view_literals;
-                            const auto res = co_await writer.writeAll(std::as_bytes(std::span{"hello world"sv}));
-                            REQUIRE(res);
-                        }(std::move(pipes->at(1)))
-                    );
-                }
+        std::string message;
+        message.resize(6);
 
-                SECTION("read line") {
-                    co_await allSettled(
-                        [](auto r) -> asyncio::task::Task<void> {
-                            auto line = co_await r.readLine();
-                            REQUIRE(line);
-                            REQUIRE(*line == "hello world hello world");
+        REQUIRE(co_await reader.readExactly(std::as_writable_bytes(std::span{message})));
+        REQUIRE(message == MESSAGE.substr(0, 6));
+        REQUIRE(reader.available() == MESSAGE.size() - 6);
 
-                            line = co_await r.readLine();
-                            REQUIRE(line);
-                            REQUIRE(*line == "hello hello world hello world");
+        message.resize(MESSAGE.size() - 6);
+        REQUIRE(co_await reader.readExactly(std::as_writable_bytes(std::span{message})));
+        REQUIRE(message == MESSAGE.substr(6));
+        REQUIRE(reader.available() == 0);
+    }
 
-                            line = co_await r.readLine();
-                            REQUIRE_FALSE(line);
-                            REQUIRE(line.error() == asyncio::IOError::UNEXPECTED_EOF);
-                        }(std::move(reader)),
-                        [](auto writer) -> asyncio::task::Task<void> {
-                            constexpr std::string_view message = "hello world hello world\r\nhello ";
+    SECTION("read line") {
+        REQUIRE(co_await reader.readLine() == MESSAGE.substr(0, MESSAGE.size() - 2));
+    }
 
-                            auto res = co_await writer.writeAll(std::as_bytes(std::span{message}));
-                            REQUIRE(res);
+    SECTION("read until") {
+        const auto data = co_await reader.readUntil(std::byte{'\r'});
+        REQUIRE(data);
+        REQUIRE_THAT(
+            *data,
+            Catch::Matchers::RangeEquals(std::as_bytes(std::span{MESSAGE.substr(0, MESSAGE.size() - 2)}))
+        );
+    }
 
-                            res = co_await writer.writeAll(std::as_bytes(std::span{message}));
-                            REQUIRE(res);
-                        }(std::move(pipes->at(1)))
-                    );
-                }
+    SECTION("peek") {
+        SECTION("normal") {
+            static_assert(MESSAGE.size() > 6);
 
-                SECTION("read until") {
-                    co_await allSettled(
-                        [](auto r) -> asyncio::task::Task<void> {
-                            using namespace std::string_view_literals;
+            std::string message;
+            message.resize(6);
 
-                            auto res = co_await r.readUntil(std::byte{'\1'});
-                            REQUIRE(res);
-                            REQUIRE(
-                                std::string_view{reinterpret_cast<const char *>(res->data()), res->size()}
-                                == "hello world hello world"
-                            );
-
-                            res = co_await r.readUntil(std::byte{'\1'});
-                            REQUIRE(res);
-                            REQUIRE(
-                                std::string_view{reinterpret_cast<const char *>(res->data()), res->size()}
-                                == "hello hello world hello world"
-                            );
-
-                            res = co_await r.readUntil(std::byte{'\1'});
-                            REQUIRE_FALSE(res);
-                            REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
-                        }(std::move(reader)),
-                        [](auto writer) -> asyncio::task::Task<void> {
-                            constexpr std::string_view message = "hello world hello world\1hello ";
-
-                            auto res = co_await writer.writeAll(std::as_bytes(std::span{message}));
-                            REQUIRE(res);
-
-                            res = co_await writer.writeAll(std::as_bytes(std::span{message}));
-                            REQUIRE(res);
-                        }(std::move(pipes->at(1)))
-                    );
-                }
-
-                SECTION("peek") {
-                    SECTION("normal") {
-                        co_await allSettled(
-                            [](auto r) -> asyncio::task::Task<void> {
-                                std::string message;
-                                message.resize(6);
-
-                                auto res = co_await r.peek(std::as_writable_bytes(std::span{message}));
-                                REQUIRE(res);
-                                REQUIRE(message == "hello ");
-                                REQUIRE(r.available() == 11);
-
-                                res = co_await r.peek(std::as_writable_bytes(std::span{message}));
-                                REQUIRE(res);
-                                REQUIRE(message == "hello ");
-                                REQUIRE(r.available() == 11);
-                            }(std::move(reader)),
-                            [](auto writer) -> asyncio::task::Task<void> {
-                                using namespace std::string_view_literals;
-                                const auto res = co_await writer.writeAll(std::as_bytes(std::span{"hello world"sv}));
-                                REQUIRE(res);
-                            }(std::move(pipes->at(1)))
-                        );
-                    }
-
-                    SECTION("invalid argument") {
-                        std::array<std::byte, 17> data{};
-                        const auto res = co_await reader.peek(data);
-                        REQUIRE_FALSE(res);
-                        REQUIRE(res.error() == std::errc::invalid_argument);
-                    }
-                }
-            }
-
-            SECTION("unique pointer") {
-                asyncio::BufReader reader(std::make_unique<asyncio::Pipe>(std::move(pipes->at(0))));
-
-                co_await allSettled(
-                    [](auto r) -> asyncio::task::Task<void> {
-                        std::string message;
-                        message.resize(6);
-
-                        auto res = co_await r.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "hello ");
-                        REQUIRE(r.available() == 5);
-
-                        message.resize(5);
-                        res = co_await r.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "world");
-                        REQUIRE(r.available() == 0);
-
-                        auto n = co_await r.read(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(n);
-                        REQUIRE(*n == 0);
-                    }(std::move(reader)),
-                    [](auto writer) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
-                        const auto res = co_await writer.writeAll(std::as_bytes(std::span{"hello world"sv}));
-                        REQUIRE(res);
-                    }(std::move(pipes->at(1)))
-                );
-            }
-
-            SECTION("shared pointer") {
-                asyncio::BufReader reader(std::make_shared<asyncio::Pipe>(std::move(pipes->at(0))));
-
-                co_await allSettled(
-                    [](auto r) -> asyncio::task::Task<void> {
-                        std::string message;
-                        message.resize(6);
-
-                        auto res = co_await r.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "hello ");
-                        REQUIRE(r.available() == 5);
-
-                        message.resize(5);
-                        res = co_await r.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "world");
-                        REQUIRE(r.available() == 0);
-
-                        auto n = co_await r.read(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(n);
-                        REQUIRE(*n == 0);
-                    }(std::move(reader)),
-                    [](auto writer) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
-                        const auto res = co_await writer.writeAll(std::as_bytes(std::span{"hello world"sv}));
-                        REQUIRE(res);
-                    }(std::move(pipes->at(1)))
-                );
-            }
+            REQUIRE(co_await reader.peek(std::as_writable_bytes(std::span{message})));
+            REQUIRE(message == MESSAGE.substr(0, 6));
+            REQUIRE(reader.available() == MESSAGE.size());
         }
 
-        SECTION("writer") {
-            SECTION("instance") {
-                asyncio::BufWriter writer(std::move(pipes->at(1)), 16);
-                REQUIRE(writer.capacity() == 16);
-
-                co_await allSettled(
-                    [](auto reader) -> asyncio::task::Task<void> {
-                        std::string message;
-                        message.resize(11);
-
-                        auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "hello world");
-
-                        res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "hello world");
-
-                        const auto n = co_await reader.read(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(n);
-                        REQUIRE(*n == 0);
-                    }(std::move(pipes->at(0))),
-                    [](auto w) -> asyncio::task::Task<void> {
-                        constexpr std::string_view message = "hello world";
-                        auto res = co_await w.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(w.pending() == message.size());
-
-                        res = co_await w.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(w.pending() == message.size() * 2 - 16);
-
-                        res = co_await w.flush();
-                        REQUIRE(res);
-                    }(std::move(writer))
-                );
-            }
-
-            SECTION("unique pointer") {
-                asyncio::BufWriter writer(std::make_unique<asyncio::Pipe>(std::move(pipes->at(1))), 16);
-                REQUIRE(writer.capacity() == 16);
-
-                co_await allSettled(
-                    [](auto reader) -> asyncio::task::Task<void> {
-                        std::string message;
-                        message.resize(11);
-
-                        auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "hello world");
-
-                        res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "hello world");
-
-                        const auto n = co_await reader.read(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(n);
-                        REQUIRE(*n == 0);
-                    }(std::move(pipes->at(0))),
-                    [](auto w) -> asyncio::task::Task<void> {
-                        constexpr std::string_view message = "hello world";
-                        auto res = co_await w.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(w.pending() == message.size());
-
-                        res = co_await w.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(w.pending() == message.size() * 2 - 16);
-
-                        res = co_await w.flush();
-                        REQUIRE(res);
-                    }(std::move(writer))
-                );
-            }
-
-            SECTION("shared pointer") {
-                asyncio::BufWriter writer(std::make_unique<asyncio::Pipe>(std::move(pipes->at(1))), 16);
-                REQUIRE(writer.capacity() == 16);
-
-                co_await allSettled(
-                    [](auto reader) -> asyncio::task::Task<void> {
-                        std::string message;
-                        message.resize(11);
-
-                        auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "hello world");
-
-                        res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message == "hello world");
-
-                        const auto n = co_await reader.read(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(n);
-                        REQUIRE(*n == 0);
-                    }(std::move(pipes->at(0))),
-                    [](auto w) -> asyncio::task::Task<void> {
-                        constexpr std::string_view message = "hello world";
-                        auto res = co_await w.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(w.pending() == message.size());
-
-                        res = co_await w.writeAll(std::as_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(w.pending() == message.size() * 2 - 16);
-
-                        res = co_await w.flush();
-                        REQUIRE(res);
-                    }(std::move(writer))
-                );
-            }
+        SECTION("invalid argument") {
+            std::array<std::byte, 1024> data{};
+            REQUIRE_ERROR(co_await reader.peek(data), std::errc::invalid_argument);
         }
-    });
-    REQUIRE(result);
-    REQUIRE(*result);
+    }
 }
+
+ASYNC_TEST_CASE("buffer writer", "[buffer]") {
+    static_assert(MESSAGE.size() < BUFFER_CAPACITY);
+
+    const auto stringWriter = std::make_shared<asyncio::StringWriter>();
+    asyncio::BufWriter writer{stringWriter, BUFFER_CAPACITY};
+
+    SECTION("capacity") {
+        REQUIRE(writer.capacity() == BUFFER_CAPACITY);
+    }
+
+    SECTION("pending") {
+        REQUIRE(writer.pending() == 0);
+    }
+
+    SECTION("write") {
+        REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{MESSAGE})));
+        REQUIRE(writer.pending() == MESSAGE.size());
+        REQUIRE(stringWriter->data().empty());
+
+        REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{MESSAGE})));
+        REQUIRE(writer.pending() == MESSAGE.size() * 2 - BUFFER_CAPACITY);
+        REQUIRE(stringWriter->data().size() == BUFFER_CAPACITY);
+        REQUIRE(stringWriter->data().substr(0, MESSAGE.size()) == MESSAGE);
+        REQUIRE(stringWriter->data().substr(MESSAGE.size()) == MESSAGE.substr(0, BUFFER_CAPACITY - MESSAGE.size()));
+    }
+
+    SECTION("flush") {
+        REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{MESSAGE})));
+        REQUIRE(co_await writer.flush());
+        REQUIRE(writer.pending() == 0);
+        REQUIRE(stringWriter->data() == MESSAGE);
+    }
+}
+
+static_assert(std::is_constructible_v<asyncio::BufReader<asyncio::StringReader>, asyncio::StringReader>);
+
+static_assert(
+    std::is_constructible_v<
+        asyncio::BufReader<std::unique_ptr<asyncio::IReader>>,
+        std::unique_ptr<asyncio::IReader>
+    >
+);
+
+static_assert(
+    std::is_constructible_v<
+        asyncio::BufReader<std::shared_ptr<asyncio::IReader>>,
+        std::shared_ptr<asyncio::IReader>
+    >
+);
+
+static_assert(std::is_constructible_v<asyncio::BufWriter<asyncio::StringWriter>, asyncio::StringWriter>);
+
+static_assert(
+    std::is_constructible_v<
+        asyncio::BufWriter<std::unique_ptr<asyncio::IWriter>>,
+        std::unique_ptr<asyncio::IWriter>
+    >
+);
+
+static_assert(
+    std::is_constructible_v<
+        asyncio::BufWriter<std::shared_ptr<asyncio::IWriter>>,
+        std::shared_ptr<asyncio::IWriter>
+    >
+);

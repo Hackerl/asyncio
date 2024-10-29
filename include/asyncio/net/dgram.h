@@ -14,19 +14,19 @@ namespace asyncio::net {
         explicit UDPSocket(uv::Handle<uv_udp_t> udp);
 
     private:
+        static std::expected<UDPSocket, std::error_code> make();
         static std::expected<UDPSocket, std::error_code> bind(const SocketAddress &address);
         static std::expected<UDPSocket, std::error_code> connect(const SocketAddress &address);
 
     public:
-        static std::expected<UDPSocket, std::error_code> make();
         static std::expected<UDPSocket, std::error_code> from(uv_os_sock_t socket);
 
-        static std::expected<UDPSocket, std::error_code> bind(const std::string &ip, unsigned short port);
+        static std::expected<UDPSocket, std::error_code> bind(const std::string &ip, std::uint16_t port);
         static std::expected<UDPSocket, std::error_code> bind(const IPv4Address &address);
         static std::expected<UDPSocket, std::error_code> bind(const IPv6Address &address);
 
         static task::Task<UDPSocket, std::error_code>
-        connect(std::string host, unsigned short port);
+        connect(std::string host, std::uint16_t port);
 
         static std::expected<UDPSocket, std::error_code> connect(const IPv4Address &address);
         static std::expected<UDPSocket, std::error_code> connect(const IPv6Address &address);
@@ -63,7 +63,7 @@ namespace asyncio::net {
         writeTo(std::span<const std::byte> data, Address address) override;
 
         task::Task<std::size_t, std::error_code>
-        writeTo(std::span<const std::byte> data, std::string host, unsigned short port);
+        writeTo(std::span<const std::byte> data, std::string host, std::uint16_t port);
 
         task::Task<void, std::error_code> close() override;
 

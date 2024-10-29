@@ -9,29 +9,35 @@ namespace asyncio::net {
     using IPv6 = zero::os::net::IPv6;
     using IP = zero::os::net::IP;
 
-    struct IPv4Address {
-        unsigned short port{};
-        IPv4 ip{};
+    inline constexpr auto LOCALHOST_IPV4 = zero::os::net::LOCALHOST_IPV4;
+    inline constexpr auto BROADCAST_IPV4 = zero::os::net::BROADCAST_IPV4;
+    inline constexpr auto UNSPECIFIED_IPV4 = zero::os::net::UNSPECIFIED_IPV4;
+    inline constexpr auto LOCALHOST_IPV6 = zero::os::net::LOCALHOST_IPV6;
+    inline constexpr auto UNSPECIFIED_IPV6 = zero::os::net::UNSPECIFIED_IPV6;
 
-        bool operator==(const IPv4Address &) const = default;
-        static std::expected<IPv4Address, std::error_code> from(const std::string &ip, unsigned short port);
+    struct IPv4Address {
+        IPv4 ip{};
+        std::uint16_t port{};
+
+        auto operator<=>(const IPv4Address &) const = default;
+        static std::expected<IPv4Address, std::error_code> from(const std::string &ip, std::uint16_t port);
     };
 
     struct IPv6Address {
-        unsigned short port{};
         IPv6 ip{};
+        std::uint16_t port{};
         std::optional<std::string> zone;
 
-        bool operator==(const IPv6Address &) const = default;
+        auto operator<=>(const IPv6Address &) const = default;
 
         static IPv6Address from(const IPv4Address &ipv4);
-        static std::expected<IPv6Address, std::error_code> from(const std::string &ip, unsigned short port);
+        static std::expected<IPv6Address, std::error_code> from(const std::string &ip, std::uint16_t port);
     };
 
     struct UnixAddress {
         std::string path;
 
-        bool operator==(const UnixAddress &) const = default;
+        auto operator<=>(const UnixAddress &) const = default;
     };
 
     using IPAddress = std::variant<IPv4Address, IPv6Address>;
@@ -41,21 +47,57 @@ namespace asyncio::net {
     template<typename T>
         requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address>)
     bool operator==(const IPAddress &lhs, const T &rhs) {
-        if constexpr (std::is_same_v<T, IPv4Address>)
-            return std::holds_alternative<IPv4Address>(lhs) && std::get<IPv4Address>(lhs) == rhs;
-        else
-            return std::holds_alternative<IPv6Address>(lhs) && std::get<IPv6Address>(lhs) == rhs;
+        return std::visit(
+            [&]<typename U>(const U &arg) {
+                if constexpr (std::is_same_v<U, T>)
+                    return arg == rhs;
+                else
+                    return false;
+            },
+            lhs
+        );
+    }
+
+    template<typename T>
+        requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address>)
+    bool operator==(const T &lhs, const IPAddress &rhs) {
+        return std::visit(
+            [&]<typename U>(const U &arg) {
+                if constexpr (std::is_same_v<U, T>)
+                    return arg == lhs;
+                else
+                    return false;
+            },
+            rhs
+        );
     }
 
     template<typename T>
         requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address> || std::is_same_v<T, UnixAddress>)
     bool operator==(const Address &lhs, const T &rhs) {
-        if constexpr (std::is_same_v<T, IPv4Address>)
-            return std::holds_alternative<IPv4Address>(lhs) && std::get<IPv4Address>(lhs) == rhs;
-        else if constexpr (std::is_same_v<T, IPv6Address>)
-            return std::holds_alternative<IPv6Address>(lhs) && std::get<IPv6Address>(lhs) == rhs;
-        else
-            return std::holds_alternative<UnixAddress>(lhs) && std::get<UnixAddress>(lhs) == rhs;
+        return std::visit(
+            [&]<typename U>(const U &arg) {
+                if constexpr (std::is_same_v<U, T>)
+                    return arg == rhs;
+                else
+                    return false;
+            },
+            lhs
+        );
+    }
+
+    template<typename T>
+        requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address> || std::is_same_v<T, UnixAddress>)
+    bool operator==(const T &lhs, const Address &rhs) {
+        return std::visit(
+            [&]<typename U>(const U &arg) {
+                if constexpr (std::is_same_v<U, T>)
+                    return arg == lhs;
+                else
+                    return false;
+            },
+            rhs
+        );
     }
 
     DEFINE_ERROR_CODE_EX(
@@ -65,7 +107,7 @@ namespace asyncio::net {
         ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
     )
 
-    std::expected<Address, std::error_code> addressFrom(const std::string &ip, unsigned short port);
+    std::expected<IPAddress, std::error_code> ipAddressFrom(const std::string &ip, std::uint16_t port);
     std::expected<Address, std::error_code> addressFrom(const sockaddr *addr, socklen_t length);
 
     DEFINE_ERROR_CODE_EX(
@@ -135,7 +177,7 @@ struct fmt::formatter<asyncio::net::UnixAddress, Char> {
 
     template<typename FmtContext>
     static auto format(const asyncio::net::UnixAddress &address, FmtContext &ctx) {
-        return std::ranges::copy(address.path, ctx.out()).out;
+        return fmt::format_to(ctx.out(), "unix://{}", address.path);
     }
 };
 

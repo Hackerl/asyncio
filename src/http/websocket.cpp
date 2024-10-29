@@ -77,19 +77,17 @@ void asyncio::http::ws::Header::mask(const bool mask) {
 
 asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::WebSocket::connect(const URL url) {
     const auto scheme = url.scheme();
-    CO_EXPECT(scheme);
-
     const auto host = url.host();
-    CO_EXPECT(host);
-
     const auto port = url.port();
-    CO_EXPECT(port);
+
+    if (!host || !port)
+        co_return std::unexpected{Error::INVALID_URL};
 
     std::shared_ptr<IReader> reader;
     std::shared_ptr<IWriter> writer;
     std::shared_ptr<ICloseable> closeable;
 
-    if (*scheme == WS_SCHEME) {
+    if (scheme == WS_SCHEME) {
         auto stream = co_await net::TCPStream::connect(*host, *port)
             .transform([](net::TCPStream &&value) {
                 return std::make_shared<net::TCPStream>(std::move(value));
@@ -99,7 +97,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         writer = *stream;
         closeable = *std::move(stream);
     }
-    else if (*scheme == WS_SECURE_SCHEME) {
+    else if (scheme == WS_SECURE_SCHEME) {
         auto stream = co_await net::TCPStream::connect(*host, *port);
         CO_EXPECT(stream);
 
@@ -131,7 +129,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         b = static_cast<std::byte>(dist(gen));
 
     const auto key = zero::encoding::base64::encode(secret);
-    const auto path = url.path().value_or("/");
+    const auto path = url.path();
     const auto query = url.query();
 
     const auto header = fmt::format(
@@ -145,7 +143,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         !query ? path : path + "?" + *query,
         *host, *port,
         key,
-        *scheme, *host, *port
+        scheme, *host, *port
     );
 
     CO_EXPECT(co_await writer->writeAll(std::as_bytes(std::span{header})));
@@ -347,7 +345,7 @@ asyncio::http::ws::WebSocket::readMessage() {
                 co_return std::unexpected{CloseCode::NORMAL_CLOSURE};
 
             co_return std::unexpected{
-                static_cast<CloseCode>(ntohs(*reinterpret_cast<const unsigned short *>(message->data.data())))
+                static_cast<CloseCode>(ntohs(*reinterpret_cast<const std::uint16_t *>(message->data.data())))
             };
         }
         else {
@@ -396,7 +394,7 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(c
     assert(mState == State::CONNECTED);
 
     mState = State::CLOSING;
-    const auto c = htons(static_cast<unsigned short>(code));
+    const auto c = htons(static_cast<std::uint16_t>(code));
 
     CO_EXPECT(co_await writeInternalMessage({
         Opcode::CLOSE,

@@ -15,30 +15,30 @@
 #endif
 
 std::expected<asyncio::net::IPv4Address, std::error_code>
-asyncio::net::IPv4Address::from(const std::string &ip, const unsigned short port) {
+asyncio::net::IPv4Address::from(const std::string &ip, const std::uint16_t port) {
     IPv4 ipv4{};
 
     EXPECT(uv::expected([&] {
         return uv_inet_pton(AF_INET, ip.c_str(), ipv4.data());
     }));
 
-    return IPv4Address{port, ipv4};
+    return IPv4Address{ipv4, port};
 }
 
 asyncio::net::IPv6Address asyncio::net::IPv6Address::from(const IPv4Address &ipv4) {
     IPv6Address address;
 
-    address.port = ipv4.port;
     address.ip[10] = std::byte{255};
     address.ip[11] = std::byte{255};
+    address.port = ipv4.port;
 
-    std::memcpy(address.ip.data() + 12, ipv4.ip.data(), 4);
+    std::ranges::copy(ipv4.ip, address.ip.begin() + 12);
 
     return address;
 }
 
 std::expected<asyncio::net::IPv6Address, std::error_code>
-asyncio::net::IPv6Address::from(const std::string &ip, const unsigned short port) {
+asyncio::net::IPv6Address::from(const std::string &ip, const std::uint16_t port) {
     IPv6 ipv6{};
     const auto pos = ip.find_last_of('%');
 
@@ -47,13 +47,13 @@ asyncio::net::IPv6Address::from(const std::string &ip, const unsigned short port
     }));
 
     if (pos == std::string::npos)
-        return IPv6Address{port, ipv6};
+        return IPv6Address{ipv6, port};
 
-    return IPv6Address{port, ipv6, ip.substr(pos + 1)};
+    return IPv6Address{ipv6, port, ip.substr(pos + 1)};
 }
 
-std::expected<asyncio::net::Address, std::error_code>
-asyncio::net::addressFrom(const std::string &ip, const unsigned short port) {
+std::expected<asyncio::net::IPAddress, std::error_code>
+asyncio::net::ipAddressFrom(const std::string &ip, const std::uint16_t port) {
     if (auto result = IPv6Address::from(ip, port))
         return result;
 
@@ -71,8 +71,8 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 
         IPv4Address ipv4;
 
-        ipv4.port = ntohs(address->sin_port);
         std::memcpy(ipv4.ip.data(), &address->sin_addr, sizeof(in_addr));
+        ipv4.port = ntohs(address->sin_port);
 
         return ipv4;
     }
@@ -85,8 +85,8 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 
         IPv6Address ipv6;
 
-        ipv6.port = ntohs(address->sin6_port);
         std::memcpy(ipv6.ip.data(), &address->sin6_addr, sizeof(in6_addr));
+        ipv6.port = ntohs(address->sin6_port);
 
         if (address->sin6_scope_id == 0)
             return ipv6;

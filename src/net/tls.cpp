@@ -1,5 +1,5 @@
 #include <asyncio/net/tls.h>
-#include <zero/filesystem/fs.h>
+#include <asyncio/fs.h>
 
 #ifdef _WIN32
 std::expected<void, std::error_code> loadSystemCerts(X509_STORE *store, const std::string &name) {
@@ -65,12 +65,9 @@ asyncio::net::tls::Certificate::load(const std::string_view content) {
     return Certificate{std::move(cert)};
 }
 
-std::expected<asyncio::net::tls::Certificate, std::error_code>
+asyncio::task::Task<asyncio::net::tls::Certificate, std::error_code>
 asyncio::net::tls::Certificate::loadFile(const std::filesystem::path &path) {
-    return zero::filesystem::readString(path)
-        .and_then([](const auto &content) {
-            return load(content);
-        });
+    co_return co_await fs::readString(path).andThen(load);
 }
 
 std::expected<asyncio::net::tls::PrivateKey, std::error_code>
@@ -94,29 +91,51 @@ asyncio::net::tls::PrivateKey::load(const std::string_view content) {
     return PrivateKey{std::move(key)};
 }
 
-std::expected<asyncio::net::tls::PrivateKey, std::error_code>
+asyncio::task::Task<asyncio::net::tls::PrivateKey, std::error_code>
 asyncio::net::tls::PrivateKey::loadFile(const std::filesystem::path &path) {
-    return zero::filesystem::readString(path)
-        .and_then([](const auto &content) {
-            return load(content);
-        });
+    co_return co_await fs::readString(path).andThen(load);
 }
 
-std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::ClientConfig::build() const {
+template<typename T>
+T &asyncio::net::tls::Config<T>::minVersion(const Version version) {
+    mMinVersion = version;
+    return *static_cast<T *>(this);
+}
+
+template<typename T>
+T &asyncio::net::tls::Config<T>::maxVersion(const Version version) {
+    mMaxVersion = version;
+    return *static_cast<T *>(this);
+}
+
+template<typename T>
+T &asyncio::net::tls::Config<T>::rootCAs(std::list<Certificate> certificates) {
+    mRootCAs = std::move(certificates);
+    return *static_cast<T *>(this);
+}
+
+template<typename T>
+T &asyncio::net::tls::Config<T>::certKeyPairs(std::list<CertKeyPair> pairs) {
+    mCertKeyPairs = std::move(pairs);
+    return *static_cast<T *>(this);
+}
+
+template<typename T>
+std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Config<T>::build() const {
     Context context{SSL_CTX_new(TLS_method()), SSL_CTX_free};
 
     if (!context)
         return std::unexpected{openSSLError()};
 
     EXPECT(expected([&] {
-        return SSL_CTX_set_min_proto_version(context.get(), std::to_underlying(minVersion));
+        return SSL_CTX_set_min_proto_version(context.get(), std::to_underlying(mMinVersion));
     }));
 
     EXPECT(expected([&] {
-        return SSL_CTX_set_max_proto_version(context.get(), std::to_underlying(maxVersion));
+        return SSL_CTX_set_max_proto_version(context.get(), std::to_underlying(mMaxVersion));
     }));
 
-    if (rootCAs.empty()) {
+    if (mRootCAs.empty()) {
 #ifdef _WIN32
         const auto store = SSL_CTX_get_cert_store(context.get());
 
@@ -137,14 +156,14 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Cl
         if (!store)
             return std::unexpected{openSSLError()};
 
-        for (const auto &[cert]: rootCAs) {
+        for (const auto &[cert]: mRootCAs) {
             EXPECT(expected([&] {
                 return X509_STORE_add_cert(store, cert.get());
             }));
         }
     }
 
-    for (const auto &[cert, key]: certKeyPairs) {
+    for (const auto &[cert, key]: mCertKeyPairs) {
         EXPECT(expected([&] {
             return SSL_CTX_use_certificate(context.get(), cert.inner.get());
         }));
@@ -153,68 +172,35 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Cl
         }));
     }
 
-    SSL_CTX_set_verify(context.get(), insecure ? SSL_VERIFY_NONE : SSL_VERIFY_PEER, nullptr);
+    if constexpr (std::is_same_v<T, ClientConfig>) {
+        SSL_CTX_set_verify(context.get(), mInsecure ? SSL_VERIFY_NONE : SSL_VERIFY_PEER, nullptr);
+    }
+    else {
+        SSL_CTX_set_verify(
+            context.get(),
+            mInsecure ? SSL_VERIFY_NONE : SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+            nullptr
+        );
+    }
+
     return context;
 }
 
-std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::ServerConfig::build() const {
-    Context context{SSL_CTX_new(TLS_method()), SSL_CTX_free};
-
-    if (!context)
-        return std::unexpected{openSSLError()};
-
-    EXPECT(expected([&] {
-        return SSL_CTX_set_min_proto_version(context.get(), std::to_underlying(minVersion));
-    }));
-
-    EXPECT(expected([&] {
-        return SSL_CTX_set_max_proto_version(context.get(), std::to_underlying(maxVersion));
-    }));
-
-    if (rootCAs.empty()) {
-#ifdef _WIN32
-        const auto store = SSL_CTX_get_cert_store(context.get());
-
-        if (!store)
-            return std::unexpected{openSSLError()};
-
-        EXPECT(loadSystemCerts(store, "CA"));
-        EXPECT(loadSystemCerts(store, "AuthRoot"));
-        EXPECT(loadSystemCerts(store, "ROOT"));
-#else
-        EXPECT(expected([&] {
-            return SSL_CTX_set_default_verify_paths(context.get());
-        }));
-#endif
-    } else {
-        const auto store = SSL_CTX_get_cert_store(context.get());
-
-        if (!store)
-            return std::unexpected{openSSLError()};
-
-        for (const auto &[cert]: rootCAs) {
-            EXPECT(expected([&] {
-                return X509_STORE_add_cert(store, cert.get());
-            }));
-        }
-    }
-
-    for (const auto &[cert, key]: certKeyPairs) {
-        EXPECT(expected([&] {
-            return SSL_CTX_use_certificate(context.get(), cert.inner.get());
-        }));
-        EXPECT(expected([&] {
-            return SSL_CTX_use_PrivateKey(context.get(), key.inner.get());
-        }));
-    }
-
-    SSL_CTX_set_verify(
-        context.get(),
-        verifyClient ? SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT : SSL_VERIFY_NONE,
-        nullptr
-    );
-
-    return context;
+asyncio::net::tls::ClientConfig &asyncio::net::tls::ClientConfig::insecure(const bool enable) {
+    mInsecure = enable;
+    return *this;
 }
+
+asyncio::net::tls::ServerConfig::ServerConfig() : Config{} {
+    mInsecure = true;
+}
+
+asyncio::net::tls::ServerConfig &asyncio::net::tls::ServerConfig::verifyClient(const bool enable) {
+    mInsecure = !enable;
+    return *this;
+}
+
+template class asyncio::net::tls::Config<asyncio::net::tls::ClientConfig>;
+template class asyncio::net::tls::Config<asyncio::net::tls::ServerConfig>;
 
 DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::net::tls::OpenSSLError, asyncio::net::tls::TLSError)

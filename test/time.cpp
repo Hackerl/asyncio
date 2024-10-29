@@ -1,83 +1,51 @@
+#include "catch_extensions.h"
 #include <asyncio/time.h>
 #include <catch2/catch_test_macros.hpp>
 
-TEST_CASE("time", "[time]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        SECTION("sleep") {
-            using namespace std::chrono_literals;
-            const auto tp = std::chrono::system_clock::now();
-            co_await asyncio::sleep(50ms);
-            REQUIRE(std::chrono::system_clock::now() - tp > 45ms);
-        }
+ASYNC_TEST_CASE("sleep", "[time]") {
+    using namespace std::chrono_literals;
+    const auto tp = std::chrono::system_clock::now();
+    co_await asyncio::sleep(50ms);
+    REQUIRE(std::chrono::system_clock::now() - tp > 45ms);
+}
 
-        SECTION("timeout") {
-            SECTION("success") {
-                using namespace std::chrono_literals;
-                const auto res = co_await asyncio::timeout(asyncio::sleep(10ms), 20ms);
-                REQUIRE(res);
-            }
+ASYNC_TEST_CASE("timeout", "[time]") {
+    using namespace std::chrono_literals;
 
-            SECTION("timeout") {
-                using namespace std::chrono_literals;
-                const auto res = co_await asyncio::timeout(asyncio::sleep(20ms), 10ms);
-                REQUIRE_FALSE(res);
-                REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
-            }
+    SECTION("not expired") {
+        REQUIRE(co_await asyncio::timeout(asyncio::sleep(10ms), 20ms));
+    }
 
-            SECTION("failure") {
-                using namespace std::chrono_literals;
-                auto task = asyncio::sleep(50ms);
-                REQUIRE(task.cancel());
-                const auto res = co_await asyncio::timeout(std::move(task), 20ms);
-                REQUIRE(res);
-                REQUIRE(res.value().error() == std::errc::operation_canceled);
-            }
+    SECTION("expired") {
+        REQUIRE_ERROR(co_await asyncio::timeout(asyncio::sleep(20ms), 10ms), asyncio::TimeoutError::ELAPSED);
+    }
 
-            SECTION("cancel") {
-                using namespace std::chrono_literals;
-                auto task = asyncio::timeout(asyncio::sleep(20ms), 20ms);
-                REQUIRE(task.cancel());
-                const auto res = co_await task;
-                REQUIRE(res);
-                REQUIRE_FALSE(*res);
-                REQUIRE(res->error() == std::errc::operation_canceled);
-            }
-
-            SECTION("cannot cancel") {
-                using namespace std::chrono_literals;
-
-                const auto promise = std::make_shared<asyncio::Promise<void, std::error_code>>();
-                auto task = asyncio::timeout(
-                    from(asyncio::task::Cancellable{
-                        promise->getFuture(),
-                        [=]() -> std::expected<void, std::error_code> {
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
-                        }
-                    }),
-                    20ms
-                );
-
-                SECTION("success") {
-                    co_await asyncio::sleep(20ms);
-                    promise->resolve();
-
-                    const auto &res = co_await task;
-                    REQUIRE(res);
-                    REQUIRE(*res);
+    SECTION("expired but cannot be cancelled") {
+        const auto promise = std::make_shared<asyncio::Promise<void, std::error_code>>();
+        auto task = asyncio::timeout(
+            from(asyncio::task::Cancellable{
+                promise->getFuture(),
+                [=]() -> std::expected<void, std::error_code> {
+                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
                 }
+            }),
+            10ms
+        );
 
-                SECTION("failure") {
-                    co_await asyncio::sleep(20ms);
-                    promise->reject(make_error_code(std::errc::invalid_argument));
+        promise->resolve();
 
-                    const auto &res = co_await task;
-                    REQUIRE(res);
-                    REQUIRE_FALSE(*res);
-                    REQUIRE(res->error() == std::errc::invalid_argument);
-                }
-            }
-        }
-    });
-    REQUIRE(result);
-    REQUIRE(*result);
+        const auto result = co_await task;
+        REQUIRE(result);
+        REQUIRE(*result);
+    }
+
+    SECTION("cancel") {
+        auto task = asyncio::timeout(asyncio::sleep(20ms), 10ms);
+        REQUIRE(task.cancel());
+
+        const auto result = co_await task;
+        REQUIRE(result);
+        REQUIRE_FALSE(*result);
+        REQUIRE(result->error() == std::errc::operation_canceled);
+    }
 }

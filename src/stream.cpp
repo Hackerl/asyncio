@@ -237,17 +237,9 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
         );
     }));
 
-    if (const auto result = co_await promise.getFuture(); !result) {
-        const auto size = data.size();
-        const auto queueSize = uv_stream_get_write_queue_size(mStream.raw());
-        assert(queueSize <= size);
-
-        if (queueSize < size)
-            co_return size - queueSize;
-
-        co_return std::unexpected{result.error()};
-    }
-
+    // if an error occurs but some data has been written, the amount written should be returned,
+    // but I have no way of knowing how much data has been written.
+    CO_EXPECT(co_await promise.getFuture());
     co_return data.size();
 }
 

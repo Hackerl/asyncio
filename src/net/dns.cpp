@@ -1,4 +1,5 @@
 #include <asyncio/net/dns.h>
+#include <zero/defer.h>
 
 asyncio::task::Task<std::vector<asyncio::net::Address>, std::error_code>
 asyncio::net::dns::getAddressInfo(
@@ -21,6 +22,7 @@ asyncio::net::dns::getAddressInfo(
                     return;
                 }
 
+                DEFER(uv_freeaddrinfo(result));
                 std::vector<Address> addresses;
 
                 for (const auto *ptr = result; ptr; ptr = ptr->ai_next) {
@@ -32,7 +34,10 @@ asyncio::net::dns::getAddressInfo(
                     addresses.push_back(*std::move(address));
                 }
 
-                uv_freeaddrinfo(result);
+                std::ranges::sort(addresses);
+                const auto [first, last] = std::ranges::unique(addresses);
+                addresses.erase(first, last);
+
                 p->resolve(std::move(addresses));
             },
             node.c_str(),

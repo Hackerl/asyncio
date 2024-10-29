@@ -75,7 +75,7 @@ jobs:
           CFLAGS: -fsanitize=address
           CXXFLAGS: -fsanitize=address
       - name: Test
-        run: ctest --output-on-failure --test-dir build -E "^asynchronous io$"
+        run: ctest --output-on-failure --test-dir build
 
   windows-32:
     runs-on: windows-latest
@@ -104,7 +104,7 @@ jobs:
           CFLAGS: -fsanitize=address
           CXXFLAGS: -fsanitize=address
       - name: Test
-        run: ctest --output-on-failure --test-dir build -E "^asynchronous io$"
+        run: ctest --output-on-failure --test-dir build
 
   macos:
     runs-on: macos-13

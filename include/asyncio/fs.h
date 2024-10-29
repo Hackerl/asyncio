@@ -2,8 +2,7 @@
 #define ASYNCIO_FS_H
 
 #include "io.h"
-#include <asyncio/thread.h>
-#include <zero/filesystem/std.h>
+#include <zero/filesystem/fs.h>
 
 namespace asyncio::fs {
     class File final : public IFileDescriptor, public IReader, public IWriter, public ICloseable, public ISeekable {
@@ -51,20 +50,20 @@ namespace asyncio::fs {
     task::Task<void, std::error_code>
     copy(std::filesystem::path from, std::filesystem::path to, std::filesystem::copy_options options);
 
-    task::Task<bool, std::error_code> copyFile(std::filesystem::path from, std::filesystem::path to);
+    task::Task<void, std::error_code> copyFile(std::filesystem::path from, std::filesystem::path to);
 
-    task::Task<bool, std::error_code>
+    task::Task<void, std::error_code>
     copyFile(std::filesystem::path from, std::filesystem::path to, std::filesystem::copy_options options);
 
     task::Task<void, std::error_code>
     copySymlink(std::filesystem::path from, std::filesystem::path to);
 
-    task::Task<bool, std::error_code> createDirectory(std::filesystem::path path);
+    task::Task<void, std::error_code> createDirectory(std::filesystem::path path);
 
-    task::Task<bool, std::error_code>
+    task::Task<void, std::error_code>
     createDirectory(std::filesystem::path path, std::filesystem::path existing);
 
-    task::Task<bool, std::error_code> createDirectories(std::filesystem::path path);
+    task::Task<void, std::error_code> createDirectories(std::filesystem::path path);
 
     task::Task<void, std::error_code>
     createHardLink(std::filesystem::path target, std::filesystem::path link);
@@ -99,7 +98,7 @@ namespace asyncio::fs {
 
     task::Task<std::filesystem::path, std::error_code> readSymlink(std::filesystem::path path);
 
-    task::Task<bool, std::error_code> remove(std::filesystem::path path);
+    task::Task<void, std::error_code> remove(std::filesystem::path path);
     task::Task<std::uintmax_t, std::error_code> removeAll(std::filesystem::path path);
 
     task::Task<void, std::error_code> rename(std::filesystem::path from, std::filesystem::path to);
@@ -150,41 +149,15 @@ namespace asyncio::fs {
     };
 
     template<typename T>
-        requires (
+    class Asynchronous {
+        static_assert(
             std::is_same_v<T, std::filesystem::directory_iterator> ||
             std::is_same_v<T, std::filesystem::recursive_directory_iterator>
-        )
-    class Asynchronous {
+        );
+
     public:
-        explicit Asynchronous(T it) : mIterator{std::move(it)}, mStarted{false} {
-        }
-
-        task::Task<std::optional<DirectoryEntry>, std::error_code> next() {
-            if (mIterator == std::default_sentinel)
-                co_return std::nullopt;
-
-            if (!mStarted) {
-                mStarted = true;
-                co_return DirectoryEntry{zero::filesystem::DirectoryEntry{*mIterator}};
-            }
-
-            CO_EXPECT(co_await toThreadPool([this]() -> std::expected<void, std::error_code> {
-                std::error_code ec;
-                mIterator.increment(ec);
-
-                if (ec)
-                    return std::unexpected{ec};
-
-                return {};
-            }).transformError(make_error_code).andThen([](auto result) {
-                return result;
-            }));
-
-            if (mIterator == std::default_sentinel)
-                co_return std::nullopt;
-
-            co_return DirectoryEntry{zero::filesystem::DirectoryEntry{*mIterator}};
-        }
+        explicit Asynchronous(T it);
+        task::Task<std::optional<DirectoryEntry>, std::error_code> next();
 
     private:
         T mIterator;

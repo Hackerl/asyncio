@@ -47,7 +47,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("ip", "listen ip");
-    cmdline.add<unsigned short>("port", "listen port");
+    cmdline.add<std::uint16_t>("port", "listen port");
     cmdline.add<std::filesystem::path>("cert", "cert path");
     cmdline.add<std::filesystem::path>("key", "private key path");
 
@@ -57,7 +57,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     cmdline.parse(argc, argv);
 
     const auto ip = cmdline.get<std::string>("ip");
-    const auto port = cmdline.get<unsigned short>("port");
+    const auto port = cmdline.get<std::uint16_t>("port");
 
     const auto caFile = cmdline.getOptional<std::filesystem::path>("ca");
     const auto certFile = cmdline.get<std::filesystem::path>("cert");
@@ -65,24 +65,24 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 
     const auto verifyClient = cmdline.exist("verify");
 
-    auto cert = asyncio::net::tls::Certificate::loadFile(certFile);
+    auto cert = co_await asyncio::net::tls::Certificate::loadFile(certFile);
     CO_EXPECT(cert);
 
-    auto key = asyncio::net::tls::PrivateKey::loadFile(keyFile);
+    auto key = co_await asyncio::net::tls::PrivateKey::loadFile(keyFile);
     CO_EXPECT(key);
 
-    asyncio::net::tls::ServerConfig config{
-        .verifyClient = verifyClient,
-        .certKeyPairs = {{*std::move(cert), *std::move(key)}}
-    };
+    asyncio::net::tls::ServerConfig config;
 
     if (caFile) {
-        auto ca = asyncio::net::tls::Certificate::loadFile(*caFile);
+        auto ca = co_await asyncio::net::tls::Certificate::loadFile(*caFile);
         CO_EXPECT(ca);
-        config.rootCAs.push_back(*std::move(ca));
+        config.rootCAs({*std::move(ca)});
     }
 
-    auto context = config.build();
+    auto context = config
+                   .verifyClient(verifyClient)
+                   .certKeyPairs({{*std::move(cert), *std::move(key)}})
+                   .build();
     CO_EXPECT(context);
 
     auto listener = asyncio::net::TCPListener::listen(ip, port);

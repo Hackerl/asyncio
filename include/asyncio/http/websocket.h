@@ -137,6 +137,7 @@ namespace asyncio::http::ws {
         DEFINE_ERROR_CODE_INNER(
             Error,
             "asyncio::http::ws::WebSocket",
+            INVALID_URL, "invalid url",
             UNSUPPORTED_SCHEME, "unsupported websocket scheme",
             INVALID_RESPONSE, "invalid http response",
             UNEXPECTED_STATUS_CODE, "unexpected http response status code",

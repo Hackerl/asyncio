@@ -13,7 +13,7 @@ namespace asyncio {
 
         Promise<T> promise;
 
-        std::thread thread([&] {
+        std::thread thread{[&] {
             if constexpr (std::is_void_v<T>) {
                 f();
                 promise.resolve();
@@ -21,7 +21,7 @@ namespace asyncio {
             else {
                 promise.resolve(f());
             }
-        });
+        }};
         DEFER(thread.join());
 
         co_return *co_await promise.getFuture();
@@ -38,7 +38,7 @@ namespace asyncio {
 
         Promise<T> promise;
 
-        std::thread thread([&] {
+        std::thread thread{[&] {
             if constexpr (std::is_void_v<T>) {
                 f();
                 promise.resolve();
@@ -46,7 +46,7 @@ namespace asyncio {
             else {
                 promise.resolve(f());
             }
-        });
+        }};
         DEFER(thread.join());
 
         co_return *co_await task::Cancellable{

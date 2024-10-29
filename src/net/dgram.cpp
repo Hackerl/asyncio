@@ -4,6 +4,16 @@
 asyncio::net::UDPSocket::UDPSocket(uv::Handle<uv_udp_t> udp) : mUDP{std::move(udp)} {
 }
 
+std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::make() {
+    auto udp = std::make_unique<uv_udp_t>();
+
+    EXPECT(uv::expected([&] {
+        return uv_udp_init(getEventLoop()->raw(), udp.get());
+    }));
+
+    return UDPSocket{uv::Handle{std::move(udp)}};
+}
+
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::bind(const SocketAddress &address) {
     auto udp = make();
@@ -28,16 +38,6 @@ asyncio::net::UDPSocket::connect(const SocketAddress &address) {
     return *std::move(udp);
 }
 
-std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::make() {
-    auto udp = std::make_unique<uv_udp_t>();
-
-    EXPECT(uv::expected([&] {
-        return uv_udp_init(getEventLoop()->raw(), udp.get());
-    }));
-
-    return UDPSocket{uv::Handle{std::move(udp)}};
-}
-
 std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::from(const uv_os_sock_t socket) {
     auto udp = make();
     EXPECT(udp);
@@ -50,11 +50,18 @@ std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket:
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
-asyncio::net::UDPSocket::bind(const std::string &ip, const unsigned short port) {
-    const auto address = addressFrom(ip, port);
+asyncio::net::UDPSocket::bind(const std::string &ip, const std::uint16_t port) {
+    const auto address = ipAddressFrom(ip, port);
     EXPECT(address);
-    auto socketAddress = socketAddressFrom(*address);
+
+    auto socketAddress = std::visit(
+        [](const auto &arg) {
+            return socketAddressFrom(arg);
+        },
+        *address
+    );
     EXPECT(socketAddress);
+
     return bind(*std::move(socketAddress));
 }
 
@@ -73,7 +80,7 @@ asyncio::net::UDPSocket::bind(const IPv6Address &address) {
 }
 
 asyncio::task::Task<asyncio::net::UDPSocket, std::error_code>
-asyncio::net::UDPSocket::connect(const std::string host, const unsigned short port) {
+asyncio::net::UDPSocket::connect(const std::string host, const std::uint16_t port) {
     const auto addresses = co_await dns::getAddressInfo(
         host,
         std::to_string(port),
@@ -346,7 +353,7 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, const Ad
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
-asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, std::string host, const unsigned short port) {
+asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, std::string host, const std::uint16_t port) {
     const auto addresses = co_await dns::getAddressInfo(
         std::move(host),
         std::to_string(port),

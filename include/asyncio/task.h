@@ -119,9 +119,6 @@ namespace asyncio::task {
         std::function<std::expected<void, std::error_code>()> cancel;
     };
 
-    template<typename T, typename E>
-    Cancellable(zero::async::promise::Future<T, E>, std::function<void()>) -> Cancellable<T, E>;
-
     struct Cancelled {
     };
 

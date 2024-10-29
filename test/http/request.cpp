@@ -1,640 +1,326 @@
+#include <catch_extensions.h>
 #include <asyncio/http/request.h>
 #include <asyncio/net/stream.h>
-#include <asyncio/buffer.h>
-#include <zero/filesystem/fs.h>
+#include <asyncio/fs.h>
 #include <catch2/catch_test_macros.hpp>
-
-constexpr auto URL = "http://localhost:30000/object?id=0";
+#include <catch2/matchers/catch_matchers_all.hpp>
+#include <regex>
 
 struct People {
     std::string name;
     int age{};
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(People, name, age);
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(People, name, age);
+asyncio::task::Task<std::string, std::error_code> serve(asyncio::net::TCPListener listener) {
+    using namespace std::string_view_literals;
 
-TEST_CASE("http requests", "[http]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 30000);
-        REQUIRE(listener);
+    auto stream = co_await listener.accept();
+    CO_EXPECT(stream);
 
-        SECTION("get") {
-            SECTION("normal") {
-                co_await allSettled(
-                    [](auto l) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
+    std::string rawRequest;
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
-                        });
-                        REQUIRE(stream);
+    while (true) {
+        std::array<std::byte, 1024> data{};
+        const auto n = co_await stream->read(data);
+        CO_EXPECT(n);
 
-                        asyncio::BufReader reader(*stream);
+        rawRequest.append(reinterpret_cast<const char *>(data.data()), *n);
 
-                        auto line = co_await reader.readLine();
-                        REQUIRE(line);
-                        REQUIRE(*line == "GET /object?id=0 HTTP/1.1");
+        if (rawRequest.contains("\r\n\r\n"))
+            break;
+    }
 
-                        while (true) {
-                            line = co_await reader.readLine();
-                            REQUIRE(line);
+    std::smatch match;
 
-                            if (line->empty())
-                                break;
-                        }
+    if (std::regex_search(rawRequest, match, std::regex(R"(Content-Length: (\d+))"))) {
+        const auto length = zero::strings::toNumber<std::size_t>(match.str(1));
+        CO_EXPECT(length);
 
-                        const auto res = co_await stream.value()->writeAll(
-                            std::as_bytes(
-                                std::span{
-                                    "HTTP/1.1 200 OK\r\n"
-                                    "Content-Length: 11\r\n"
-                                    "Content-Type: text/html\r\n"
-                                    "Server: asyncio\r\n"
-                                    "Set-Cookie: user=jack\r\n\r\n"
-                                    "hello world"sv
-                                }
-                            )
-                        );
-                        REQUIRE(res);
-                    }(*std::move(listener)),
-                    []() -> asyncio::task::Task<void> {
-                        const auto url = asyncio::http::URL::from(URL);
-                        REQUIRE(url);
+        std::vector<std::byte> remain(*length - (rawRequest.size() - rawRequest.find("\r\n\r\n") - 4));
+        CO_EXPECT(co_await stream->readExactly(remain));
 
-                        auto requests = asyncio::http::Requests::make();
-                        REQUIRE(requests);
+        rawRequest.append(reinterpret_cast<const char *>(remain.data()), remain.size());
+    }
 
-                        auto response = co_await requests->get(*url);
-                        REQUIRE(response);
-                        REQUIRE(response->statusCode() == 200);
-
-                        const auto length = response->contentLength();
-                        REQUIRE(length);
-                        REQUIRE(*length == 11);
-
-                        const auto type = response->contentType();
-                        REQUIRE(type);
-                        REQUIRE(*type == "text/html");
-
-                        const auto server = response->header("Server");
-                        REQUIRE(server);
-                        REQUIRE(*server == "asyncio");
-
-                        const auto cookies = response->cookies();
-                        REQUIRE(cookies.size() == 1);
-                        REQUIRE(cookies[0].find("jack") != std::string::npos);
-
-                        const auto content = co_await response->string();
-                        REQUIRE(content);
-                        REQUIRE(*content == "hello world");
-                    }()
-                );
+    CO_EXPECT(co_await stream->writeAll(
+        std::as_bytes(
+            std::span{
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Length: 11\r\n"
+                "Content-Type: text/html\r\n"
+                "Server: asyncio\r\n"
+                "Set-Cookie: user=jack\r\n\r\n"
+                "hello world"sv
             }
+        )
+    ));
 
-            SECTION("empty body") {
-                co_await allSettled(
-                    [](auto l) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
+    co_return rawRequest;
+}
 
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
-                        });
-                        REQUIRE(stream);
+ASYNC_TEST_CASE("requests", "[http]") {
+    const auto temp = co_await asyncio::fs::temporaryDirectory();
+    REQUIRE(temp);
 
-                        asyncio::BufReader reader(*stream);
+    const auto path = *temp / "asyncio-http-requests";
 
-                        auto line = co_await reader.readLine();
-                        REQUIRE(line);
-                        REQUIRE(*line == "GET /object?id=0 HTTP/1.1");
+    auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 0);
+    REQUIRE(listener);
 
-                        while (true) {
-                            line = co_await reader.readLine();
-                            REQUIRE(line);
+    const auto address = listener->address();
+    REQUIRE(address);
 
-                            if (line->empty())
-                                break;
-                        }
+    auto url = asyncio::http::URL::from("http://127.0.0.1");
+    REQUIRE(url);
 
-                        const auto res = co_await stream.value()->writeAll(
-                            std::as_bytes(
-                                std::span{
-                                    "HTTP/1.1 200 OK\r\n"
-                                    "Content-Length: 0\r\n\r\n"sv
-                                }
-                            )
-                        );
-                        REQUIRE(res);
-                    }(*std::move(listener)),
-                    []() -> asyncio::task::Task<void> {
-                        const auto url = asyncio::http::URL::from(URL);
-                        REQUIRE(url);
+    url->port(std::get<asyncio::net::IPv4Address>(*address).port);
 
-                        auto requests = asyncio::http::Requests::make();
-                        REQUIRE(requests);
+    auto task = serve(*std::move(listener));
 
-                        auto response = co_await requests->get(*url);
-                        REQUIRE(response);
+    SECTION("response") {
+        auto requests = asyncio::http::Requests::make();
+        REQUIRE(requests);
 
-                        const auto content = co_await response->string();
-                        REQUIRE(content);
-                        REQUIRE(content->empty());
-                    }()
-                );
-            }
+        auto response = co_await requests->get(*url);
+        REQUIRE(response);
 
-            SECTION("get json") {
-                co_await allSettled(
-                    [](auto l) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
-
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
-                        });
-                        REQUIRE(stream);
-
-                        asyncio::BufReader reader(*stream);
-
-                        auto line = co_await reader.readLine();
-                        REQUIRE(line);
-                        REQUIRE(*line == "GET /object?id=0 HTTP/1.1");
-
-                        while (true) {
-                            line = co_await reader.readLine();
-                            REQUIRE(line);
-
-                            if (line->empty())
-                                break;
-                        }
-
-                        const auto res = co_await stream.value()->writeAll(
-                            std::as_bytes(
-                                std::span{
-                                    "HTTP/1.1 200 OK\r\n"
-                                    "Content-Length: 27\r\n\r\n"
-                                    "{\"name\": \"rose\", \"age\": 17}"sv
-                                }
-                            )
-                        );
-                        REQUIRE(res);
-                    }(*std::move(listener)),
-                    []() -> asyncio::task::Task<void> {
-                        const auto url = asyncio::http::URL::from(URL);
-                        REQUIRE(url);
-
-                        auto requests = asyncio::http::Requests::make();
-                        REQUIRE(requests);
-
-                        auto response = co_await requests->get(*url);
-                        REQUIRE(response);
-
-                        const auto people = co_await response->string().transform([](const auto &content) {
-                            return nlohmann::json::parse(content).template get<People>();
-                        });
-                        REQUIRE(people);
-                        REQUIRE(people->name == "rose");
-                        REQUIRE(people->age == 17);
-                    }()
-                );
-            }
+        SECTION("status code") {
+            REQUIRE(response->statusCode() == 200);
         }
 
-        SECTION("post") {
-            SECTION("post string") {
-                co_await allSettled(
-                    [](auto l) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
-
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
-                        });
-                        REQUIRE(stream);
-
-                        asyncio::BufReader reader(*stream);
-
-                        auto line = co_await reader.readLine();
-                        REQUIRE(line);
-                        REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
-
-                        std::map<std::string, std::string> headers;
-
-                        while (true) {
-                            line = co_await reader.readLine();
-                            REQUIRE(line);
-
-                            if (line->empty())
-                                break;
-
-                            const auto tokens = zero::strings::split(*line, ":", 1);
-                            REQUIRE(tokens.size() == 2);
-                            headers[tokens[0]] = zero::strings::trim(tokens[1]);
-                        }
-
-                        const auto it = headers.find("Content-Length");
-                        REQUIRE(it != headers.end());
-
-                        const auto length = zero::strings::toNumber<size_t>(it->second);
-                        REQUIRE(length);
-
-                        std::string content;
-                        content.resize(*length);
-
-                        auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{content}));
-                        REQUIRE(res);
-                        REQUIRE(content == "hello world");
-
-                        res = co_await stream.value()->writeAll(
-                            std::as_bytes(
-                                std::span{
-                                    "HTTP/1.1 200 OK\r\n"
-                                    "Content-Length: 11\r\n\r\n"
-                                    "hello world"sv
-                                }
-                            )
-                        );
-                        REQUIRE(res);
-                    }(*std::move(listener)),
-                    []() -> asyncio::task::Task<void> {
-                        const auto url = asyncio::http::URL::from(URL);
-                        REQUIRE(url);
-
-                        auto requests = asyncio::http::Requests::make();
-                        REQUIRE(requests);
-
-                        auto response = co_await requests->post(*url, "hello world");
-                        REQUIRE(response);
-
-                        const auto content = co_await response->string();
-                        REQUIRE(content);
-                        REQUIRE(*content == "hello world");
-                    }()
-                );
-            }
-
-            SECTION("post form") {
-                co_await allSettled(
-                    [](auto l) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
-
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
-                        });
-                        REQUIRE(stream);
-
-                        asyncio::BufReader reader(*stream);
-
-                        auto line = co_await reader.readLine();
-                        REQUIRE(line);
-                        REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
-
-                        std::map<std::string, std::string> headers;
-
-                        while (true) {
-                            line = co_await reader.readLine();
-                            REQUIRE(line);
-
-                            if (line->empty())
-                                break;
-
-                            const auto tokens = zero::strings::split(*line, ":", 1);
-                            REQUIRE(tokens.size() == 2);
-                            headers[tokens[0]] = zero::strings::trim(tokens[1]);
-                        }
-
-                        const auto it = headers.find("Content-Length");
-                        REQUIRE(it != headers.end());
-
-                        const auto length = zero::strings::toNumber<size_t>(it->second);
-                        REQUIRE(length);
-
-                        std::string content;
-                        content.resize(*length);
-
-                        auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{content}));
-                        REQUIRE(res);
-                        REQUIRE(content == "name=jack");
-
-                        res = co_await stream.value()->writeAll(
-                            std::as_bytes(
-                                std::span{
-                                    "HTTP/1.1 200 OK\r\n"
-                                    "Content-Length: 11\r\n\r\n"
-                                    "hello world"sv
-                                }
-                            )
-                        );
-                        REQUIRE(res);
-                    }(*std::move(listener)),
-                    []() -> asyncio::task::Task<void> {
-                        const auto url = asyncio::http::URL::from(URL);
-                        REQUIRE(url);
-
-                        auto requests = asyncio::http::Requests::make();
-                        REQUIRE(requests);
-
-                        const std::map<std::string, std::string> payload{{"name", "jack"}};
-                        auto response = co_await requests->post(*url, payload);
-                        REQUIRE(response);
-
-                        const auto content = co_await response->string();
-                        REQUIRE(content);
-                        REQUIRE(*content == "hello world");
-                    }()
-                );
-            }
-
-            SECTION("post file") {
-                co_await allSettled(
-                    [](auto l) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
-
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
-                        });
-                        REQUIRE(stream);
-
-                        asyncio::BufReader reader(*stream);
-
-                        auto line = co_await reader.readLine();
-                        REQUIRE(line);
-                        REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
-
-                        std::map<std::string, std::string> headers;
-
-                        while (true) {
-                            line = co_await reader.readLine();
-                            REQUIRE(line);
-
-                            if (line->empty())
-                                break;
-
-                            auto tokens = zero::strings::split(*line, ":", 1);
-                            REQUIRE(tokens.size() == 2);
-                            headers[tokens[0]] = zero::strings::trim(tokens[1]);
-                        }
-
-                        const auto it = headers.find("Content-Length");
-                        REQUIRE(it != headers.end());
-
-                        const auto length = zero::strings::toNumber<size_t>(it->second);
-                        REQUIRE(length);
-
-                        std::string content;
-                        content.resize(*length);
-
-                        auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{content}));
-                        REQUIRE(res);
-
-                        res = co_await stream.value()->writeAll(
-                            std::as_bytes(
-                                std::span{
-                                    "HTTP/1.1 200 OK\r\n"
-                                    "Content-Length: 11\r\n\r\n"
-                                    "hello world"sv
-                                }
-                            )
-                        );
-                        REQUIRE(res);
-                    }(*std::move(listener)),
-                    []() -> asyncio::task::Task<void> {
-                        const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
-                        REQUIRE(zero::filesystem::write(path, "hello world"));
-
-                        const auto url = asyncio::http::URL::from(URL);
-                        REQUIRE(url);
-
-                        auto requests = asyncio::http::Requests::make();
-                        REQUIRE(requests);
-
-                        const std::map<std::string, std::filesystem::path> payload{{"file", path}};
-                        auto response = co_await requests->post(*url, payload);
-                        REQUIRE(response);
-
-                        const auto content = co_await response->string();
-                        REQUIRE(content);
-                        REQUIRE(*content == "hello world");
-
-                        REQUIRE(std::filesystem::remove(path));
-                    }()
-                );
-            }
-
-            SECTION("post multipart") {
-                co_await allSettled(
-                    [](auto l) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
-
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
-                        });
-                        REQUIRE(stream);
-
-                        asyncio::BufReader reader(*stream);
-
-                        auto line = co_await reader.readLine();
-                        REQUIRE(line);
-                        REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
-
-                        std::map<std::string, std::string> headers;
-
-                        while (true) {
-                            line = co_await reader.readLine();
-                            REQUIRE(line);
-
-                            if (line->empty())
-                                break;
-
-                            auto tokens = zero::strings::split(*line, ":", 1);
-                            REQUIRE(tokens.size() == 2);
-                            headers[tokens[0]] = zero::strings::trim(tokens[1]);
-                        }
-
-                        const auto it = headers.find("Content-Length");
-                        REQUIRE(it != headers.end());
-
-                        const auto length = zero::strings::toNumber<size_t>(it->second);
-                        REQUIRE(length);
-
-                        std::string content;
-                        content.resize(*length);
-
-                        auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{content}));
-                        REQUIRE(res);
-
-                        res = co_await stream.value()->writeAll(
-                            std::as_bytes(
-                                std::span{
-                                    "HTTP/1.1 200 OK\r\n"
-                                    "Content-Length: 11\r\n\r\n"
-                                    "hello world"sv
-                                }
-                            )
-                        );
-                        REQUIRE(res);
-                    }(*std::move(listener)),
-                    []() -> asyncio::task::Task<void> {
-                        const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
-                        REQUIRE(zero::filesystem::write(path, "hello world"));
-
-                        const auto url = asyncio::http::URL::from(URL);
-                        REQUIRE(url);
-
-                        auto requests = asyncio::http::Requests::make();
-                        REQUIRE(requests);
-
-                        const std::map<std::string, std::variant<std::string, std::filesystem::path>> payload{
-                            {"name", std::string{"jack"}},
-                            {"file", path}
-                        };
-
-                        auto response = co_await requests->post(*url, payload);
-                        REQUIRE(response);
-
-                        const auto content = co_await response->string();
-                        REQUIRE(content);
-                        REQUIRE(*content == "hello world");
-
-                        REQUIRE(std::filesystem::remove(path));
-                    }()
-                );
-            }
-
-            SECTION("post json") {
-                co_await allSettled(
-                    [](auto l) -> asyncio::task::Task<void> {
-                        using namespace std::string_view_literals;
-
-                        auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
-                            return std::make_shared<asyncio::net::TCPStream>(std::move(value));
-                        });
-                        REQUIRE(stream);
-
-                        asyncio::BufReader reader(*stream);
-
-                        auto line = co_await reader.readLine();
-                        REQUIRE(line);
-                        REQUIRE(*line == "POST /object?id=0 HTTP/1.1");
-
-                        std::map<std::string, std::string> headers;
-
-                        while (true) {
-                            line = co_await reader.readLine();
-                            REQUIRE(line);
-
-                            if (line->empty())
-                                break;
-
-                            auto tokens = zero::strings::split(*line, ":", 1);
-                            REQUIRE(tokens.size() == 2);
-                            headers[tokens[0]] = zero::strings::trim(tokens[1]);
-                        }
-
-                        auto it = headers.find("Content-Type");
-                        REQUIRE(it != headers.end());
-                        REQUIRE(it->second == "application/json");
-
-                        it = headers.find("Content-Length");
-                        REQUIRE(it != headers.end());
-
-                        const auto length = zero::strings::toNumber<size_t>(it->second);
-                        REQUIRE(length);
-
-                        std::string content;
-                        content.resize(*length);
-
-                        auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{content}));
-                        REQUIRE(res);
-
-                        const auto [name, age] = nlohmann::json::parse(content).get<People>();
-                        REQUIRE(name == "jack");
-                        REQUIRE(age == 18);
-
-                        res = co_await stream.value()->writeAll(
-                            std::as_bytes(
-                                std::span{
-                                    "HTTP/1.1 200 OK\r\n"
-                                    "Content-Length: 11\r\n\r\n"
-                                    "hello world"sv
-                                }
-                            )
-                        );
-                        REQUIRE(res);
-                    }(*std::move(listener)),
-                    []() -> asyncio::task::Task<void> {
-                        const auto url = asyncio::http::URL::from(URL);
-                        REQUIRE(url);
-
-                        auto requests = asyncio::http::Requests::make();
-                        REQUIRE(requests);
-
-                        auto response = co_await requests->post(*url, People{"jack", 18});
-                        REQUIRE(response);
-
-                        const auto content = co_await response->string();
-                        REQUIRE(content);
-                        REQUIRE(*content == "hello world");
-                    }()
-                );
-            }
+        SECTION("content length") {
+            REQUIRE(response->contentLength() == 11);
         }
 
-        SECTION("output to file") {
-            co_await allSettled(
-                [](auto l) -> asyncio::task::Task<void> {
-                    using namespace std::string_view_literals;
+        SECTION("cookies") {
+            const auto cookies = response->cookies();
+            REQUIRE_THAT(cookies, Catch::Matchers::SizeIs(1));
+            REQUIRE_THAT(cookies.front(), Catch::Matchers::ContainsSubstring("jack"));
+        }
 
-                    auto stream = co_await l.accept().transform([](asyncio::net::TCPStream &&value) {
-                        return std::make_shared<asyncio::net::TCPStream>(std::move(value));
-                    });
-                    REQUIRE(stream);
+        SECTION("header") {
+            REQUIRE(response->header("Server") == "asyncio");
+        }
 
-                    asyncio::BufReader reader(*stream);
+        SECTION("string") {
+            REQUIRE(co_await response->string() == "hello world");
+        }
 
-                    auto line = co_await reader.readLine();
-                    REQUIRE(line);
-                    REQUIRE(*line == "GET /object?id=0 HTTP/1.1");
+        SECTION("output") {
+            REQUIRE(co_await response->output(path));
+            REQUIRE(co_await asyncio::fs::readString(path) == "hello world");
+            REQUIRE(co_await asyncio::fs::remove(path));
+        }
 
-                    while (true) {
-                        line = co_await reader.readLine();
-                        REQUIRE(line);
+        SECTION("read") {
+            std::string content;
+            content.resize(11);
 
-                        if (line->empty())
-                            break;
-                    }
+            REQUIRE(co_await response->readExactly(std::as_writable_bytes(std::span{content})));
+            REQUIRE(content == "hello world");
+        }
 
-                    const auto res = co_await stream.value()->writeAll(
-                        std::as_bytes(
-                            std::span{
-                                "HTTP/1.1 200 OK\r\n"
-                                "Content-Length: 11\r\n\r\n"
-                                "hello world"sv
-                            }
-                        )
-                    );
-                    REQUIRE(res);
-                }(*std::move(listener)),
-                []() -> asyncio::task::Task<void> {
-                    const auto url = asyncio::http::URL::from(URL);
-                    REQUIRE(url);
+        // avoid response not being written completely
+        REQUIRE(co_await response->readAll());
+        REQUIRE(co_await task);
+    }
 
-                    auto requests = asyncio::http::Requests::make();
-                    REQUIRE(requests);
+    SECTION("options") {
+        auto requests = asyncio::http::Requests::make();
+        REQUIRE(requests);
 
-                    auto response = co_await requests->get(*url);
-                    REQUIRE(response);
+        asyncio::http::Options options;
 
-                    const auto path = std::filesystem::temp_directory_path() / "asyncio-requests";
-                    const auto res = co_await response->output(path);
-                    REQUIRE(res);
+        SECTION("headers") {
+            options.headers["Custom-Header"] = "Custom-Value";
 
-                    const auto content = zero::filesystem::readString(path);
-                    REQUIRE(content);
-                    REQUIRE(*content == "hello world");
+            auto response = co_await requests->get(*url, options);
+            REQUIRE(response);
+            REQUIRE(co_await response->readAll());
 
-                    REQUIRE(std::filesystem::remove(path));
-                }()
+            const auto rawRequest = co_await task;
+            REQUIRE(rawRequest);
+            REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring("Custom-Header: Custom-Value"));
+        }
+
+        SECTION("cookies") {
+            options.cookies["Custom-Cookie"] = "Custom-Value";
+
+            auto response = co_await requests->get(*url, options);
+            REQUIRE(response);
+            REQUIRE(co_await response->readAll());
+
+            const auto rawRequest = co_await task;
+            REQUIRE(rawRequest);
+            REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring("Cookie: Custom-Cookie=Custom-Value"));
+        }
+
+        SECTION("user agent") {
+            options.userAgent = "Custom Agent";
+
+            auto response = co_await requests->get(*url, options);
+            REQUIRE(response);
+            REQUIRE(co_await response->readAll());
+
+            const auto rawRequest = co_await task;
+            REQUIRE(rawRequest);
+            REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring("User-Agent: Custom Agent"));
+        }
+
+        SECTION("hook") {
+            options.hooks.emplace_back(
+                [](const asyncio::http::Connection &connection) -> std::expected<void, std::error_code> {
+                    curl_easy_setopt(connection.easy.get(), CURLOPT_USERAGENT, "Custom Agent");
+                    return {};
+                }
             );
+
+            auto response = co_await requests->get(*url, options);
+            REQUIRE(response);
+            REQUIRE(co_await response->readAll());
+
+            const auto rawRequest = co_await task;
+            REQUIRE(rawRequest);
+            REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring("User-Agent: Custom Agent"));
         }
-    });
-    REQUIRE(result);
-    REQUIRE(*result);
+    }
+
+    SECTION("session options") {
+        auto requests = asyncio::http::Requests::make({
+            .userAgent = "Custom Agent"
+        });
+        REQUIRE(requests);
+
+        SECTION("default") {
+            auto response = co_await requests->get(*url);
+            REQUIRE(response);
+            REQUIRE(co_await response->readAll());
+
+            const auto rawRequest = co_await task;
+            REQUIRE(rawRequest);
+            REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring("User-Agent: Custom Agent"));
+        }
+
+        SECTION("override") {
+            auto response = co_await requests->get(*url, asyncio::http::Options{.userAgent = "Override"});
+            REQUIRE(response);
+            REQUIRE(co_await response->readAll());
+
+            const auto rawRequest = co_await task;
+            REQUIRE(rawRequest);
+            REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring("User-Agent: Override"));
+        }
+    }
+
+    SECTION("request") {
+        auto requests = asyncio::http::Requests::make();
+        REQUIRE(requests);
+
+        SECTION("methods") {
+            SECTION("get") {
+                auto response = co_await requests->get(*url);
+                REQUIRE(response);
+                REQUIRE(co_await response->readAll());
+
+                const auto rawRequest = co_await task;
+                REQUIRE(rawRequest);
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::StartsWith("GET / HTTP/1.1\r\n"));
+            }
+
+            SECTION("post") {
+                auto response = co_await requests->post(*url, "");
+                REQUIRE(response);
+                REQUIRE(co_await response->readAll());
+
+                const auto rawRequest = co_await task;
+                REQUIRE(rawRequest);
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::StartsWith("POST / HTTP/1.1\r\n"));
+            }
+
+            SECTION("put") {
+                auto response = co_await requests->put(*url, "");
+                REQUIRE(response);
+                REQUIRE(co_await response->readAll());
+
+                const auto rawRequest = co_await task;
+                REQUIRE(rawRequest);
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::StartsWith("PUT / HTTP/1.1\r\n"));
+            }
+
+            SECTION("delete") {
+                auto response = co_await requests->del(*url);
+                REQUIRE(response);
+                REQUIRE(co_await response->readAll());
+
+                const auto rawRequest = co_await task;
+                REQUIRE(rawRequest);
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::StartsWith("DELETE / HTTP/1.1\r\n"));
+            }
+        }
+
+        SECTION("payload") {
+            SECTION("string") {
+                auto response = co_await requests->post(*url, "hello world");
+                REQUIRE(response);
+                REQUIRE(co_await response->readAll());
+
+                const auto rawRequest = co_await task;
+                REQUIRE(rawRequest);
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::EndsWith("hello world"));
+            }
+
+            SECTION("form") {
+                auto response = co_await requests->post(*url, std::map<std::string, std::string>{{"name", "jack"}});
+                REQUIRE(response);
+                REQUIRE(co_await response->readAll());
+
+                const auto rawRequest = co_await task;
+                REQUIRE(rawRequest);
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::EndsWith("name=jack"));
+            }
+
+            SECTION("multipart") {
+                REQUIRE(co_await asyncio::fs::write(path, "hello world"));
+
+                auto response = co_await requests->post(
+                    *url,
+                    std::map<std::string, std::variant<std::string, std::filesystem::path>>{
+                        {"name", std::string{"jack"}},
+                        {"file", path}
+                    }
+                );
+                REQUIRE(response);
+                REQUIRE(co_await response->readAll());
+
+                const auto rawRequest = co_await task;
+                REQUIRE(rawRequest);
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring("Content-Type: multipart/form-data"));
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring("jack"));
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring("hello world"));
+
+                REQUIRE(co_await asyncio::fs::remove(path));
+            }
+
+            SECTION("json") {
+                SECTION("json object") {
+                    auto response = co_await requests->post(*url, nlohmann::json{{"name", "jack"}, {"age", 18}});
+                    REQUIRE(response);
+                    REQUIRE(co_await response->readAll());
+                }
+
+                SECTION("serializable object") {
+                    auto response = co_await requests->post(*url, People{"jack", 18});
+                    REQUIRE(response);
+                    REQUIRE(co_await response->readAll());
+                }
+
+                const auto rawRequest = co_await task;
+                REQUIRE(rawRequest);
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring(R"("name":"jack")"));
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring(R"("age":18)"));
+            }
+        }
+    }
 }

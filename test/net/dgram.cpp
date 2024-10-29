@@ -1,107 +1,131 @@
+#include <catch_extensions.h>
 #include <asyncio/net/dgram.h>
 #include <catch2/catch_test_macros.hpp>
 
 constexpr std::string_view MESSAGE = "hello world";
 
-TEST_CASE("datagram network connection", "[net]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        auto server = asyncio::net::UDPSocket::bind("127.0.0.1", 30000);
-        REQUIRE(server);
+ASYNC_TEST_CASE("UDP socket", "[net]") {
+    auto socket = asyncio::net::UDPSocket::bind("127.0.0.1", 0);
+    REQUIRE(socket);
 
-        SECTION("normal") {
-            co_await allSettled(
-                [](auto socket) -> asyncio::task::Task<void> {
-                    std::string message;
-                    message.resize(MESSAGE.size());
+    SECTION("fd") {
+        const auto fd = socket->fd();
+#ifdef _WIN32
+        REQUIRE(fd != nullptr);
+#else
+        REQUIRE(fd >= 0);
+#endif
+    }
 
-                    const auto res = co_await socket.readFrom(std::as_writable_bytes(std::span{message}));
-                    REQUIRE(res);
+    SECTION("local address") {
+        const auto address = socket->localAddress();
+        REQUIRE(address);
+        REQUIRE(std::get<asyncio::net::IPv4Address>(*address).ip == asyncio::net::LOCALHOST_IPV4);
+    }
 
-                    const auto &[num, from] = *res;
-                    REQUIRE(num);
-                    REQUIRE(num == MESSAGE.size());
-                    REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
-                    REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30001)");
-                    REQUIRE(message == MESSAGE);
+    SECTION("remote address") {
+        REQUIRE_ERROR(socket->remoteAddress(), std::errc::not_connected);
+    }
 
-                    const auto n = co_await socket.writeTo(std::as_bytes(std::span{message}), from);
-                    REQUIRE(n);
-                    REQUIRE(*n == num);
-                }(*std::move(server)),
-                []() -> asyncio::task::Task<void> {
-                    using namespace std::string_view_literals;
+    SECTION("read") {
+        auto peer = asyncio::net::UDPSocket::bind("127.0.0.1", 0);
+        REQUIRE(peer);
 
-                    auto socket = asyncio::net::UDPSocket::bind("127.0.0.1", 30001);
-                    REQUIRE(socket);
+        const auto destination = socket->localAddress();
+        REQUIRE(destination);
 
-                    const auto n = co_await socket->writeTo(
-                        std::as_bytes(std::span{"hello world"sv}),
-                        "127.0.0.1",
-                        30000
-                    );
-                    REQUIRE(n);
-                    REQUIRE(*n == MESSAGE.size());
+        REQUIRE(co_await peer->writeTo(std::as_bytes(std::span{MESSAGE}), *destination) == MESSAGE.size());
 
-                    std::string message;
-                    message.resize(MESSAGE.size());
+        std::string message;
+        message.resize(MESSAGE.size());
 
-                    const auto res = co_await socket->readFrom(std::as_writable_bytes(std::span{message}));
-                    REQUIRE(res);
+        REQUIRE(co_await socket->read(std::as_writable_bytes(std::span{message})) == MESSAGE.size());
+        REQUIRE(message == MESSAGE);
+    }
 
-                    const auto &[num, from] = *res;
-                    REQUIRE(num);
-                    REQUIRE(num == MESSAGE.size());
-                    REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
-                    REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
-                    REQUIRE(message == MESSAGE);
-                }()
-            );
-        }
+    SECTION("write") {
+        REQUIRE_ERROR(
+            co_await socket->write(std::as_bytes(std::span{MESSAGE})),
+            std::errc::destination_address_required
+        );
+    }
 
-        SECTION("connect") {
-            co_await allSettled(
-                [](auto socket) -> asyncio::task::Task<void> {
-                    std::string message;
-                    message.resize(MESSAGE.size());
+    SECTION("read from") {
+        auto peer = asyncio::net::UDPSocket::bind("127.0.0.1", 0);
+        REQUIRE(peer);
 
-                    const auto res = co_await socket.readFrom(std::as_writable_bytes(std::span{message}));
-                    REQUIRE(res);
+        const auto destination = socket->localAddress();
+        REQUIRE(destination);
 
-                    const auto &[num, from] = *res;
-                    REQUIRE(num);
-                    REQUIRE(num == MESSAGE.size());
-                    REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
-                    REQUIRE(fmt::to_string(from).find("127.0.0.1") != std::string::npos);
-                    REQUIRE(message == MESSAGE);
+        REQUIRE(co_await peer->writeTo(std::as_bytes(std::span{MESSAGE}), *destination) == MESSAGE.size());
 
-                    const auto n = co_await socket.writeTo(std::as_bytes(std::span{message}), from);
-                    REQUIRE(n);
-                    REQUIRE(*n == num);
-                }(*std::move(server)),
-                []() -> asyncio::task::Task<void> {
-                    auto socket = co_await asyncio::net::UDPSocket::connect("127.0.0.1", 30000);
-                    REQUIRE(socket);
+        std::string message;
+        message.resize(MESSAGE.size());
 
-                    const auto n = co_await socket->write(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(n);
-                    REQUIRE(*n == MESSAGE.size());
+        const auto result = co_await socket->readFrom(std::as_writable_bytes(std::span{message}));
+        REQUIRE(result);
+        REQUIRE(result->first == MESSAGE.size());
+        REQUIRE(message == MESSAGE);
 
-                    std::string message;
-                    message.resize(MESSAGE.size());
+        const auto address = peer->localAddress();
+        REQUIRE(address);
+        REQUIRE(result->second == *address);
+    }
 
-                    const auto res = co_await socket->readFrom(std::as_writable_bytes(std::span{message}));
-                    REQUIRE(res);
+    SECTION("write to") {
+        auto peer = asyncio::net::UDPSocket::bind("127.0.0.1", 0);
+        REQUIRE(peer);
 
-                    const auto &[num, from] = *res;
-                    REQUIRE(num);
-                    REQUIRE(num == MESSAGE.size());
-                    REQUIRE(std::holds_alternative<asyncio::net::IPv4Address>(from));
-                    REQUIRE(fmt::to_string(from) == "variant(127.0.0.1:30000)");
-                    REQUIRE(message == MESSAGE);
-                }()
-            );
-        }
-    });
-    REQUIRE(result);
-    REQUIRE(*result);
+        const auto destination = peer->localAddress();
+        REQUIRE(destination);
+
+        REQUIRE(co_await socket->writeTo(std::as_bytes(std::span{MESSAGE}), *destination) == MESSAGE.size());
+
+        std::string message;
+        message.resize(MESSAGE.size());
+
+        const auto result = co_await peer->readFrom(std::as_writable_bytes(std::span{message}));
+        REQUIRE(result);
+        REQUIRE(result->first == MESSAGE.size());
+        REQUIRE(message == MESSAGE);
+
+        const auto address = socket->localAddress();
+        REQUIRE(address);
+        REQUIRE(result->second == *address);
+    }
+
+    SECTION("close") {
+        REQUIRE(co_await socket->close());
+    }
+}
+
+ASYNC_TEST_CASE("UDP socket connect", "[net]") {
+    auto peer = asyncio::net::UDPSocket::bind("127.0.0.1", 0);
+    REQUIRE(peer);
+
+    const auto peerAddress = peer->localAddress();
+    REQUIRE(peerAddress);
+
+    auto socket = asyncio::net::UDPSocket::connect(std::get<asyncio::net::IPv4Address>(*peerAddress));
+    REQUIRE(socket);
+
+    SECTION("remote address") {
+        REQUIRE(socket->remoteAddress() == peerAddress);
+    }
+
+    SECTION("write") {
+        REQUIRE(co_await socket->write(std::as_bytes(std::span{MESSAGE})) == MESSAGE.size());
+
+        std::string message;
+        message.resize(MESSAGE.size());
+
+        const auto result = co_await peer->readFrom(std::as_writable_bytes(std::span{message}));
+        REQUIRE(result);
+        REQUIRE(result->first == MESSAGE.size());
+        REQUIRE(message == MESSAGE);
+
+        const auto address = socket->localAddress();
+        REQUIRE(address);
+        REQUIRE(result->second == *address);
+    }
 }

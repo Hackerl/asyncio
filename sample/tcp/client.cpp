@@ -9,12 +9,12 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");
-    cmdline.add<unsigned short>("port", "remote port");
+    cmdline.add<std::uint16_t>("port", "remote port");
 
     cmdline.parse(argc, argv);
 
     const auto host = cmdline.get<std::string>("host");
-    const auto port = cmdline.get<unsigned short>("port");
+    const auto port = cmdline.get<std::uint16_t>("port");
 
     auto stream = co_await asyncio::net::TCPStream::connect(host, port);
     CO_EXPECT(stream);

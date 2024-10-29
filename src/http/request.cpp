@@ -125,9 +125,9 @@ std::optional<std::string> asyncio::http::Response::header(const std::string &na
 }
 
 asyncio::task::Task<std::string, std::error_code> asyncio::http::Response::string() {
-    co_return co_await readAll().transform([](const auto &data) {
-        return std::string{reinterpret_cast<const char *>(data.data()), data.size()};
-    });
+    StringWriter writer;
+    CO_EXPECT(co_await copy(*this, writer));
+    co_return *std::move(writer);
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
@@ -135,7 +135,8 @@ asyncio::task::Task<void, std::error_code>
 asyncio::http::Response::output(std::filesystem::path path) {
     auto file = co_await fs::open(std::move(path), O_WRONLY | O_CREAT | O_TRUNC);
     CO_EXPECT(file);
-    co_return co_await copy(*this, *file);
+    CO_EXPECT(co_await copy(*this, *file));
+    co_return {};
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
@@ -364,9 +365,6 @@ const asyncio::http::Options &asyncio::http::Requests::options() const {
 // ReSharper disable once CppMemberFunctionMayBeConst
 std::expected<std::unique_ptr<asyncio::http::Connection>, std::error_code>
 asyncio::http::Requests::prepare(std::string method, const URL &url, const std::optional<Options> &options) {
-    const auto u = url.string();
-    EXPECT(u);
-
     std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy{curl_easy_init(), curl_easy_cleanup};
 
     if (!easy)
@@ -396,7 +394,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     else
         curl_easy_setopt(connection->easy.get(), CURLOPT_CUSTOMREQUEST, method.c_str());
 
-    curl_easy_setopt(connection->easy.get(), CURLOPT_URL, u->c_str());
+    curl_easy_setopt(connection->easy.get(), CURLOPT_URL, url.string().c_str());
     curl_easy_setopt(connection->easy.get(), CURLOPT_COOKIEFILE, "");
     curl_easy_setopt(connection->easy.get(), CURLOPT_WRITEFUNCTION, onWrite);
     curl_easy_setopt(connection->easy.get(), CURLOPT_WRITEDATA, connection.get());
@@ -534,38 +532,6 @@ asyncio::http::Requests::request(
             "&"
         )).c_str()
     );
-
-    co_return co_await perform(*std::move(connection));
-}
-
-asyncio::task::Task<asyncio::http::Response, std::error_code>
-asyncio::http::Requests::request(
-    std::string method,
-    const URL url,
-    const std::optional<Options> options,
-    std::map<std::string, std::filesystem::path> payload
-) {
-    auto connection = prepare(std::move(method), url, options);
-    CO_EXPECT(connection);
-
-    std::unique_ptr<curl_mime, decltype(&curl_mime_free)> form{
-        curl_mime_init(connection.value()->easy.get()),
-        curl_mime_free
-    };
-
-    for (const auto &[key, value]: payload) {
-        const auto field = curl_mime_addpart(form.get());
-        curl_mime_name(field, key.c_str());
-        CO_EXPECT(expected([&] {
-            return curl_mime_filedata(field, value.string().c_str());
-        }));
-    }
-
-    curl_easy_setopt(connection.value()->easy.get(), CURLOPT_MIMEPOST, form.get());
-
-    connection.value()->defers.emplace_back([form = form.release()] {
-        curl_mime_free(form);
-    });
 
     co_return co_await perform(*std::move(connection));
 }

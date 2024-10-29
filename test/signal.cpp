@@ -1,35 +1,28 @@
+#include "catch_extensions.h"
 #include <asyncio/signal.h>
-#include <asyncio/time.h>
 #include <catch2/catch_test_macros.hpp>
 #include <unistd.h>
 #include <thread>
 
-TEST_CASE("signal handler", "[signal]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        auto signal = asyncio::Signal::make();
-        REQUIRE(signal);
+ASYNC_TEST_CASE("signal", "[signal]") {
+    auto signal = asyncio::Signal::make();
+    REQUIRE(signal);
 
-        SECTION("normal") {
-            using namespace std::chrono_literals;
+    SECTION("normal") {
+        using namespace std::chrono_literals;
 
-            std::thread thread([] {
-                std::this_thread::sleep_for(20ms);
-                kill(getpid(), SIGINT);
-            });
+        std::thread thread{[] {
+            std::this_thread::sleep_for(20ms);
+            kill(getpid(), SIGINT);
+        }};
 
-            const auto res = co_await signal->on(SIGINT);
-            REQUIRE(res);
+        REQUIRE(co_await signal->on(SIGINT));
+        thread.join();
+    }
 
-            thread.join();
-        }
-
-        SECTION("timeout") {
-            using namespace std::chrono_literals;
-            const auto res = co_await asyncio::timeout(signal->on(SIGINT), 10ms);
-            REQUIRE_FALSE(res);
-            REQUIRE(res.error() == asyncio::TimeoutError::ELAPSED);
-        }
-    });
-    REQUIRE(result);
-    REQUIRE(*result);
+    SECTION("cancel") {
+        auto task = signal->on(SIGINT);
+        REQUIRE(task.cancel());
+        REQUIRE_ERROR(co_await task, std::errc::operation_canceled);
+    }
 }

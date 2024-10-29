@@ -1,20 +1,16 @@
+#include "catch_extensions.h"
 #include <asyncio/sync/event.h>
 #include <catch2/catch_test_macros.hpp>
 
-TEST_CASE("asyncio promise", "[promise]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        asyncio::Promise<void> promise;
-        const auto event = std::make_shared<asyncio::sync::Event>();
-        REQUIRE_FALSE(event->isSet());
+ASYNC_TEST_CASE("promise", "[promise]") {
+    asyncio::Promise<void> promise;
+    asyncio::sync::Event event;
 
-        promise.getFuture().then([=] {
-            event->set();
-        });
-
-        promise.resolve();
-        REQUIRE_FALSE(event->isSet());
-        co_await event->wait();
+    promise.getFuture().then([&] {
+        event.set();
     });
-    REQUIRE(result);
-    REQUIRE(*result);
+
+    promise.resolve();
+    REQUIRE_FALSE(event.isSet());
+    co_await event.wait();
 }

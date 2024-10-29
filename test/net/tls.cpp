@@ -1,3 +1,4 @@
+#include <catch_extensions.h>
 #include <asyncio/net/tls.h>
 #include <asyncio/net/stream.h>
 #include <catch2/catch_test_macros.hpp>
@@ -125,90 +126,81 @@ FReHT5LzsIm40VPPdsITh6c=
 
 constexpr std::string_view MESSAGE = "hello world";
 
-TEST_CASE("ssl stream network connection", "[net]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 30000);
-        REQUIRE(listener);
+ASYNC_TEST_CASE("tls stream", "[net]") {
+    auto ca = asyncio::net::tls::Certificate::load(CA_CERT);
+    REQUIRE(ca);
 
-        co_await allSettled(
-            [](auto l) -> asyncio::task::Task<void> {
-                auto stream = co_await l.accept();
-                REQUIRE(stream);
+    auto serverCert = asyncio::net::tls::Certificate::load(SERVER_CERT);
+    REQUIRE(serverCert);
 
-                auto ca = asyncio::net::tls::Certificate::load(CA_CERT);
-                REQUIRE(ca);
+    auto serverKey = asyncio::net::tls::PrivateKey::load(SERVER_KEY);
+    REQUIRE(serverKey);
 
-                auto cert = asyncio::net::tls::Certificate::load(SERVER_CERT);
-                REQUIRE(cert);
+    auto serverContext = asyncio::net::tls::ServerConfig{}
+                         .verifyClient(true)
+                         .rootCAs({*ca})
+                         .certKeyPairs({{*std::move(serverCert), *std::move(serverKey)}})
+                         .build();
+    REQUIRE(serverContext);
 
-                auto key = asyncio::net::tls::PrivateKey::load(SERVER_KEY);
-                REQUIRE(key);
+    auto clientCert = asyncio::net::tls::Certificate::load(CLIENT_CERT);
+    REQUIRE(clientCert);
 
-                const asyncio::net::tls::ServerConfig config{
-                    .verifyClient = true,
-                    .rootCAs = {*std::move(ca)},
-                    .certKeyPairs = {{*std::move(cert), *std::move(key)}}
-                };
+    auto clientKey = asyncio::net::tls::PrivateKey::load(CLIENT_KEY);
+    REQUIRE(clientKey);
 
-                auto context = config.build();
-                REQUIRE(context);
+    auto clientContext = asyncio::net::tls::ClientConfig{}
+                         .rootCAs({*ca})
+                         .certKeyPairs({{*std::move(clientCert), *std::move(clientKey)}})
+                         .build();
+    REQUIRE(clientContext);
 
-                auto tls = co_await asyncio::net::tls::accept(std::move(*std::move(stream)), *std::move(context));
-                REQUIRE(tls);
+    auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 0);
+    REQUIRE(listener);
 
-                auto res = co_await tls->writeAll(std::as_bytes(std::span{MESSAGE}));
-                REQUIRE(res);
+    const auto address = listener->address();
+    REQUIRE(address);
 
-                std::string message;
-                message.resize(MESSAGE.size());
-
-                res = co_await tls->readExactly(std::as_writable_bytes(std::span{message}));
-                REQUIRE(res);
-                REQUIRE(message == MESSAGE);
-
-                res = co_await tls->close();
-                REQUIRE(res);
-            }(*std::move(listener)),
-            []() -> asyncio::task::Task<void> {
-                auto stream = co_await asyncio::net::TCPStream::connect("127.0.0.1", 30000);
-                REQUIRE(stream);
-
-                auto ca = asyncio::net::tls::Certificate::load(CA_CERT);
-                REQUIRE(ca);
-
-                auto cert = asyncio::net::tls::Certificate::load(SERVER_CERT);
-                REQUIRE(cert);
-
-                auto key = asyncio::net::tls::PrivateKey::load(SERVER_KEY);
-                REQUIRE(key);
-
-                const asyncio::net::tls::ClientConfig config{
-                    .rootCAs = {*std::move(ca)},
-                    .certKeyPairs = {{*std::move(cert), *std::move(key)}}
-                };
-
-                auto context = config.build();
-                REQUIRE(context);
-
-                auto tls = co_await asyncio::net::tls::connect(std::move(*std::move(stream)), *std::move(context));
-                REQUIRE(tls);
-
-                std::string message;
-                message.resize(MESSAGE.size());
-
-                auto res = co_await tls->readExactly(std::as_writable_bytes(std::span{message}));
-                REQUIRE(res);
-                REQUIRE(message == MESSAGE);
-
-                res = co_await tls->writeAll(std::as_bytes(std::span{message}));
-                REQUIRE(res);
-
-                const auto n = co_await tls->read(std::as_writable_bytes(std::span{message}));
-                REQUIRE(n);
-                REQUIRE(*n == 0);
-            }()
-        );
-    });
+    auto result = co_await all(
+        listener->accept().andThen([&](auto stream) {
+            return asyncio::net::tls::accept(std::move(stream), *std::move(serverContext));
+        }),
+        asyncio::net::TCPStream::connect(*address).andThen([&](auto stream) {
+            return asyncio::net::tls::connect(std::move(stream), *std::move(clientContext));
+        })
+    );
     REQUIRE(result);
-    REQUIRE(*result);
+
+    auto &server = result->at(0);
+    auto &client = result->at(1);
+
+    SECTION("read") {
+        auto task = server.writeAll(std::as_bytes(std::span{MESSAGE}));
+
+        std::string message;
+        message.resize(MESSAGE.size());
+
+        REQUIRE(co_await client.readExactly(std::as_writable_bytes(std::span{message})));
+        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await task);
+    }
+
+    SECTION("write") {
+        auto task = client.writeAll(std::as_bytes(std::span{MESSAGE}));
+
+        std::string message;
+        message.resize(MESSAGE.size());
+
+        REQUIRE(co_await server.readExactly(std::as_writable_bytes(std::span{message})));
+        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await task);
+    }
+
+    SECTION("close") {
+        auto task = client.close();
+
+        std::array<std::byte, 1024> data{};
+        REQUIRE(co_await server.read(data) == 0);
+        REQUIRE(co_await task);
+    }
 }

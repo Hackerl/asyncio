@@ -1,6 +1,7 @@
+#include <catch_extensions.h>
 #include <asyncio/net/net.h>
 #include <catch2/catch_test_macros.hpp>
-#include <regex>
+#include <catch2/matchers/catch_matchers_all.hpp>
 
 #ifdef _WIN32
 #include <netioapi.h>
@@ -15,112 +16,213 @@
 #include <sys/un.h>
 #endif
 
-TEST_CASE("network components", "[net]") {
-    SECTION("IPv4") {
-        const asyncio::net::Address address = asyncio::net::IPv4Address{
-            80,
-            {std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}}
-        };
+TEST_CASE("IPv4 address", "[net]") {
+    SECTION("parse") {
+        SECTION("valid") {
+            REQUIRE(
+                asyncio::net::IPv4Address::from("127.0.0.1", 80) ==
+                asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80}
+            );
+        }
 
-        REQUIRE(address == asyncio::net::IPv4Address{80, {std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}}});
-        REQUIRE(address != asyncio::net::IPv4Address{80, {std::byte{127}, std::byte{0}, std::byte{0}, std::byte{0}}});
-        REQUIRE(address != asyncio::net::IPv6Address{});
-        REQUIRE(address != asyncio::net::UnixAddress{});
-        REQUIRE(address != asyncio::net::UnixAddress{});
-
-        REQUIRE(fmt::to_string(address) == "variant(127.0.0.1:80)");
-
-        REQUIRE(*asyncio::net::addressFrom("127.0.0.1", 80) == address);
-        REQUIRE(*asyncio::net::IPv4Address::from("127.0.0.1", 80) == address);
-
-        const auto socketAddress = socketAddressFrom(address);
-        REQUIRE(socketAddress);
-        REQUIRE(socketAddress->second == sizeof(sockaddr_in));
-
-        const auto addr = reinterpret_cast<const sockaddr_in *>(socketAddress->first.get());
-
-        REQUIRE(addr->sin_family == AF_INET);
-        REQUIRE(addr->sin_port == htons(80));
-        REQUIRE(memcmp(&addr->sin_addr, "\x7f\x00\x00\x01", 4) == 0);
+        SECTION("invalid") {
+            REQUIRE_ERROR(asyncio::net::IPv4Address::from("127.0.0", 80), std::errc::invalid_argument);
+        }
     }
 
-    SECTION("mapped IPv6") {
-        constexpr auto ipv4Address = asyncio::net::IPv4Address{
-            80,
-            {std::byte{8}, std::byte{8}, std::byte{8}, std::byte{8}}
-        };
+    SECTION("stringify") {
+        REQUIRE(fmt::to_string(asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80}) == "127.0.0.1:80");
+    }
+}
 
-        const auto ipv6Address = asyncio::net::IPv6Address::from(ipv4Address);
+TEST_CASE("IPv6 address", "[net]") {
+    SECTION("parse") {
+        SECTION("valid") {
+            SECTION("with zone") {
+                REQUIRE(
+                    asyncio::net::IPv6Address::from("::1%eth0", 80) ==
+                    asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80, "eth0"}
+                );
+            }
 
-        REQUIRE(ipv6Address.port == 80);
-        REQUIRE(zero::os::net::stringify(ipv6Address.ip) == "::ffff:8.8.8.8");
-        REQUIRE(fmt::to_string(ipv6Address) == "[::ffff:8.8.8.8]:80");
+            SECTION("without zone") {
+                REQUIRE(
+                    asyncio::net::IPv6Address::from("::1", 80) ==
+                    asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80}
+                );
+            }
+        }
+
+        SECTION("invalid") {
+            REQUIRE_ERROR(asyncio::net::IPv6Address::from(":", 80), std::errc::invalid_argument);
+        }
+    }
+
+    SECTION("mapped") {
+        REQUIRE(
+            asyncio::net::IPv6Address::from(asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80}) ==
+            asyncio::net::IPv6Address{
+                {
+                    std::byte{0}, std::byte{0}, std::byte{0}, std::byte{0},
+                    std::byte{0}, std::byte{0}, std::byte{0}, std::byte{0},
+                    std::byte{0}, std::byte{0}, std::byte{255}, std::byte{255},
+                    std::byte{127}, std::byte{0}, std::byte{0}, std::byte{1}
+                },
+                80
+            }
+        );
+    }
+
+    SECTION("stringify") {
+        SECTION("with zone") {
+            REQUIRE(
+                fmt::to_string(asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80, "eth0"}) == "[::1%eth0]:80"
+            );
+        }
+
+        SECTION("without zone") {
+            REQUIRE(fmt::to_string(asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80}) == "[::1]:80");
+        }
+    }
+}
+
+TEST_CASE("unix address", "[net]") {
+    SECTION("filesystem") {
+        REQUIRE(fmt::to_string(asyncio::net::UnixAddress{"/tmp/test.sock"}) == "unix:///tmp/test.sock");
+    }
+
+    SECTION("abstract") {
+        REQUIRE(fmt::to_string(asyncio::net::UnixAddress{"@test.sock"}) == "unix://@test.sock");
+    }
+}
+
+TEST_CASE("convert network address to socket address", "[net]") {
+    SECTION("IPv4") {
+        const auto address = socketAddressFrom(asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80});
+        REQUIRE(address);
+
+        const auto ptr = reinterpret_cast<const sockaddr_in *>(address->first.get());
+        REQUIRE(ptr->sin_family == AF_INET);
+        REQUIRE(ptr->sin_port == htons(80));
+        REQUIRE(std::memcmp(&ptr->sin_addr, "\x7f\x00\x00\x01", 4) == 0);
     }
 
     SECTION("IPv6") {
         const auto interfaces = zero::os::net::interfaces();
         REQUIRE(interfaces);
-        REQUIRE_FALSE(interfaces->empty());
+        REQUIRE_THAT(*interfaces, !Catch::Matchers::IsEmpty());
 
         const auto &zone = std::views::keys(*interfaces).front();
         const auto index = if_nametoindex(zone.c_str());
-        REQUIRE(index);
+        REQUIRE(index != 0);
 
-        const asyncio::net::Address address = asyncio::net::IPv6Address{80, {}, zone};
+        const auto address = socketAddressFrom(asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80, zone});
+        REQUIRE(address);
 
-        REQUIRE(address == asyncio::net::IPv6Address{80, {}, zone});
-        REQUIRE(address != asyncio::net::IPv6Address{80, {}});
-        REQUIRE(address != asyncio::net::IPv6Address{80, {std::byte{127}}, zone});
-        REQUIRE(address != asyncio::net::IPv4Address{});
-        REQUIRE(address != asyncio::net::UnixAddress{});
-
-        REQUIRE(std::regex_match(fmt::to_string(address), std::regex(R"(variant\(\[::%.*\]:80\))")));
-
-        REQUIRE(*asyncio::net::addressFrom("::", 80) != address);
-        REQUIRE(*asyncio::net::IPv6Address::from("::", 80) != address);
-        REQUIRE(*asyncio::net::addressFrom(fmt::format("::%{}", zone), 80) == address);
-        REQUIRE(*asyncio::net::IPv6Address::from(fmt::format("::%{}", zone), 80) == address);
-
-        const auto socketAddress = socketAddressFrom(address);
-        REQUIRE(socketAddress);
-        REQUIRE(socketAddress->second == sizeof(sockaddr_in6));
-
-        const auto addr = reinterpret_cast<const sockaddr_in6 *>(socketAddress->first.get());
-
-        REQUIRE(addr->sin6_family == AF_INET6);
-        REQUIRE(addr->sin6_port == htons(80));
-        REQUIRE(addr->sin6_scope_id == index);
+        const auto ptr = reinterpret_cast<const sockaddr_in6 *>(address->first.get());
+        REQUIRE(ptr->sin6_family == AF_INET6);
+        REQUIRE(ptr->sin6_port == htons(80));
+        REQUIRE(ptr->sin6_scope_id == index);
         REQUIRE(
-            std::all_of(
-                (const std::byte *) &addr->sin6_addr,
-                (const std::byte *) &addr->sin6_addr + sizeof(sockaddr_in6::sin6_addr),
-                [](const auto &byte) {
-                    return byte == std::byte{0};
-                }
-            )
+            std::memcmp(&ptr->sin6_addr, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01", 16) == 0
         );
     }
 
 #if defined(__unix__) || defined(__APPLE__)
-    SECTION("UNIX") {
-        using namespace std::string_view_literals;
-        const asyncio::net::Address address = asyncio::net::UnixAddress{"/tmp/test.sock"};
+    SECTION("unix") {
+        SECTION("filesystem") {
+            const std::string path{"/tmp/test.sock"};
 
-        REQUIRE(address == asyncio::net::UnixAddress{"/tmp/test.sock"});
-        REQUIRE(address != asyncio::net::UnixAddress{"/root/test.sock"});
-        REQUIRE(address != asyncio::net::IPv4Address{});
-        REQUIRE(address != asyncio::net::IPv6Address{});
+            const auto address = socketAddressFrom(asyncio::net::UnixAddress{path});
+            REQUIRE(address);
+            REQUIRE(address->second == sizeof(sa_family_t) + path.size() + 1);
 
-        REQUIRE(fmt::to_string(address) == "variant(/tmp/test.sock)");
+            const auto ptr = reinterpret_cast<const sockaddr_un *>(address->first.get());
+            REQUIRE(ptr->sun_family == AF_UNIX);
+            REQUIRE(ptr->sun_path == path);
+        }
 
-        const auto socketAddress = socketAddressFrom(address);
-        REQUIRE(socketAddress);
-        REQUIRE(socketAddress->second == sizeof(sa_family_t) + "/tmp/test.sock"sv.size() + 1);
+#ifdef __linux__
+        SECTION("abstract") {
+            const std::string path{"@test.sock"};
 
-        const auto addr = reinterpret_cast<const sockaddr_un *>(socketAddress->first.get());
+            const auto address = socketAddressFrom(asyncio::net::UnixAddress{path});
+            REQUIRE(address);
+            REQUIRE(address->second == sizeof(sa_family_t) + path.size());
 
-        REQUIRE(addr->sun_family == AF_UNIX);
-        REQUIRE(addr->sun_path == "/tmp/test.sock"sv);
+            const auto ptr = reinterpret_cast<const sockaddr_un *>(address->first.get());
+            REQUIRE(ptr->sun_family == AF_UNIX);
+            REQUIRE(ptr->sun_path[0] == '\0');
+            REQUIRE(ptr->sun_path + 1 == path.substr(1));
+        }
+#endif
+    }
+#endif
+}
+
+TEST_CASE("convert socket address to network address", "[net]") {
+    SECTION("IPv4") {
+        sockaddr_in addr{};
+
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(80);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+        REQUIRE(
+            asyncio::net::addressFrom(reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) ==
+            asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80}
+        );
+    }
+
+    SECTION("IPv6") {
+        const sockaddr_in6 addr{
+            .sin6_family = AF_INET6,
+            .sin6_port = htons(80),
+            .sin6_addr = IN6ADDR_LOOPBACK_INIT
+        };
+
+        REQUIRE(
+            asyncio::net::addressFrom(reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) ==
+            asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80}
+        );
+    }
+
+#if defined(__unix__) || defined(__APPLE__)
+    SECTION("unix") {
+        SECTION("filesystem") {
+            const std::string path{"/tmp/test.sock"};
+
+            sockaddr_un addr{};
+
+            addr.sun_family = AF_UNIX;
+            std::strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path));
+
+            REQUIRE(
+                asyncio::net::addressFrom(
+                    reinterpret_cast<const sockaddr *>(&addr),
+                    sizeof(sa_family_t) + path.size() + 1
+                ) == asyncio::net::UnixAddress{path}
+            );
+        }
+
+#ifdef __linux__
+        SECTION("abstract") {
+            const std::string path{"@test.sock"};
+
+            sockaddr_un addr{};
+
+            addr.sun_family = AF_UNIX;
+            addr.sun_path[0] = '\0';
+            std::strncpy(addr.sun_path + 1, path.c_str() + 1, sizeof(addr.sun_path) - 1);
+
+            REQUIRE(
+                asyncio::net::addressFrom(
+                    reinterpret_cast<const sockaddr *>(&addr),
+                    sizeof(sa_family_t) + path.size()
+                ) == asyncio::net::UnixAddress{path}
+            );
+        }
+#endif
     }
 #endif
 }

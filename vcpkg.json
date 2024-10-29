@@ -1,6 +1,6 @@
 {
   "name": "asyncio",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "builtin-baseline": "9224b3bbd8df24999d85720b1d005dd6f969ade0",
   "dependencies": [
     "curl",

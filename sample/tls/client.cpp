@@ -10,7 +10,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");
-    cmdline.add<unsigned short>("port", "remote port");
+    cmdline.add<std::uint16_t>("port", "remote port");
 
     cmdline.addOptional("insecure", 'k', "skip verify server cert");
     cmdline.addOptional<std::filesystem::path>("ca", '\0', "CA cert path");
@@ -20,7 +20,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     cmdline.parse(argc, argv);
 
     const auto host = cmdline.get<std::string>("host");
-    const auto port = cmdline.get<unsigned short>("port");
+    const auto port = cmdline.get<std::uint16_t>("port");
 
     const auto caFile = cmdline.getOptional<std::filesystem::path>("ca");
     const auto certFile = cmdline.getOptional<std::filesystem::path>("cert");
@@ -28,27 +28,27 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 
     const auto insecure = cmdline.exist("insecure");
 
-    asyncio::net::tls::ClientConfig config{
-        .insecure = insecure
-    };
+    asyncio::net::tls::ClientConfig config;
 
     if (caFile) {
-        auto ca = asyncio::net::tls::Certificate::loadFile(*caFile);
+        auto ca = co_await asyncio::net::tls::Certificate::loadFile(*caFile);
         CO_EXPECT(ca);
-        config.rootCAs.push_back(*std::move(ca));
+        config.rootCAs({*std::move(ca)});
     }
 
     if (certFile && keyFile) {
-        auto cert = asyncio::net::tls::Certificate::loadFile(*certFile);
+        auto cert = co_await asyncio::net::tls::Certificate::loadFile(*certFile);
         CO_EXPECT(cert);
 
-        auto key = asyncio::net::tls::PrivateKey::loadFile(*keyFile);
+        auto key = co_await asyncio::net::tls::PrivateKey::loadFile(*keyFile);
         CO_EXPECT(key);
 
-        config.certKeyPairs.emplace_back(*std::move(cert), *std::move(key));
+        config.certKeyPairs({{*std::move(cert), *std::move(key)}});
     }
 
-    auto context = config.build();
+    auto context = config
+                   .insecure(insecure)
+                   .build();
     CO_EXPECT(context);
 
     auto stream = co_await asyncio::net::TCPStream::connect(host, port);

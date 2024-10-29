@@ -26,7 +26,7 @@ std::optional<asyncio::Pipe> &asyncio::process::ChildProcess::stdError() {
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-asyncio::task::Task<zero::os::process::ExitStatus, std::error_code> asyncio::process::ChildProcess::wait() {
+asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::ChildProcess::wait() {
 #ifdef _WIN32
     const auto event = CreateEventA(nullptr, false, false, nullptr);
 
@@ -180,7 +180,7 @@ std::expected<void, std::error_code> asyncio::process::PseudoConsole::resize(con
 
 std::expected<asyncio::process::ChildProcess, std::error_code>
 asyncio::process::PseudoConsole::spawn(const Command &command) {
-    return mPseudoConsole.spawn(command.mCommand).transform([](zero::os::process::ChildProcess &&process) {
+    return mPseudoConsole.spawn(command.mCommand).transform([](auto process) {
         return ChildProcess{zero::os::process::Process{std::move(process.impl())}, {}};
     });
 }
@@ -312,13 +312,13 @@ std::expected<asyncio::process::ChildProcess, std::error_code> asyncio::process:
     return spawn({StdioType::INHERIT, StdioType::INHERIT, StdioType::INHERIT});
 }
 
-asyncio::task::Task<zero::os::process::ExitStatus, std::error_code> asyncio::process::Command::status() const {
+asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::Command::status() const {
     auto child = spawn();
     CO_EXPECT(child);
     co_return co_await child->wait();
 }
 
-asyncio::task::Task<zero::os::process::Output, std::error_code> asyncio::process::Command::output() const {
+asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process::Command::output() const {
     auto child = spawn({StdioType::NUL, StdioType::PIPED, StdioType::PIPED});
     CO_EXPECT(child);
 

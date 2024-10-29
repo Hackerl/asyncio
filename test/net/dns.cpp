@@ -1,77 +1,69 @@
+#include <catch_extensions.h>
 #include <asyncio/net/dns.h>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 
-TEST_CASE("DNS query", "[net]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        SECTION("get address info") {
-            const auto res = co_await asyncio::net::dns::getAddressInfo(
-                "localhost",
-                "http",
-                addrinfo{
-                    .ai_family = AF_UNSPEC,
-                    .ai_socktype = SOCK_STREAM
-                }
-            );
-            REQUIRE(res);
-
-            REQUIRE(
-                std::ranges::all_of(
-                    *res,
-                    [](const auto &address) {
-                        if (std::holds_alternative<asyncio::net::IPv4Address>(address))
-                            return fmt::to_string(std::get<asyncio::net::IPv4Address>(address)) == "127.0.0.1:80";
-
-                        return fmt::to_string(std::get<asyncio::net::IPv6Address>(address)) == "[::1]:80";
-                    }
-                )
-            );
+ASYNC_TEST_CASE("get address info", "[net]") {
+    const auto result = co_await asyncio::net::dns::getAddressInfo(
+        "localhost",
+        "http",
+        addrinfo{
+            .ai_family = AF_UNSPEC,
+            .ai_socktype = SOCK_STREAM
         }
-
-        SECTION("lookup IP") {
-            const auto res = co_await asyncio::net::dns::lookupIP("localhost");
-            REQUIRE(res);
-
-            REQUIRE(
-                std::ranges::all_of(
-                    *res,
-                    [](const auto &ip) {
-                        if (std::holds_alternative<asyncio::net::IPv4>(ip))
-                            return zero::os::net::stringify(std::get<asyncio::net::IPv4>(ip)) == "127.0.0.1";
-
-                        return zero::os::net::stringify(std::get<asyncio::net::IPv6>(ip)) == "::1";
-                    }
-                )
-            );
-        }
-
-        SECTION("lookup IPv4") {
-            const auto res = co_await asyncio::net::dns::lookupIPv4("localhost");
-            REQUIRE(res);
-            REQUIRE_FALSE(res->empty());
-            REQUIRE(
-                std::ranges::any_of(
-                    *res,
-                    [](const auto &ip) {
-                        return zero::os::net::stringify(ip) == "127.0.0.1";
-                    }
-                )
-            );
-        }
-
-        SECTION("lookup IPv6") {
-            if (const auto res = co_await asyncio::net::dns::lookupIPv6("localhost");
-                res && !res->empty()) {
-                REQUIRE(
-                    std::ranges::any_of(
-                        *res,
-                        [](const auto &ip) {
-                            return zero::os::net::stringify(ip) == "::1";
-                        }
-                    )
-                );
-            }
-        }
-    });
+    );
     REQUIRE(result);
-    REQUIRE(*result);
+
+    REQUIRE_THAT(
+        *result,
+        Catch::Matchers::AllMatch(Catch::Matchers::Predicate<asyncio::net::Address>([&](const auto &address) {
+            return std::visit(
+                []<typename T>(const T &arg) -> bool {
+                    if constexpr (std::is_same_v<T, asyncio::net::IPv4Address>)
+                        return arg.ip == asyncio::net::LOCALHOST_IPV4 && arg.port == 80;
+                    else if constexpr (std::is_same_v<T, asyncio::net::IPv6Address>)
+                        return arg.ip == asyncio::net::LOCALHOST_IPV6 && arg.port == 80;
+                    else
+                        std::abort();
+                },
+                address
+            );
+        }))
+    );
+}
+
+ASYNC_TEST_CASE("lookup IP", "[net]") {
+    const auto result = co_await asyncio::net::dns::lookupIP("localhost");
+    REQUIRE(result);
+
+    REQUIRE_THAT(
+        *result,
+        Catch::Matchers::AllMatch(Catch::Matchers::Predicate<asyncio::net::IP>([&](const auto &ip) {
+            return std::visit(
+                []<typename T>(const T &arg) -> bool {
+                    if constexpr (std::is_same_v<T, asyncio::net::IPv4>)
+                        return arg == asyncio::net::LOCALHOST_IPV4;
+                    else if constexpr (std::is_same_v<T, asyncio::net::IPv6>)
+                        return arg == asyncio::net::LOCALHOST_IPV6;
+                    else
+                        std::abort();
+                },
+                ip
+            );
+        }))
+    );
+}
+
+ASYNC_TEST_CASE("lookup IPv4", "[net]") {
+    const auto result = co_await asyncio::net::dns::lookupIPv4("localhost");
+    REQUIRE(result);
+    REQUIRE_THAT(*result, Catch::Matchers::SizeIs(1));
+    REQUIRE(result->front() == asyncio::net::LOCALHOST_IPV4);
+}
+
+ASYNC_TEST_CASE("lookup IPv6", "[net]") {
+    if (const auto result = co_await asyncio::net::dns::lookupIPv6("localhost"); result && !result->empty()) {
+        REQUIRE_THAT(*result, Catch::Matchers::SizeIs(1));
+        REQUIRE(result->front() == asyncio::net::LOCALHOST_IPV6);
+    }
 }

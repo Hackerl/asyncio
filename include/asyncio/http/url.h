@@ -5,12 +5,11 @@
 #include <curl/curl.h>
 #include <zero/cmdline.h>
 #include <zero/error.h>
-#include <zero/formatter.h>
 #include <fmt/std.h>
 
 namespace asyncio::http {
-    std::expected<std::string, std::error_code> urlEncode(const std::string &str);
-    std::expected<std::string, std::error_code> urlDecode(const std::string &str);
+    std::string urlEscape(const std::string &str);
+    std::expected<std::string, std::error_code> urlUnescape(const std::string &str);
 
     class URL {
     public:
@@ -20,7 +19,6 @@ namespace asyncio::http {
             [](const int value) { return curl_url_strerror(static_cast<CURLUcode>(value)); }
         )
 
-        URL();
         explicit URL(std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url);
         URL(const URL &rhs);
         URL(URL &&rhs) noexcept;
@@ -30,29 +28,31 @@ namespace asyncio::http {
 
         static std::expected<URL, std::error_code> from(const std::string &str);
 
-        [[nodiscard]] std::expected<std::string, std::error_code> string() const;
-        [[nodiscard]] std::expected<std::string, std::error_code> scheme() const;
-        [[nodiscard]] std::expected<std::string, std::error_code> user() const;
-        [[nodiscard]] std::expected<std::string, std::error_code> password() const;
-        [[nodiscard]] std::expected<std::string, std::error_code> host() const;
-        [[nodiscard]] std::expected<std::string, std::error_code> path() const;
-        [[nodiscard]] std::expected<std::string, std::error_code> query() const;
-        [[nodiscard]] std::expected<std::string, std::error_code> fragment() const;
-        [[nodiscard]] std::expected<unsigned short, std::error_code> port() const;
+        [[nodiscard]] std::string string() const;
+        [[nodiscard]] std::string scheme() const;
+        [[nodiscard]] std::optional<std::string> user() const;
+        [[nodiscard]] std::optional<std::string> password() const;
+        [[nodiscard]] std::optional<std::string> host() const;
+        [[nodiscard]] std::string path() const;
+        [[nodiscard]] std::string rawPath() const;
+        [[nodiscard]] std::optional<std::string> query() const;
+        [[nodiscard]] std::optional<std::string> rawQuery() const;
+        [[nodiscard]] std::optional<std::string> fragment() const;
+        [[nodiscard]] std::optional<std::uint16_t> port() const;
 
-        URL &scheme(const std::optional<std::string> &scheme);
+        URL &scheme(const std::string &scheme);
         URL &user(const std::optional<std::string> &user);
         URL &password(const std::optional<std::string> &password);
         URL &host(const std::optional<std::string> &host);
-        URL &path(const std::optional<std::string> &path);
+        URL &path(const std::string &path);
         URL &query(const std::optional<std::string> &query);
         URL &fragment(const std::optional<std::string> &fragment);
-        URL &port(std::optional<unsigned short> port);
+        URL &port(std::optional<std::uint16_t> port);
 
         URL &appendQuery(const std::string &query);
         URL &appendQuery(const std::string &key, const std::string &value);
 
-        // char * is implicitly converted to bool, not std::string.
+        // `char *` will be implicitly converted to bool, not std::string.
         template<typename T>
             requires std::is_same_v<T, bool>
         URL &appendQuery(const std::string &key, const T value) {

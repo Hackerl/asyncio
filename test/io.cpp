@@ -1,158 +1,88 @@
+#include "catch_extensions.h"
 #include <asyncio/io.h>
-#include <asyncio/stream.h>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 
 constexpr std::string_view MESSAGE = "hello world";
 
-TEST_CASE("asynchronous io", "[io]") {
-    const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-        SECTION("copy") {
-            auto streams1 = asyncio::Stream::pair();
-            REQUIRE(streams1);
+ASYNC_TEST_CASE("copy", "[io]") {
+    asyncio::StringReader reader{std::string{MESSAGE}};
+    asyncio::StringWriter writer;
+    REQUIRE(co_await copy(reader, writer) == MESSAGE.size());
+    REQUIRE(*writer == MESSAGE);
+}
 
-            auto streams2 = asyncio::Stream::pair();
-            REQUIRE(streams2);
+ASYNC_TEST_CASE("read all", "[io]") {
+    asyncio::StringReader reader{std::string{MESSAGE}};
 
-            co_await allSettled(
-                [](auto reader, auto writer) -> asyncio::task::Task<void> {
-                    const auto res = co_await asyncio::copy(reader, writer);
-                    REQUIRE(res);
-                }(std::move(streams1->at(1)), std::move(streams2->at(0))),
-                [](auto writer) -> asyncio::task::Task<void> {
-                    auto res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(res);
-                }(std::move(streams1->at(0))),
-                [](auto reader) -> asyncio::task::Task<void> {
-                    std::string message;
-                    message.resize(MESSAGE.size());
-
-                    auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                    REQUIRE(res);
-                    REQUIRE(message == MESSAGE);
-
-                    res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                    REQUIRE_FALSE(res);
-                    REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
-                }(std::move(streams2->at(1)))
-            );
-        }
-
-        SECTION("copy bidirectional") {
-            auto streams1 = asyncio::Stream::pair();
-            REQUIRE(streams1);
-
-            auto streams2 = asyncio::Stream::pair();
-            REQUIRE(streams2);
-
-            co_await allSettled(
-                [](auto first, auto second) -> asyncio::task::Task<void> {
-                    const auto res = co_await asyncio::copyBidirectional(first, second);
-                    REQUIRE(res);
-                }(std::move(streams1->at(1)), std::move(streams2->at(0))),
-                [](auto stream) -> asyncio::task::Task<void> {
-                    auto res = co_await stream.writeAll(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(res);
-
-                    std::string message;
-                    message.resize(MESSAGE.size());
-
-                    res = co_await stream.readExactly(std::as_writable_bytes(std::span{message}));
-                    REQUIRE(res);
-                    REQUIRE(message == MESSAGE);
-
-                    res = co_await stream.readExactly(std::as_writable_bytes(std::span{message}));
-                    REQUIRE_FALSE(res);
-                    REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
-                }(std::move(streams1->at(0))),
-                [](auto stream) -> asyncio::task::Task<void> {
-                    std::string message;
-                    message.resize(MESSAGE.size());
-
-                    auto res = co_await stream.readExactly(std::as_writable_bytes(std::span{message}));
-                    REQUIRE(res);
-                    REQUIRE(message == MESSAGE);
-
-                    res = co_await stream.writeAll(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(res);
-                }(std::move(streams2->at(1)))
-            );
-        }
-
-        SECTION("read all") {
-            auto streams = asyncio::Stream::pair();
-            REQUIRE(streams);
-
-            co_await allSettled(
-                [](auto stream) -> asyncio::task::Task<void> {
-                    auto res = co_await stream.writeAll(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(res);
-
-                    res = co_await stream.writeAll(std::as_bytes(std::span{MESSAGE}));
-                    REQUIRE(res);
-                }(std::move(streams->at(0))),
-                [](auto reader) -> asyncio::task::Task<void> {
-                    const auto res = co_await reader.readAll();
-                    REQUIRE(res);
-                    REQUIRE(res->size() == MESSAGE.size() * 2);
-                    REQUIRE(memcmp(res->data(), MESSAGE.data(), MESSAGE.size()) == 0);
-                    REQUIRE(memcmp(res->data() + MESSAGE.size(), MESSAGE.data(), MESSAGE.size()) == 0);
-                }(std::move(streams->at(1)))
-            );
-        }
-
-        SECTION("read exactly") {
-            SECTION("normal") {
-                auto streams = asyncio::Stream::pair();
-                REQUIRE(streams);
-
-                co_await allSettled(
-                    [](auto writer) -> asyncio::task::Task<void> {
-                        auto res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
-                        REQUIRE(res);
-
-                        res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
-                        REQUIRE(res);
-
-                        res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
-                        REQUIRE(res);
-                    }(std::move(streams->at(0))),
-                    [](auto reader) -> asyncio::task::Task<void> {
-                        std::string message;
-                        message.resize(MESSAGE.size() * 3);
-
-                        const auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE(res);
-                        REQUIRE(message.substr(0, MESSAGE.size()) == MESSAGE);
-                        REQUIRE(message.substr(MESSAGE.size(), MESSAGE.size()) == MESSAGE);
-                        REQUIRE(message.substr(MESSAGE.size() * 2, MESSAGE.size()) == MESSAGE);
-                    }(std::move(streams->at(1)))
-                );
-            }
-
-            SECTION("error") {
-                auto streams = asyncio::Stream::pair();
-                REQUIRE(streams);
-
-                co_await allSettled(
-                    [](auto writer) -> asyncio::task::Task<void> {
-                        auto res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
-                        REQUIRE(res);
-
-                        res = co_await writer.writeAll(std::as_bytes(std::span{MESSAGE}));
-                        REQUIRE(res);
-                    }(std::move(streams->at(0))),
-                    [](auto reader) -> asyncio::task::Task<void> {
-                        std::string message;
-                        message.resize(MESSAGE.size() * 3);
-
-                        const auto res = co_await reader.readExactly(std::as_writable_bytes(std::span{message}));
-                        REQUIRE_FALSE(res);
-                        REQUIRE(res.error() == asyncio::IOError::UNEXPECTED_EOF);
-                    }(std::move(streams->at(1)))
-                );
-            }
-        }
-    });
+    const auto result = co_await reader.readAll();
     REQUIRE(result);
-    REQUIRE(*result);
+    REQUIRE_THAT(*result, Catch::Matchers::RangeEquals(std::as_bytes(std::span{MESSAGE})));
+}
+
+ASYNC_TEST_CASE("read exactly", "[io]") {
+    SECTION("normal") {
+        asyncio::StringReader reader{std::string{MESSAGE}};
+
+        std::string message;
+        message.resize(MESSAGE.size());
+
+        REQUIRE(co_await reader.readExactly(std::as_writable_bytes(std::span{message})));
+        REQUIRE(message == MESSAGE);
+    }
+
+    SECTION("unexpected eof") {
+        asyncio::StringReader reader{""};
+
+        std::string message;
+        message.resize(MESSAGE.size());
+
+        REQUIRE_ERROR(
+            co_await reader.readExactly(std::as_writable_bytes(std::span{message})),
+            asyncio::IOError::UNEXPECTED_EOF
+        );
+    }
+}
+
+ASYNC_TEST_CASE("string reader", "[io]") {
+    asyncio::StringReader reader{std::string{MESSAGE}};
+
+    std::string message;
+    message.resize(MESSAGE.size());
+
+    REQUIRE(co_await reader.read(std::as_writable_bytes(std::span{message})) == MESSAGE.size());
+    REQUIRE(message == MESSAGE);
+
+    REQUIRE(co_await reader.read(std::as_writable_bytes(std::span{message})) == 0);
+}
+
+ASYNC_TEST_CASE("string writer", "[io]") {
+    asyncio::StringWriter writer;
+    REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{MESSAGE})));
+    REQUIRE(writer.data() == MESSAGE);
+    REQUIRE(*writer == MESSAGE);
+}
+
+ASYNC_TEST_CASE("bytes reader", "[io]") {
+    asyncio::BytesReader reader{
+        std::vector<std::byte>{
+            reinterpret_cast<const std::byte *>(MESSAGE.data()),
+            reinterpret_cast<const std::byte *>(MESSAGE.data()) + MESSAGE.size()
+        }
+    };
+
+    std::vector<std::byte> data;
+    data.resize(MESSAGE.size());
+
+    REQUIRE(co_await reader.read(data) == MESSAGE.size());
+    REQUIRE_THAT(data, Catch::Matchers::RangeEquals(std::as_bytes(std::span{MESSAGE})));
+
+    REQUIRE(co_await reader.read(data) == 0);
+}
+
+ASYNC_TEST_CASE("bytes writer", "[io]") {
+    asyncio::BytesWriter writer;
+    REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{MESSAGE})));
+    REQUIRE_THAT(writer.data(), Catch::Matchers::RangeEquals(std::as_bytes(std::span{MESSAGE})));
+    REQUIRE_THAT(*writer, Catch::Matchers::RangeEquals(std::as_bytes(std::span{MESSAGE})));
 }

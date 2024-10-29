@@ -46,14 +46,14 @@ namespace asyncio::net::tls {
         std::shared_ptr<X509> inner;
 
         static std::expected<Certificate, std::error_code> load(std::string_view content);
-        static std::expected<Certificate, std::error_code> loadFile(const std::filesystem::path &path);
+        static task::Task<Certificate, std::error_code> loadFile(const std::filesystem::path &path);
     };
 
     struct PrivateKey {
         std::shared_ptr<EVP_PKEY> inner;
 
         static std::expected<PrivateKey, std::error_code> load(std::string_view content);
-        static std::expected<PrivateKey, std::error_code> loadFile(const std::filesystem::path &path);
+        static task::Task<PrivateKey, std::error_code> loadFile(const std::filesystem::path &path);
     };
 
     struct CertKeyPair {
@@ -63,24 +63,38 @@ namespace asyncio::net::tls {
 
     using Context = std::shared_ptr<SSL_CTX>;
 
-    struct ClientConfig {
-        Version minVersion{Version::TLS_VERSION_1_2};
-        Version maxVersion{Version::TLS_VERSION_1_3};
-        bool insecure{};
-        std::list<Certificate> rootCAs;
-        std::list<CertKeyPair> certKeyPairs;
+    class ClientConfig;
+    class ServerConfig;
+
+    template<typename T>
+    class Config {
+        static_assert(std::is_same_v<T, ClientConfig> || std::is_same_v<T, ServerConfig>);
+
+    public:
+        T &minVersion(Version version);
+        T &maxVersion(Version version);
+        T &rootCAs(std::list<Certificate> certificates);
+        T &certKeyPairs(std::list<CertKeyPair> pairs);
 
         [[nodiscard]] std::expected<Context, std::error_code> build() const;
+
+    protected:
+        Version mMinVersion{Version::TLS_VERSION_1_2};
+        Version mMaxVersion{Version::TLS_VERSION_1_3};
+        bool mInsecure{false};
+        std::list<Certificate> mRootCAs;
+        std::list<CertKeyPair> mCertKeyPairs;
     };
 
-    struct ServerConfig {
-        Version minVersion{Version::TLS_VERSION_1_2};
-        Version maxVersion{Version::TLS_VERSION_1_3};
-        bool verifyClient{};
-        std::list<Certificate> rootCAs;
-        std::list<CertKeyPair> certKeyPairs;
+    class ClientConfig : public Config<ClientConfig> {
+    public:
+        ClientConfig &insecure(bool enable);
+    };
 
-        [[nodiscard]] std::expected<Context, std::error_code> build() const;
+    class ServerConfig : public Config<ServerConfig> {
+    public:
+        ServerConfig();
+        ServerConfig &verifyClient(bool enable);
     };
 
     DEFINE_ERROR_CODE_EX(

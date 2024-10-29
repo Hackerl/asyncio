@@ -16,7 +16,7 @@ namespace asyncio::net {
     public:
         static std::expected<TCPStream, std::error_code> from(uv_os_sock_t socket);
 
-        static task::Task<TCPStream, std::error_code> connect(std::string host, unsigned short port);
+        static task::Task<TCPStream, std::error_code> connect(std::string host, std::uint16_t port);
         static task::Task<TCPStream, std::error_code> connect(IPAddress address);
 
         [[nodiscard]] FileDescriptor fd() const override;
@@ -57,7 +57,7 @@ namespace asyncio::net {
         static std::expected<TCPListener, std::error_code> listen(const SocketAddress &address);
 
     public:
-        static std::expected<TCPListener, std::error_code> listen(const std::string &ip, unsigned short port);
+        static std::expected<TCPListener, std::error_code> listen(const std::string &ip, std::uint16_t port);
         static std::expected<TCPListener, std::error_code> listen(const IPAddress &address);
 
         [[nodiscard]] FileDescriptor fd() const override;
