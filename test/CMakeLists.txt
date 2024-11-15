@@ -29,10 +29,6 @@ add_executable(
         $<$<NOT:$<PLATFORM_ID:Windows>>:signal.cpp>
 )
 
-if (WIN32)
-    target_compile_definitions(asyncio_test PUBLIC NOMINMAX)
-endif ()
-
 target_include_directories(asyncio_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(asyncio_test PRIVATE asyncio Catch2::Catch2WithMain)
 

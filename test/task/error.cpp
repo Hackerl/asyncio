@@ -1,5 +1,6 @@
 #include <asyncio/task.h>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 
 TEST_CASE("task with error", "[task]") {
     const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
@@ -122,18 +123,15 @@ TEST_CASE("task with error", "[task]") {
             co_await task;
         }
 
-        SECTION("traceback") {
+        SECTION("trace") {
             asyncio::Promise<int, std::error_code> promise;
             auto task = asyncio::task::from(promise.getFuture());
-
-            const auto callstack = task.traceback();
-            REQUIRE_FALSE(callstack.empty());
-            REQUIRE(std::strstr(callstack[0].function_name(), "from"));
+            REQUIRE_THAT(task.trace(), Catch::Matchers::ContainsSubstring("from"));
 
             promise.resolve(10);
 
             const auto &res = co_await task;
-            REQUIRE(task.traceback().empty());
+            REQUIRE_THAT(task.trace(), Catch::Matchers::IsEmpty());
             REQUIRE(res);
             REQUIRE(*res == 10);
         }

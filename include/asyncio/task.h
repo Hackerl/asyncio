@@ -7,6 +7,7 @@
 #include <coroutine>
 #include <exception>
 #include <source_location>
+#include <treehh/tree.hh>
 
 namespace asyncio::task {
     DEFINE_ERROR_CODE_EX(
@@ -24,14 +25,17 @@ namespace asyncio::task {
             if (!future.isReady())
                 return false;
 
+            if (onReady)
+                std::exchange(onReady, nullptr)();
+
             result.emplace(std::move(future).result());
             return true;
         }
 
         void await_suspend(const std::coroutine_handle<> handle) {
             future.setCallback([=, this](std::expected<T, E> &&res) {
-                if (beforeResume)
-                    std::exchange(beforeResume, nullptr)();
+                if (onReady)
+                    std::exchange(onReady, nullptr)();
 
                 if (!res) {
                     result.emplace(std::unexpected{std::move(res).error()});
@@ -67,7 +71,7 @@ namespace asyncio::task {
         }
 
         zero::async::promise::Future<T, E> future;
-        std::function<void()> beforeResume;
+        std::function<void()> onReady;
         std::optional<std::expected<T, E>> result;
     };
 
@@ -77,14 +81,17 @@ namespace asyncio::task {
             if (!future.isReady())
                 return false;
 
+            if (onReady)
+                std::exchange(onReady, nullptr)();
+
             result.emplace(std::move(future).result());
             return true;
         }
 
         void await_suspend(const std::coroutine_handle<> handle) {
             future.setCallback([=, this](std::expected<T, E> &&res) {
-                if (beforeResume)
-                    std::exchange(beforeResume, nullptr)();
+                if (onReady)
+                    std::exchange(onReady, nullptr)();
 
                 if (!res) {
                     result.emplace(std::unexpected{std::move(res).error()});
@@ -106,7 +113,7 @@ namespace asyncio::task {
         }
 
         zero::async::promise::Future<T, E> future;
-        std::function<void()> beforeResume;
+        std::function<void()> onReady;
         std::optional<std::expected<T, E>> result;
     };
 
@@ -125,46 +132,12 @@ namespace asyncio::task {
         bool locked{false};
         bool cancelled{false};
 
-        void step() {
-            next.reset();
-            location.reset();
-            cancel = nullptr;
-            group = nullptr;
-        }
+        void step();
+        void end();
+        std::expected<void, std::error_code> cancelAll();
 
-        std::expected<void, std::error_code> tryCancel() {
-            auto frame = this;
-
-            while (true) {
-                frame->cancelled = true;
-
-                if (frame->locked)
-                    return std::unexpected{make_error_code(Error::LOCKED)};
-
-                if (!frame->next)
-                    break;
-
-                frame = frame->next.get();
-            }
-
-            if (!frame->cancel)
-                return std::unexpected{make_error_code(Error::CANCELLATION_NOT_SUPPORTED)};
-
-            return std::exchange(frame->cancel, nullptr)();
-        }
-
-        void end() {
-            finished = true;
-
-            const auto eventLoop = getEventLoop();
-
-            for (auto &callback: std::exchange(callbacks, {})) {
-                if (const auto result = eventLoop->post([callback = std::move(callback)] {
-                    callback();
-                }); !result)
-                    throw std::system_error{result.error()};
-            }
-        }
+        [[nodiscard]] tree<std::source_location> callTree() const;
+        [[nodiscard]] std::string trace() const;
     };
 
     template<typename T, typename E>
@@ -211,20 +184,15 @@ namespace asyncio::task {
 
         // ReSharper disable once CppMemberFunctionMayBeConst
         std::expected<void, std::error_code> cancel() {
-            return mFrame->tryCancel();
+            return mFrame->cancelAll();
         }
 
-        [[nodiscard]] std::vector<std::source_location> traceback() const {
-            std::vector<std::source_location> callstack;
+        [[nodiscard]] tree<std::source_location> callTree() const {
+            return mFrame->callTree();
+        }
 
-            for (auto frame = mFrame; frame; frame = frame->next) {
-                if (!frame->location)
-                    break;
-
-                callstack.push_back(*frame->location);
-            }
-
-            return callstack;
+        [[nodiscard]] std::string trace() const {
+            return mFrame->trace();
         }
 
         // ReSharper disable once CppMemberFunctionMayBeConst
@@ -400,27 +368,7 @@ namespace asyncio::task {
 
     class TaskGroup {
     public:
-        std::expected<void, std::error_code> cancel() {
-            const auto errors = mFrames
-                | std::views::filter([](const auto &frame) {
-                    return !frame->finished;
-                })
-                | std::views::transform([](const auto &frame) {
-                    return frame->tryCancel();
-                })
-                | std::views::filter([](const auto &result) {
-                    return !result;
-                })
-                | std::ranges::views::transform([](const auto &result) {
-                    return result.error();
-                })
-                | std::ranges::to<std::list>();
-
-            if (!errors.empty())
-                return std::unexpected{errors.back()};
-
-            return {};
-        }
+        std::expected<void, std::error_code> cancel();
 
         template<typename T>
             requires zero::detail::is_specialization_v<std::remove_cvref_t<T>, Task>
@@ -447,6 +395,8 @@ namespace asyncio::task {
 
         template<typename T, typename E>
         friend class Promise;
+
+        friend struct Frame;
     };
 
     template<typename T, typename E>

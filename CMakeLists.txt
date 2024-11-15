@@ -51,6 +51,10 @@ add_library(
         src/sync/condition.cpp
 )
 
+if (WIN32)
+    target_compile_definitions(asyncio PUBLIC NOMINMAX)
+endif ()
+
 target_include_directories(
         asyncio
         PUBLIC
