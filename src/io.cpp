@@ -71,7 +71,7 @@ asyncio::task::Task<std::uint64_t, std::error_code> asyncio::ISeekable::position
     return seek(0, Whence::CURRENT);
 }
 
-asyncio::StringReader::StringReader(std::string string) : mString(std::move(string)) {
+asyncio::StringReader::StringReader(std::string string) : mString{std::move(string)} {
 }
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::StringReader::read(const std::span<std::byte> data) {
@@ -91,7 +91,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::StringWriter::write(c
     co_return data.size();
 }
 
-asyncio::BytesReader::BytesReader(std::vector<std::byte> bytes) : mBytes(std::move(bytes)) {
+asyncio::BytesReader::BytesReader(std::vector<std::byte> bytes) : mBytes{std::move(bytes)} {
 }
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::BytesReader::read(const std::span<std::byte> data) {

@@ -33,14 +33,27 @@ asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream
 
 asyncio::task::Task<void, std::error_code>
 serve(asyncio::net::TCPListener listener, const asyncio::net::tls::Context context) {
+    std::expected<void, std::error_code> result;
+    asyncio::task::TaskGroup group;
+
     while (true) {
         auto stream = co_await listener.accept();
-        CO_EXPECT(stream);
 
-        handle(*std::move(stream), context).future().fail([](const auto &ec) {
+        if (!stream) {
+            result = std::unexpected{stream.error()};
+            break;
+        }
+
+        auto task = handle(*std::move(stream), context);
+
+        group.add(task);
+        task.future().fail([](const auto &ec) {
             fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
         });
     }
+
+    co_await group;
+    co_return result;
 }
 
 asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {

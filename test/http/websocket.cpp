@@ -21,7 +21,7 @@ public:
         NO_KEY_HEADER, "no websocket key header"
     )
 
-    explicit Server(asyncio::net::TCPStream stream) : mStream(std::move(stream)) {
+    explicit Server(asyncio::net::TCPStream stream) : mStream{std::move(stream)} {
     }
 
     static asyncio::task::Task<Server, std::error_code> accept(asyncio::net::TCPStream stream) {

@@ -9,7 +9,7 @@
 #include <zero/os/unix/error.h>
 #endif
 
-asyncio::fs::File::File(const uv_file file): mFile(file), mEventLoop{getEventLoop()} {
+asyncio::fs::File::File(const uv_file file): mFile{file}, mEventLoop{getEventLoop()} {
 }
 
 asyncio::fs::File::File(File &&rhs) noexcept
@@ -530,7 +530,7 @@ asyncio::task::Task<bool, std::error_code> asyncio::fs::isSymlink(const std::fil
     }));
 }
 
-asyncio::fs::DirectoryEntry::DirectoryEntry(zero::filesystem::DirectoryEntry entry) : mEntry(std::move(entry)) {
+asyncio::fs::DirectoryEntry::DirectoryEntry(zero::filesystem::DirectoryEntry entry) : mEntry{std::move(entry)} {
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::DirectoryEntry::assign(const std::filesystem::path path) {

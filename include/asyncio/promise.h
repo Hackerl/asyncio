@@ -48,10 +48,10 @@ namespace asyncio {
 
             this->mCore->event.set();
 
-            const auto result = mEventLoop->post([core = this->mCore] {
+            if (const auto result = mEventLoop->post([core = this->mCore] {
                 core->trigger();
-            });
-            assert(result);
+            }); !result)
+                throw std::system_error{result.error()};
         }
 
         template<typename... Ts>
@@ -76,10 +76,10 @@ namespace asyncio {
 
             this->mCore->event.set();
 
-            const auto result = mEventLoop->post([core = this->mCore] {
+            if (const auto result = mEventLoop->post([core = this->mCore] {
                 core->trigger();
-            });
-            assert(result);
+            }); !result)
+                throw std::system_error{result.error()};
         }
 
     private:
