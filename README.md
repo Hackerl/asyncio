@@ -33,9 +33,9 @@
 <h3 align="center">asyncio</h3>
 
   <p align="center">
-    C++20 coroutine network framework
+    C++23 coroutine network framework
     <br />
-    <a href="https://github.com/Hackerl/asyncio/wiki"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/Hackerl/asyncio/tree/master/doc"><strong>Explore the docs »</strong></a>
     <br />
     <br />
     <a href="https://github.com/Hackerl/asyncio/tree/master/sample">View Demo</a>
@@ -80,7 +80,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-Based on the `libevent` event loop, use C++20 stackless `coroutines` to implement events and network basic components, and provide `channel` to send and receive data between tasks.
+Based on the `libuv` event loop, use C++20 stackless `coroutines` to implement network components, and provide `channel` to send and receive data between tasks.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -90,7 +90,7 @@ Based on the `libevent` event loop, use C++20 stackless `coroutines` to implemen
 
 * [![CMake][CMake]][CMake-url]
 * [![vcpkg][vcpkg]][vcpkg-url]
-* [![C++20][C++20]][C++20-url]
+* [![C++23][C++23]][C++23-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -99,13 +99,11 @@ Based on the `libevent` event loop, use C++20 stackless `coroutines` to implemen
 <!-- GETTING STARTED -->
 ## Getting Started
 
-Due to many dependencies, it is not recommended to install manually, you should use `vcpkg`.
-
 ### Prerequisites
 
 Required compiler:
-* GCC >= 13
-* LLVM >= 16
+* GCC >= 14
+* LLVM >= 18
 * MSVC >= 19.38
 
 Export environment variables:
@@ -116,276 +114,232 @@ Export environment variables:
 
 * Linux
   ```sh
-  mkdir -p build && cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" && cmake --build build -j$(nproc)
+  cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" && cmake --build build -j$(nproc)
   ```
 
 * Android
   ```sh
   # set "ANDROID_PLATFORM" for dependencies installed by vcpkg: echo 'set(VCPKG_CMAKE_SYSTEM_VERSION 24)' >> "${VCPKG_INSTALLATION_ROOT}/triplets/community/arm64-android.cmake"
-  mkdir -p build && cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake" -DVCPKG_TARGET_TRIPLET=arm64-android -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 && cmake --build build -j$(nproc)
+  cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake" -DVCPKG_TARGET_TRIPLET=arm64-android -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 && cmake --build build -j$(nproc)
   ```
 
 * Windows(Developer PowerShell)
   ```sh
-  mkdir -p build && cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" && cmake --build build -j $env:NUMBER_OF_PROCESSORS
+  cmake -B build -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" && cmake --build build -j $env:NUMBER_OF_PROCESSORS
   ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Installation
-You can use `CMake` to compile and install based on the source code, or use `CMake` + `vcpkg` directly.
 
-* CMakeLists.txt
-  ```cmake
-  find_package(asyncio CONFIG REQUIRED)
-  add_executable(demo main.cpp)
-  target_link_libraries(demo PRIVATE asyncio::asyncio)
-  ```
+Install `asyncio` from the [`vcpkg` private registry](https://github.com/Hackerl/vcpkg-registry):
 
-* vcpkg-configuration.json
-  ```json
-  {
-    "registries": [
-      {
-        "kind": "git",
-        "repository": "https://github.com/Hackerl/vcpkg-registry",
-        "baseline": "4abdfe14cbaee3e51d28a169061b7d3e54dbcc37",
-        "packages": [
-          "asyncio",
-          "zero"
-        ]
-      }
-    ]
-  }
-  ```
+1. Create a `vcpkg-configuration.json` file in the project root directory:
 
-* vcpkg.json
-  ```json
-  {
-    "name": "demo",
-    "version-string": "1.0.0",
-    "builtin-baseline": "c9e2aa851e987698519f58518aa16564af3a85ab",
-    "dependencies": [
-      {
-        "name": "asyncio",
-        "version>=": "1.0.1"
-      }
-    ]
-  }
-  ```
+   ```json
+   {
+     "registries": [
+       {
+         "kind": "git",
+         "repository": "https://github.com/Hackerl/vcpkg-registry",
+         "baseline": "56e949885c4f22d5711523f360ac92d73f7a8495",
+         "packages": [
+           "asyncio",
+           "zero"
+         ]
+       }
+     ]
+   }
+   ```
+
+   > The `baseline` defines the minimum version of `asyncio` that will be installed. The one used above might be outdated, so please update it as necessary.
+
+2. Create a `vcpkg.json` file in the project root directory:
+
+   ```json
+   {
+     "name": "project name",
+     "version-string": "1.0.0",
+     "builtin-baseline": "9224b3bbd8df24999d85720b1d005dd6f969ade0",
+     "dependencies": [
+       "asyncio"
+     ]
+   }
+   ```
+
+3. Add the following to the `CMakeLists.txt` file:
+
+   ```cmake
+   find_package(asyncio CONFIG REQUIRED)
+   target_link_libraries(custom_target PRIVATE asyncio::asyncio-main)
+   ```
 
 
 
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-### TCP/TLS
+### HTTP Client
 
-* Basic
+Using the `HTTP Client` in a `C++` project has never been easier:
 
-  ```cpp
-  asyncio::run([&]() -> asyncio::task::Task<void> {
-      auto buffer = co_await asyncio::net::connect(host, port);
+```c++
+#include <asyncio/http/request.h>
 
-      if (!buffer) {
-          LOG_ERROR("stream buffer connect failed{}]", buffer.error());
-          co_return;
-      }
+asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
+    const auto url = asyncio::http::URL::from("https://www.google.com");
+    CO_EXPECT(url);
 
-      while (true) {
-          std::string message = "hello world\r\n";
-          auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+    auto requests = asyncio::http::Requests::make();
+    CO_EXPECT(requests);
 
-          if (!result) {
-              LOG_ERROR("stream buffer drain failed[{}]", result.error());
-              break;
-          }
+    auto response = co_await requests->get(*url);
+    CO_EXPECT(response);
 
-          auto line = co_await buffer->readLine();
+    const auto content = co_await response->string();
+    CO_EXPECT(content);
 
-          if (!line) {
-              LOG_ERROR("stream buffer read line failed[{}]", line.error());
-              break;
-          }
+    fmt::print("{}", *content);
+    co_return {};
+}
+```
 
-          LOG_INFO("receive message[{}]", *line);
-          co_await asyncio::sleep(1s);
-      }
-  });
-  ```
+> We use `asyncMain` instead of `main` as the entry point, and `CO_EXPECT` is used to check for errors and throw them upwards.
 
-* TLS
+### TCP
 
-  ```cpp
-  asyncio::run([&]() -> asyncio::task::Task<void> {
-      asyncio::net::ssl::Config config = {
-              .insecure = insecure,
-              .server = false
-      };
+#### Server
 
-      if (ca)
-          config.ca = *ca;
+```c++
+#include <asyncio/net/stream.h>
+#include <asyncio/signal.h>
+#include <zero/cmdline.h>
 
-      if (cert)
-          config.cert = *cert;
+asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
+    const auto address = stream.remoteAddress();
+    CO_EXPECT(address);
 
-      if (privateKey)
-          config.privateKey = *privateKey;
+    fmt::print("connection[{}]\n", *address);
 
-      auto context = asyncio::net::ssl::newContext(config);
+    while (true) {
+        std::string message;
+        message.resize(1024);
 
-      if (!context) {
-          LOG_ERROR("create ssl context failed[{}]", context.error());
-          co_return;
-      }
+        const auto n = co_await stream.read(std::as_writable_bytes(std::span{message}));
+        CO_EXPECT(n);
 
-      auto buffer = co_await asyncio::net::ssl::connect(*context, host, port);
+        if (*n == 0)
+            break;
 
-      if (!buffer) {
-          LOG_ERROR("stream buffer connect failed[{}]", buffer.error());
-          co_return;
-      }
+        message.resize(*n);
 
-      while (true) {
-          std::string message = "hello world\r\n";
-          auto result = co_await buffer->writeAll(std::as_bytes(std::span{message}));
+        fmt::print("receive message: {}\n", message);
+        CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{message})));
+    }
 
-          if (!result) {
-              LOG_ERROR("stream buffer drain failed[{}]", result.error());
-              break;
-          }
+    co_return {};
+}
 
-          auto line = co_await buffer->readLine();
+asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
+    std::expected<void, std::error_code> result;
+    asyncio::task::TaskGroup group;
 
-          if (!line) {
-              LOG_ERROR("stream buffer read line failed[{}]", line.error());
-              break;
-          }
+    while (true) {
+        auto stream = co_await listener.accept();
 
-          LOG_INFO("receive message[{}]", *line);
-          co_await asyncio::sleep(1s);
-      }
-  });
-  ```
+        if (!stream) {
+            result = std::unexpected{stream.error()};
+            break;
+        }
 
-### Worker
+        auto task = handle(*std::move(stream));
 
-* Basic
+        group.add(task);
+        task.future().fail([](const auto &ec) {
+            fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
+        });
+    }
 
-  ```cpp
-  asyncio::run([]() -> asyncio::task::Task<void> {
-      co_await asyncio::toThread([]() -> std::expected<void, std::error_code> {
-          auto tp = std::chrono::system_clock::now();
-          std::this_thread::sleep_for(50ms);
-          REQUIRE(std::chrono::system_clock::now() - tp > 50ms);
-          return {};
-      });
-  });
-  ```
+    co_await group;
+    co_return result;
+}
 
-* Throw error
+asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
+    zero::Cmdline cmdline;
 
-  ```cpp
-  asyncio::run([]() -> asyncio::task::Task<void> {
-      auto result = co_await asyncio::toThread([]() -> std::expected<void, std::error_code> {
-          std::this_thread::sleep_for(10ms);
-          return std::unexpected{make_error_code(std::errc::bad_message)};
-      });
+    cmdline.add<std::string>("host", "remote host");
+    cmdline.add<std::uint16_t>("port", "remote port");
 
-      REQUIRE_FALSE(result);
-      REQUIRE(result.error() == std::errc::bad_message);
-  });
-  ```
+    cmdline.parse(argc, argv);
 
-### Channel
+    const auto host = cmdline.get<std::string>("host");
+    const auto port = cmdline.get<std::uint16_t>("port");
 
-* Basic
+    auto listener = asyncio::net::TCPListener::listen(host, port);
+    CO_EXPECT(listener);
 
-  ```cpp
-  asyncio::run([]() -> asyncio::task::Task<void> {
-      auto channel = asyncio::Channel<int>::make(100);
+    auto signal = asyncio::Signal::make();
+    CO_EXPECT(signal);
 
-      co_await task::allSettled(
-              [](auto channel) -> asyncio::task::Task<void, std::error_code> {
-                  std::expected<void, std::error_code> result;
+    co_return co_await race(
+        serve(*std::move(listener)),
+        signal->on(SIGINT).transform([](const int) {
+        })
+    );
+}
+```
 
-                  for (int i{0}; i < 1000; i++) {
-                      auto res = co_await channel->send(i);
+> Start the server with `./server 127.0.0.1 8000`, and gracefully exit by pressing `ctrl + c` in the terminal.
 
-                      if (!res) {
-                          result = std::unexpected(res.error());
-                          break;
-                      }
+#### Client
 
-                      co_await asyncio::sleep(1s);
-                  }
+```c++
+#include <asyncio/net/stream.h>
+#include <asyncio/time.h>
+#include <zero/cmdline.h>
 
-                  co_return result;
-              }(channel),
-              [](auto channel) -> asyncio::task::Task<void, std::error_code> {
-                  std::expected<void, std::error_code> result;
+asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
+    using namespace std::chrono_literals;
+    using namespace std::string_view_literals;
 
-                  while (true) {
-                      auto res = co_await channel->receive();
+    zero::Cmdline cmdline;
 
-                      if (!res) {
-                          result = std::unexpected(res.error());
-                          break;
-                      }
+    cmdline.add<std::string>("host", "remote host");
+    cmdline.add<std::uint16_t>("port", "remote port");
 
-                      // do something
-                  }
+    cmdline.parse(argc, argv);
 
-                  co_return result;
-              }(channel)
-      );
-  });
-  ```
+    const auto host = cmdline.get<std::string>("host");
+    const auto port = cmdline.get<std::uint16_t>("port");
 
-* Concurrent
+    auto stream = co_await asyncio::net::TCPStream::connect(host, port);
+    CO_EXPECT(stream);
 
-  ```cpp
-  asyncio::run([]() -> asyncio::task::Task<void> {
-      auto channel = asyncio::Channel<int>::make(100);
+    while (true) {
+        CO_EXPECT(co_await stream->writeAll(std::as_bytes(std::span{"hello world"sv})));
 
-      co_await task::allSettled(
-              [](auto channel) -> asyncio::task::Task<void, std::error_code> {
-                  std::expected<void, std::error_code> result;
+        std::string message;
+        message.resize(1024);
 
-                  for (int i{0}; i < 1000; i++) {
-                      auto res = co_await channel->send(i);
+        const auto n = co_await stream->read(std::as_writable_bytes(std::span{message}));
+        CO_EXPECT(n);
 
-                      if (!res) {
-                          result = std::unexpected(res.error());
-                          break;
-                      }
+        if (*n == 0)
+            break;
 
-                      co_await asyncio::sleep(1s);
-                  }
+        message.resize(*n);
 
-                  co_return result;
-              }(channel),
-              asyncio::toThread([=]() -> std::expected<void, std::error_code> {
-                  std::expected<void, std::error_code> result;
+        fmt::print("receive message: {}\n", message);
+        co_await asyncio::sleep(1s);
+    }
 
-                  while (true) {
-                      auto res = channel->receiveSync();
+    co_return {};
+}
+```
 
-                      if (!res) {
-                          result = std::unexpected(res.error());
-                          break;
-                      }
+> Connect to the server with `./client 127.0.0.1 8000`.
 
-                      // do something that takes a long time
-                  }
-
-                  return result;
-              })
-      );
-  });
-  ```
-
-_For more examples, please refer to the [Documentation](https://github.com/Hackerl/asyncio/wiki)_
+_For more examples, please refer to the [Documentation](https://github.com/Hackerl/asyncio/tree/master/doc)_
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -394,11 +348,7 @@ _For more examples, please refer to the [Documentation](https://github.com/Hacke
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] HTTP WebSocket
-- [ ] Asynchronous Filesystem
-  - [ ] Linux AIO
-  - [ ] Windows IOCP
-  - [ ] POSIX AIO
+- [ ] HTTP Server
 
 See the [open issues](https://github.com/Hackerl/asyncio/issues) for a full list of proposed features (and known issues).
 
@@ -447,8 +397,12 @@ Project Link: [https://github.com/Hackerl/asyncio](https://github.com/Hackerl/as
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
-* [libevent](https://libevent.org)
-* [tl-expected](https://github.com/TartanLlama/expected)
+* [libuv](https://libuv.org)
+* [curl](https://curl.se)
+* [treehh](https://github.com/kpeeters/tree.hh)
+* [nlohmann-json](https://json.nlohmann.me)
+* [OpenSSL](https://www.openssl.org)
+* [Catch2](https://github.com/catchorg/Catch2)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -468,7 +422,7 @@ Project Link: [https://github.com/Hackerl/asyncio](https://github.com/Hackerl/as
 [license-url]: https://github.com/Hackerl/asyncio/blob/master/LICENSE
 [CMake]: https://img.shields.io/badge/CMake-000000?style=for-the-badge&logo=cmake&logoColor=FF3E00
 [CMake-url]: https://cmake.org
-[vcpkg]: https://img.shields.io/badge/vcpkg-000000?style=for-the-badge&logo=microsoft&logoColor=61DAFB
+[vcpkg]: https://img.shields.io/badge/vcpkg-000000?style=for-the-badge&logo=v&logoColor=61DAFB
 [vcpkg-url]: https://vcpkg.io
-[C++20]: https://img.shields.io/badge/C++20-000000?style=for-the-badge&logo=cplusplus&logoColor=4FC08D
-[C++20-url]: https://en.cppreference.com/w/cpp/20
+[C++23]: https://img.shields.io/badge/C++23-000000?style=for-the-badge&logo=cplusplus&logoColor=4FC08D
+[C++23-url]: https://en.cppreference.com/w/cpp/20
