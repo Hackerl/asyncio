@@ -242,21 +242,21 @@ namespace asyncio {
 
     DEFINE_ERROR_CODE_EX(
         TryReceiveError,
-        "asyncio::Sender::tryReceive",
+        "asyncio::Receiver::tryReceive",
         DISCONNECTED, "receiving on an empty and disconnected channel", DEFAULT_ERROR_CONDITION,
         EMPTY, "receiving on an empty channel", std::errc::operation_would_block
     )
 
     DEFINE_ERROR_CODE_EX(
         ReceiveSyncError,
-        "asyncio::Sender::receiveSync",
+        "asyncio::Receiver::receiveSync",
         DISCONNECTED, "channel is empty and disconnected", DEFAULT_ERROR_CONDITION,
         TIMEOUT, "timed out waiting on receive operation", std::errc::timed_out
     )
 
     DEFINE_ERROR_CODE_EX(
         ReceiveError,
-        "asyncio::Sender::receive",
+        "asyncio::Receiver::receive",
         DISCONNECTED, "channel is empty and disconnected", DEFAULT_ERROR_CONDITION,
         CANCELLED, "receive operation has been cancelled", std::errc::operation_canceled
     )
