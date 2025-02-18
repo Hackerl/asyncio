@@ -1,7 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/signal.h>
 #include <zero/defer.h>
-#include <catch2/catch_test_macros.hpp>
 #include <unistd.h>
 #include <thread>
 

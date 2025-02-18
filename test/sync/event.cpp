@@ -1,7 +1,6 @@
 #include <catch_extensions.h>
 #include <asyncio/sync/event.h>
 #include <asyncio/time.h>
-#include <catch2/catch_test_macros.hpp>
 
 ASYNC_TEST_CASE("event", "[sync]") {
     asyncio::sync::Event event;

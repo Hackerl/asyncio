@@ -1,7 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/poll.h>
 #include <zero/defer.h>
-#include <catch2/catch_test_macros.hpp>
 
 #ifndef _WIN32
 #include <unistd.h>

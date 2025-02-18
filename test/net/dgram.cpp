@@ -1,6 +1,5 @@
 #include <catch_extensions.h>
 #include <asyncio/net/dgram.h>
-#include <catch2/catch_test_macros.hpp>
 
 constexpr std::string_view MESSAGE = "hello world";
 

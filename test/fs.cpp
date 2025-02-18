@@ -1,7 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/fs.h>
 #include <zero/strings/strings.h>
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 constexpr std::string_view CONTENT = "hello world";

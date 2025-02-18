@@ -1,7 +1,6 @@
 #include <catch_extensions.h>
 #include <asyncio/time.h>
 #include <asyncio/sync/mutex.h>
-#include <catch2/catch_test_macros.hpp>
 
 ASYNC_TEST_CASE("mutex", "[sync]") {
     asyncio::sync::Mutex mutex;

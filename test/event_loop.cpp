@@ -1,7 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/event_loop.h>
 #include <asyncio/time.h>
-#include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("event loop", "[event loop]") {
     SECTION("with error") {

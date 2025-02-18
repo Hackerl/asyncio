@@ -1,6 +1,5 @@
 #include "catch_extensions.h"
 #include <asyncio/time.h>
-#include <catch2/catch_test_macros.hpp>
 
 ASYNC_TEST_CASE("sleep", "[time]") {
     using namespace std::chrono_literals;

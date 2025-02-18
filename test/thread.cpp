@@ -1,6 +1,5 @@
 #include "catch_extensions.h"
 #include <asyncio/thread.h>
-#include <catch2/catch_test_macros.hpp>
 
 ASYNC_TEST_CASE("post task to a new thread", "[thread]") {
     using namespace std::chrono_literals;

@@ -1,6 +1,5 @@
 #include <catch_extensions.h>
 #include <asyncio/net/dns.h>
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("get address info", "[net]") {

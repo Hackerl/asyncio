@@ -1,7 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/channel.h>
 #include <asyncio/thread.h>
-#include <catch2/catch_test_macros.hpp>
 #include <future>
 
 constexpr auto MAX_COUNT = 100000;

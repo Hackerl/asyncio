@@ -1,7 +1,6 @@
 #include <catch_extensions.h>
 #include <asyncio/net/tls.h>
 #include <asyncio/net/stream.h>
-#include <catch2/catch_test_macros.hpp>
 
 constexpr auto CA_CERT = R"(-----BEGIN CERTIFICATE-----
 MIIDTTCCAjUCFCvK20SUCJA9JqCcIpXa4ATR9O+BMA0GCSqGSIb3DQEBCwUAMGMx

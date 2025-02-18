@@ -1,6 +1,5 @@
 #include <catch_extensions.h>
 #include <asyncio/http/url.h>
-#include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("URL escape", "[http]") {
     REQUIRE(

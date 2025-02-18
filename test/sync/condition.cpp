@@ -1,7 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/sync/condition.h>
 #include <asyncio/time.h>
-#include <catch2/catch_test_macros.hpp>
 
 ASYNC_TEST_CASE("condition variable", "[sync]") {
     asyncio::sync::Condition condition;

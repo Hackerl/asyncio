@@ -3,7 +3,6 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/buffer.h>
 #include <zero/encoding/base64.h>
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <openssl/sha.h>
 #include <regex>
