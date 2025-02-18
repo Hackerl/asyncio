@@ -7,29 +7,27 @@ jobs:
       matrix:
         shared: [ ON, OFF ]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Install LLVM
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 18
           sudo apt install -y libc++abi-18-dev libc++-18-dev
-      - name: Build
-        run: |
-          cmake -B build \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET="x64-linux-dynamic" \
-            -DBUILD_SHARED_LIBS=${{ matrix.shared }}
-          cmake --build build -j$(nproc)
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+      - name: Build and test
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug-asan
+          configurePresetAdditionalArgs: "['-DBUILD_SHARED_LIBS=${{ matrix.shared }}', '-DVCPKG_TARGET_TRIPLET=x64-linux-dynamic']"
+          buildPreset: debug-asan
+          testPreset: debug-asan
         env:
           CC: clang-18
           CXX: clang++-18
-          CFLAGS: -fsanitize=address
-          CXXFLAGS: -fsanitize=address -stdlib=libc++
-          LDFLAGS: -fsanitize=address
-      - name: Test
-        run: ctest --output-on-failure --test-dir build
-        env:
+          CXXFLAGS: -stdlib=libc++
           # https://github.com/llvm/llvm-project/issues/59432
           ASAN_OPTIONS: alloc_dealloc_mismatch=0
 
@@ -37,15 +35,18 @@ jobs:
   linux-static:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Install musl toolchains
         run: curl -fsSL https://github.com/Hackerl/musl-cross-make/releases/download/gcc-14.1.0/x86_64-linux-musl-native-gcc14.tar.gz | tar -xz -C /opt
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
       - name: Build
-        run: |
-          cmake -B build \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DCMAKE_EXE_LINKER_FLAGS="-static-pie"
-          cmake --build build -j$(nproc)
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug
+          configurePresetAdditionalArgs: "['-DCMAKE_EXE_LINKER_FLAGS=-static-pie']"
+          buildPreset: debug
         env:
           CC: /opt/x86_64-linux-musl-native/bin/x86_64-linux-musl-gcc
           CXX: /opt/x86_64-linux-musl-native/bin/x86_64-linux-musl-g++
@@ -53,107 +54,128 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: ilammy/msvc-dev-cmd@v1
-      - name: Build
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+      - name: Create custom triplet
         # https://github.com/microsoft/vcpkg/issues/29132
         run: |
           Set-Content x64-windows-static-sanitizer.cmake @"
           set(VCPKG_TARGET_ARCHITECTURE x64)
           set(VCPKG_CRT_LINKAGE static)
           set(VCPKG_LIBRARY_LINKAGE static)
-          set(VCPKG_C_FLAGS $Env:CFLAGS)
-          set(VCPKG_CXX_FLAGS $Env:CXXFLAGS)
+          set(VCPKG_C_FLAGS "-fsanitize=address")
+          set(VCPKG_CXX_FLAGS "-fsanitize=address")
           "@
-          cmake -B build `
-            -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_OVERLAY_TRIPLETS="$(pwd)" `
-            -DVCPKG_TARGET_TRIPLET="x64-windows-static-sanitizer" `
-            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug
-          cmake --build build -j $Env:NUMBER_OF_PROCESSORS
-        env:
-          CFLAGS: -fsanitize=address
-          CXXFLAGS: -fsanitize=address
-      - name: Test
-        run: ctest --output-on-failure --test-dir build
+      - name: Build and test
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug-asan
+          configurePresetAdditionalArgs: "[String.raw`-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}`, '-DVCPKG_TARGET_TRIPLET=x64-windows-static-sanitizer', '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug']"
+          buildPreset: debug-asan
+          testPreset: debug-asan
 
   windows-32:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x86
-      - name: Build
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+      - name: Create custom triplet
         # https://github.com/microsoft/vcpkg/issues/29132
         run: |
           Set-Content x86-windows-static-sanitizer.cmake @"
           set(VCPKG_TARGET_ARCHITECTURE x86)
           set(VCPKG_CRT_LINKAGE static)
           set(VCPKG_LIBRARY_LINKAGE static)
-          set(VCPKG_C_FLAGS $Env:CFLAGS)
-          set(VCPKG_CXX_FLAGS $Env:CXXFLAGS)
+          set(VCPKG_C_FLAGS "-fsanitize=address")
+          set(VCPKG_CXX_FLAGS "-fsanitize=address")
           "@
-          cmake -B build -A Win32 `
-            -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_OVERLAY_TRIPLETS="$(pwd)" `
-            -DVCPKG_TARGET_TRIPLET="x86-windows-static-sanitizer" `
-            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug
-          cmake --build build -j $Env:NUMBER_OF_PROCESSORS
+      - name: Build and test
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug-asan
+          configurePresetAdditionalArgs: "['-A Win32', String.raw`-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}`, '-DVCPKG_TARGET_TRIPLET=x86-windows-static-sanitizer', '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug']"
+          buildPreset: debug-asan
+          testPreset: debug-asan
         env:
-          CFLAGS: -fsanitize=address
-          CXXFLAGS: -fsanitize=address
-      - name: Test
-        run: ctest --output-on-failure --test-dir build
+          VCPKG_DEFAULT_TRIPLET: x86-windows
 
   macos:
-    runs-on: macos-13
+    runs-on: ${{ matrix.platform.os }}
     strategy:
       matrix:
         shared: [ ON, OFF ]
+        platform:
+          - os: macos-13
+            triplet: x64-osx-dynamic
+          - os: macos-13-xlarge
+            triplet: arm64-osx-dynamic
+          - os: macos-14
+            triplet: arm64-osx-dynamic
+          - os: macos-14-large
+            triplet: x64-osx-dynamic
+          - os: macos-15
+            triplet: arm64-osx-dynamic
+          - os: macos-15-large
+            triplet: x64-osx-dynamic
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Install LLVM
         run: |
           brew install llvm
           echo "LLVM_HOME=$(brew --prefix llvm)" >> $GITHUB_ENV
-      - name: Build
-        run: |
-          cmake -B build \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET="x64-osx-dynamic" \
-            -DBUILD_SHARED_LIBS=${{ matrix.shared }}
-          cmake --build build -j$(sysctl -n hw.physicalcpu)
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+      - name: Build and test
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug-asan
+          configurePresetAdditionalArgs: "['-DBUILD_SHARED_LIBS=${{ matrix.shared }}', '-DVCPKG_TARGET_TRIPLET=${{ matrix.platform.triplet }}']"
+          buildPreset: debug-asan
+          testPreset: debug-asan
         env:
           CC: ${{ env.LLVM_HOME }}/bin/clang
           CXX: ${{ env.LLVM_HOME }}/bin/clang++
-          CFLAGS: -fsanitize=address
-          CXXFLAGS: -fsanitize=address
-          LDFLAGS: -fsanitize=address -L${{ env.LLVM_HOME }}/lib/c++ -L${{ env.LLVM_HOME }}/lib -L${{ env.LLVM_HOME }}/lib/unwind -lunwind -Wl,-rpath,${{ env.LLVM_HOME }}/lib/c++ -Wl,-rpath,${{ env.LLVM_HOME }}/lib -Wl,-rpath,${{ env.LLVM_HOME }}/lib/unwind
-      - name: Test
-        run: ctest --output-on-failure --test-dir build
+          LDFLAGS: -L${{ env.LLVM_HOME }}/lib/c++ -L${{ env.LLVM_HOME }}/lib -L${{ env.LLVM_HOME }}/lib/unwind -lunwind -Wl,-rpath,${{ env.LLVM_HOME }}/lib/c++ -Wl,-rpath,${{ env.LLVM_HOME }}/lib -Wl,-rpath,${{ env.LLVM_HOME }}/lib/unwind
 
   android:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        api: [ 21, 22, 23, 24 ]
+        shared: [ ON, OFF ]
+        api: [ 28, 34 ]
+        platform:
+          - abi: arm64-v8a
+            triplet: arm64-android
+          - abi: armeabi-v7a
+            triplet: arm-neon-android
+          - abi: x86
+            triplet: x86-android
+          - abi: x86_64
+            triplet: x64-android
     steps:
-      - uses: actions/checkout@v4
-      - uses: nttld/setup-ndk@v1
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
           ndk-version: r27
-      - name: Build
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+      - name: Create custom triplet
         run: |
-          mkdir -p build
-          cmake -B build \
-            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
-            -DVCPKG_TARGET_TRIPLET=arm64-android \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-${{ matrix.api }} \
-            -DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST
-          cmake --build build -j$(nproc)
+          cp "${VCPKG_ROOT}/triplets/${{ matrix.platform.triplet }}.cmake" android-${{ matrix.api }}.cmake
+          echo "set(VCPKG_CMAKE_SYSTEM_VERSION ${{ matrix.api }})" >> android-${{ matrix.api }}.cmake
+      - name: Build
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug-asan
+          configurePresetAdditionalArgs: "['-DBUILD_SHARED_LIBS=${{ matrix.shared }}', '-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake', String.raw`-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}`, '-DVCPKG_TARGET_TRIPLET=android-${{ matrix.api }}', '-DANDROID_ABI=${{ matrix.platform.abi }}', '-DANDROID_PLATFORM=android-${{ matrix.api }}', '-DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST']"
+          buildPreset: debug-asan
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
