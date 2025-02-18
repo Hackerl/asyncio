@@ -222,7 +222,7 @@ asyncio::fs::write(std::filesystem::path path, const std::span<const std::byte> 
 }
 
 asyncio::task::Task<void, std::error_code>
-asyncio::fs::write(std::filesystem::path path, const std::string_view content) {
+asyncio::fs::write(std::filesystem::path path, const std::string content) {
     auto file = co_await open(std::move(path), O_WRONLY | O_CREAT | O_TRUNC);
     CO_EXPECT(file);
     co_return co_await file->writeAll(std::as_bytes(std::span{content}));

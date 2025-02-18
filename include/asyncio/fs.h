@@ -30,7 +30,7 @@ namespace asyncio::fs {
     task::Task<std::string, std::error_code> readString(std::filesystem::path path);
 
     task::Task<void, std::error_code> write(std::filesystem::path path, std::span<const std::byte> content);
-    task::Task<void, std::error_code> write(std::filesystem::path path, std::string_view content);
+    task::Task<void, std::error_code> write(std::filesystem::path path, std::string content);
 
     task::Task<std::filesystem::path, std::error_code> absolute(std::filesystem::path path);
     task::Task<std::filesystem::path, std::error_code> canonical(std::filesystem::path path);

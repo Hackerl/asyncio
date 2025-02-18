@@ -10,7 +10,7 @@ ASYNC_TEST_CASE("file", "[fs]") {
     REQUIRE(temp);
 
     const auto path = *temp / "asyncio-fs-file";
-    REQUIRE(co_await asyncio::fs::write(path, CONTENT));
+    REQUIRE(co_await asyncio::fs::write(path, std::string{CONTENT}));
 
     auto file = co_await asyncio::fs::open(path, O_RDWR);
     REQUIRE(file);
@@ -53,7 +53,7 @@ ASYNC_TEST_CASE("open file", "[fs]") {
     const auto path = *temp / "asyncio-fs-open-file";
 
     SECTION("read only") {
-        REQUIRE(co_await asyncio::fs::write(path, CONTENT));
+        REQUIRE(co_await asyncio::fs::write(path, std::string{CONTENT}));
 
         auto file = co_await asyncio::fs::open(path, O_RDONLY);
         REQUIRE(file);
@@ -96,7 +96,7 @@ ASYNC_TEST_CASE("open file", "[fs]") {
     }
 
     SECTION("append") {
-        REQUIRE(co_await asyncio::fs::write(path, CONTENT));
+        REQUIRE(co_await asyncio::fs::write(path, std::string{CONTENT}));
 
         auto file = co_await asyncio::fs::open(path, O_WRONLY | O_APPEND);
         REQUIRE(file);
@@ -120,7 +120,7 @@ ASYNC_TEST_CASE("open file", "[fs]") {
     }
 
     SECTION("truncate") {
-        REQUIRE(co_await asyncio::fs::write(path, CONTENT));
+        REQUIRE(co_await asyncio::fs::write(path, std::string{CONTENT}));
 
         auto file = co_await asyncio::fs::open(path, O_RDONLY | O_CREAT | O_TRUNC);
         REQUIRE(file);
@@ -140,7 +140,7 @@ ASYNC_TEST_CASE("open file", "[fs]") {
         }
 
         SECTION("failure") {
-            REQUIRE(co_await asyncio::fs::write(path, CONTENT));
+            REQUIRE(co_await asyncio::fs::write(path, std::string{CONTENT}));
             REQUIRE_ERROR(co_await asyncio::fs::open(path, O_WRONLY | O_CREAT | O_EXCL), std::errc::file_exists);
             REQUIRE(co_await asyncio::fs::remove(path));
         }
@@ -152,7 +152,7 @@ ASYNC_TEST_CASE("seekable file", "[fs]") {
     REQUIRE(temp);
 
     const auto path = *temp / "asyncio-fs-seekable-file";
-    REQUIRE(co_await asyncio::fs::write(path, CONTENT));
+    REQUIRE(co_await asyncio::fs::write(path, std::string{CONTENT}));
 
     auto file = co_await asyncio::fs::open(path, O_RDONLY);
     REQUIRE(file);
@@ -263,7 +263,7 @@ ASYNC_TEST_CASE("write string to file", "[fs]") {
 
     const auto path = *temp / "asyncio-fs-write-string";
 
-    REQUIRE(co_await asyncio::fs::write(path, CONTENT));
+    REQUIRE(co_await asyncio::fs::write(path, std::string{CONTENT}));
     REQUIRE(co_await asyncio::fs::readString(path) == CONTENT);
     REQUIRE(co_await asyncio::fs::remove(path));
 }
