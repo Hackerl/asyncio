@@ -3,66 +3,68 @@
 #include <asyncio/thread.h>
 #include <future>
 
-constexpr auto MAX_COUNT = 100000;
-constexpr auto MESSAGE = "hello world";
+namespace {
+    constexpr auto MAX_COUNT = 100000;
+    constexpr auto MESSAGE = "hello world";
 
-asyncio::task::Task<void, std::error_code>
-produce(asyncio::Sender<std::string> sender, const std::shared_ptr<std::atomic<int>> counter) {
-    while (true) {
-        if (*counter >= MAX_COUNT)
-            co_return {};
+    asyncio::task::Task<void, std::error_code>
+    produce(asyncio::Sender<std::string> sender, const std::shared_ptr<std::atomic<int>> counter) {
+        while (true) {
+            if (*counter >= MAX_COUNT)
+                co_return {};
 
-        CO_EXPECT(co_await sender.send(MESSAGE));
-        ++*counter;
-    }
-}
-
-std::expected<void, std::error_code>
-produceSync(asyncio::Sender<std::string> sender, const std::shared_ptr<std::atomic<int>> &counter) {
-    while (true) {
-        if (*counter >= MAX_COUNT)
-            return {};
-
-        EXPECT(sender.sendSync(MESSAGE));
-        ++*counter;
-    }
-}
-
-asyncio::task::Task<void, std::error_code>
-consume(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::atomic<int>> counter) {
-    while (true) {
-        const auto result = co_await receiver.receive();
-
-        if (!result) {
-            if (result.error() != asyncio::ReceiveError::DISCONNECTED)
-                co_return std::unexpected{result.error()};
-
-            co_return {};
+            CO_EXPECT(co_await sender.send(MESSAGE));
+            ++*counter;
         }
-
-        if (*result != MESSAGE)
-            co_return std::unexpected{make_error_code(std::errc::bad_message)};
-
-        ++*counter;
     }
-}
 
-std::expected<void, std::error_code>
-consumeSync(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::atomic<int>> &counter) {
-    while (true) {
-        const auto result = receiver.receiveSync();
+    std::expected<void, std::error_code>
+    produceSync(asyncio::Sender<std::string> sender, const std::shared_ptr<std::atomic<int>> &counter) {
+        while (true) {
+            if (*counter >= MAX_COUNT)
+                return {};
 
-        if (!result) {
-            if (result.error() != asyncio::ReceiveSyncError::DISCONNECTED)
-                return std::unexpected{result.error()};
-
-            return {};
+            EXPECT(sender.sendSync(MESSAGE));
+            ++*counter;
         }
+    }
 
-        if (*result != MESSAGE)
-            return std::unexpected{make_error_code(std::errc::bad_message)};
+    asyncio::task::Task<void, std::error_code>
+    consume(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::atomic<int>> counter) {
+        while (true) {
+            const auto result = co_await receiver.receive();
 
-        ++*counter;
+            if (!result) {
+                if (result.error() != asyncio::ReceiveError::DISCONNECTED)
+                    co_return std::unexpected{result.error()};
+
+                co_return {};
+            }
+
+            if (*result != MESSAGE)
+                co_return std::unexpected{make_error_code(std::errc::bad_message)};
+
+            ++*counter;
+        }
+    }
+
+    std::expected<void, std::error_code>
+    consumeSync(asyncio::Receiver<std::string> receiver, const std::shared_ptr<std::atomic<int>> &counter) {
+        while (true) {
+            const auto result = receiver.receiveSync();
+
+            if (!result) {
+                if (result.error() != asyncio::ReceiveSyncError::DISCONNECTED)
+                    return std::unexpected{result.error()};
+
+                return {};
+            }
+
+            if (*result != MESSAGE)
+                return std::unexpected{make_error_code(std::errc::bad_message)};
+
+            ++*counter;
+        }
     }
 }
 

@@ -2,40 +2,42 @@
 #include <asyncio/fs.h>
 
 #ifdef _WIN32
-std::expected<void, std::error_code> loadSystemCerts(X509_STORE *store, const std::string &name) {
-    const auto systemStore = CertOpenSystemStoreA(0, name.c_str());
+namespace {
+    std::expected<void, std::error_code> loadSystemCerts(X509_STORE *store, const std::string &name) {
+        const auto systemStore = CertOpenSystemStoreA(0, name.c_str());
 
-    if (!systemStore)
-        return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
+        if (!systemStore)
+            return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
 
-    DEFER(CertCloseStore(systemStore, 0));
+        DEFER(CertCloseStore(systemStore, 0));
 
-    PCCERT_CONTEXT ctx{};
+        PCCERT_CONTEXT ctx{};
 
-    DEFER(
-        if (ctx)
-            CertFreeCertificateContext(ctx);
-    );
-
-    while (true) {
-        ctx = CertEnumCertificatesInStore(systemStore, ctx);
-
-        if (!ctx)
-            return {};
-
-        const auto cert = d2i_X509(
-            nullptr,
-            const_cast<const unsigned char **>(&ctx->pbCertEncoded),
-            static_cast<long>(ctx->cbCertEncoded)
+        DEFER(
+            if (ctx)
+                CertFreeCertificateContext(ctx);
         );
 
-        if (!cert)
-            return std::unexpected{asyncio::net::tls::openSSLError()};
+        while (true) {
+            ctx = CertEnumCertificatesInStore(systemStore, ctx);
 
-        DEFER(X509_free(cert));
-        EXPECT(asyncio::net::tls::expected([&] {
-            return X509_STORE_add_cert(store, cert);
-        }));
+            if (!ctx)
+                return {};
+
+            const auto cert = d2i_X509(
+                nullptr,
+                const_cast<const unsigned char **>(&ctx->pbCertEncoded),
+                static_cast<long>(ctx->cbCertEncoded)
+            );
+
+            if (!cert)
+                return std::unexpected{asyncio::net::tls::openSSLError()};
+
+            DEFER(X509_free(cert));
+            EXPECT(asyncio::net::tls::expected([&] {
+                return X509_STORE_add_cert(store, cert);
+            }));
+        }
     }
 }
 #endif

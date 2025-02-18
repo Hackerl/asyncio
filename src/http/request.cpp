@@ -25,40 +25,42 @@ std::expected<void, std::error_code> expected(F &&f) {
     return {};
 }
 
-std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_t n, void *userdata) {
-    const auto total = size * n;
-    const auto connection = static_cast<asyncio::http::Connection *>(userdata);
+namespace {
+    std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_t n, void *userdata) {
+        const auto total = size * n;
+        const auto connection = static_cast<asyncio::http::Connection *>(userdata);
 
-    if (!connection->transferring) {
-        connection->transferring = true;
-        connection->promise.resolve();
+        if (!connection->transferring) {
+            connection->transferring = true;
+            connection->promise.resolve();
+        }
+
+        if (total == 0)
+            return 0;
+
+        if (!connection->dataPromise)
+            return CURL_WRITEFUNC_PAUSE;
+
+        const auto need = total - connection->skip;
+
+        if (connection->buffer.size() < need) {
+            std::memcpy(
+                connection->buffer.data(),
+                reinterpret_cast<const std::byte *>(buffer) + connection->skip,
+                connection->buffer.size()
+            );
+
+            std::exchange(connection->dataPromise, std::nullopt)->resolve(connection->buffer.size());
+            connection->skip += connection->buffer.size();
+            return CURL_WRITEFUNC_PAUSE;
+        }
+
+        std::memcpy(connection->buffer.data(), reinterpret_cast<const std::byte *>(buffer) + connection->skip, need);
+        std::exchange(connection->dataPromise, std::nullopt)->resolve(need);
+
+        connection->skip = 0;
+        return total;
     }
-
-    if (total == 0)
-        return 0;
-
-    if (!connection->dataPromise)
-        return CURL_WRITEFUNC_PAUSE;
-
-    const auto need = total - connection->skip;
-
-    if (connection->buffer.size() < need) {
-        std::memcpy(
-            connection->buffer.data(),
-            reinterpret_cast<const std::byte *>(buffer) + connection->skip,
-            connection->buffer.size()
-        );
-
-        std::exchange(connection->dataPromise, std::nullopt)->resolve(connection->buffer.size());
-        connection->skip += connection->buffer.size();
-        return CURL_WRITEFUNC_PAUSE;
-    }
-
-    std::memcpy(connection->buffer.data(), reinterpret_cast<const std::byte *>(buffer) + connection->skip, need);
-    std::exchange(connection->dataPromise, std::nullopt)->resolve(need);
-
-    connection->skip = 0;
-    return total;
 }
 
 asyncio::http::Response::Response(Requests *requests, std::unique_ptr<Connection> connection)

@@ -5,58 +5,60 @@
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <regex>
 
-struct People {
-    std::string name;
-    int age{};
+namespace {
+    struct People {
+        std::string name;
+        int age{};
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(People, name, age);
-};
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(People, name, age);
+    };
 
-asyncio::task::Task<std::string, std::error_code> serve(asyncio::net::TCPListener listener) {
-    using namespace std::string_view_literals;
+    asyncio::task::Task<std::string, std::error_code> serve(asyncio::net::TCPListener listener) {
+        using namespace std::string_view_literals;
 
-    auto stream = co_await listener.accept();
-    CO_EXPECT(stream);
+        auto stream = co_await listener.accept();
+        CO_EXPECT(stream);
 
-    std::string rawRequest;
+        std::string rawRequest;
 
-    while (true) {
-        std::array<std::byte, 1024> data{};
-        const auto n = co_await stream->read(data);
-        CO_EXPECT(n);
+        while (true) {
+            std::array<std::byte, 1024> data{};
+            const auto n = co_await stream->read(data);
+            CO_EXPECT(n);
 
-        rawRequest.append(reinterpret_cast<const char *>(data.data()), *n);
+            rawRequest.append(reinterpret_cast<const char *>(data.data()), *n);
 
-        if (rawRequest.contains("\r\n\r\n"))
-            break;
-    }
+            if (rawRequest.contains("\r\n\r\n"))
+                break;
+        }
 
-    std::smatch match;
+        std::smatch match;
 
-    if (std::regex_search(rawRequest, match, std::regex(R"(Content-Length: (\d+))"))) {
-        const auto length = zero::strings::toNumber<std::size_t>(match.str(1));
-        CO_EXPECT(length);
+        if (std::regex_search(rawRequest, match, std::regex(R"(Content-Length: (\d+))"))) {
+            const auto length = zero::strings::toNumber<std::size_t>(match.str(1));
+            CO_EXPECT(length);
 
-        std::vector<std::byte> remain(*length - (rawRequest.size() - rawRequest.find("\r\n\r\n") - 4));
-        CO_EXPECT(co_await stream->readExactly(remain));
+            std::vector<std::byte> remain(*length - (rawRequest.size() - rawRequest.find("\r\n\r\n") - 4));
+            CO_EXPECT(co_await stream->readExactly(remain));
 
-        rawRequest.append(reinterpret_cast<const char *>(remain.data()), remain.size());
-    }
+            rawRequest.append(reinterpret_cast<const char *>(remain.data()), remain.size());
+        }
 
-    CO_EXPECT(co_await stream->writeAll(
-        std::as_bytes(
-            std::span{
+        CO_EXPECT(co_await stream->writeAll(
+            std::as_bytes(
+                std::span{
                 "HTTP/1.1 200 OK\r\n"
                 "Content-Length: 11\r\n"
                 "Content-Type: text/html\r\n"
                 "Server: asyncio\r\n"
                 "Set-Cookie: user=jack\r\n\r\n"
                 "hello world"sv
-            }
-        )
-    ));
+                }
+            )
+        ));
 
-    co_return rawRequest;
+        co_return rawRequest;
+    }
 }
 
 ASYNC_TEST_CASE("requests", "[http]") {

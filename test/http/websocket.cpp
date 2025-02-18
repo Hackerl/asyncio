@@ -12,92 +12,95 @@ constexpr auto MASKING_KEY_LENGTH = 4;
 
 constexpr std::string_view PAYLOAD = "hello world";
 
-class Server {
-public:
-    DEFINE_ERROR_CODE_INNER(
-        Error,
-        "WebsocketServer",
-        NO_KEY_HEADER, "no websocket key header"
-    )
+namespace {
+    class Server {
+    public:
+        DEFINE_ERROR_CODE_INNER(
+            Error,
+            "WebsocketServer",
+            NO_KEY_HEADER, "no websocket key header"
+        )
 
-    explicit Server(asyncio::net::TCPStream stream) : mStream{std::move(stream)} {
-    }
-
-    static asyncio::task::Task<Server, std::error_code> accept(asyncio::net::TCPStream stream) {
-        std::string rawHeader;
-
-        while (true) {
-            std::array<std::byte, 1024> data{};
-            const auto n = co_await stream.read(data);
-            CO_EXPECT(n);
-
-            rawHeader.append(reinterpret_cast<const char *>(data.data()), *n);
-
-            if (rawHeader.ends_with("\r\n\r\n"))
-                break;
+        explicit Server(asyncio::net::TCPStream stream) : mStream{std::move(stream)} {
         }
 
-        std::smatch match;
+        static asyncio::task::Task<Server, std::error_code> accept(asyncio::net::TCPStream stream) {
+            std::string rawHeader;
 
-        if (!std::regex_search(rawHeader, match, std::regex(R"(Sec-WebSocket-Key: (.+))")))
-            co_return std::unexpected{make_error_code(Error::NO_KEY_HEADER)};
+            while (true) {
+                std::array<std::byte, 1024> data{};
+                const auto n = co_await stream.read(data);
+                CO_EXPECT(n);
 
-        std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
-        const auto data = match.str(1) + WS_MAGIC;
+                rawHeader.append(reinterpret_cast<const char *>(data.data()), *n);
 
-        SHA1(
-            reinterpret_cast<const unsigned char *>(data.data()),
-            data.size(),
-            reinterpret_cast<unsigned char *>(digest.data())
-        );
+                if (rawHeader.ends_with("\r\n\r\n"))
+                    break;
+            }
 
-        const auto response = fmt::format(
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Accept: {}\r\n\r\n",
-            zero::encoding::base64::encode(digest)
-        );
+            std::smatch match;
 
-        CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{response})));
-        co_return Server{std::move(stream)};
-    }
+            if (!std::regex_search(rawHeader, match, std::regex(R"(Sec-WebSocket-Key: (.+))")))
+                co_return std::unexpected{make_error_code(Error::NO_KEY_HEADER)};
 
-    asyncio::task::Task<std::pair<asyncio::http::ws::Opcode, std::vector<std::byte>>, std::error_code> readMessage() {
-        asyncio::http::ws::Header header;
+            std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
+            const auto data = match.str(1) + WS_MAGIC;
 
-        CO_EXPECT(co_await mStream.readExactly({reinterpret_cast<std::byte *>(&header), sizeof(header)}));
+            SHA1(
+                reinterpret_cast<const unsigned char *>(data.data()),
+                data.size(),
+                reinterpret_cast<unsigned char *>(digest.data())
+            );
 
-        std::array<std::byte, MASKING_KEY_LENGTH> key{};
-        CO_EXPECT(co_await mStream.readExactly(std::as_writable_bytes(std::span{key})));
+            const auto response = fmt::format(
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Accept: {}\r\n\r\n",
+                zero::encoding::base64::encode(digest)
+            );
 
-        const auto length = header.length();
-        std::vector<std::byte> payload(length);
+            CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{response})));
+            co_return Server{std::move(stream)};
+        }
 
-        CO_EXPECT(co_await mStream.readExactly(payload));
+        asyncio::task::Task<std::pair<asyncio::http::ws::Opcode, std::vector<std::byte>>, std::error_code>
+        readMessage() {
+            asyncio::http::ws::Header header;
 
-        for (std::size_t i{0}; i < length; ++i)
-            payload[i] ^= key[i % 4];
+            CO_EXPECT(co_await mStream.readExactly({reinterpret_cast<std::byte *>(&header), sizeof(header)}));
 
-        co_return std::pair{header.opcode(), std::move(payload)};
-    }
+            std::array<std::byte, MASKING_KEY_LENGTH> key{};
+            CO_EXPECT(co_await mStream.readExactly(std::as_writable_bytes(std::span{key})));
 
-    asyncio::task::Task<void, std::error_code>
-    writeMessage(const asyncio::http::ws::Opcode opcode, std::span<const std::byte> payload) {
-        asyncio::http::ws::Header header;
+            const auto length = header.length();
+            std::vector<std::byte> payload(length);
 
-        header.final(true);
-        header.mask(false);
-        header.opcode(opcode);
-        header.length(payload.size());
+            CO_EXPECT(co_await mStream.readExactly(payload));
 
-        CO_EXPECT(co_await mStream.writeAll({reinterpret_cast<const std::byte *>(&header), sizeof(header)}));
-        co_return co_await mStream.writeAll(payload);
-    }
+            for (std::size_t i{0}; i < length; ++i)
+                payload[i] ^= key[i % 4];
 
-private:
-    asyncio::net::TCPStream mStream;
-};
+            co_return std::pair{header.opcode(), std::move(payload)};
+        }
+
+        asyncio::task::Task<void, std::error_code>
+        writeMessage(const asyncio::http::ws::Opcode opcode, std::span<const std::byte> payload) {
+            asyncio::http::ws::Header header;
+
+            header.final(true);
+            header.mask(false);
+            header.opcode(opcode);
+            header.length(payload.size());
+
+            CO_EXPECT(co_await mStream.writeAll({reinterpret_cast<const std::byte *>(&header), sizeof(header)}));
+            co_return co_await mStream.writeAll(payload);
+        }
+
+    private:
+        asyncio::net::TCPStream mStream;
+    };
+}
 
 DECLARE_ERROR_CODE(Server::Error)
 
