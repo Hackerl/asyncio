@@ -335,6 +335,14 @@ asyncio::http::URL &asyncio::http::URL::append(const std::string &subPath) {
     return *this;
 }
 
+std::strong_ordering asyncio::http::operator<=>(const URL &lhs, const URL &rhs) {
+    return lhs.string() <=> rhs.string();
+}
+
+bool asyncio::http::operator==(const URL &lhs, const URL &rhs) {
+    return lhs.string() == rhs.string();
+}
+
 template<>
 std::expected<asyncio::http::URL, std::error_code> zero::scan(const std::string_view input) {
     return asyncio::http::URL::from({input.begin(), input.end()});

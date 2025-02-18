@@ -76,6 +76,9 @@ namespace asyncio::http {
     private:
         std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> mURL;
     };
+
+    std::strong_ordering operator<=>(const URL &lhs, const URL &rhs);
+    bool operator==(const URL &lhs, const URL &rhs);
 }
 
 DECLARE_ERROR_CODE(asyncio::http::URL::Error)

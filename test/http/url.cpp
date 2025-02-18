@@ -242,3 +242,38 @@ TEST_CASE("URL", "[http]") {
         REQUIRE(url->string() == "http://root:123456@localhost:8080/login?name=rose#page=1");
     }
 }
+
+TEST_CASE("URL comparison") {
+    SECTION("equal") {
+        const auto url = asyncio::http::URL::from("http://localhost:8080");
+        REQUIRE(url);
+        REQUIRE(*url == *url);
+    }
+
+    SECTION("not equal") {
+        const auto url1 = asyncio::http::URL::from("http://localhost:8080");
+        REQUIRE(url1);
+
+        const auto url2 = asyncio::http::URL::from("http://localhost:8081");
+        REQUIRE(url2);
+        REQUIRE(*url1 != *url2);
+    }
+
+    SECTION("less") {
+        const auto url1 = asyncio::http::URL::from("http://localhost:8080");
+        REQUIRE(url1);
+
+        const auto url2 = asyncio::http::URL::from("http://localhost:8081");
+        REQUIRE(url2);
+        REQUIRE(*url1 < *url2);
+    }
+
+    SECTION("greater") {
+        const auto url1 = asyncio::http::URL::from("http://localhost:8080");
+        REQUIRE(url1);
+
+        const auto url2 = asyncio::http::URL::from("http://localhost:8081");
+        REQUIRE(url2);
+        REQUIRE(*url2 > *url1);
+    }
+}
