@@ -68,6 +68,9 @@ namespace asyncio {
             std::vector<std::byte> data;
 
             while (true) {
+                if (co_await task::cancelled)
+                    co_return std::unexpected{task::Error::CANCELLED};
+
                 const auto first = mBuffer.get() + mHead;
                 const auto last = mBuffer.get() + mTail;
 
@@ -104,6 +107,9 @@ namespace asyncio {
                 }
 
                 while (mTail < data.size()) {
+                    if (co_await task::cancelled)
+                        co_return std::unexpected{task::Error::CANCELLED};
+
                     const auto n = co_await std::invoke(
                         &IReader::read,
                         mReader,
@@ -151,6 +157,13 @@ namespace asyncio {
 
             while (n < data.size()) {
                 assert(mPending <= mCapacity);
+
+                if (co_await task::cancelled) {
+                    if (n > 0)
+                        break;
+
+                    co_return std::unexpected{task::Error::CANCELLED};
+                }
 
                 if (mPending == mCapacity) {
                     if (const auto result = co_await flush(); !result) {

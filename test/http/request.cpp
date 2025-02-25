@@ -32,9 +32,7 @@ namespace {
                 break;
         }
 
-        std::smatch match;
-
-        if (std::regex_search(rawRequest, match, std::regex(R"(Content-Length: (\d+))"))) {
+        if (std::smatch match; std::regex_search(rawRequest, match, std::regex(R"(Content-Length: (\d+))"))) {
             const auto length = zero::strings::toNumber<std::size_t>(match.str(1));
             CO_EXPECT(length);
 

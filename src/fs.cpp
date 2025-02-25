@@ -70,7 +70,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const 
 }
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const std::span<const std::byte> data) {
-    Promise<std::size_t, std::error_code> promise(mEventLoop);
+    Promise<std::size_t, std::error_code> promise{mEventLoop};
     uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {
@@ -104,7 +104,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
-    Promise<void, std::error_code> promise(mEventLoop);
+    Promise<void, std::error_code> promise{mEventLoop};
     uv_fs_t request{.data = &promise};
 
     CO_EXPECT(uv::expected([&] {

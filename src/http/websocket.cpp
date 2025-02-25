@@ -124,9 +124,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
     std::uniform_int_distribution dist{0, 255};
 
     std::array<std::byte, 16> secret{};
-
-    for (auto &b: secret)
-        b = static_cast<std::byte>(dist(gen));
+    std::ranges::generate(secret, [&] { return static_cast<std::byte>(dist(gen)); });
 
     const auto key = zero::encoding::base64::encode(secret);
     const auto path = url.path();
@@ -304,9 +302,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     std::uniform_int_distribution dist{0, 255};
 
     std::array<std::byte, MASKING_KEY_LENGTH> key{};
-
-    for (auto &b: key)
-        b = static_cast<std::byte>(dist(gen));
+    std::ranges::generate(key, [&] { return static_cast<std::byte>(dist(gen)); });
 
     CO_EXPECT(co_await mWriter->writeAll(key));
 
