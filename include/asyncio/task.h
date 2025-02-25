@@ -368,11 +368,16 @@ namespace asyncio::task {
 
     class TaskGroup {
     public:
+        [[nodiscard]] bool cancelled() const;
+
         std::expected<void, std::error_code> cancel();
 
         template<typename T>
             requires zero::detail::is_specialization_v<std::remove_cvref_t<T>, Task>
         void add(T &&task) {
+            if (mCancelled)
+                std::ignore = task.cancel();
+
             auto frame = task.mFrame;
             mFrames.push_back(frame);
 
@@ -390,6 +395,7 @@ namespace asyncio::task {
         }
 
     private:
+        bool mCancelled{false};
         std::list<std::shared_ptr<Frame>> mFrames;
         std::optional<asyncio::Promise<void, std::exception_ptr>> mPromise;
 

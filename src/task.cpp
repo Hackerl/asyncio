@@ -99,7 +99,13 @@ std::string asyncio::task::Frame::trace() const {
     return to_string(fmt::join(frames, "\n"));
 }
 
+bool asyncio::task::TaskGroup::cancelled() const {
+    return mCancelled;
+}
+
 std::expected<void, std::error_code> asyncio::task::TaskGroup::cancel() {
+    mCancelled = true;
+
     const auto errors = mFrames
         | std::views::filter([](const auto &frame) {
             return !frame->finished;
