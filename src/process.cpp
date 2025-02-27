@@ -277,6 +277,16 @@ asyncio::process::Command &asyncio::process::Command::removeEnv(const std::strin
     return *this;
 }
 
+asyncio::process::Command &asyncio::process::Command::inheritedResource(const Resource resource) {
+    mCommand.inheritedResource(resource);
+    return *this;
+}
+
+asyncio::process::Command &asyncio::process::Command::inheritedResources(std::vector<Resource> resource) {
+    mCommand.inheritedResources(std::move(resource));
+    return *this;
+}
+
 asyncio::process::Command &asyncio::process::Command::stdInput(const StdioType type) {
     mCommand.stdInput(type);
     return *this;
@@ -306,6 +316,10 @@ const std::optional<std::filesystem::path> &asyncio::process::Command::currentDi
 
 const std::map<std::string, std::optional<std::string>> &asyncio::process::Command::envs() const {
     return mCommand.envs();
+}
+
+const std::vector<asyncio::process::Command::Resource> &asyncio::process::Command::inheritedResources() const {
+    return mCommand.inheritedResources();
 }
 
 std::expected<asyncio::process::ChildProcess, std::error_code> asyncio::process::Command::spawn() const {

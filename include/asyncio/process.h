@@ -54,6 +54,7 @@ namespace asyncio::process {
 
     class Command {
     public:
+        using Resource = zero::os::process::Command::Resource;
         using StdioType = zero::os::process::Command::StdioType;
 
         explicit Command(std::filesystem::path path);
@@ -68,6 +69,8 @@ namespace asyncio::process {
         Command &currentDirectory(std::filesystem::path path);
         Command &env(std::string key, std::string value);
         Command &envs(std::map<std::string, std::string> envs);
+        Command &inheritedResource(Resource resource);
+        Command &inheritedResources(std::vector<Resource> resource);
         Command &clearEnv();
         Command &removeEnv(const std::string &key);
         Command &stdInput(StdioType type);
@@ -78,6 +81,7 @@ namespace asyncio::process {
         [[nodiscard]] const std::vector<std::string> &args() const;
         [[nodiscard]] const std::optional<std::filesystem::path> &currentDirectory() const;
         [[nodiscard]] const std::map<std::string, std::optional<std::string>> &envs() const;
+        [[nodiscard]] const std::vector<Resource> &inheritedResources() const;
 
         [[nodiscard]] std::expected<ChildProcess, std::error_code> spawn() const;
         [[nodiscard]] task::Task<ExitStatus, std::error_code> status() const;
