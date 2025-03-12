@@ -11,7 +11,7 @@ namespace asyncio {
         UNEXPECTED_EOF, "unexpected end of file", IOError::UNEXPECTED_EOF
     )
 
-    template<Trait<IReader> T>
+    template<zero::detail::Trait<IReader> T>
     class BufReader final : public IBufReader {
         static constexpr auto DEFAULT_BUFFER_CAPACITY = 8192;
 
@@ -58,7 +58,7 @@ namespace asyncio {
             auto data = co_await readUntil(std::byte{'\n'});
             CO_EXPECT(data);
 
-            if (data->back() == std::byte{'\r'})
+            if (!data->empty() && data->back() == std::byte{'\r'})
                 data->pop_back();
 
             co_return std::string{reinterpret_cast<const char *>(data->data()), data->size()};
@@ -137,7 +137,7 @@ namespace asyncio {
         std::unique_ptr<std::byte[]> mBuffer;
     };
 
-    template<Trait<IWriter> T>
+    template<zero::detail::Trait<IWriter> T>
     class BufWriter final : public IBufWriter {
         static constexpr auto DEFAULT_BUFFER_CAPACITY = 8192;
 
@@ -147,43 +147,54 @@ namespace asyncio {
               mBuffer{std::make_unique<std::byte[]>(capacity)} {
         }
 
+    private:
+        task::Task<std::size_t, std::error_code> writeOnce(const std::span<const std::byte> data) {
+            assert(mPending <= mCapacity);
+
+            if (mPending == mCapacity) {
+                CO_EXPECT(co_await flush());
+            }
+
+            const auto size = (std::min)(mCapacity - mPending, data.size());
+            std::copy_n(data.begin(), size, mBuffer.get() + mPending);
+
+            mPending += size;
+            co_return size;
+        }
+
+    public:
         [[nodiscard]] std::size_t capacity() const {
             return mCapacity;
         }
 
         task::Task<std::size_t, std::error_code>
         write(const std::span<const std::byte> data) override {
-            std::size_t n{0};
+            std::size_t offset{0};
 
-            while (n < data.size()) {
+            while (offset < data.size()) {
                 assert(mPending <= mCapacity);
 
                 if (co_await task::cancelled) {
-                    if (n > 0)
+                    if (offset > 0)
                         break;
 
                     co_return std::unexpected{task::Error::CANCELLED};
                 }
 
-                if (mPending == mCapacity) {
-                    if (const auto result = co_await flush(); !result) {
-                        if (n > 0)
-                            break;
+                const auto n = co_await writeOnce(data.subspan(offset));
 
-                        co_return std::unexpected{result.error()};
-                    }
+                if (!n) {
+                    if (offset > 0)
+                        break;
 
-                    continue;
+                    co_return std::unexpected{n.error()};
                 }
 
-                const auto size = (std::min)(mCapacity - mPending, data.size() - n);
-                std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(n), size, mBuffer.get() + mPending);
-
-                mPending += size;
-                n += size;
+                assert(*n != 0);
+                offset += *n;
             }
 
-            co_return n;
+            co_return offset;
         }
 
         [[nodiscard]] std::size_t pending() const override {

@@ -104,7 +104,11 @@ namespace asyncio::net::tls {
     )
 
     template<typename T>
-        requires (Trait<T, IReader> && Trait<T, IWriter> && Trait<T, ICloseable>)
+        requires (
+            zero::detail::Trait<T, IReader> &&
+            zero::detail::Trait<T, IWriter> &&
+            zero::detail::Trait<T, ICloseable>
+        )
     class TLS final : public IReader, public IWriter, public ICloseable {
     public:
         TLS(T stream, std::unique_ptr<SSL, decltype(&SSL_free)> ssl)
@@ -286,7 +290,11 @@ namespace asyncio::net::tls {
     };
 
     template<typename T>
-        requires (Trait<T, IReader> && Trait<T, IWriter> && Trait<T, ICloseable>)
+        requires (
+            zero::detail::Trait<T, IReader> &&
+            zero::detail::Trait<T, IWriter> &&
+            zero::detail::Trait<T, ICloseable>
+        )
     task::Task<TLS<T>, std::error_code> connect(
         T stream,
         const Context context,
@@ -325,7 +333,11 @@ namespace asyncio::net::tls {
     }
 
     template<typename T>
-        requires (Trait<T, IReader> && Trait<T, IWriter> && Trait<T, ICloseable>)
+        requires (
+            zero::detail::Trait<T, IReader> &&
+            zero::detail::Trait<T, IWriter> &&
+            zero::detail::Trait<T, ICloseable>
+        )
     task::Task<TLS<T>, std::error_code> accept(T stream, const Context context) {
         std::unique_ptr<SSL, decltype(&SSL_free)> ssl{SSL_new(context.get()), SSL_free};
 

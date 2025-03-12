@@ -3,16 +3,9 @@
 
 #include "task.h"
 #include <span>
-#include <chrono>
 #include <zero/interface.h>
 
 namespace asyncio {
-    template<typename T, typename I>
-    concept Trait = std::is_convertible_v<std::remove_cvref_t<T>, std::shared_ptr<I>> || (
-        std::derived_from<std::remove_cvref_t<T>, std::remove_const_t<I>> &&
-        std::is_convertible_v<std::add_lvalue_reference_t<T>, I &>
-    );
-
     DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
@@ -78,7 +71,8 @@ namespace asyncio {
         virtual task::Task<void, std::error_code> flush() = 0;
     };
 
-    task::Task<std::size_t, std::error_code> copy(Trait<IReader> auto &reader, Trait<IWriter> auto &writer) {
+    task::Task<std::size_t, std::error_code>
+    copy(zero::detail::Trait<IReader> auto &reader, zero::detail::Trait<IWriter> auto &writer) {
         std::size_t written{0};
 
         while (true) {
