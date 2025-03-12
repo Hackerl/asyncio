@@ -1,33 +1,28 @@
 #include "catch_extensions.h"
 #include <asyncio/binary.h>
-#include <catch2/generators/catch_generators_all.hpp>
 
-template<typename T>
-asyncio::task::Task<void> transfer() {
-    const auto i = GENERATE(take(100, random(std::numeric_limits<T>::min(), std::numeric_limits<T>::max())));
+ASYNC_TEMPLATE_TEST_CASE(
+    "binary transfer",
+    "[binary]",
+    std::int16_t, std::uint16_t, std::int32_t, std::uint32_t, std::int64_t, std::uint64_t
+) {
+    const auto input = GENERATE(
+        take(100, random((std::numeric_limits<TestType>::min)(), (std::numeric_limits<TestType>::max)()))
+    );
 
     SECTION("little endian") {
         asyncio::BytesWriter writer;
-        REQUIRE(co_await asyncio::binary::writeLE(writer, i));
+        REQUIRE(co_await asyncio::binary::writeLE(writer, input));
 
         asyncio::BytesReader reader{*std::move(writer)};
-        REQUIRE(co_await asyncio::binary::readLE<T>(reader) == i);
+        REQUIRE(co_await asyncio::binary::readLE<TestType>(reader) == input);
     }
 
     SECTION("big endian") {
         asyncio::BytesWriter writer;
-        REQUIRE(co_await asyncio::binary::writeBE(writer, i));
+        REQUIRE(co_await asyncio::binary::writeBE(writer, input));
 
         asyncio::BytesReader reader{*std::move(writer)};
-        REQUIRE(co_await asyncio::binary::readBE<T>(reader) == i);
+        REQUIRE(co_await asyncio::binary::readBE<TestType>(reader) == input);
     }
-}
-
-ASYNC_TEST_CASE("binary transfer", "[binary]") {
-    co_await transfer<std::int16_t>();
-    co_await transfer<std::uint16_t>();
-    co_await transfer<std::int32_t>();
-    co_await transfer<std::uint32_t>();
-    co_await transfer<std::int64_t>();
-    co_await transfer<std::uint64_t>();
 }

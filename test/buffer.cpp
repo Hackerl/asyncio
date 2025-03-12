@@ -2,100 +2,154 @@
 #include <asyncio/buffer.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
-constexpr auto BUFFER_CAPACITY = 16;
-constexpr std::string_view MESSAGE = "hello world\r\n";
-
 ASYNC_TEST_CASE("buffer reader", "[buffer]") {
-    static_assert(MESSAGE.size() < BUFFER_CAPACITY);
-    asyncio::BufReader reader{asyncio::StringReader{std::string{MESSAGE}}, BUFFER_CAPACITY};
+    const auto input = GENERATE(take(10, randomBytes(1, 10240)));
+    const auto capacity = GENERATE(1uz, take(1, random(2uz, 10240uz)));
 
     SECTION("capacity") {
-        REQUIRE(reader.capacity() == BUFFER_CAPACITY);
+        asyncio::BufReader reader{asyncio::BytesReader{input}, capacity};
+        REQUIRE(reader.capacity() == capacity);
     }
 
     SECTION("available") {
-        REQUIRE(reader.available() == 0);
+        asyncio::BufReader reader{asyncio::BytesReader{input}, capacity};
+
+        SECTION("empty") {
+            REQUIRE(reader.available() == 0);
+        }
+
+        SECTION("not empty") {
+            std::vector<std::byte> data;
+            REQUIRE(co_await reader.read(data) == 0);
+            REQUIRE(reader.available() == (std::min)(input.size(), capacity));
+        }
     }
 
     SECTION("read") {
-        static_assert(MESSAGE.size() > 6);
+        asyncio::BufReader reader{asyncio::BytesReader{input}, capacity};
 
-        std::string message;
-        message.resize(6);
+        SECTION("normal") {
+            const auto size = GENERATE_REF(take(1, random(1uz, input.size() * 2)));
 
-        REQUIRE(co_await reader.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE.substr(0, 6));
-        REQUIRE(reader.available() == MESSAGE.size() - 6);
+            std::vector<std::byte> data;
+            data.resize(size);
 
-        message.resize(MESSAGE.size() - 6);
-        REQUIRE(co_await reader.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE.substr(6));
-        REQUIRE(reader.available() == 0);
-    }
+            const auto n = co_await reader.read(data);
+            REQUIRE(n == (std::min)(size, input.size()));
 
-    SECTION("read line") {
-        REQUIRE(co_await reader.readLine() == MESSAGE.substr(0, MESSAGE.size() - 2));
-    }
+            data.resize(*n);
+            REQUIRE_THAT(data, Catch::Matchers::RangeEquals(std::span{input.data(), *n}));
+        }
 
-    SECTION("read until") {
-        const auto data = co_await reader.readUntil(std::byte{'\r'});
-        REQUIRE(data);
-        REQUIRE_THAT(
-            *data,
-            Catch::Matchers::RangeEquals(std::as_bytes(std::span{MESSAGE.substr(0, MESSAGE.size() - 2)}))
-        );
+        SECTION("eof") {
+            REQUIRE(co_await reader.readAll());
+            std::array<std::byte, 64> data{};
+            REQUIRE(co_await reader.read(data) == 0);
+        }
     }
 
     SECTION("peek") {
+        asyncio::BufReader reader{asyncio::BytesReader{input}, capacity};
+
         SECTION("normal") {
-            static_assert(MESSAGE.size() > 6);
+            const auto limit = (std::min)(input.size(), capacity);
+            const auto size = GENERATE_REF(take(1, random(1uz, limit)));
 
-            std::string message;
-            message.resize(6);
+            std::vector<std::byte> data;
+            data.resize(size);
 
-            REQUIRE(co_await reader.peek(std::as_writable_bytes(std::span{message})));
-            REQUIRE(message == MESSAGE.substr(0, 6));
-            REQUIRE(reader.available() == MESSAGE.size());
+            REQUIRE(co_await reader.peek(data));
+            REQUIRE_THAT(data, Catch::Matchers::RangeEquals(std::span{input.data(), size}));
+            REQUIRE(reader.available() == limit);
         }
 
         SECTION("invalid argument") {
-            std::array<std::byte, 1024> data{};
+            const auto size = GENERATE_REF(take(1, random(capacity + 1, capacity * 2)));
+
+            std::vector<std::byte> data;
+            data.resize(size);
             REQUIRE_ERROR(co_await reader.peek(data), std::errc::invalid_argument);
+        }
+    }
+
+    auto inputString = GENERATE(take(10, randomAlphanumericString(1, 10240)));
+
+    SECTION("read line") {
+        SECTION("normal") {
+            const auto pos = GENERATE_REF(take(1, random(0uz, inputString.size() - 1)));
+
+            SECTION("CRLF") {
+                inputString.insert(inputString.begin() + static_cast<std::ptrdiff_t>(pos), '\r');
+                inputString.insert(inputString.begin() + static_cast<std::ptrdiff_t>(pos) + 1, '\n');
+            }
+
+            SECTION("LF") {
+                inputString.insert(inputString.begin() + static_cast<std::ptrdiff_t>(pos), '\n');
+            }
+
+            asyncio::BufReader reader{asyncio::StringReader{inputString}, capacity};
+            REQUIRE(co_await reader.readLine() == inputString.substr(0, pos));
+        }
+
+        SECTION("unexpected eof") {
+            asyncio::BufReader reader{asyncio::StringReader{inputString}, capacity};
+            REQUIRE_ERROR(co_await reader.readLine(), asyncio::IOError::UNEXPECTED_EOF);
+        }
+    }
+
+    SECTION("read until") {
+        const auto c = GENERATE('\t', '\n', '\r', '\x0b', '\x0c');
+
+        SECTION("normal") {
+            const auto pos = GENERATE_REF(take(1, random(0uz, inputString.size() - 1)));
+
+            inputString.insert(inputString.begin() + static_cast<std::ptrdiff_t>(pos), c);
+            asyncio::BufReader reader{asyncio::StringReader{inputString}, capacity};
+
+            const auto data = co_await reader.readUntil(static_cast<std::byte>(c));
+            REQUIRE(data);
+            REQUIRE_THAT(*data, Catch::Matchers::RangeEquals(std::as_bytes(std::span{inputString.data(), pos})));
+        }
+
+        SECTION("unexpected eof") {
+            asyncio::BufReader reader{asyncio::StringReader{inputString}, capacity};
+            REQUIRE_ERROR(co_await reader.readUntil(static_cast<std::byte>(c)), asyncio::IOError::UNEXPECTED_EOF);
         }
     }
 }
 
 ASYNC_TEST_CASE("buffer writer", "[buffer]") {
-    static_assert(MESSAGE.size() < BUFFER_CAPACITY);
+    const auto input = GENERATE(take(10, randomBytes(1, 10240)));
+    const auto capacity = GENERATE(1uz, take(1, random(2uz, 10240uz)));
 
-    const auto stringWriter = std::make_shared<asyncio::StringWriter>();
-    asyncio::BufWriter writer{stringWriter, BUFFER_CAPACITY};
+    const auto bytesWriter = std::make_shared<asyncio::BytesWriter>();
+    asyncio::BufWriter writer{bytesWriter, capacity};
 
     SECTION("capacity") {
-        REQUIRE(writer.capacity() == BUFFER_CAPACITY);
+        REQUIRE(writer.capacity() == capacity);
     }
 
     SECTION("pending") {
-        REQUIRE(writer.pending() == 0);
+        SECTION("empty") {
+            REQUIRE(writer.pending() == 0);
+        }
+
+        SECTION("not empty") {
+            REQUIRE(co_await writer.writeAll(input));
+            REQUIRE(writer.pending() > 0);
+        }
     }
 
     SECTION("write") {
-        REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{MESSAGE})));
-        REQUIRE(writer.pending() == MESSAGE.size());
-        REQUIRE(stringWriter->data().empty());
-
-        REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{MESSAGE})));
-        REQUIRE(writer.pending() == MESSAGE.size() * 2 - BUFFER_CAPACITY);
-        REQUIRE(stringWriter->data().size() == BUFFER_CAPACITY);
-        REQUIRE(stringWriter->data().substr(0, MESSAGE.size()) == MESSAGE);
-        REQUIRE(stringWriter->data().substr(MESSAGE.size()) == MESSAGE.substr(0, BUFFER_CAPACITY - MESSAGE.size()));
+        REQUIRE(co_await writer.write(input) == input.size());
+        REQUIRE(writer.pending() > 0);
     }
 
     SECTION("flush") {
-        REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{MESSAGE})));
+        REQUIRE(co_await writer.writeAll(input));
         REQUIRE(co_await writer.flush());
         REQUIRE(writer.pending() == 0);
-        REQUIRE(stringWriter->data() == MESSAGE);
+        REQUIRE_THAT(bytesWriter->data(), Catch::Matchers::RangeEquals(input));
     }
 }
 
