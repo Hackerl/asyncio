@@ -54,7 +54,6 @@ namespace asyncio::process {
 
     class Command {
     public:
-        using Resource = zero::os::process::Command::Resource;
         using StdioType = zero::os::process::Command::StdioType;
 
         explicit Command(std::filesystem::path path);
@@ -64,24 +63,77 @@ namespace asyncio::process {
         spawn(const std::array<StdioType, 3> &defaultTypes) const;
 
     public:
-        Command &arg(std::string arg);
-        Command &args(std::vector<std::string> args);
-        Command &currentDirectory(std::filesystem::path path);
-        Command &env(std::string key, std::string value);
-        Command &envs(std::map<std::string, std::string> envs);
-        Command &inheritedResource(Resource resource);
-        Command &inheritedResources(std::vector<Resource> resource);
-        Command &clearEnv();
-        Command &removeEnv(const std::string &key);
-        Command &stdInput(StdioType type);
-        Command &stdOutput(StdioType type);
-        Command &stdError(StdioType type);
+        template<typename Self>
+        Self &&arg(this Self &&self, std::string arg) {
+            self.mCommand.arg(std::move(arg));
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&args(this Self &&self, std::vector<std::string> args) {
+            self.mCommand.args(std::move(args));
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&currentDirectory(this Self &&self, std::filesystem::path path) {
+            self.mCommand.currentDirectory(std::move(path));
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&env(this Self &&self, std::string key, std::string value) {
+            self.mCommand.env(std::move(key), std::move(value));
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&envs(this Self &&self, std::map<std::string, std::string> envs) {
+            self.mCommand.envs(std::move(envs));
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&clearEnv(this Self &&self) {
+            self.mCommand.clearEnv();
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&inheritedResource(this Self &&self, zero::os::Resource resource) {
+            self.mCommand.inheritedResource(std::move(resource));
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&inheritedResources(this Self &&self, std::vector<zero::os::Resource> resource) {
+            self.mCommand.inheritedResources(std::move(resource));
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&stdInput(this Self &&self, StdioType type) {
+            self.mCommand.stdInput(type);
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&stdOutput(this Self &&self, StdioType type) {
+            self.mCommand.stdOutput(type);
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&stdError(this Self &&self, StdioType type) {
+            self.mCommand.stdError(type);
+            return std::forward<Self>(self);
+        }
 
         [[nodiscard]] const std::filesystem::path &program() const;
         [[nodiscard]] const std::vector<std::string> &args() const;
         [[nodiscard]] const std::optional<std::filesystem::path> &currentDirectory() const;
         [[nodiscard]] const std::map<std::string, std::optional<std::string>> &envs() const;
-        [[nodiscard]] const std::vector<Resource> &inheritedResources() const;
+        [[nodiscard]] const std::vector<zero::os::Resource> &inheritedResources() const;
 
         [[nodiscard]] std::expected<ChildProcess, std::error_code> spawn() const;
         [[nodiscard]] task::Task<ExitStatus, std::error_code> status() const;

@@ -38,7 +38,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
     co_return co_await toThread(
         [&]() -> std::expected<ExitStatus, std::error_code> {
             const auto &impl = this->impl();
-            const std::array handles{impl.handle(), event};
+            const std::array handles{*impl.handle(), event};
 
             const auto result = WaitForMultipleObjects(handles.size(), handles.data(), false, INFINITE);
 
@@ -136,18 +136,13 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     auto pc = zero::os::process::PseudoConsole::make(rows, columns);
     EXPECT(pc);
 
-    auto &file = pc->file();
+    auto &resource = pc->master();
 
     const auto fd = uv::expected([&] {
-        return uv_open_osfhandle(file);
+        return uv_open_osfhandle(resource.fd());
     });
     EXPECT(fd);
-
-#ifdef _WIN32
-    file = nullptr;
-#else
-    file = -1;
-#endif
+    std::ignore = resource.release();
 
     auto pipe = asyncio::Pipe::from(*fd);
 
@@ -206,31 +201,31 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
     };
 
     for (int i{0}; i < 3; ++i) {
-        auto &fd = (*child.*memberPointers[i])();
+        auto &resource = (*child.*memberPointers[i])();
 
-        if (!fd)
+        if (!resource)
             continue;
 
-        const auto file = uv::expected([&] {
-            return uv_open_osfhandle(*fd);
+        const auto fd = uv::expected([&] {
+            return uv_open_osfhandle(resource->fd());
         });
 
-        if (!file) {
+        if (!fd) {
             std::ignore = child->kill();
             std::ignore = child->wait();
-            return std::unexpected{file.error()};
+            return std::unexpected{fd.error()};
         }
 
-        fd.reset();
+        std::ignore = resource->release();
 
-        auto pipe = Pipe::from(*file);
+        auto pipe = Pipe::from(*fd);
 
         if (!pipe) {
             std::ignore = child->kill();
             std::ignore = child->wait();
 
             uv_fs_t request{};
-            uv_fs_close(nullptr, &request, *file, nullptr);
+            uv_fs_close(nullptr, &request, *fd, nullptr);
             uv_fs_req_cleanup(&request);
 
             return std::unexpected{pipe.error()};
@@ -240,66 +235,6 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
     }
 
     return ChildProcess{zero::os::process::Process{std::move(child->impl())}, std::move(stdio)};
-}
-
-asyncio::process::Command &asyncio::process::Command::arg(std::string arg) {
-    mCommand.arg(std::move(arg));
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::args(std::vector<std::string> args) {
-    mCommand.args(std::move(args));
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::currentDirectory(std::filesystem::path path) {
-    mCommand.currentDirectory(std::move(path));
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::env(std::string key, std::string value) {
-    mCommand.env(std::move(key), std::move(value));
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::envs(std::map<std::string, std::string> envs) {
-    mCommand.envs(std::move(envs));
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::clearEnv() {
-    mCommand.clearEnv();
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::removeEnv(const std::string &key) {
-    mCommand.removeEnv(key);
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::inheritedResource(const Resource resource) {
-    mCommand.inheritedResource(resource);
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::inheritedResources(std::vector<Resource> resource) {
-    mCommand.inheritedResources(std::move(resource));
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::stdInput(const StdioType type) {
-    mCommand.stdInput(type);
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::stdOutput(const StdioType type) {
-    mCommand.stdOutput(type);
-    return *this;
-}
-
-asyncio::process::Command &asyncio::process::Command::stdError(const StdioType type) {
-    mCommand.stdError(type);
-    return *this;
 }
 
 const std::filesystem::path &asyncio::process::Command::program() const {
@@ -318,7 +253,7 @@ const std::map<std::string, std::optional<std::string>> &asyncio::process::Comma
     return mCommand.envs();
 }
 
-const std::vector<asyncio::process::Command::Resource> &asyncio::process::Command::inheritedResources() const {
+const std::vector<zero::os::Resource> &asyncio::process::Command::inheritedResources() const {
     return mCommand.inheritedResources();
 }
 
