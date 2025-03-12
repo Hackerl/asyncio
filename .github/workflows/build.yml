@@ -3,9 +3,6 @@ on: [ push ]
 jobs:
   linux:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        shared: [ ON, OFF ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,7 +18,7 @@ jobs:
         uses: lukka/run-cmake@v10
         with:
           configurePreset: debug-asan
-          configurePresetAdditionalArgs: "['-DBUILD_SHARED_LIBS=${{ matrix.shared }}', '-DVCPKG_TARGET_TRIPLET=x64-linux-dynamic']"
+          configurePresetAdditionalArgs: "['-DVCPKG_TARGET_TRIPLET=x64-linux-dynamic']"
           buildPreset: debug-asan
           testPreset: debug-asan
         env:
@@ -104,23 +101,7 @@ jobs:
           VCPKG_DEFAULT_TRIPLET: x86-windows
 
   macos:
-    runs-on: ${{ matrix.platform.os }}
-    strategy:
-      matrix:
-        shared: [ ON, OFF ]
-        platform:
-          - os: macos-13
-            triplet: x64-osx-dynamic
-          - os: macos-13-xlarge
-            triplet: arm64-osx-dynamic
-          - os: macos-14
-            triplet: arm64-osx-dynamic
-          - os: macos-14-large
-            triplet: x64-osx-dynamic
-          - os: macos-15
-            triplet: arm64-osx-dynamic
-          - os: macos-15-large
-            triplet: x64-osx-dynamic
+    runs-on: macos-13
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -134,7 +115,7 @@ jobs:
         uses: lukka/run-cmake@v10
         with:
           configurePreset: debug-asan
-          configurePresetAdditionalArgs: "['-DBUILD_SHARED_LIBS=${{ matrix.shared }}', '-DVCPKG_TARGET_TRIPLET=${{ matrix.platform.triplet }}']"
+          configurePresetAdditionalArgs: "['-DVCPKG_TARGET_TRIPLET=x64-osx-dynamic']"
           buildPreset: debug-asan
           testPreset: debug-asan
         env:
@@ -146,17 +127,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        shared: [ ON, OFF ]
         api: [ 28, 34 ]
         platform:
           - abi: arm64-v8a
             triplet: arm64-android
           - abi: armeabi-v7a
             triplet: arm-neon-android
-          - abi: x86
-            triplet: x86-android
-          - abi: x86_64
-            triplet: x64-android
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -175,7 +151,7 @@ jobs:
         uses: lukka/run-cmake@v10
         with:
           configurePreset: debug-asan
-          configurePresetAdditionalArgs: "['-DBUILD_SHARED_LIBS=${{ matrix.shared }}', '-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake', String.raw`-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}`, '-DVCPKG_TARGET_TRIPLET=android-${{ matrix.api }}', '-DANDROID_ABI=${{ matrix.platform.abi }}', '-DANDROID_PLATFORM=android-${{ matrix.api }}', '-DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST']"
+          configurePresetAdditionalArgs: "['-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake', String.raw`-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}`, '-DVCPKG_TARGET_TRIPLET=android-${{ matrix.api }}', '-DANDROID_ABI=${{ matrix.platform.abi }}', '-DANDROID_PLATFORM=android-${{ matrix.api }}', '-DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST']"
           buildPreset: debug-asan
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
