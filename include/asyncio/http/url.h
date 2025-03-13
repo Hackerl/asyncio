@@ -2,6 +2,7 @@
 #define ASYNCIO_URL_H
 
 #include <memory>
+#include <cassert>
 #include <curl/curl.h>
 #include <zero/cmdline.h>
 #include <zero/error.h>
@@ -19,6 +20,17 @@ namespace asyncio::http {
             [](const int value) { return curl_url_strerror(static_cast<CURLUcode>(value)); }
         )
 
+    private:
+        template<typename F>
+            requires std::is_same_v<std::invoke_result_t<F>, CURLUcode>
+        static std::expected<void, std::error_code> expected(F &&f) {
+            if (const auto code = f(); code != CURLUE_OK)
+                return std::unexpected{make_error_code(static_cast<Error>(code))};
+
+            return {};
+        }
+
+    public:
         explicit URL(std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url);
         URL(const URL &rhs);
         URL(URL &&rhs) noexcept;
@@ -40,37 +52,157 @@ namespace asyncio::http {
         [[nodiscard]] std::optional<std::string> fragment() const;
         [[nodiscard]] std::optional<std::uint16_t> port() const;
 
-        URL &scheme(const std::string &scheme);
-        URL &user(const std::optional<std::string> &user);
-        URL &password(const std::optional<std::string> &password);
-        URL &host(const std::optional<std::string> &host);
-        URL &path(const std::string &path);
-        URL &query(const std::optional<std::string> &query);
-        URL &fragment(const std::optional<std::string> &fragment);
-        URL &port(std::optional<std::uint16_t> port);
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&scheme(this Self &&self, const std::string &scheme) {
+            if (const auto result = expected([&] {
+                return curl_url_set(self.mURL.get(), CURLUPART_SCHEME, scheme.c_str(), 0);
+            }); !result)
+                throw std::system_error{result.error()};
 
-        URL &appendQuery(const std::string &query);
-        URL &appendQuery(const std::string &key, const std::string &value);
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&user(this Self &&self, const std::optional<std::string> &user) {
+            if (const auto result = expected([&] {
+                return curl_url_set(self.mURL.get(), CURLUPART_USER, user ? user->c_str() : nullptr, CURLU_URLENCODE);
+            }); !result)
+                throw std::system_error{result.error()};
+
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&password(this Self &&self, const std::optional<std::string> &password) {
+            if (const auto result = expected([&] {
+                return curl_url_set(
+                    self.mURL.get(),
+                    CURLUPART_PASSWORD,
+                    password ? password->c_str() : nullptr,
+                    CURLU_URLENCODE
+                );
+            }); !result)
+                throw std::system_error{result.error()};
+
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&host(this Self &&self, const std::optional<std::string> &host) {
+            if (const auto result = expected([&] {
+                return curl_url_set(self.mURL.get(), CURLUPART_HOST, host ? host->c_str() : nullptr, 0);
+            }); !result)
+                throw std::system_error{result.error()};
+
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&path(this Self &&self, const std::string &path) {
+            if (const auto result = expected([&] {
+                return curl_url_set(self.mURL.get(), CURLUPART_PATH, path.c_str(), CURLU_URLENCODE);
+            }); !result)
+                throw std::system_error{result.error()};
+
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&query(this Self &&self, const std::optional<std::string> &query) {
+            if (const auto result = expected([&] {
+                return curl_url_set(self.mURL.get(), CURLUPART_QUERY, query ? query->c_str() : nullptr, 0);
+            }); !result)
+                throw std::system_error{result.error()};
+
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&fragment(this Self &&self, const std::optional<std::string> &fragment) {
+            if (const auto result = expected([&] {
+                return curl_url_set(
+                    self.mURL.get(),
+                    CURLUPART_FRAGMENT,
+                    fragment ? fragment->c_str() : nullptr,
+                    CURLU_URLENCODE
+                );
+            }); !result)
+                throw std::system_error{result.error()};
+
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&port(this Self &&self, const std::optional<std::uint16_t> port) {
+            if (const auto result = expected([&] {
+                return curl_url_set(self.mURL.get(), CURLUPART_PORT, port ? std::to_string(*port).c_str() : nullptr, 0);
+            }); !result)
+                throw std::system_error{result.error()};
+
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&appendQuery(this Self &&self, const std::string &query) {
+            if (const auto result = expected([&] {
+                return curl_url_set(
+                    self.mURL.get(),
+                    CURLUPART_QUERY,
+                    query.c_str(),
+                    CURLU_APPENDQUERY | CURLU_URLENCODE
+                );
+            }); !result)
+                throw std::system_error{result.error()};
+
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&appendQuery(this Self &&self, const std::string &key, const std::string &value) {
+            return std::forward<Self>(self).appendQuery(key + "=" + value);
+        }
 
         // `char *` will be implicitly converted to bool, not std::string.
-        template<typename T>
+        template<typename Self, typename T>
             requires std::is_same_v<T, bool>
-        URL &appendQuery(const std::string &key, const T value) {
-            return appendQuery(key, value ? "true" : "false");
+        Self &&appendQuery(this Self &&self, const std::string &key, const T value) {
+            return std::forward<Self>(self).appendQuery(key, value ? "true" : "false");
         }
 
-        template<typename T>
+        template<typename Self, typename T>
             requires (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
-        URL &appendQuery(const std::string &key, const T value) {
-            return appendQuery(key, std::to_string(value));
+        Self &&appendQuery(this Self &&self, const std::string &key, const T value) {
+            return std::forward<Self>(self).appendQuery(key, std::to_string(value));
         }
 
-        URL &append(const std::string &subPath);
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&append(this Self &&self, const std::string &subPath) {
+            assert(!subPath.empty());
+            assert(subPath.front() != '/');
 
-        template<typename T>
-            requires std::is_arithmetic_v<T>
-        URL &append(T subPath) {
-            return append(std::to_string(subPath));
+            if (const auto parent = self.path(); parent.back() != '/')
+                self.path(parent + '/' + subPath);
+            else
+                self.path(parent + subPath);
+
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self, typename T>
+            requires (!std::is_const_v<Self> && std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
+        Self &&append(this Self &&self, T subPath) {
+            return std::forward<Self>(self).append(std::to_string(subPath));
         }
 
     private:

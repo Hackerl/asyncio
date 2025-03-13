@@ -71,10 +71,49 @@ namespace asyncio::net::tls {
         static_assert(std::is_same_v<T, ClientConfig> || std::is_same_v<T, ServerConfig>);
 
     public:
-        T &minVersion(Version version);
-        T &maxVersion(Version version);
-        T &rootCAs(std::list<Certificate> certificates);
-        T &certKeyPairs(std::list<CertKeyPair> pairs);
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        decltype(auto) minVersion(this Self &&self, const Version version) {
+            self.mMinVersion = version;
+
+            if constexpr (std::is_lvalue_reference_v<Self>)
+                return static_cast<T &>(self);
+            else
+                return static_cast<T &&>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        decltype(auto) maxVersion(this Self &&self, const Version version) {
+            self.mMaxVersion = version;
+
+            if constexpr (std::is_lvalue_reference_v<Self>)
+                return static_cast<T &>(self);
+            else
+                return static_cast<T &&>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        decltype(auto) rootCAs(this Self &&self, std::list<Certificate> certificates) {
+            self.mRootCAs = std::move(certificates);
+
+            if constexpr (std::is_lvalue_reference_v<Self>)
+                return static_cast<T &>(self);
+            else
+                return static_cast<T &&>(self);
+        }
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        decltype(auto) certKeyPairs(this Self &&self, std::list<CertKeyPair> pairs) {
+            self.mCertKeyPairs = std::move(pairs);
+
+            if constexpr (std::is_lvalue_reference_v<Self>)
+                return static_cast<T &>(self);
+            else
+                return static_cast<T &&>(self);
+        }
 
         [[nodiscard]] std::expected<Context, std::error_code> build() const;
 
@@ -88,13 +127,24 @@ namespace asyncio::net::tls {
 
     class ClientConfig : public Config<ClientConfig> {
     public:
-        ClientConfig &insecure(bool enable);
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&insecure(this Self &&self, const bool enable) {
+            self.mInsecure = enable;
+            return std::forward<Self>(self);
+        }
     };
 
     class ServerConfig : public Config<ServerConfig> {
     public:
         ServerConfig();
-        ServerConfig &verifyClient(bool enable);
+
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&verifyClient(this Self &&self, const bool enable) {
+            self.mInsecure = !enable;
+            return std::forward<Self>(self);
+        }
     };
 
     DEFINE_ERROR_CODE_EX(

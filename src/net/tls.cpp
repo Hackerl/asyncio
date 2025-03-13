@@ -99,30 +99,6 @@ asyncio::net::tls::PrivateKey::loadFile(const std::filesystem::path &path) {
 }
 
 template<typename T>
-T &asyncio::net::tls::Config<T>::minVersion(const Version version) {
-    mMinVersion = version;
-    return *static_cast<T *>(this);
-}
-
-template<typename T>
-T &asyncio::net::tls::Config<T>::maxVersion(const Version version) {
-    mMaxVersion = version;
-    return *static_cast<T *>(this);
-}
-
-template<typename T>
-T &asyncio::net::tls::Config<T>::rootCAs(std::list<Certificate> certificates) {
-    mRootCAs = std::move(certificates);
-    return *static_cast<T *>(this);
-}
-
-template<typename T>
-T &asyncio::net::tls::Config<T>::certKeyPairs(std::list<CertKeyPair> pairs) {
-    mCertKeyPairs = std::move(pairs);
-    return *static_cast<T *>(this);
-}
-
-template<typename T>
 std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Config<T>::build() const {
     Context context{SSL_CTX_new(TLS_method()), SSL_CTX_free};
 
@@ -188,18 +164,8 @@ std::expected<asyncio::net::tls::Context, std::error_code> asyncio::net::tls::Co
     return context;
 }
 
-asyncio::net::tls::ClientConfig &asyncio::net::tls::ClientConfig::insecure(const bool enable) {
-    mInsecure = enable;
-    return *this;
-}
-
 asyncio::net::tls::ServerConfig::ServerConfig() : Config{} {
     mInsecure = true;
-}
-
-asyncio::net::tls::ServerConfig &asyncio::net::tls::ServerConfig::verifyClient(const bool enable) {
-    mInsecure = !enable;
-    return *this;
 }
 
 template class asyncio::net::tls::Config<asyncio::net::tls::ClientConfig>;
