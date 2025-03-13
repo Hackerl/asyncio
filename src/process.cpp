@@ -109,12 +109,31 @@ std::expected<std::optional<asyncio::process::ExitStatus>, std::error_code> asyn
 #endif
 }
 
+#ifdef _WIN32
+asyncio::process::PseudoConsole::Pipe::Pipe(asyncio::Pipe reader, asyncio::Pipe writer)
+    : mReader{std::move(reader)}, mWriter{std::move(writer)} {
+}
+
+asyncio::task::Task<std::size_t, std::error_code>
+asyncio::process::PseudoConsole::Pipe::read(const std::span<std::byte> data) {
+    co_return co_await mReader.read(data);
+}
+
+asyncio::task::Task<std::size_t, std::error_code>
+asyncio::process::PseudoConsole::Pipe::write(const std::span<const std::byte> data) {
+    co_return co_await mWriter.write(data);
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::process::PseudoConsole::Pipe::close() {
+    CO_EXPECT(co_await mReader.close());
+    co_return co_await mWriter.close();
+}
+#else
 asyncio::process::PseudoConsole::Pipe::Pipe(asyncio::Pipe pipe) : asyncio::Pipe{std::move(pipe)} {
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::process::PseudoConsole::Pipe::read(const std::span<std::byte> data) {
-#ifdef __linux__
     co_return co_await asyncio::Pipe::read(data)
         .orElse([](const auto &ec) -> std::expected<std::size_t, std::error_code> {
             if (ec != std::errc::io_error)
@@ -122,10 +141,8 @@ asyncio::process::PseudoConsole::Pipe::read(const std::span<std::byte> data) {
 
             return 0;
         });
-#else
-    co_return co_await asyncio::Pipe::read(data);
-#endif
 }
+#endif
 
 asyncio::process::PseudoConsole::PseudoConsole(zero::os::process::PseudoConsole pc, Pipe pipe)
     : mPseudoConsole{std::move(pc)}, mPipe{std::move(pipe)} {
@@ -136,6 +153,41 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     auto pc = zero::os::process::PseudoConsole::make(rows, columns);
     EXPECT(pc);
 
+#ifdef _WIN32
+    auto &[reader, writer] = pc->master();
+
+    const auto firstFD = uv::expected([&] {
+        return uv_open_osfhandle(reader.fd());
+    });
+    EXPECT(firstFD);
+    std::ignore = reader.release();
+
+    auto first = asyncio::Pipe::from(*firstFD);
+
+    if (!first) {
+        uv_fs_t request{};
+        uv_fs_close(nullptr, &request, *firstFD, nullptr);
+        uv_fs_req_cleanup(&request);
+        return std::unexpected{first.error()};
+    }
+
+    const auto secondFD = uv::expected([&] {
+        return uv_open_osfhandle(writer.fd());
+    });
+    EXPECT(secondFD);
+    std::ignore = writer.release();
+
+    auto second = asyncio::Pipe::from(*secondFD);
+
+    if (!second) {
+        uv_fs_t request{};
+        uv_fs_close(nullptr, &request, *secondFD, nullptr);
+        uv_fs_req_cleanup(&request);
+        return std::unexpected{second.error()};
+    }
+
+    return PseudoConsole{*std::move(pc), {*std::move(first), *std::move(second)}};
+#else
     auto &resource = pc->master();
 
     const auto fd = uv::expected([&] {
@@ -153,14 +205,8 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
         return std::unexpected{pipe.error()};
     }
 
-    if (!pipe) {
-        uv_fs_t request{};
-        uv_fs_close(nullptr, &request, *fd, nullptr);
-        uv_fs_req_cleanup(&request);
-        return std::unexpected{pipe.error()};
-    }
-
     return PseudoConsole{*std::move(pc), Pipe{*std::move(pipe)}};
+#endif
 }
 
 #ifdef _WIN32
@@ -180,7 +226,7 @@ asyncio::process::PseudoConsole::spawn(const Command &command) {
     });
 }
 
-asyncio::process::PseudoConsole::Pipe &asyncio::process::PseudoConsole::pipe() {
+asyncio::process::PseudoConsole::Pipe &asyncio::process::PseudoConsole::master() {
     return mPipe;
 }
 

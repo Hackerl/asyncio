@@ -28,12 +28,27 @@ namespace asyncio::process {
 
     class PseudoConsole {
     public:
+#ifdef _WIN32
+        class Pipe final : public IReader, public IWriter, public ICloseable {
+        public:
+            Pipe(asyncio::Pipe reader, asyncio::Pipe writer);
+
+            task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
+            task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
+            task::Task<void, std::error_code> close() override;
+
+        private:
+            asyncio::Pipe mReader;
+            asyncio::Pipe mWriter;
+        };
+#else
         class Pipe final : public asyncio::Pipe {
         public:
             explicit Pipe(asyncio::Pipe pipe);
 
             task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         };
+#endif
 
         PseudoConsole(zero::os::process::PseudoConsole pc, Pipe pipe);
         static std::expected<PseudoConsole, std::error_code> make(short rows, short columns);
@@ -45,7 +60,7 @@ namespace asyncio::process {
         std::expected<void, std::error_code> resize(short rows, short columns);
         std::expected<ChildProcess, std::error_code> spawn(const Command &command);
 
-        Pipe &pipe();
+        Pipe &master();
 
     private:
         zero::os::process::PseudoConsole mPseudoConsole;

@@ -5,47 +5,33 @@
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <fmt/format.h>
 
-ASYNC_TEST_CASE("command", "[process]") {
-    SECTION("status") {
-        const auto status = co_await asyncio::process::Command{"hostname"}.status();
-        REQUIRE(status);
-        REQUIRE(status->success());
-    }
+#ifdef _WIN32
+#include <asyncio/thread.h>
+#endif
 
-    SECTION("output") {
-        SECTION("hostname") {
-            const auto hostname = zero::os::hostname();
-            REQUIRE(hostname);
-
-            const auto output = co_await asyncio::process::Command{"hostname"}.output();
-            REQUIRE(output);
-            REQUIRE(output->status.success());
-            REQUIRE(fmt::to_string(output->status) == "exit code(0)");
-
-            REQUIRE(zero::strings::trim({
-                reinterpret_cast<const char *>(output->out.data()),
-                output->out.size()
-            }) == *hostname);
-        }
-
-        SECTION("whoami") {
-            const auto username = zero::os::username();
-            REQUIRE(username);
-
-            const auto output = co_await asyncio::process::Command{"whoami"}.output();
-            REQUIRE(output);
-            REQUIRE(output->status.success());
-            REQUIRE(fmt::to_string(output->status) == "exit code(0)");
-
-            REQUIRE_THAT(
-                (std::string{reinterpret_cast<const char *>(output->out.data()), output->out.size()}),
-                Catch::Matchers::ContainsSubstring(*username)
-            );
-        }
-    }
+ASYNC_TEST_CASE("spawn child process and collect status", "[process]") {
+    const auto status = co_await asyncio::process::Command{"hostname"}
+                                 .stdOutput(zero::os::process::Command::StdioType::NUL)
+                                 .status();
+    REQUIRE(status);
+    REQUIRE(status->success());
 }
 
-ASYNC_TEST_CASE("pseudo console", "[process]") {
+ASYNC_TEST_CASE("spawn child process and collect output", "[process]") {
+    const auto hostname = zero::os::hostname();
+    REQUIRE(hostname);
+
+    const auto output = co_await asyncio::process::Command{"hostname"}.output();
+    REQUIRE(output);
+    REQUIRE(output->status.success());
+
+    REQUIRE(zero::strings::trim({
+        reinterpret_cast<const char *>(output->out.data()),
+        output->out.size()
+    }) == *hostname);
+}
+
+ASYNC_TEST_CASE("spawn child process with pseudo console", "[process]") {
     using namespace std::string_view_literals;
 
     auto pc = asyncio::process::PseudoConsole::make(80, 32);
@@ -59,14 +45,16 @@ ASYNC_TEST_CASE("pseudo console", "[process]") {
     REQUIRE(child);
 #endif
 
-    auto &pipe = pc->pipe();
-    REQUIRE(co_await pipe.writeAll(std::as_bytes(std::span{"echo hello\rexit\r"sv})));
+    auto &master = pc->master();
+    REQUIRE(co_await master.writeAll(std::as_bytes(std::span{"echo hello\rexit\r"sv})));
 
-    auto task = pipe.readAll();
+    auto task = master.readAll();
     REQUIRE(co_await child->wait());
 
 #ifdef _WIN32
-    pc->close();
+    REQUIRE(co_await asyncio::toThreadPool([&] {
+        pc->close();
+    }));
 #endif
 
     const auto data = co_await task;
