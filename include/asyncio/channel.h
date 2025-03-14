@@ -6,11 +6,13 @@
 #include <zero/atomic/circular_buffer.h>
 
 namespace asyncio {
-    static constexpr auto SENDER = 0;
-    static constexpr auto RECEIVER = 1;
-
     template<typename T>
     struct ChannelCore {
+        struct Context {
+            std::list<std::shared_ptr<Promise<void, std::error_code>>> pending;
+            std::atomic<std::size_t> counter;
+        };
+
         explicit ChannelCore(std::shared_ptr<EventLoop> e, const std::size_t capacity)
             : eventLoop{std::move(e)}, buffer{capacity} {
         }
@@ -19,16 +21,34 @@ namespace asyncio {
         std::atomic<bool> closed;
         std::shared_ptr<EventLoop> eventLoop;
         zero::atomic::CircularBuffer<T> buffer;
-        std::array<std::list<std::shared_ptr<Promise<void, std::error_code>>>, 2> pending;
-        std::array<std::atomic<std::size_t>, 2> counters;
+        Context sender;
+        Context receiver;
 
-        void trigger(const std::size_t index) {
+        void notifySender() {
             std::lock_guard guard{mutex};
 
-            if (pending[index].empty())
+            auto &pending = sender.pending;
+
+            if (pending.empty())
                 return;
 
-            for (const auto &promise: std::exchange(pending[index], {})) {
+            for (const auto &promise: std::exchange(pending, {})) {
+                if (promise->isFulfilled())
+                    continue;
+
+                promise->resolve();
+            }
+        }
+
+        void notifyReceiver() {
+            std::lock_guard guard{mutex};
+
+            auto &pending = receiver.pending;
+
+            if (pending.empty())
+                return;
+
+            for (const auto &promise: std::exchange(pending, {})) {
                 if (promise->isFulfilled())
                     continue;
 
@@ -46,8 +66,8 @@ namespace asyncio {
                 closed = true;
             }
 
-            trigger(SENDER);
-            trigger(RECEIVER);
+            notifySender();
+            notifyReceiver();
         }
     };
 
@@ -76,18 +96,18 @@ namespace asyncio {
     class Sender {
     public:
         explicit Sender(std::shared_ptr<ChannelCore<T>> core) : mCore{std::move(core)} {
-            ++mCore->counters[SENDER];
+            ++mCore->sender.counter;
         }
 
         Sender(const Sender &rhs) : mCore{rhs.mCore} {
-            ++mCore->counters[SENDER];
+            ++mCore->sender.counter;
         }
 
         Sender(Sender &&rhs) = default;
 
         Sender &operator=(const Sender &rhs) {
             mCore = rhs.mCore;
-            ++mCore->counters[SENDER];
+            ++mCore->sender.counter;
             return *this;
         }
 
@@ -97,7 +117,7 @@ namespace asyncio {
             if (!mCore)
                 return;
 
-            if (--mCore->counters[SENDER] > 0)
+            if (--mCore->sender.counter > 0)
                 return;
 
             mCore->close();
@@ -115,7 +135,7 @@ namespace asyncio {
 
             mCore->buffer[*index] = std::forward<U>(element);
             mCore->buffer.commit(*index);
-            mCore->trigger(RECEIVER);
+            mCore->notifyReceiver();
 
             return {};
         }
@@ -132,7 +152,7 @@ namespace asyncio {
                 if (index) {
                     mCore->buffer[*index] = std::forward<U>(element);
                     mCore->buffer.commit(*index);
-                    mCore->trigger(RECEIVER);
+                    mCore->notifyReceiver();
                     return {};
                 }
 
@@ -151,13 +171,13 @@ namespace asyncio {
                 const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
                 const auto future = promise->getFuture();
 
-                mCore->pending[SENDER].push_back(promise);
+                mCore->sender.pending.push_back(promise);
                 mCore->mutex.unlock();
 
                 if (const auto result = future.wait(timeout); !result) {
                     assert(result.error() == std::errc::timed_out);
                     std::lock_guard guard{mCore->mutex};
-                    mCore->pending[SENDER].remove(promise);
+                    mCore->sender.pending.remove(promise);
                     return std::unexpected{SendSyncError::TIMEOUT};
                 }
             }
@@ -173,7 +193,7 @@ namespace asyncio {
                 if (index) {
                     mCore->buffer[*index] = std::move(element);
                     mCore->buffer.commit(*index);
-                    mCore->trigger(RECEIVER);
+                    mCore->notifyReceiver();
                     co_return {};
                 }
 
@@ -191,7 +211,7 @@ namespace asyncio {
 
                 const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
 
-                mCore->pending[SENDER].push_back(promise);
+                mCore->sender.pending.push_back(promise);
                 mCore->mutex.unlock();
 
                 if (const auto result = co_await task::Cancellable{
@@ -206,7 +226,7 @@ namespace asyncio {
                 }; !result) {
                     assert(result.error() == std::errc::operation_canceled);
                     std::lock_guard guard{mCore->mutex};
-                    mCore->pending[SENDER].remove(promise);
+                    mCore->sender.pending.remove(promise);
                     co_return std::unexpected{SendError::CANCELLED};
                 }
             }
@@ -265,18 +285,18 @@ namespace asyncio {
     class Receiver {
     public:
         explicit Receiver(std::shared_ptr<ChannelCore<T>> core) : mCore{std::move(core)} {
-            ++mCore->counters[RECEIVER];
+            ++mCore->receiver.counter;
         }
 
         Receiver(const Receiver &rhs) : mCore{rhs.mCore} {
-            ++mCore->counters[RECEIVER];
+            ++mCore->receiver.counter;
         }
 
         Receiver(Receiver &&rhs) = default;
 
         Receiver &operator=(const Receiver &rhs) {
             mCore = rhs.mCore;
-            ++mCore->counters[RECEIVER];
+            ++mCore->receiver.counter;
             return *this;
         }
 
@@ -286,7 +306,7 @@ namespace asyncio {
             if (!mCore)
                 return;
 
-            if (--mCore->counters[RECEIVER] > 0)
+            if (--mCore->receiver.counter > 0)
                 return;
 
             mCore->close();
@@ -301,7 +321,7 @@ namespace asyncio {
             auto element = std::move(mCore->buffer[*index]);
 
             mCore->buffer.release(*index);
-            mCore->trigger(SENDER);
+            mCore->notifySender();
 
             return element;
         }
@@ -314,7 +334,7 @@ namespace asyncio {
                 if (index) {
                     auto element = std::move(mCore->buffer[*index]);
                     mCore->buffer.release(*index);
-                    mCore->trigger(SENDER);
+                    mCore->notifySender();
                     return element;
                 }
 
@@ -333,13 +353,13 @@ namespace asyncio {
                 const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
                 const auto future = promise->getFuture();
 
-                mCore->pending[RECEIVER].push_back(promise);
+                mCore->receiver.pending.push_back(promise);
                 mCore->mutex.unlock();
 
                 if (const auto result = future.wait(timeout); !result) {
                     assert(result.error() == std::errc::timed_out);
                     std::lock_guard guard{mCore->mutex};
-                    mCore->pending[RECEIVER].remove(promise);
+                    mCore->receiver.pending.remove(promise);
                     return std::unexpected{ReceiveSyncError::TIMEOUT};
                 }
             }
@@ -352,7 +372,7 @@ namespace asyncio {
                 if (index) {
                     auto element = std::move(mCore->buffer[*index]);
                     mCore->buffer.release(*index);
-                    mCore->trigger(SENDER);
+                    mCore->notifySender();
                     co_return element;
                 }
 
@@ -370,7 +390,7 @@ namespace asyncio {
 
                 const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
 
-                mCore->pending[RECEIVER].push_back(promise);
+                mCore->receiver.pending.push_back(promise);
                 mCore->mutex.unlock();
 
                 if (const auto result = co_await task::Cancellable{
@@ -385,7 +405,7 @@ namespace asyncio {
                 }; !result) {
                     assert(result.error() == std::errc::operation_canceled);
                     std::lock_guard guard{mCore->mutex};
-                    mCore->pending[RECEIVER].remove(promise);
+                    mCore->receiver.pending.remove(promise);
                     co_return std::unexpected{ReceiveError::CANCELLED};
                 }
             }
