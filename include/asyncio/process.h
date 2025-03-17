@@ -127,6 +127,18 @@ namespace asyncio::process {
         }
 
         template<typename Self>
+        Self &&inheritedNativeResource(this Self &&self, const zero::os::Resource::Native resource) {
+            self.mCommand.inheritedNativeResource(resource);
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
+        Self &&inheritedNativeResources(this Self &&self, std::vector<zero::os::Resource::Native> resource) {
+            self.mCommand.inheritedNativeResources(std::move(resource));
+            return std::forward<Self>(self);
+        }
+
+        template<typename Self>
         Self &&stdInput(this Self &&self, StdioType type) {
             self.mCommand.stdInput(type);
             return std::forward<Self>(self);
@@ -149,6 +161,7 @@ namespace asyncio::process {
         [[nodiscard]] const std::optional<std::filesystem::path> &currentDirectory() const;
         [[nodiscard]] const std::map<std::string, std::optional<std::string>> &envs() const;
         [[nodiscard]] const std::vector<zero::os::Resource> &inheritedResources() const;
+        [[nodiscard]] const std::vector<zero::os::Resource::Native> &inheritedNativeResources() const;
 
         [[nodiscard]] std::expected<ChildProcess, std::error_code> spawn() const;
         [[nodiscard]] task::Task<ExitStatus, std::error_code> status() const;

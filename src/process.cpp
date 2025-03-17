@@ -303,6 +303,10 @@ const std::vector<zero::os::Resource> &asyncio::process::Command::inheritedResou
     return mCommand.inheritedResources();
 }
 
+const std::vector<zero::os::Resource::Native> &asyncio::process::Command::inheritedNativeResources() const {
+    return mCommand.inheritedNativeResources();
+}
+
 std::expected<asyncio::process::ChildProcess, std::error_code> asyncio::process::Command::spawn() const {
     return spawn({StdioType::INHERIT, StdioType::INHERIT, StdioType::INHERIT});
 }
