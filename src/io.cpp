@@ -28,7 +28,7 @@ asyncio::task::Task<std::vector<std::byte>, std::error_code> asyncio::IReader::r
         if (*n == 0)
             break;
 
-        data.insert(data.end(), buffer.begin(), buffer.begin() + *n);
+        data.insert(data.end(), buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(*n));
     }
 
     co_return data;

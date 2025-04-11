@@ -45,12 +45,12 @@ namespace {
         CO_EXPECT(co_await stream->writeAll(
             std::as_bytes(
                 std::span{
-                "HTTP/1.1 200 OK\r\n"
-                "Content-Length: 11\r\n"
-                "Content-Type: text/html\r\n"
-                "Server: asyncio\r\n"
-                "Set-Cookie: user=jack\r\n\r\n"
-                "hello world"sv
+                    "HTTP/1.1 200 OK\r\n"
+                    "Content-Length: 11\r\n"
+                    "Content-Type: text/html\r\n"
+                    "Server: asyncio\r\n"
+                    "Set-Cookie: user=jack\r\n\r\n"
+                    "hello world"sv
                 }
             )
         ));
@@ -63,7 +63,7 @@ ASYNC_TEST_CASE("requests", "[http]") {
     const auto temp = co_await asyncio::fs::temporaryDirectory();
     REQUIRE(temp);
 
-    const auto path = *temp / "asyncio-http-requests";
+    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
 
     auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 0);
     REQUIRE(listener);
@@ -319,6 +319,26 @@ ASYNC_TEST_CASE("requests", "[http]") {
                 REQUIRE(rawRequest);
                 REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring(R"("name":"jack")"));
                 REQUIRE_THAT(*rawRequest, Catch::Matchers::ContainsSubstring(R"("age":18)"));
+            }
+
+            SECTION("stream") {
+                const auto method = GENERATE("POST", "PUT");
+                const auto input = GENERATE(take(1, randomString(1, 102400)));
+
+                REQUIRE(co_await asyncio::fs::write(path, input));
+
+                auto file = co_await asyncio::fs::open(path, O_RDONLY);
+                REQUIRE(file);
+
+                auto response = co_await requests->request(method, *url, std::nullopt, *std::move(file));
+                REQUIRE(response);
+                REQUIRE(co_await response->readAll());
+
+                const auto rawRequest = co_await task;
+                REQUIRE(rawRequest);
+                REQUIRE_THAT(*rawRequest, Catch::Matchers::EndsWith(input));
+
+                REQUIRE(co_await asyncio::fs::remove(path));
             }
         }
     }

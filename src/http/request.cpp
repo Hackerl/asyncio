@@ -7,63 +7,7 @@ using namespace std::chrono_literals;
 constexpr auto DEFAULT_CONNECT_TIMEOUT = 30s;
 constexpr auto DEFAULT_TRANSFER_TIMEOUT = 1h;
 
-template<typename F>
-    requires std::is_same_v<std::invoke_result_t<F>, CURLcode>
-std::expected<void, std::error_code> expected(F &&f) {
-    if (const auto code = f(); code != CURLE_OK)
-        return std::unexpected{static_cast<asyncio::http::Requests::CURLError>(code)};
-
-    return {};
-}
-
-template<typename F>
-    requires std::is_same_v<std::invoke_result_t<F>, CURLMcode>
-std::expected<void, std::error_code> expected(F &&f) {
-    if (const auto code = f(); code != CURLM_OK)
-        return std::unexpected{static_cast<asyncio::http::Requests::CURLMError>(code)};
-
-    return {};
-}
-
-namespace {
-    std::size_t onWrite(const char *buffer, const std::size_t size, const std::size_t n, void *userdata) {
-        const auto total = size * n;
-        const auto connection = static_cast<asyncio::http::Connection *>(userdata);
-
-        if (!connection->transferring) {
-            connection->transferring = true;
-            connection->promise.resolve();
-        }
-
-        if (total == 0)
-            return 0;
-
-        if (!connection->dataPromise)
-            return CURL_WRITEFUNC_PAUSE;
-
-        const auto need = total - connection->skip;
-
-        if (connection->buffer.size() < need) {
-            std::memcpy(
-                connection->buffer.data(),
-                reinterpret_cast<const std::byte *>(buffer) + connection->skip,
-                connection->buffer.size()
-            );
-
-            std::exchange(connection->dataPromise, std::nullopt)->resolve(connection->buffer.size());
-            connection->skip += connection->buffer.size();
-            return CURL_WRITEFUNC_PAUSE;
-        }
-
-        std::memcpy(connection->buffer.data(), reinterpret_cast<const std::byte *>(buffer) + connection->skip, need);
-        std::exchange(connection->dataPromise, std::nullopt)->resolve(need);
-
-        connection->skip = 0;
-        return total;
-    }
-}
-
-asyncio::http::Response::Response(Requests *requests, std::unique_ptr<Connection> connection)
+asyncio::http::Response::Response(Requests *requests, std::shared_ptr<Connection> connection)
     : mRequests{requests}, mConnection{std::move(connection)} {
 }
 
@@ -144,16 +88,18 @@ asyncio::http::Response::output(std::filesystem::path path) {
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::http::Response::read(const std::span<std::byte> data) {
     if (mConnection->finished) {
-        if (mConnection->error)
-            co_return std::unexpected{*mConnection->error};
+        if (const auto &error = mConnection->error)
+            co_return std::unexpected{*error};
 
         co_return 0;
     }
 
-    mConnection->buffer = data;
-    mConnection->dataPromise.emplace();
+    auto &downstream = mConnection->downstream;
 
-    auto future = mConnection->dataPromise->getFuture();
+    downstream.data = data;
+    downstream.promise.emplace();
+
+    auto future = downstream.promise->getFuture();
 
     CO_EXPECT(expected([&] {
         return curl_easy_pause(mConnection->easy.get(), CURLPAUSE_RECV_CONT);
@@ -162,14 +108,16 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
     co_return co_await task::Cancellable{
         std::move(future),
         [this]() -> std::expected<void, std::error_code> {
-            if (!mConnection->dataPromise)
+            auto &promise = mConnection->downstream.promise;
+
+            if (!promise)
                 return std::unexpected{task::Error::WILL_BE_DONE};
 
             EXPECT(expected([&] {
                 return curl_easy_pause(mConnection->easy.get(), CURLPAUSE_RECV);
             }));
 
-            std::exchange(mConnection->dataPromise, std::nullopt)->reject(task::Error::CANCELLED);
+            std::exchange(promise, std::nullopt)->reject(task::Error::CANCELLED);
             return {};
         }
     };
@@ -196,10 +144,12 @@ void asyncio::http::Requests::Core::recycle() {
                 continue;
             }
 
-            if (!connection->dataPromise)
+            auto &promise = connection->downstream.promise;
+
+            if (!promise)
                 continue;
 
-            std::exchange(connection->dataPromise, std::nullopt)->reject(*connection->error);
+            std::exchange(promise, std::nullopt)->reject(*connection->error);
             continue;
         }
 
@@ -208,10 +158,12 @@ void asyncio::http::Requests::Core::recycle() {
             continue;
         }
 
-        if (!connection->dataPromise)
+        auto &promise = connection->downstream.promise;
+
+        if (!promise)
             continue;
 
-        std::exchange(connection->dataPromise, std::nullopt)->resolve(0);
+        std::exchange(promise, std::nullopt)->resolve(0);
     }
 }
 
@@ -305,9 +257,9 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
         });
     });
 
-    std::unique_ptr<CURLM, decltype(&curl_multi_cleanup)> multi{curl_multi_init(), curl_multi_cleanup};
+    std::unique_ptr<CURLM, decltype(&curl_multi_cleanup)> ptr{curl_multi_init(), curl_multi_cleanup};
 
-    if (!multi)
+    if (!ptr)
         return std::unexpected{std::error_code{errno, std::generic_category()}};
 
     auto timer = std::make_unique<uv_timer_t>();
@@ -320,13 +272,14 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
         0,
         std::move(options),
         uv::Handle(std::move(timer)),
-        std::move(multi)
+        std::move(ptr)
     );
 
     core->timer->data = core.get();
+    const auto multi = core->multi.get();
 
     curl_multi_setopt(
-        core->multi.get(),
+        multi,
         CURLMOPT_SOCKETFUNCTION,
         static_cast<curl_socket_callback>(
             [](CURL *, const curl_socket_t s, const int action, void *ctx, void *socketContext) {
@@ -338,10 +291,10 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
         )
     );
 
-    curl_multi_setopt(core->multi.get(), CURLMOPT_SOCKETDATA, core.get());
+    curl_multi_setopt(multi, CURLMOPT_SOCKETDATA, core.get());
 
     curl_multi_setopt(
-        core->multi.get(),
+        multi,
         CURLMOPT_TIMERFUNCTION,
         static_cast<curl_multi_timer_callback>([](CURLM *, const long ms, void *ctx) {
             if (!static_cast<Core *>(ctx)->setTimer(ms))
@@ -351,25 +304,102 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
         })
     );
 
-    curl_multi_setopt(core->multi.get(), CURLMOPT_TIMERDATA, core.get());
+    curl_multi_setopt(multi, CURLMOPT_TIMERDATA, core.get());
 
     return Requests{std::move(core)};
 }
 
-asyncio::http::Options &asyncio::http::Requests::options() {
-    return mCore->options;
+std::size_t asyncio::http::Requests::onRead(char *buffer, const std::size_t size, const std::size_t n, void *userdata) {
+    const auto total = size * n;
+    const auto connection = static_cast<Connection *>(userdata);
+
+    auto &[data, reader, task, future, aborted] = connection->upstream;
+
+    if (task) {
+        assert(task->done());
+        assert(future);
+        assert(future->isReady());
+
+        task.reset();
+        const auto result = std::exchange(future, std::nullopt)->result();
+
+        if (!result)
+            return CURL_READFUNC_ABORT;
+
+        assert(*result <= total);
+        std::memcpy(buffer, data.data(), *result);
+        return *result;
+    }
+
+    data.resize(total);
+    task = reader->read(data);
+
+    if (!task->done()) {
+        future = task->future().finally([&, easy = connection->easy.get()] {
+            if (aborted)
+                return;
+
+            // The `onRead` callback will not be executed immediately,
+            // otherwise it needs to be put into the next event loop.
+            curl_easy_pause(easy, CURLPAUSE_SEND_CONT);
+        });
+
+        return CURL_READFUNC_PAUSE;
+    }
+
+    const auto result = std::exchange(task, std::nullopt)->future().result();
+
+    if (!result)
+        return CURL_READFUNC_ABORT;
+
+    std::memcpy(buffer, data.data(), *result);
+    return *result;
 }
 
-const asyncio::http::Options &asyncio::http::Requests::options() const {
-    return mCore->options;
+std::size_t asyncio::http::Requests::onWrite(
+    const char *buffer,
+    const std::size_t size,
+    const std::size_t n,
+    void *userdata
+) {
+    const auto total = size * n;
+    const auto connection = static_cast<Connection *>(userdata);
+
+    if (!connection->transferring) {
+        connection->transferring = true;
+        connection->promise.resolve();
+    }
+
+    if (total == 0)
+        return 0;
+
+    auto &[skip, data, promise] = connection->downstream;
+
+    if (!promise)
+        return CURL_WRITEFUNC_PAUSE;
+
+    const auto remaining = total - skip;
+
+    if (data.size() < remaining) {
+        std::memcpy(data.data(), reinterpret_cast<const std::byte *>(buffer) + skip, data.size());
+        std::exchange(promise, std::nullopt)->resolve(data.size());
+        skip += data.size();
+        return CURL_WRITEFUNC_PAUSE;
+    }
+
+    std::memcpy(data.data(), reinterpret_cast<const std::byte *>(buffer) + skip, remaining);
+    std::exchange(promise, std::nullopt)->resolve(remaining);
+
+    skip = 0;
+    return total;
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-std::expected<std::unique_ptr<asyncio::http::Connection>, std::error_code>
+std::expected<std::shared_ptr<asyncio::http::Connection>, std::error_code>
 asyncio::http::Requests::prepare(std::string method, const URL &url, const std::optional<Options> &options) {
-    std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> easy{curl_easy_init(), curl_easy_cleanup};
+    std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> ptr{curl_easy_init(), curl_easy_cleanup};
 
-    if (!easy)
+    if (!ptr)
         return std::unexpected{std::error_code{errno, std::generic_category()}};
 
     const auto [
@@ -383,47 +413,48 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         hooks
     ] = options.value_or(mCore->options);
 
-    auto connection = std::make_unique<Connection>(std::move(easy));
+    auto connection = std::make_shared<Connection>(std::move(ptr));
+    const auto easy = connection->easy.get();
 
     method = zero::strings::toupper(method);
 
     if (method == "HEAD")
-        curl_easy_setopt(connection->easy.get(), CURLOPT_NOBODY, 1L);
+        curl_easy_setopt(easy, CURLOPT_NOBODY, 1L);
     else if (method == "GET")
-        curl_easy_setopt(connection->easy.get(), CURLOPT_HTTPGET, 1L);
+        curl_easy_setopt(easy, CURLOPT_HTTPGET, 1L);
     else if (method == "POST")
-        curl_easy_setopt(connection->easy.get(), CURLOPT_POST, 1L);
+        curl_easy_setopt(easy, CURLOPT_POST, 1L);
     else
-        curl_easy_setopt(connection->easy.get(), CURLOPT_CUSTOMREQUEST, method.c_str());
+        curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
 
-    curl_easy_setopt(connection->easy.get(), CURLOPT_URL, url.string().c_str());
-    curl_easy_setopt(connection->easy.get(), CURLOPT_COOKIEFILE, "");
-    curl_easy_setopt(connection->easy.get(), CURLOPT_WRITEFUNCTION, onWrite);
-    curl_easy_setopt(connection->easy.get(), CURLOPT_WRITEDATA, connection.get());
-    curl_easy_setopt(connection->easy.get(), CURLOPT_PRIVATE, connection.get());
-    curl_easy_setopt(connection->easy.get(), CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(connection->easy.get(), CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
-    curl_easy_setopt(connection->easy.get(), CURLOPT_USERAGENT, userAgent.value_or("asyncio requests").c_str());
-    curl_easy_setopt(connection->easy.get(), CURLOPT_ACCEPT_ENCODING, "");
+    curl_easy_setopt(easy, CURLOPT_URL, url.string().c_str());
+    curl_easy_setopt(easy, CURLOPT_COOKIEFILE, "");
+    curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, onWrite);
+    curl_easy_setopt(easy, CURLOPT_WRITEDATA, connection.get());
+    curl_easy_setopt(easy, CURLOPT_PRIVATE, connection.get());
+    curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
+    curl_easy_setopt(easy, CURLOPT_USERAGENT, userAgent.value_or("asyncio requests").c_str());
+    curl_easy_setopt(easy, CURLOPT_ACCEPT_ENCODING, "");
 
     curl_easy_setopt(
-        connection->easy.get(),
+        easy,
         CURLOPT_CONNECTTIMEOUT,
         static_cast<long>(connectTimeout.value_or(DEFAULT_CONNECT_TIMEOUT).count())
     );
 
     curl_easy_setopt(
-        connection->easy.get(),
+        easy,
         CURLOPT_TIMEOUT,
         static_cast<long>(timeout.value_or(DEFAULT_TRANSFER_TIMEOUT).count())
     );
 
     if (proxy)
-        curl_easy_setopt(connection->easy.get(), CURLOPT_PROXY, proxy->c_str());
+        curl_easy_setopt(easy, CURLOPT_PROXY, proxy->c_str());
 
     if (!cookies.empty()) {
         curl_easy_setopt(
-            connection->easy.get(),
+            easy,
             CURLOPT_COOKIE,
             to_string(fmt::join(
                 cookies | std::views::transform([](const auto &it) { return it.first + "=" + it.second; }),
@@ -438,7 +469,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         list = curl_slist_append(list, fmt::format("{}: {}", k, v).c_str());
 
     if (list) {
-        curl_easy_setopt(connection->easy.get(), CURLOPT_HTTPHEADER, list);
+        curl_easy_setopt(easy, CURLOPT_HTTPHEADER, list);
 
         connection->defers.emplace_back([list] {
             curl_slist_free_all(list);
@@ -447,19 +478,19 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
 
     const auto &[insecure, ca, cert, privateKey, password] = tls;
 
-    curl_easy_setopt(connection->easy.get(), CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L);
+    curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L);
 
     if (ca)
-        curl_easy_setopt(connection->easy.get(), CURLOPT_CAINFO, ca->c_str());
+        curl_easy_setopt(easy, CURLOPT_CAINFO, ca->c_str());
 
     if (cert)
-        curl_easy_setopt(connection->easy.get(), CURLOPT_SSLCERT, cert->c_str());
+        curl_easy_setopt(easy, CURLOPT_SSLCERT, cert->c_str());
 
     if (privateKey)
-        curl_easy_setopt(connection->easy.get(), CURLOPT_SSLKEY, privateKey->c_str());
+        curl_easy_setopt(easy, CURLOPT_SSLKEY, privateKey->c_str());
 
     if (password)
-        curl_easy_setopt(connection->easy.get(), CURLOPT_KEYPASSWD, password->c_str());
+        curl_easy_setopt(easy, CURLOPT_KEYPASSWD, password->c_str());
 
     for (const auto &hook: hooks) {
         EXPECT(hook(*connection));
@@ -469,14 +500,17 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
 }
 
 asyncio::task::Task<asyncio::http::Response, std::error_code>
-asyncio::http::Requests::perform(std::unique_ptr<Connection> connection) {
+asyncio::http::Requests::perform(std::shared_ptr<Connection> connection) {
+    const auto easy = connection->easy.get();
+    const auto multi = mCore->multi.get();
+
     CO_EXPECT(expected([&] {
-        return curl_multi_add_handle(mCore->multi.get(), connection->easy.get());
+        return curl_multi_add_handle(multi, easy);
     }));
 
     DEFER(
         if (connection)
-            curl_multi_remove_handle(mCore->multi.get(), connection->easy.get());
+            curl_multi_remove_handle(multi, easy);
     );
 
     CO_EXPECT(co_await task::Cancellable{
@@ -491,6 +525,14 @@ asyncio::http::Requests::perform(std::unique_ptr<Connection> connection) {
     });
 
     co_return Response{this, std::move(connection)};
+}
+
+asyncio::http::Options &asyncio::http::Requests::options() {
+    return mCore->options;
+}
+
+const asyncio::http::Options &asyncio::http::Requests::options() const {
+    return mCore->options;
 }
 
 asyncio::task::Task<asyncio::http::Response, std::error_code>
@@ -510,8 +552,10 @@ asyncio::http::Requests::request(
     auto connection = prepare(std::move(method), url, options);
     CO_EXPECT(connection);
 
-    curl_easy_setopt(connection.value()->easy.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(payload.length()));
-    curl_easy_setopt(connection.value()->easy.get(), CURLOPT_COPYPOSTFIELDS, payload.c_str());
+    const auto easy = connection.value()->easy.get();
+
+    curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, static_cast<long>(payload.length()));
+    curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload.c_str());
 
     co_return co_await perform(*std::move(connection));
 }
@@ -548,8 +592,10 @@ asyncio::http::Requests::request(
     auto connection = prepare(std::move(method), url, options);
     CO_EXPECT(connection);
 
+    const auto easy = connection.value()->easy.get();
+
     std::unique_ptr<curl_mime, decltype(&curl_mime_free)> form{
-        curl_mime_init(connection.value()->easy.get()),
+        curl_mime_init(easy),
         curl_mime_free
     };
 
@@ -569,7 +615,7 @@ asyncio::http::Requests::request(
         }));
     }
 
-    curl_easy_setopt(connection.value()->easy.get(), CURLOPT_MIMEPOST, form.get());
+    curl_easy_setopt(easy, CURLOPT_MIMEPOST, form.get());
 
     connection.value()->defers.emplace_back([form = form.release()] {
         curl_mime_free(form);
@@ -578,4 +624,4 @@ asyncio::http::Requests::request(
     co_return co_await perform(*std::move(connection));
 }
 
-DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::http::Requests::CURLError, asyncio::http::Requests::CURLMError)
+DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::http::CURLError, asyncio::http::CURLMError)
