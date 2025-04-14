@@ -66,56 +66,105 @@ namespace asyncio::net::tls {
     class ClientConfig;
     class ServerConfig;
 
-    template<typename T>
     class Config {
-        static_assert(std::is_same_v<T, ClientConfig> || std::is_same_v<T, ServerConfig>);
+#ifdef _WIN32
+        static std::expected<void, std::error_code> loadSystemCerts(X509_STORE *store, const std::string &name);
+#endif
 
     public:
         template<typename Self>
             requires (!std::is_const_v<Self>)
-        decltype(auto) minVersion(this Self &&self, const Version version) {
+        Self &&minVersion(this Self &&self, const Version version) {
             self.mMinVersion = version;
-
-            if constexpr (std::is_lvalue_reference_v<Self>)
-                return static_cast<T &>(self);
-            else
-                return static_cast<T &&>(self);
+            return std::forward<Self>(self);
         }
 
         template<typename Self>
             requires (!std::is_const_v<Self>)
-        decltype(auto) maxVersion(this Self &&self, const Version version) {
+        Self &&maxVersion(this Self &&self, const Version version) {
             self.mMaxVersion = version;
-
-            if constexpr (std::is_lvalue_reference_v<Self>)
-                return static_cast<T &>(self);
-            else
-                return static_cast<T &&>(self);
+            return std::forward<Self>(self);
         }
 
         template<typename Self>
             requires (!std::is_const_v<Self>)
-        decltype(auto) rootCAs(this Self &&self, std::list<Certificate> certificates) {
+        Self &&rootCAs(this Self &&self, std::list<Certificate> certificates) {
             self.mRootCAs = std::move(certificates);
-
-            if constexpr (std::is_lvalue_reference_v<Self>)
-                return static_cast<T &>(self);
-            else
-                return static_cast<T &&>(self);
+            return std::forward<Self>(self);
         }
 
         template<typename Self>
             requires (!std::is_const_v<Self>)
-        decltype(auto) certKeyPairs(this Self &&self, std::list<CertKeyPair> pairs) {
+        Self &&certKeyPairs(this Self &&self, std::list<CertKeyPair> pairs) {
             self.mCertKeyPairs = std::move(pairs);
-
-            if constexpr (std::is_lvalue_reference_v<Self>)
-                return static_cast<T &>(self);
-            else
-                return static_cast<T &&>(self);
+            return std::forward<Self>(self);
         }
 
-        [[nodiscard]] std::expected<Context, std::error_code> build() const;
+        template<typename Self>
+        std::expected<Context, std::error_code> build(this const Self &self) {
+            Context context{SSL_CTX_new(TLS_method()), SSL_CTX_free};
+
+            if (!context)
+                return std::unexpected{openSSLError()};
+
+            EXPECT(expected([&] {
+                return SSL_CTX_set_min_proto_version(context.get(), std::to_underlying(self.mMinVersion));
+            }));
+
+            EXPECT(expected([&] {
+                return SSL_CTX_set_max_proto_version(context.get(), std::to_underlying(self.mMaxVersion));
+            }));
+
+            if (self.mRootCAs.empty()) {
+#ifdef _WIN32
+                const auto store = SSL_CTX_get_cert_store(context.get());
+
+                if (!store)
+                    return std::unexpected{openSSLError()};
+
+                EXPECT(loadSystemCerts(store, "CA"));
+                EXPECT(loadSystemCerts(store, "AuthRoot"));
+                EXPECT(loadSystemCerts(store, "ROOT"));
+#else
+                EXPECT(expected([&] {
+                    return SSL_CTX_set_default_verify_paths(context.get());
+                }));
+#endif
+            } else {
+                const auto store = SSL_CTX_get_cert_store(context.get());
+
+                if (!store)
+                    return std::unexpected{openSSLError()};
+
+                for (const auto &[cert]: self.mRootCAs) {
+                    EXPECT(expected([&] {
+                        return X509_STORE_add_cert(store, cert.get());
+                    }));
+                }
+            }
+
+            for (const auto &[cert, key]: self.mCertKeyPairs) {
+                EXPECT(expected([&] {
+                    return SSL_CTX_use_certificate(context.get(), cert.inner.get());
+                }));
+                EXPECT(expected([&] {
+                    return SSL_CTX_use_PrivateKey(context.get(), key.inner.get());
+                }));
+            }
+
+            if constexpr (std::is_same_v<Self, ClientConfig>) {
+                SSL_CTX_set_verify(context.get(), self.mInsecure ? SSL_VERIFY_NONE : SSL_VERIFY_PEER, nullptr);
+            }
+            else {
+                SSL_CTX_set_verify(
+                    context.get(),
+                    self.mInsecure ? SSL_VERIFY_NONE : SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+                    nullptr
+                );
+            }
+
+            return context;
+        }
 
     protected:
         Version mMinVersion{Version::TLS_VERSION_1_2};
@@ -125,7 +174,7 @@ namespace asyncio::net::tls {
         std::list<CertKeyPair> mCertKeyPairs;
     };
 
-    class ClientConfig : public Config<ClientConfig> {
+    class ClientConfig : public Config {
     public:
         template<typename Self>
             requires (!std::is_const_v<Self>)
@@ -135,7 +184,7 @@ namespace asyncio::net::tls {
         }
     };
 
-    class ServerConfig : public Config<ServerConfig> {
+    class ServerConfig : public Config {
     public:
         ServerConfig();
 
