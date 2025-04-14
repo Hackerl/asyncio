@@ -147,6 +147,92 @@ namespace asyncio {
             co_return std::move(*context.result);
         }
     }
+
+    template<typename F, typename C>
+        requires std::is_same_v<std::invoke_result_t<C>, std::expected<void, std::error_code>>
+    task::Task<std::invoke_result_t<F>, ToThreadPoolError>
+    toThreadPool(F f, C cancel) {
+        using T = std::invoke_result_t<F>;
+
+        if constexpr (std::is_void_v<T>) {
+            struct Context {
+                std::decay_t<F> function;
+                Promise<int> promise;
+            };
+
+            Context context{std::move(f)};
+            uv_work_t request{.data = &context};
+
+            const auto result = uv_queue_work(
+                getEventLoop()->raw(),
+                &request,
+                [](auto *req) {
+                    static_cast<Context *>(req->data)->function();
+                },
+                [](auto *req, const int status) {
+                    static_cast<Context *>(req->data)->promise.resolve(status);
+                }
+            );
+            assert(result == 0);
+
+            if (const auto status = *co_await task::Cancellable{
+                context.promise.getFuture(),
+                [&]() -> std::expected<void, std::error_code> {
+                    return uv::expected([&] {
+                        return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
+                    }).transform([](const auto &) {
+                    }).or_else([&](const auto &) {
+                        return cancel();
+                    });
+                }
+            }; status < 0) {
+                assert(status == UV_ECANCELED);
+                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+            }
+
+            co_return {};
+        }
+        else {
+            struct Context {
+                std::decay_t<F> function;
+                Promise<int> promise;
+                std::optional<T> result;
+            };
+
+            Context context{std::move(f)};
+            uv_work_t request{.data = &context};
+
+            const auto result = uv_queue_work(
+                getEventLoop()->raw(),
+                &request,
+                [](auto *req) {
+                    auto &[function, promise, result] = *static_cast<Context *>(req->data);
+                    result.emplace(function());
+                },
+                [](auto *req, const int status) {
+                    static_cast<Context *>(req->data)->promise.resolve(status);
+                }
+            );
+            assert(result == 0);
+
+            if (const auto status = *co_await task::Cancellable{
+                context.promise.getFuture(),
+                [&]() -> std::expected<void, std::error_code> {
+                    return uv::expected([&] {
+                        return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
+                    }).transform([](const auto &) {
+                    }).or_else([&](const auto &) {
+                        return cancel();
+                    });
+                }
+            }; status < 0) {
+                assert(status == UV_ECANCELED);
+                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+            }
+
+            co_return std::move(*context.result);
+        }
+    }
 }
 
 DECLARE_ERROR_CODE(asyncio::ToThreadPoolError)
