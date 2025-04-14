@@ -14,7 +14,7 @@ namespace asyncio {
         };
 
         explicit ChannelCore(std::shared_ptr<EventLoop> e, const std::size_t capacity)
-            : eventLoop{std::move(e)}, buffer{capacity} {
+            : eventLoop{std::move(e)}, buffer{capacity + 1} {
         }
 
         std::mutex mutex;
@@ -241,7 +241,7 @@ namespace asyncio {
         }
 
         [[nodiscard]] std::size_t capacity() const {
-            return mCore->buffer.capacity();
+            return mCore->buffer.capacity() - 1;
         }
 
         [[nodiscard]] bool empty() const {
@@ -416,7 +416,7 @@ namespace asyncio {
         }
 
         [[nodiscard]] std::size_t capacity() const {
-            return mCore->buffer.capacity();
+            return mCore->buffer.capacity() - 1;
         }
 
         [[nodiscard]] bool empty() const {
@@ -454,13 +454,13 @@ namespace asyncio {
     using Channel = std::pair<Sender<T>, Receiver<T>>;
 
     template<typename T>
-    Channel<T> channel(std::shared_ptr<EventLoop> eventLoop, const std::size_t capacity) {
+    Channel<T> channel(std::shared_ptr<EventLoop> eventLoop, const std::size_t capacity = 1) {
         const auto core = std::make_shared<ChannelCore<T>>(std::move(eventLoop), capacity);
         return {Sender<T>{core}, Receiver<T>{core}};
     }
 
     template<typename T>
-    Channel<T> channel(const std::size_t capacity) {
+    Channel<T> channel(const std::size_t capacity = 1) {
         return channel<T>(getEventLoop(), capacity);
     }
 }
