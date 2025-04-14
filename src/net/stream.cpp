@@ -210,12 +210,12 @@ asyncio::task::Task<void, std::error_code> asyncio::net::TCPStream::closeReset()
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::TCPStream::read(const std::span<std::byte> data) {
-    co_return co_await mStream.read(data);
+    return mStream.read(data);
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::TCPStream::write(const std::span<const std::byte> data) {
-    co_return co_await mStream.write(data);
+    return mStream.write(data);
 }
 
 asyncio::task::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
@@ -231,7 +231,7 @@ asyncio::net::TCPStream::readFrom(const std::span<std::byte> data) {
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::TCPStream::writeTo(const std::span<const std::byte> data, const Address) {
-    co_return co_await write(data);
+    return write(data);
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::net::TCPStream::close() {
@@ -447,12 +447,12 @@ std::expected<DWORD, std::error_code> asyncio::net::NamedPipeStream::serverProce
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::NamedPipeStream::read(const std::span<std::byte> data) {
-    co_return co_await mPipe.read(data);
+    return mPipe.read(data);
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::NamedPipeStream::write(const std::span<const std::byte> data) {
-    co_return co_await mPipe.write(data);
+    return mPipe.write(data);
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::net::NamedPipeStream::close() {
@@ -670,12 +670,12 @@ asyncio::task::Task<void, std::error_code> asyncio::net::UnixStream::shutdown() 
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UnixStream::read(const std::span<std::byte> data) {
-    co_return co_await mPipe.read(data);
+    return mPipe.read(data);
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UnixStream::write(const std::span<const std::byte> data) {
-    co_return co_await mPipe.write(data);
+    return mPipe.write(data);
 }
 
 asyncio::task::Task<std::pair<std::size_t, asyncio::net::Address>, std::error_code>
@@ -691,7 +691,7 @@ asyncio::net::UnixStream::readFrom(const std::span<std::byte> data) {
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UnixStream::writeTo(const std::span<const std::byte> data, const Address) {
-    co_return co_await write(data);
+    return write(data);
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::net::UnixStream::close() {

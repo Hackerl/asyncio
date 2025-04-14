@@ -201,7 +201,7 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
 }
 
 asyncio::task::Task<std::vector<std::byte>, std::error_code> asyncio::fs::read(std::filesystem::path path) {
-    co_return co_await open(std::move(path), O_RDONLY).andThen(&IReader::readAll);
+    return open(std::move(path), O_RDONLY).andThen(&IReader::readAll);
 }
 
 asyncio::task::Task<std::string, std::error_code> asyncio::fs::readString(std::filesystem::path path) {

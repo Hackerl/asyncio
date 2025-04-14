@@ -223,7 +223,7 @@ std::expected<void, std::error_code> asyncio::net::UDPSocket::setTTL(const int t
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UDPSocket::read(const std::span<std::byte> data) {
-    co_return co_await readFrom(data).transform([](const auto &result) {
+    return readFrom(data).transform([](const auto &result) {
         return result.first;
     });
 }

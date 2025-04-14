@@ -116,12 +116,12 @@ asyncio::process::PseudoConsole::Pipe::Pipe(asyncio::Pipe reader, asyncio::Pipe 
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::process::PseudoConsole::Pipe::read(const std::span<std::byte> data) {
-    co_return co_await mReader.read(data);
+    return mReader.read(data);
 }
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::process::PseudoConsole::Pipe::write(const std::span<const std::byte> data) {
-    co_return co_await mWriter.write(data);
+    return mWriter.write(data);
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::process::PseudoConsole::Pipe::close() {
@@ -134,7 +134,7 @@ asyncio::process::PseudoConsole::Pipe::Pipe(asyncio::Pipe pipe) : asyncio::Pipe{
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::process::PseudoConsole::Pipe::read(const std::span<std::byte> data) {
-    co_return co_await asyncio::Pipe::read(data)
+    return asyncio::Pipe::read(data)
         .orElse([](const auto &ec) -> std::expected<std::size_t, std::error_code> {
             if (ec != std::errc::io_error)
                 return std::unexpected{ec};

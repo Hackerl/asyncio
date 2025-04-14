@@ -375,12 +375,12 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMe
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::sendText(std::string text) {
-    co_return co_await writeMessage({Opcode::TEXT, std::move(text)});
+    return writeMessage({Opcode::TEXT, std::move(text)});
 }
 
 asyncio::task::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::sendBinary(const std::span<const std::byte> data) {
-    co_return co_await writeMessage({Opcode::BINARY, std::vector<std::byte>{data.begin(), data.end()}});
+    return writeMessage({Opcode::BINARY, std::vector<std::byte>{data.begin(), data.end()}});
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
