@@ -10,8 +10,8 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 18
-          sudo apt install -y libc++abi-18-dev libc++-18-dev
+          sudo ./llvm.sh 19
+          sudo apt install -y libc++abi-19-dev libc++-19-dev
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
       - name: Build and test
@@ -22,11 +22,9 @@ jobs:
           buildPreset: debug-asan
           testPreset: debug-asan
         env:
-          CC: clang-18
-          CXX: clang++-18
+          CC: clang-19
+          CXX: clang++-19
           CXXFLAGS: -stdlib=libc++
-          # https://github.com/llvm/llvm-project/issues/59432
-          ASAN_OPTIONS: alloc_dealloc_mismatch=0
 
   # `REQUIRE(co_await expr)` unexpectedly repeats execution in GCC, so skip unit testing for now.
   linux-static:
@@ -122,6 +120,7 @@ jobs:
           CC: ${{ env.LLVM_HOME }}/bin/clang
           CXX: ${{ env.LLVM_HOME }}/bin/clang++
           LDFLAGS: -L${{ env.LLVM_HOME }}/lib/c++ -L${{ env.LLVM_HOME }}/lib -L${{ env.LLVM_HOME }}/lib/unwind -lunwind -Wl,-rpath,${{ env.LLVM_HOME }}/lib/c++ -Wl,-rpath,${{ env.LLVM_HOME }}/lib -Wl,-rpath,${{ env.LLVM_HOME }}/lib/unwind
+          SDKROOT: macosx
 
   android:
     runs-on: ubuntu-latest
@@ -140,7 +139,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r27
+          ndk-version: r27c
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
       - name: Create custom triplet

@@ -302,7 +302,7 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
         );
     }));
 
-    co_return co_await task::Cancellable{
+    co_return co_await task::CancellableFuture{
         context.promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())

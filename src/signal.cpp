@@ -27,7 +27,7 @@ asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
         );
     }));
 
-    co_return co_await task::Cancellable{
+    co_return co_await task::CancellableFuture{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())

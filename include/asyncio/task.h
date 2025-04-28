@@ -141,8 +141,14 @@ namespace asyncio::task {
     };
 
     template<typename T, typename E>
-    struct Cancellable {
+    struct CancellableFuture {
         zero::async::promise::Future<T, E> future;
+        std::function<std::expected<void, std::error_code>()> cancel;
+    };
+
+    template<typename T, typename E>
+    struct CancellableTask {
+        Task<T, E> task;
         std::function<std::expected<void, std::error_code>()> cancel;
     };
 
@@ -450,7 +456,7 @@ namespace asyncio::task {
         template<typename Result, typename Error>
         NoExceptAwaitable<Result, Error>
         await_transform(
-            Cancellable<Result, Error> cancellable,
+            CancellableFuture<Result, Error> cancellable,
             const std::source_location location = std::source_location::current()
         ) {
             mFrame->location = location;
@@ -461,6 +467,23 @@ namespace asyncio::task {
                 mFrame->cancel = std::move(cancellable.cancel);
 
             return {std::move(cancellable.future), [this] { mFrame->step(); }};
+        }
+
+        template<typename Result, typename Error>
+        Awaitable<Result, Error>
+        await_transform(
+            CancellableTask<Result, Error> cancellable,
+            const std::source_location location = std::source_location::current()
+        ) {
+            mFrame->next = cancellable.task.mFrame;
+            mFrame->location = location;
+
+            if (mFrame->cancelled && !mFrame->locked)
+                std::ignore = cancellable.cancel();
+            else
+                mFrame->cancel = std::move(cancellable.cancel);
+
+            return {cancellable.task.future(), [this] { mFrame->step(); }};
         }
 
         template<typename Result, typename Error>
@@ -611,7 +634,7 @@ namespace asyncio::task {
         template<typename Result, typename Error>
         NoExceptAwaitable<Result, Error>
         await_transform(
-            Cancellable<Result, Error> cancellable,
+            CancellableFuture<Result, Error> cancellable,
             const std::source_location location = std::source_location::current()
         ) {
             mFrame->location = location;
@@ -622,6 +645,23 @@ namespace asyncio::task {
                 mFrame->cancel = std::move(cancellable.cancel);
 
             return {std::move(cancellable.future), [this] { mFrame->step(); }};
+        }
+
+        template<typename Result, typename Error>
+        Awaitable<Result, Error>
+        await_transform(
+            CancellableTask<Result, Error> cancellable,
+            const std::source_location location = std::source_location::current()
+        ) {
+            mFrame->next = cancellable.task.mFrame;
+            mFrame->location = location;
+
+            if (mFrame->cancelled && !mFrame->locked)
+                std::ignore = cancellable.cancel();
+            else
+                mFrame->cancel = std::move(cancellable.cancel);
+
+            return {cancellable.task.future(), [this] { mFrame->step(); }};
         }
 
         template<typename Result, typename Error>
@@ -1055,7 +1095,7 @@ namespace asyncio::task {
     }
 
     template<typename T, typename E>
-    Task<T, E> from(Cancellable<T, E> cancellable) {
+    Task<T, E> from(CancellableFuture<T, E> cancellable) {
         auto result = co_await std::move(cancellable);
 
         if constexpr (std::is_same_v<E, std::exception_ptr>) {
@@ -1068,6 +1108,17 @@ namespace asyncio::task {
         else {
             co_return std::move(result);
         }
+    }
+
+    template<typename T, typename E>
+    Task<T, E> from(CancellableTask<T, E> cancellable) {
+        co_return co_await std::move(cancellable);
+    }
+
+    template<typename F>
+        requires zero::detail::is_specialization_v<std::invoke_result_t<F>, Task>
+    std::invoke_result_t<F> spawn(F f) {
+        co_return co_await f();
     }
 }
 

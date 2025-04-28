@@ -7,7 +7,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Event::wait() {
     const auto promise = std::make_shared<Promise<void, std::error_code>>();
     mPending.push_back(promise);
 
-    co_return co_await task::Cancellable{
+    co_return co_await task::CancellableFuture{
         promise->getFuture(),
         [=, this]() -> std::expected<void, std::error_code> {
             if (mPending.remove(promise) == 0)

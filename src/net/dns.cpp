@@ -46,7 +46,7 @@ asyncio::net::dns::getAddressInfo(
         );
     }));
 
-    co_return co_await task::Cancellable{
+    co_return co_await task::CancellableFuture{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             EXPECT(uv::expected([&] {

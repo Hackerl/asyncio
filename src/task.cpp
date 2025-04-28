@@ -29,18 +29,16 @@ std::expected<void, std::error_code> asyncio::task::Frame::cancelAll() {
         frame->cancelled = true;
 
         if (frame->locked)
-            return std::unexpected{make_error_code(Error::LOCKED)};
+            return std::unexpected{Error::LOCKED};
+
+        if (frame->cancel)
+            return std::exchange(frame->cancel, nullptr)();
 
         if (!frame->next)
-            break;
+            return std::unexpected{Error::CANCELLATION_NOT_SUPPORTED};
 
         frame = frame->next.get();
     }
-
-    if (!frame->cancel)
-        return std::unexpected{make_error_code(Error::CANCELLATION_NOT_SUPPORTED)};
-
-    return std::exchange(frame->cancel, nullptr)();
 }
 
 tree<std::source_location> asyncio::task::Frame::callTree() const {

@@ -121,7 +121,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         );
     }));
 
-    co_return co_await task::Cancellable{
+    co_return co_await task::CancellableFuture{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
@@ -173,7 +173,7 @@ task.cancel();
 ```c++
 asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
     // ...
-    co_return co_await task::Cancellable{
+    co_return co_await task::CancellableFuture{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())

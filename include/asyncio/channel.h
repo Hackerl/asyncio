@@ -214,7 +214,7 @@ namespace asyncio {
                 mCore->sender.pending.push_back(promise);
                 mCore->mutex.unlock();
 
-                if (const auto result = co_await task::Cancellable{
+                if (const auto result = co_await task::CancellableFuture{
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())
@@ -393,7 +393,7 @@ namespace asyncio {
                 mCore->receiver.pending.push_back(promise);
                 mCore->mutex.unlock();
 
-                if (const auto result = co_await task::Cancellable{
+                if (const auto result = co_await task::CancellableFuture{
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())

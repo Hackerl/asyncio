@@ -53,7 +53,7 @@ namespace asyncio {
         };
         DEFER(thread.join());
 
-        co_return *co_await task::Cancellable{
+        co_return *co_await task::CancellableFuture{
             promise.getFuture(),
             [&]() -> std::expected<void, std::error_code> {
                 return cancel(thread.native_handle());
@@ -93,7 +93,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const auto status = *co_await task::Cancellable{
+            if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     EXPECT(uv::expected([&] {
@@ -131,7 +131,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const auto status = *co_await task::Cancellable{
+            if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     EXPECT(uv::expected([&] {
@@ -175,7 +175,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const auto status = *co_await task::Cancellable{
+            if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     return uv::expected([&] {
@@ -215,7 +215,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const auto status = *co_await task::Cancellable{
+            if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     return uv::expected([&] {

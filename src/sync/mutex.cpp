@@ -17,7 +17,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Mutex::lock() {
     const auto promise = std::make_shared<Promise<void, std::error_code>>();
     mPending.push_back(promise);
 
-    const auto result = co_await task::Cancellable{
+    const auto result = co_await task::CancellableFuture{
         promise->getFuture(),
         [=]() -> std::expected<void, std::error_code> {
             if (promise->isFulfilled())
