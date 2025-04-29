@@ -1,4 +1,5 @@
 #include <asyncio/event_loop.h>
+#include <asyncio/task.h>
 
 thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 
@@ -108,4 +109,39 @@ std::shared_ptr<asyncio::EventLoop> asyncio::getEventLoop() {
 
 void asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
     threadEventLoop = eventLoop;
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::reschedule() {
+    auto ptr = std::make_unique<uv_idle_t>();
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_idle_init(getEventLoop()->raw(), ptr.get());
+    }));
+
+    uv::Handle idle{std::move(ptr)};
+
+    Promise<void, std::error_code> promise;
+    idle->data = &promise;
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_idle_start(
+            idle.raw(),
+            [](auto *handle) {
+                uv_idle_stop(handle);
+                static_cast<Promise<void, std::error_code> *>(handle->data)->resolve();
+            }
+        );
+    }));
+
+    co_return co_await task::CancellableFuture{
+        promise.getFuture(),
+        [&]() -> std::expected<void, std::error_code> {
+            if (promise.isFulfilled())
+                return std::unexpected{task::Error::WILL_BE_DONE};
+
+            uv_idle_stop(idle.raw());
+            promise.reject(task::Error::CANCELLED);
+            return {};
+        }
+    };
 }

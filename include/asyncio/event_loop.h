@@ -74,6 +74,8 @@ namespace asyncio {
         assert(future.isReady());
         return {std::move(future).result()};
     }
+
+    task::Task<void, std::error_code> reschedule();
 }
 
 #endif //ASYNCIO_EVENT_LOOP_H
