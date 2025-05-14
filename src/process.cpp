@@ -28,17 +28,17 @@ std::optional<asyncio::Pipe> &asyncio::process::ChildProcess::stdError() {
 // ReSharper disable once CppMemberFunctionMayBeConst
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::ChildProcess::wait() {
 #ifdef _WIN32
-    const auto event = CreateEventA(nullptr, false, false, nullptr);
+    const auto handle = CreateEventA(nullptr, false, false, nullptr);
 
-    if (!event)
+    if (!handle)
         co_return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
 
-    DEFER(CloseHandle(event));
+    const zero::os::Resource event{handle};
 
     co_return co_await toThread(
         [&]() -> std::expected<ExitStatus, std::error_code> {
             const auto &impl = this->impl();
-            const std::array handles{*impl.handle(), event};
+            const std::array handles{*impl.handle(), *event};
 
             const auto result = WaitForMultipleObjects(handles.size(), handles.data(), false, INFINITE);
 
@@ -54,7 +54,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
         },
         [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
             return zero::os::windows::expected([&] {
-                return SetEvent(event);
+                return SetEvent(*event);
             });
         }
     );
