@@ -15,7 +15,7 @@ ASYNC_TEST_CASE("event", "[sync]") {
         auto task2 = event.wait();
         REQUIRE_FALSE(task2.done());
 
-        co_await asyncio::sleep(20ms);
+        REQUIRE(co_await asyncio::sleep(20ms));
 
         REQUIRE_FALSE(event.isSet());
         REQUIRE_FALSE(task1.done());

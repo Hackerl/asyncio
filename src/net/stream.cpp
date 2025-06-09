@@ -194,18 +194,17 @@ asyncio::task::Task<void, std::error_code> asyncio::net::TCPStream::shutdown() {
 asyncio::task::Task<void, std::error_code> asyncio::net::TCPStream::closeReset() {
     const auto handle = mStream.mStream.release();
 
-    Promise<void> promise;
+    Promise<void, std::error_code> promise;
     handle->data = &promise;
 
     uv_tcp_close_reset(
         reinterpret_cast<uv_tcp_t *>(handle.get()),
         [](auto *h) {
-            static_cast<Promise<void> *>(h->data)->resolve();
+            static_cast<Promise<void, std::error_code> *>(h->data)->resolve();
         }
     );
 
-    co_await promise.getFuture();
-    co_return {};
+    co_return co_await promise.getFuture();
 }
 
 asyncio::task::Task<std::size_t, std::error_code>

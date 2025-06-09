@@ -67,7 +67,9 @@ ASYNC_TEST_CASE("automatically cancel at next suspension point - exception", "[t
     asyncio::Promise<void, std::exception_ptr> promise2;
 
     auto task = asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
-        co_await promise1.getFuture();
+        if (const auto result = co_await promise1.getFuture(); !result)
+            std::rethrow_exception(result.error());
+
         co_await from(asyncio::task::CancellableFuture{
             promise2.getFuture(),
             [&]() -> std::expected<void, std::error_code> {

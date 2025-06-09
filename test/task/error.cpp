@@ -1107,7 +1107,9 @@ ASYNC_TEST_CASE("task transform - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .transform([](const auto &value) -> asyncio::task::Task<int> {
-                co_await asyncio::reschedule();
+                if (const auto result = co_await asyncio::reschedule(); !result)
+                    throw std::system_error{result.error()};
+
                 co_return value * 10;
             });
 
@@ -1146,7 +1148,9 @@ ASYNC_TEST_CASE("task transform error - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .transformError([](const auto &ec) -> asyncio::task::Task<int> {
-                co_await asyncio::reschedule();
+                if (const auto result = co_await asyncio::reschedule(); !result)
+                    throw std::system_error{result.error()};
+
                 co_return ec.value();
             });
 
@@ -1195,7 +1199,7 @@ ASYNC_TEST_CASE("task and then - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .andThen([](const auto &value) -> asyncio::task::Task<int, std::error_code> {
-                co_await asyncio::reschedule();
+                CO_EXPECT(co_await asyncio::reschedule());
 
                 if (value % 2)
                     co_return std::unexpected{make_error_code(std::errc::invalid_argument)};
@@ -1255,7 +1259,7 @@ ASYNC_TEST_CASE("task or else - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .orElse([](const auto &ec) -> asyncio::task::Task<int, std::error_code> {
-                co_await asyncio::reschedule();
+                CO_EXPECT(co_await asyncio::reschedule());
 
                 if (ec != std::errc::io_error)
                     co_return std::unexpected{ec};

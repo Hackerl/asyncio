@@ -34,7 +34,7 @@ namespace asyncio {
         }
 
         std::ignore = timer.cancel();
-        co_await std::move(future);
+        std::ignore = co_await std::move(future);
 
         co_return std::expected<std::expected<T, E>, TimeoutError>{std::move(result)};
     }

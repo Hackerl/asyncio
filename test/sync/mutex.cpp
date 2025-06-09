@@ -15,7 +15,7 @@ ASYNC_TEST_CASE("mutex", "[sync]") {
         auto task = mutex.lock();
         REQUIRE_FALSE(task.done());
 
-        co_await asyncio::sleep(20ms);
+        REQUIRE(co_await asyncio::sleep(20ms));
         REQUIRE_FALSE(task.done());
 
         mutex.unlock();

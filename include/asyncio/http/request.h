@@ -242,7 +242,7 @@ namespace asyncio::http {
             if (task && !task->done()) {
                 aborted = true;
                 std::ignore = task->cancel();
-                co_await std::move(*future);
+                std::ignore = co_await std::move(*future);
             }
 
             co_return std::move(response);

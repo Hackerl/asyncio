@@ -72,7 +72,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
         message.resize(*n);
 
         fmt::print("receive message: {}\n", message);
-        co_await asyncio::sleep(1s);
+        CO_EXPECT(co_await asyncio::sleep(1s));
     }
 
     co_return {};

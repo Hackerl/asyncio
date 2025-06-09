@@ -4,7 +4,7 @@
 ASYNC_TEST_CASE("sleep", "[time]") {
     using namespace std::chrono_literals;
     const auto tp = std::chrono::system_clock::now();
-    co_await asyncio::sleep(50ms);
+    REQUIRE(co_await asyncio::sleep(50ms));
     REQUIRE(std::chrono::system_clock::now() - tp > 45ms);
 }
 

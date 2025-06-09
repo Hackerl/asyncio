@@ -381,16 +381,15 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, std::str
 asyncio::task::Task<void, std::error_code> asyncio::net::UDPSocket::close() {
     const auto handle = mUDP.release();
 
-    Promise<void> promise;
+    Promise<void, std::error_code> promise;
     handle->data = &promise;
 
     uv_close(
         reinterpret_cast<uv_handle_t *>(handle.get()),
         [](auto *h) {
-            static_cast<Promise<void> *>(h->data)->resolve();
+            static_cast<Promise<void, std::error_code> *>(h->data)->resolve();
         }
     );
 
-    co_await promise.getFuture();
-    co_return {};
+    co_return co_await promise.getFuture();
 }

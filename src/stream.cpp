@@ -246,18 +246,17 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
 asyncio::task::Task<void, std::error_code> asyncio::Stream::close() {
     const auto handle = mStream.release();
 
-    Promise<void> promise;
+    Promise<void, std::error_code> promise;
     handle->data = &promise;
 
     uv_close(
         reinterpret_cast<uv_handle_t *>(handle.get()),
         [](auto *h) {
-            static_cast<Promise<void> *>(h->data)->resolve();
+            static_cast<Promise<void, std::error_code> *>(h->data)->resolve();
         }
     );
 
-    co_await promise.getFuture();
-    co_return {};
+    co_return co_await promise.getFuture();
 }
 
 std::expected<std::size_t, std::error_code> asyncio::Stream::tryWrite(const std::span<const std::byte> data) {
@@ -321,16 +320,15 @@ asyncio::task::Task<void, std::error_code> asyncio::Listener::close() {
     const auto handle = mCore->stream.release();
     mCore.reset();
 
-    Promise<void> promise;
+    Promise<void, std::error_code> promise;
     handle->data = &promise;
 
     uv_close(
         reinterpret_cast<uv_handle_t *>(handle.get()),
         [](auto *h) {
-            static_cast<Promise<void> *>(h->data)->resolve();
+            static_cast<Promise<void, std::error_code> *>(h->data)->resolve();
         }
     );
 
-    co_await promise.getFuture();
-    co_return {};
+    co_return co_await promise.getFuture();
 }

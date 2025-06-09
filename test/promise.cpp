@@ -11,5 +11,5 @@ ASYNC_TEST_CASE("promise", "[promise]") {
 
     promise.resolve();
     REQUIRE_FALSE(event.isSet());
-    co_await event.wait();
+    REQUIRE(co_await event.wait());
 }

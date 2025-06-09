@@ -322,7 +322,7 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     CO_EXPECT(child);
 
     if (auto input = std::exchange(child->stdInput(), std::nullopt))
-        co_await input->close();
+        std::ignore = co_await input->close();
 
     auto result = co_await all(
         [&]() -> task::Task<std::vector<std::byte>, std::error_code> {
@@ -345,7 +345,7 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
 
     if (!result) {
         std::ignore = child->kill();
-        co_await child->wait();
+        std::ignore = co_await child->wait();
         co_return std::unexpected{result.error()};
     }
 
