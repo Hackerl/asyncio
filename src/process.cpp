@@ -325,22 +325,22 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
         std::ignore = co_await input->close();
 
     auto result = co_await all(
-        [&]() -> task::Task<std::vector<std::byte>, std::error_code> {
+        task::spawn([&]() -> task::Task<std::vector<std::byte>, std::error_code> {
             auto &out = child->stdOutput();
 
             if (!out)
                 co_return {};
 
             co_return co_await out->readAll();
-        }(),
-        [&]() -> task::Task<std::vector<std::byte>, std::error_code> {
+        }),
+        task::spawn([&]() -> task::Task<std::vector<std::byte>, std::error_code> {
             auto &err = child->stdError();
 
             if (!err)
                 co_return {};
 
             co_return co_await err->readAll();
-        }()
+        })
     );
 
     if (!result) {
