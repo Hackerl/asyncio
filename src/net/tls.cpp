@@ -1,9 +1,36 @@
 #include <asyncio/net/tls.h>
 #include <asyncio/fs.h>
 
+#ifdef __linux__
+constexpr auto SYSTEM_CA_BUNDLE_PATHS = {
+    "/etc/ssl/certs/ca-certificates.crt",
+    "/etc/pki/tls/certs/ca-bundle.crt",
+    "/etc/ssl/ca-bundle.pem",
+    "/etc/pki/tls/cacert.pem",
+    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+    "/etc/ssl/cert.pem"
+};
+#endif
+
 std::error_code asyncio::net::tls::openSSLError() {
     return static_cast<OpenSSLError>(ERR_get_error());
 }
+
+#ifdef __linux__
+std::optional<std::filesystem::path> asyncio::net::tls::systemCABundle() {
+    const auto it = std::ranges::find_if(
+        SYSTEM_CA_BUNDLE_PATHS,
+        [](const auto &path) {
+            return zero::filesystem::exists(path).value_or(false);
+        }
+    );
+
+    if (it == SYSTEM_CA_BUNDLE_PATHS.end())
+        return std::nullopt;
+
+    return *it;
+}
+#endif
 
 std::expected<asyncio::net::tls::Certificate, std::error_code>
 asyncio::net::tls::Certificate::load(const std::string_view content) {

@@ -1,7 +1,6 @@
 #ifndef ASYNCIO_TLS_H
 #define ASYNCIO_TLS_H
 
-#include <variant>
 #include <filesystem>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -22,6 +21,10 @@ namespace asyncio::net::tls {
     )
 
     std::error_code openSSLError();
+
+#ifdef __linux__
+    std::optional<std::filesystem::path> systemCABundle();
+#endif
 
     template<typename F>
         requires (std::is_same_v<std::invoke_result_t<F>, int> || std::is_same_v<std::invoke_result_t<F>, long>)
@@ -129,6 +132,13 @@ namespace asyncio::net::tls {
                 EXPECT(expected([&] {
                     return SSL_CTX_set_default_verify_paths(context.get());
                 }));
+#ifdef __linux__
+                if (const auto bundle = systemCABundle()) {
+                    EXPECT(expected([&] {
+                        return SSL_CTX_load_verify_locations(context.get(), bundle->string().c_str(), nullptr);
+                    }));
+                }
+#endif
 #endif
             } else {
                 const auto store = SSL_CTX_get_cert_store(context.get());

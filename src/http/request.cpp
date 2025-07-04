@@ -2,6 +2,10 @@
 #include <asyncio/fs.h>
 #include <zero/defer.h>
 
+#ifdef __linux__
+#include <asyncio/net/tls.h>
+#endif
+
 using namespace std::chrono_literals;
 
 constexpr auto DEFAULT_CONNECT_TIMEOUT = 30s;
@@ -479,6 +483,11 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     const auto &[insecure, ca, cert, privateKey, password] = tls;
 
     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L);
+
+#ifdef __linux__
+    if (const auto bundle = net::tls::systemCABundle())
+        curl_easy_setopt(easy, CURLOPT_CAINFO, bundle->string().c_str());
+#endif
 
     if (ca)
         curl_easy_setopt(easy, CURLOPT_CAINFO, ca->c_str());
