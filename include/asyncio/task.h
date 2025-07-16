@@ -756,6 +756,8 @@ namespace asyncio::task {
         all_ranges_error_t<I, S>
     >
     all(I first, S last) {
+        assert(first != last);
+
         using T = all_ranges_value_t<I, S>;
         using E = all_ranges_error_t<I, S>;
 
@@ -809,6 +811,8 @@ namespace asyncio::task {
         all_variadic_error_t<Ts...>
     >
     all(Ts &&... tasks) {
+        static_assert(sizeof...(Ts) > 0);
+
         using T = all_variadic_value_t<Ts...>;
         using E = all_variadic_error_t<Ts...>;
 
@@ -854,6 +858,8 @@ namespace asyncio::task {
         requires zero::detail::is_specialization_v<std::iter_value_t<I>, Task>
     Task<all_settled_ranges_value_t<I, S>>
     allSettled(I first, S last) {
+        assert(first != last);
+
         TaskGroup group;
 
         std::for_each(first, last, [&](auto &task) { group.add(task); });
@@ -886,6 +892,8 @@ namespace asyncio::task {
         requires (zero::detail::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
     Task<all_settled_variadic_value_t<Ts...>>
     allSettled(Ts &&... tasks) {
+        static_assert(sizeof...(Ts) > 0);
+
         TaskGroup group;
 
         (group.add(tasks), ...);
@@ -922,6 +930,8 @@ namespace asyncio::task {
         any_ranges_error_t<I, S>
     >
     any(I first, S last) {
+        assert(first != last);
+
         TaskGroup group;
 
         std::for_each(first, last, [&](auto &task) { group.add(task); });
@@ -960,6 +970,8 @@ namespace asyncio::task {
         any_variadic_error_t<Ts...>
     >
     any(Ts &&... tasks) {
+        static_assert(sizeof...(Ts) > 0);
+
         TaskGroup group;
 
         (group.add(tasks), ...);
@@ -996,6 +1008,8 @@ namespace asyncio::task {
         race_ranges_error_t<I, S>
     >
     race(I first, S last) {
+        assert(first != last);
+
         using T = race_ranges_value_t<I, S>;
         using E = race_ranges_error_t<I, S>;
 
@@ -1049,6 +1063,8 @@ namespace asyncio::task {
         race_variadic_error_t<Ts...>
     >
     race(Ts &&... tasks) {
+        static_assert(sizeof...(Ts) > 0);
+
         using T = race_variadic_value_t<Ts...>;
         using E = race_variadic_error_t<Ts...>;
 
