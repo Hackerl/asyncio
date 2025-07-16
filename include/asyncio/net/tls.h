@@ -213,12 +213,8 @@ namespace asyncio::net::tls {
     )
 
     template<typename T>
-        requires (
-            zero::detail::Trait<T, IReader> &&
-            zero::detail::Trait<T, IWriter> &&
-            zero::detail::Trait<T, ICloseable>
-        )
-    class TLS final : public IReader, public IWriter, public ICloseable {
+        requires (zero::detail::Trait<T, IReader> && zero::detail::Trait<T, IWriter>)
+    class TLS final : public IReader, public IWriter, public ICloseable, public IHalfCloseable {
     public:
         TLS(T stream, std::unique_ptr<SSL, decltype(&SSL_free)> ssl)
             : mStream{std::move(stream)}, mSSL{std::move(ssl)} {
@@ -306,17 +302,8 @@ namespace asyncio::net::tls {
                     co_return result;
                 }
 
-                if (result == 0) {
-                    if (const auto res = SSL_shutdown(mSSL.get()); res != 1) {
-                        assert(res < 0);
-                        co_return std::unexpected{
-                            make_error_code(static_cast<OpenSSLError>(SSL_get_error(mSSL.get(), result)))
-                        };
-                    }
-
-                    CO_EXPECT(co_await transferOut());
+                if (result == 0)
                     co_return 0;
-                }
 
                 if (const auto error = SSL_get_error(mSSL.get(), result); error == SSL_ERROR_WANT_READ) {
                     CO_EXPECT(co_await transferOut());
@@ -359,19 +346,12 @@ namespace asyncio::net::tls {
             }
         }
 
-        task::Task<void, std::error_code> close() override {
+        task::Task<void, std::error_code> shutdown() override {
             while (true) {
                 const auto result = SSL_shutdown(mSSL.get());
 
-                if (result == 0) {
-                    CO_EXPECT(co_await transferOut());
-                    continue;
-                }
-
-                if (result == 1) {
-                    CO_EXPECT(co_await transferOut());
-                    break;
-                }
+                if (result == 0 || result == 1)
+                    co_return co_await transferOut();
 
                 if (const auto error = SSL_get_error(mSSL.get(), result); error == SSL_ERROR_WANT_READ) {
                     CO_EXPECT(co_await transferOut());
@@ -387,9 +367,34 @@ namespace asyncio::net::tls {
                     co_return std::unexpected{make_error_code(static_cast<OpenSSLError>(error))};
                 }
             }
+        }
 
-            CO_EXPECT(co_await std::invoke(&ICloseable::close, mStream));
-            co_return {};
+        task::Task<void, std::error_code> close() override {
+            while (true) {
+                const auto result = SSL_shutdown(mSSL.get());
+
+                if (result == 0) {
+                    CO_EXPECT(co_await transferOut());
+                    continue;
+                }
+
+                if (result == 1)
+                    co_return co_await transferOut();
+
+                if (const auto error = SSL_get_error(mSSL.get(), result); error == SSL_ERROR_WANT_READ) {
+                    CO_EXPECT(co_await transferOut());
+                    CO_EXPECT(co_await transferIn());
+                }
+                else if (error == SSL_ERROR_WANT_WRITE) {
+                    CO_EXPECT(co_await transferOut());
+                }
+                else if (error == SSL_ERROR_SSL) {
+                    co_return std::unexpected{openSSLError()};
+                }
+                else {
+                    co_return std::unexpected{make_error_code(static_cast<OpenSSLError>(error))};
+                }
+            }
         }
 
     private:

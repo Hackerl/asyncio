@@ -5,7 +5,7 @@
 #include <asyncio/pipe.h>
 
 namespace asyncio::net {
-    class TCPStream final : public ISocket {
+    class TCPStream final : public ISocket, public IHalfCloseable {
     public:
         explicit TCPStream(Stream stream);
 
@@ -31,7 +31,7 @@ namespace asyncio::net {
 
         std::expected<void, std::error_code> simultaneousAccepts(bool enable);
 
-        task::Task<void, std::error_code> shutdown();
+        task::Task<void, std::error_code> shutdown() override;
         task::Task<void, std::error_code> closeReset();
 
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
@@ -109,7 +109,7 @@ namespace asyncio::net {
         PipeListener mListener;
     };
 #else
-    class UnixStream final : public ISocket {
+    class UnixStream final : public ISocket, public IHalfCloseable {
     public:
         struct Credential {
             uid_t uid{};
@@ -129,7 +129,7 @@ namespace asyncio::net {
 
         [[nodiscard]] std::expected<Credential, std::error_code> peerCredential() const;
 
-        task::Task<void, std::error_code> shutdown();
+        task::Task<void, std::error_code> shutdown() override;
 
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;

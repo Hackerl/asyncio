@@ -195,11 +195,41 @@ ASYNC_TEST_CASE("tls stream", "[net]") {
         REQUIRE(co_await task);
     }
 
+    SECTION("shutdown") {
+        {
+            auto task = client.shutdown();
+
+            std::array<std::byte, 1024> data{};
+            REQUIRE(co_await server.read(data) == 0);
+            REQUIRE(co_await task);
+        }
+
+        {
+            auto task = server.writeAll(std::as_bytes(std::span{MESSAGE}));
+
+            std::string message;
+            message.resize(MESSAGE.size());
+
+            REQUIRE(co_await client.readExactly(std::as_writable_bytes(std::span{message})));
+            REQUIRE(message == MESSAGE);
+            REQUIRE(co_await task);
+        }
+
+        {
+            auto task = server.shutdown();
+
+            std::array<std::byte, 1024> data{};
+            REQUIRE(co_await client.read(data) == 0);
+            REQUIRE(co_await task);
+        }
+    }
+
     SECTION("close") {
         auto task = client.close();
 
         std::array<std::byte, 1024> data{};
         REQUIRE(co_await server.read(data) == 0);
+        REQUIRE(co_await server.shutdown());
         REQUIRE(co_await task);
     }
 }

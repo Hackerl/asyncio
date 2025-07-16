@@ -24,6 +24,11 @@ namespace asyncio {
         virtual task::Task<void, std::error_code> close() = 0;
     };
 
+    class IHalfCloseable : public virtual zero::Interface {
+    public:
+        virtual task::Task<void, std::error_code> shutdown() = 0;
+    };
+
     class IReader : public virtual zero::Interface {
     public:
         DEFINE_ERROR_CODE_INNER_EX(
