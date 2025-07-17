@@ -228,7 +228,7 @@ TEST_CASE("convert socket address to network address", "[net]") {
 }
 
 ASYNC_TEST_CASE("copy bidirectional", "[net]") {
-    const auto input = GENERATE(take(10, randomBytes(1, 10240)));
+    const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
     auto pair1 = asyncio::Stream::pair();
     REQUIRE(pair1);
@@ -241,13 +241,17 @@ ASYNC_TEST_CASE("copy bidirectional", "[net]") {
     auto &stream1 = pair1->at(0);
     auto &stream2 = pair2->at(1);
 
+    auto task1 = stream2.readAll();
+
     REQUIRE(co_await stream1.writeAll(input));
     REQUIRE(co_await stream1.shutdown());
-    REQUIRE(co_await stream2.readAll() == input);
+    REQUIRE(co_await task1 == input);
+
+    auto task2 = stream1.readAll();
 
     REQUIRE(co_await stream2.writeAll(input));
     REQUIRE(co_await stream2.shutdown());
-    REQUIRE(co_await stream1.readAll() == input);
+    REQUIRE(co_await task2 == input);
 
     const auto result = co_await task;
     REQUIRE(result);

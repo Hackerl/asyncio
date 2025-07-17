@@ -3,8 +3,8 @@
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("buffer reader", "[buffer]") {
-    const auto input = GENERATE(take(1, randomBytes(1, 10240)));
-    const auto capacity = GENERATE(1uz, take(1, random(2uz, 10240uz)));
+    const auto input = GENERATE(take(1, randomBytes(1, 102400)));
+    const auto capacity = GENERATE(1uz, take(1, random(2uz, 102400uz)));
 
     SECTION("capacity") {
         asyncio::BufReader reader{asyncio::BytesReader{input}, capacity};
@@ -72,7 +72,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
         }
     }
 
-    auto inputString = GENERATE(take(1, randomAlphanumericString(1, 10240)));
+    auto inputString = GENERATE(take(1, randomAlphanumericString(1, 102400)));
 
     SECTION("read line") {
         SECTION("normal") {
@@ -119,8 +119,8 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
 }
 
 ASYNC_TEST_CASE("buffer writer", "[buffer]") {
-    const auto input = GENERATE(take(1, randomBytes(1, 10240)));
-    const auto capacity = GENERATE(1uz, take(1, random(2uz, 10240uz)));
+    const auto input = GENERATE(take(1, randomBytes(1, 102400)));
+    const auto capacity = GENERATE(1uz, take(1, random(2uz, 102400uz)));
 
     const auto bytesWriter = std::make_shared<asyncio::BytesWriter>();
     asyncio::BufWriter writer{bytesWriter, capacity};

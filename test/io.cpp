@@ -3,26 +3,23 @@
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("copy", "[io]") {
-    const auto input = GENERATE(take(10, randomString(1, 10240)));
+    const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
-    asyncio::StringReader reader{input};
-    asyncio::StringWriter writer;
+    asyncio::BytesReader reader{input};
+    asyncio::BytesWriter writer;
     REQUIRE(co_await asyncio::copy(reader, writer) == input.size());
     REQUIRE(*writer == input);
 }
 
 ASYNC_TEST_CASE("read all", "[io]") {
-    const auto input = GENERATE(take(10, randomString(1, 10240)));
+    const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
-    asyncio::StringReader reader{input};
-
-    const auto result = co_await reader.readAll();
-    REQUIRE(result);
-    REQUIRE_THAT(*result, Catch::Matchers::RangeEquals(std::as_bytes(std::span{input})));
+    asyncio::BytesReader reader{input};
+    REQUIRE(co_await reader.readAll() == input);
 }
 
 ASYNC_TEST_CASE("read exactly", "[io]") {
-    const auto input = GENERATE(take(10, randomBytes(1, 10240)));
+    const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
     SECTION("normal") {
         asyncio::BytesReader reader{input};
@@ -45,7 +42,7 @@ ASYNC_TEST_CASE("read exactly", "[io]") {
 }
 
 ASYNC_TEST_CASE("string reader", "[io]") {
-    const auto input = GENERATE(take(10, randomString(1, 10240)));
+    const auto input = GENERATE(take(10, randomString(1, 102400)));
 
     asyncio::StringReader reader{input};
 
@@ -59,7 +56,7 @@ ASYNC_TEST_CASE("string reader", "[io]") {
 }
 
 ASYNC_TEST_CASE("string writer", "[io]") {
-    const auto input = GENERATE(take(10, randomString(1, 10240)));
+    const auto input = GENERATE(take(10, randomString(1, 102400)));
 
     asyncio::StringWriter writer;
     REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{input})));
@@ -68,7 +65,7 @@ ASYNC_TEST_CASE("string writer", "[io]") {
 }
 
 ASYNC_TEST_CASE("bytes reader", "[io]") {
-    const auto input = GENERATE(take(10, randomBytes(1, 10240)));
+    const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
     asyncio::BytesReader reader{input};
 
@@ -82,7 +79,7 @@ ASYNC_TEST_CASE("bytes reader", "[io]") {
 }
 
 ASYNC_TEST_CASE("bytes writer", "[io]") {
-    const auto input = GENERATE(take(10, randomBytes(1, 10240)));
+    const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
     asyncio::BytesWriter writer;
     REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{input})));
