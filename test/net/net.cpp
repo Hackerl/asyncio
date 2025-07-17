@@ -1,5 +1,6 @@
 #include <catch_extensions.h>
 #include <asyncio/net/net.h>
+#include <asyncio/stream.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 #ifdef _WIN32
@@ -224,4 +225,32 @@ TEST_CASE("convert socket address to network address", "[net]") {
 #endif
     }
 #endif
+}
+
+ASYNC_TEST_CASE("copy bidirectional", "[net]") {
+    const auto input = GENERATE(take(10, randomBytes(1, 10240)));
+
+    auto pair1 = asyncio::Stream::pair();
+    REQUIRE(pair1);
+
+    auto pair2 = asyncio::Stream::pair();
+    REQUIRE(pair2);
+
+    auto task = asyncio::net::copyBidirectional(pair1->at(1), pair2->at(0));
+
+    auto &stream1 = pair1->at(0);
+    auto &stream2 = pair2->at(1);
+
+    REQUIRE(co_await stream1.writeAll(input));
+    REQUIRE(co_await stream1.shutdown());
+    REQUIRE(co_await stream2.readAll() == input);
+
+    REQUIRE(co_await stream2.writeAll(input));
+    REQUIRE(co_await stream2.shutdown());
+    REQUIRE(co_await stream1.readAll() == input);
+
+    const auto result = co_await task;
+    REQUIRE(result);
+    REQUIRE(result->at(0) == input.size());
+    REQUIRE(result->at(1) == input.size());
 }

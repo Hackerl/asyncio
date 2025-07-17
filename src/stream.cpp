@@ -135,30 +135,6 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
 #endif
 }
 
-asyncio::task::Task<void, std::error_code> asyncio::Stream::shutdown() {
-    Promise<void, std::error_code> promise;
-    uv_shutdown_t request{.data = &promise};
-
-    CO_EXPECT(uv::expected([&] {
-        return uv_shutdown(
-            &request,
-            mStream.raw(),
-            [](auto *req, const int status) {
-                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
-
-                if (status < 0) {
-                    p->reject(static_cast<uv::Error>(status));
-                    return;
-                }
-
-                p->resolve();
-            }
-        );
-    }));
-
-    co_return co_await promise.getFuture();
-}
-
 asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const std::span<std::byte> data) {
     struct Context {
         std::span<std::byte> data;
@@ -255,6 +231,30 @@ asyncio::task::Task<void, std::error_code> asyncio::Stream::close() {
             static_cast<Promise<void, std::error_code> *>(h->data)->resolve();
         }
     );
+
+    co_return co_await promise.getFuture();
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::Stream::shutdown() {
+    Promise<void, std::error_code> promise;
+    uv_shutdown_t request{.data = &promise};
+
+    CO_EXPECT(uv::expected([&] {
+        return uv_shutdown(
+            &request,
+            mStream.raw(),
+            [](auto *req, const int status) {
+                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
+
+                if (status < 0) {
+                    p->reject(static_cast<uv::Error>(status));
+                    return;
+                }
+
+                p->resolve();
+            }
+        );
+    }));
 
     co_return co_await promise.getFuture();
 }

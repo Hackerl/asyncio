@@ -17,18 +17,15 @@ namespace asyncio {
 #endif
     }
 
-    class Stream : public IReader, public IWriter, public ICloseable {
+    class Stream : public IReader, public IWriter, public ICloseable, public IHalfCloseable {
     public:
         explicit Stream(uv::Handle<uv_stream_t> stream);
         static std::expected<std::array<Stream, 2>, std::error_code> pair();
 
-    private:
-        task::Task<void, std::error_code> shutdown();
-
-    public:
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
         task::Task<void, std::error_code> close() override;
+        task::Task<void, std::error_code> shutdown() override;
 
         std::expected<std::size_t, std::error_code> tryWrite(std::span<const std::byte> data);
 

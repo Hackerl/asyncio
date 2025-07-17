@@ -133,6 +133,33 @@ namespace asyncio::net {
         virtual task::Task<std::size_t, std::error_code>
         writeTo(std::span<const std::byte> data, Address address) = 0;
     };
+
+    template<typename T, typename U>
+        requires (
+            zero::detail::Trait<T, IReader> &&
+            zero::detail::Trait<T, IWriter> &&
+            zero::detail::Trait<T, IHalfCloseable> &&
+            zero::detail::Trait<U, IReader> &&
+            zero::detail::Trait<U, IWriter> &&
+            zero::detail::Trait<U, IHalfCloseable>
+        )
+    task::Task<std::array<std::size_t, 2>, std::error_code>
+    copyBidirectional(T &first, U &second) {
+        co_return co_await all(
+            task::spawn([&]() -> task::Task<std::size_t, std::error_code> {
+                const auto result = co_await copy(first, second);
+                CO_EXPECT(result);
+                CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, second));
+                co_return *result;
+            }),
+            task::spawn([&]() -> task::Task<std::size_t, std::error_code> {
+                const auto result = co_await copy(second, first);
+                CO_EXPECT(result);
+                CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, first));
+                co_return *result;
+            })
+        );
+    }
 }
 
 template<typename Char>
