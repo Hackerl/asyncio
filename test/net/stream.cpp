@@ -182,14 +182,14 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
         const auto address = server.localAddress();
         REQUIRE(address);
         REQUIRE(std::holds_alternative<asyncio::net::UnixAddress>(*address));
-        REQUIRE(std::get<asyncio::net::UnixAddress>(*address).path == path.string());
+        REQUIRE(std::get<asyncio::net::UnixAddress>(*address).path == path);
     }
 
     SECTION("remote address") {
         const auto address = client.remoteAddress();
         REQUIRE(address);
         REQUIRE(std::holds_alternative<asyncio::net::UnixAddress>(*address));
-        REQUIRE(std::get<asyncio::net::UnixAddress>(*address).path == path.string());
+        REQUIRE(std::get<asyncio::net::UnixAddress>(*address).path == path);
     }
 
     SECTION("peer credential") {

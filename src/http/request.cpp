@@ -620,7 +620,7 @@ asyncio::http::Requests::request(
         }
 
         CO_EXPECT(expected([&] {
-            return curl_mime_filedata(field, std::get<std::filesystem::path>(v).string().c_str());
+            return curl_mime_filedata(field, zero::filesystem::stringify(std::get<std::filesystem::path>(v)).c_str());
         }));
     }
 

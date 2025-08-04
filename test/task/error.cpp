@@ -429,8 +429,7 @@ ASYNC_TEST_CASE("task allSettled - error", "[task]") {
 
             const auto result = co_await task;
             REQUIRE(result[0]);
-            REQUIRE_FALSE(result[1]);
-            REQUIRE(result[1].error() == std::errc::invalid_argument);
+            REQUIRE_ERROR(result[1], std::errc::invalid_argument);
         }
 
         SECTION("cancel") {

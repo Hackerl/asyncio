@@ -177,7 +177,7 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
         return uv_fs_open(
             getEventLoop()->raw(),
             &request,
-            path.string().c_str(),
+            zero::filesystem::stringify(path).c_str(),
             flags,
             mode,
             [](auto *req) {
