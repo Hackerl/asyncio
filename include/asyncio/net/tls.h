@@ -135,7 +135,7 @@ namespace asyncio::net::tls {
 #ifdef __linux__
                 if (const auto bundle = systemCABundle()) {
                     EXPECT(expected([&] {
-                        return SSL_CTX_load_verify_locations(context.get(), bundle->string().c_str(), nullptr);
+                        return SSL_CTX_load_verify_locations(context.get(), bundle->c_str(), nullptr);
                     }));
                 }
 #endif

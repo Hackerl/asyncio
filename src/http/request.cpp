@@ -486,7 +486,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
 
 #ifdef __linux__
     if (const auto bundle = net::tls::systemCABundle())
-        curl_easy_setopt(easy, CURLOPT_CAINFO, bundle->string().c_str());
+        curl_easy_setopt(easy, CURLOPT_CAINFO, bundle->c_str());
 #endif
 
     if (ca)

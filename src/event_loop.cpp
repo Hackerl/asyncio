@@ -80,7 +80,7 @@ std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 std::expected<void, std::error_code> asyncio::EventLoop::post(std::function<void()> function) {
-    std::lock_guard guard{mTaskQueue->mutex};
+    const std::lock_guard guard{mTaskQueue->mutex};
     mTaskQueue->queue.push(std::move(function));
 
     EXPECT(uv::expected([this] {

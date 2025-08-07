@@ -25,7 +25,7 @@ namespace asyncio {
         Context receiver;
 
         void notifySender() {
-            std::lock_guard guard{mutex};
+            const std::lock_guard guard{mutex};
 
             auto &pending = sender.pending;
 
@@ -41,7 +41,7 @@ namespace asyncio {
         }
 
         void notifyReceiver() {
-            std::lock_guard guard{mutex};
+            const std::lock_guard guard{mutex};
 
             auto &pending = receiver.pending;
 
@@ -58,7 +58,7 @@ namespace asyncio {
 
         void close() {
             {
-                std::lock_guard guard{mutex};
+                const std::lock_guard guard{mutex};
 
                 if (closed)
                     return;
@@ -176,7 +176,7 @@ namespace asyncio {
 
                 if (const auto result = future.wait(timeout); !result) {
                     assert(result.error() == std::errc::timed_out);
-                    std::lock_guard guard{mCore->mutex};
+                    const std::lock_guard guard{mCore->mutex};
                     mCore->sender.pending.remove(promise);
                     return std::unexpected{SendSyncError::TIMEOUT};
                 }
@@ -225,7 +225,7 @@ namespace asyncio {
                     }
                 }; !result) {
                     assert(result.error() == std::errc::operation_canceled);
-                    std::lock_guard guard{mCore->mutex};
+                    const std::lock_guard guard{mCore->mutex};
                     mCore->sender.pending.remove(promise);
                     co_return std::unexpected{SendError::CANCELLED};
                 }
@@ -358,7 +358,7 @@ namespace asyncio {
 
                 if (const auto result = future.wait(timeout); !result) {
                     assert(result.error() == std::errc::timed_out);
-                    std::lock_guard guard{mCore->mutex};
+                    const std::lock_guard guard{mCore->mutex};
                     mCore->receiver.pending.remove(promise);
                     return std::unexpected{ReceiveSyncError::TIMEOUT};
                 }
@@ -404,7 +404,7 @@ namespace asyncio {
                     }
                 }; !result) {
                     assert(result.error() == std::errc::operation_canceled);
-                    std::lock_guard guard{mCore->mutex};
+                    const std::lock_guard guard{mCore->mutex};
                     mCore->receiver.pending.remove(promise);
                     co_return std::unexpected{ReceiveError::CANCELLED};
                 }
