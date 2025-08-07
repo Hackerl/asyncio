@@ -1,6 +1,6 @@
 # Task
 
-此模块为任务的核心代码。
+This module contains the core code for tasks.
 
 ## Error Code `Error`
 
@@ -15,19 +15,20 @@ DEFINE_ERROR_CODE_EX(
 )
 ```
 
-异步任务中通用的错误类型。
+Common error types used in async tasks.
 
-> 对于这些常用的错误，在每个业务代码处都单独定义一个是麻烦且枯燥的，虽然它利于错误追溯。
+> For these common errors, it would be tedious to define them separately in each business code, though that would aid in error tracing.
 
 ## Class `Task`
-每一个异步函数的返回值都必须是 `Task` 类型。
+
+Every async function must return a `Task` type.
 
 ```cpp
 template<typename T, typename E = std::exception_ptr>
 class Task;
 ```
 
-> 当错误类型是 `std::exception_ptr` 时，`Task` 的错误处理将变为异常，通常用于那些不应该失败的 `API`。
+> When the error type is `std::exception_ptr`, `Task`'s error handling becomes exception-based, typically used for APIs that should not fail.
 
 ### Method `cancel`
 
@@ -35,7 +36,7 @@ class Task;
 std::expected<void, std::error_code> cancel();
 ```
 
-取消任务，取消操作将会作用到任务树的每一个分支上；如果失败，仅返回最后一次失败的原因，所有任务依旧会被标记为取消状态，恢复运行后将在下一次挂起点再次尝试取消。
+Cancels the task. The cancellation operation applies to every branch of the task tree. If it fails, only the last failure reason is returned, but all tasks will still be marked as cancelled and will attempt to cancel again at the next suspension point when resumed.
 
 ```cpp
 auto task = allSettled(task1, task2);
@@ -52,7 +53,7 @@ REQUIRE_ERROR(result[1], std::errc::operation_canceled);
 tree<std::source_location> callTree() const;
 ```
 
-追溯整个任务树，可以获取每一个子任务的调用栈。
+Traces the entire task tree, obtaining the call stack of each subtask.
 
 ### Method `trace`
 
@@ -60,7 +61,7 @@ tree<std::source_location> callTree() const;
 [[nodiscard]] std::string trace() const
 ```
 
-追溯整个任务树，将 `call tree` 转为了可读性高的字符串。
+Traces the entire task tree, converting the `call tree` into a highly readable string.
 
 ### Method `addCallback`
 
@@ -68,7 +69,7 @@ tree<std::source_location> callTree() const;
 void addCallback(std::function<void()> callback);
 ```
 
-添加任务关联的 `callback`，将在任务完成时调用。
+Adds a `callback` associated with the task, which will be called when the task completes.
 
 ### Method `transform`
 
@@ -88,9 +89,9 @@ template<typename F>
 Task<callback_result_t<F, T>, E> transform(F f) &&;
 ```
 
-当任务成功时转换值的类型，相当于 `std::expected::transofrm`，处理函数可以是异步的。
+Transforms the value type when the task succeeds, equivalent to `std::expected::transform`. The handler function can be async.
 
-> 仅当 `E` 不为 `std::exception_ptr` 时可用。
+> Only available when `E` is not `std::exception_ptr`.
 
 ### Method `andThen`
 
@@ -110,9 +111,9 @@ template<typename F>
 Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
 ```
 
-当任务成功时使用值进行下一步操作，相当于 `std::expected::and_then`，处理函数可以是异步的。
+Performs the next operation using the value when the task succeeds, equivalent to `std::expected::and_then`. The handler function can be async.
 
-> 仅当 `E` 不为 `std::exception_ptr` 时可用。
+> Only available when `E` is not `std::exception_ptr`.
 
 ### Method `transformError`
 
@@ -132,9 +133,9 @@ template<typename F>
 Task<T, callback_result_t<F, E>> transformError(F f) &&;
 ```
 
-当任务失败时转换错误类型，相当于 `std::expected::transform_error`，处理函数可以是异步的。
+Transforms the error type when the task fails, equivalent to `std::expected::transform_error`. The handler function can be async.
 
-> 仅当 `E` 不为 `std::exception_ptr` 时可用。
+> Only available when `E` is not `std::exception_ptr`.
 
 ### Method `orElse`
 
@@ -154,9 +155,9 @@ template<typename F>
 Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 ```
 
-当任务失败时使用错误进行下一步操作，相当于 `std::expected::or_else`，处理函数可以是异步的。
+Performs the next operation using the error when the task fails, equivalent to `std::expected::or_else`. The handler function can be async.
 
-> 仅当 `E` 不为 `std::exception_ptr` 时可用。
+> Only available when `E` is not `std::exception_ptr`.
 
 ### Method `done`
 
@@ -164,7 +165,7 @@ Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 [[nodiscard]] bool done() const;
 ```
 
-返回任务是否完成。
+Returns whether the task is complete.
 
 ### Method `cancelled`
 
@@ -172,17 +173,17 @@ Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 [[nodiscard]] bool cancelled() const;
 ```
 
-返回任务是否已标记为取消。
+Returns whether the task has been marked as cancelled.
 
-### Method `cancelled`
+### Method `lock`
 
 ```cpp
 [[nodiscard]] bool lock() const;
 ```
 
-返回任务是否已被锁定。
+Returns whether the task has been locked.
 
-> 任务被锁定之后，所有子任务均无法被取消，取消时返回 `asyncio::task::Error::LOCKED`。
+> After a task is locked, all subtasks cannot be cancelled. Cancellation will return `asyncio::task::Error::LOCKED`.
 
 ### Method `future`
 
@@ -190,7 +191,7 @@ Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 zero::async::promise::Future<T, E> future();
 ```
 
-获取任务关联的 `future`，之后任务不能再被 `co_await`。
+Gets the `future` associated with the task, after which the task can no longer be `co_await`ed.
 
 ```cpp
 auto task = asyncio::sleep(1s);
@@ -204,7 +205,7 @@ task.future()
     });;
 ```
 
-> `Future` 类似于 `JavaScript` 的 `Promise`，可以绑定回调，也支持 `all` 等聚合操作。
+> `Future` is similar to JavaScript's `Promise`, can bind callbacks, and supports aggregation operations like `all`.
 
 ## Struct `CancellableFuture`
 
@@ -216,7 +217,7 @@ struct CancellableFuture {
 };
 ```
 
-`Task` 与底层接口打交道，必然要使用 `Promise` 和 `Future` 作为桥梁，然而 `Promise` 是不支持取消的，所以我们可以提供自定义的取消函数。
+`Task` must interface with lower-level code and necessarily uses `Promise` and `Future` as bridges. However, `Promise` doesn't support cancellation, so we can provide a custom cancellation function.
 
 ```cpp
 asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
@@ -257,9 +258,9 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
 }
 ```
 
-当截止时间还未达到，回调还没发生时，可以通过 `task.cancel()` 进行取消。
+When the deadline hasn't been reached and the callback hasn't occurred, cancellation can be performed via `task.cancel()`.
 
-> `Promise` 被 `resolve` 后，回调需要等待到下一次事件循环，所以我们通过 `promise.isFulfilled()` 进行判断任务是否即将完成。
+> After a `Promise` is `resolve`d, the callback needs to wait until the next event loop, so we use `promise.isFulfilled()` to determine if the task is about to complete.
 
 ## Struct `CancellableTask`
 
@@ -271,7 +272,7 @@ struct CancellableTask {
 };
 ```
 
-极少数的 `Task` 是无法被取消的，例如 `ChildProcess::wait`：
+A very small number of `Task`s cannot be cancelled, such as `ChildProcess::wait`:
 
 ```cpp
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::ChildProcess::wait() {
@@ -292,11 +293,11 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
 }
 ```
 
-我们创建一个新线程用于阻塞地执行 `waitpid`，同时我们没有任何办法取消它。
+We create a new thread to blockingly execute `waitpid`, and we have no way to cancel it.
 
-> 新的 `Linux` 内核支持 `pidfd`，但我还没有尝试它；包括 `macOS` 也一样，我知道它们都可以使用操作系统特有的功能来替换 `waitpid`。
+> Newer Linux kernels support `pidfd`, but I haven't tried it yet. The same goes for `macOS` - I know both can use OS-specific features to replace `waitpid`.
 
-无论 `Task` 能否取消，我们都可以重载它的取消函数：
+Regardless of whether a `Task` can be cancelled, we can override its cancellation function:
 
 ```cpp
 co_await asyncio::task::CancellableTask{
@@ -307,8 +308,8 @@ co_await asyncio::task::CancellableTask{
 };
 ```
 
-> 取消操作是自顶而下的，依次遍历任务树的每一个分支，当某个节点上重载了取消函数时，将会直接调用它并提早返回，然后继续遍历下一个分支。
-> 当然，大部分 `Task` 的底部都是 `CancellableFuture`，所以绝大多数时候你不必进行重载。
+> Cancellation is top-down, traversing each branch of the task tree. When a cancellation function is overridden at a node, it will be called directly and returned early, then continue traversing the next branch.
+> Of course, most `Task`s have `CancellableFuture` at their base, so most of the time you don't need to override.
 
 ## Constant `cancelled`
 
@@ -319,7 +320,7 @@ struct Cancelled {
 inline constexpr Cancelled cancelled;
 ```
 
-在 `Task` 中，我们可以使用 `cancelled` 来获取当前任务的取消状态。
+In a `Task`, we can use `cancelled` to get the current task's cancellation status.
 
 ```cpp
 asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std::span<const std::byte> data) {
@@ -340,8 +341,8 @@ asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std:
 }
 ```
 
-> 所有涉及循环的地方都应该手动检查取消状态，因为我们不能假定循环中的任意操作都是支持取消的。
-> 如果 `write` 不支持取消，那么我们只能傻傻地等待 `writeAll` 完成。
+> All loops should manually check cancellation status, as we can't assume that any operation in a loop supports cancellation.
+> If `write` doesn't support cancellation, we can only wait for `writeAll` to complete.
 
 ## Constant `lock`
 
@@ -352,7 +353,7 @@ struct Lock {
 inline constexpr Lock lock;
 ```
 
-如果我们正在执行一些原子操作，例如退出时，我们需要将至关重要的内容写入文件，我们想确保这些操作不会被中断，那么我们可以锁定当前 `Task`：
+If we're performing atomic operations, such as writing critical content to a file on exit, we want to ensure these operations aren't interrupted. We can lock the current `Task`:
 
 ```cpp
 co_await asyncio::task::lock;
@@ -360,7 +361,7 @@ co_await asyncio::task::lock;
 co_await asyncio::task::unlock;
 ```
 
-锁定之后，上层的取消操作将失败，并返回 `asyncio::task::Error::LOCKED`。
+After locking, upper-level cancellation operations will fail and return `asyncio::task::Error::LOCKED`.
 
 ## Constant `unlock`
 
@@ -371,15 +372,15 @@ struct Unlock {
 inline constexpr Unlock unlock;
 ```
 
-用于解开 `Task` 的锁定。
+Used to unlock a `Task`.
 
-> 任务被锁定时取消，取消操作将失败，但任务的状态依旧会被标记为已取消，将在解锁后的第一个挂起点处自动尝试取消。
+> When a task is cancelled while locked, the cancellation operation will fail, but the task's state will still be marked as cancelled. It will automatically attempt to cancel at the first suspension point after unlocking.
 
 ## Class `TaskGroup`
 
-用于动态管理多个任务，它就像是 `Golang` 中 `WaitGroup` 和 `Context` 的结合体，用于取消、等待多个任务。
+Used to dynamically manage multiple tasks. It's like a combination of Golang's `WaitGroup` and `Context`, used to cancel and wait for multiple tasks.
 
-> 它和聚合函数的区别是，它可以用于动态创建、数量不定的任意任务，并且不关心任务的结果。
+> The difference from aggregation functions is that it can be used for dynamically created tasks of indeterminate number, and doesn't care about task results.
 
 ```cpp
 asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
@@ -407,9 +408,9 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
 }
 ```
 
-没有比 `TCP Server` 更适合它的应用场景了，服务端不断地接收新的连接，每个连接都需要创建一个子任务进行处理。我们不能等待子任务，但又不能完全丢弃它，我们希望函数返回时所有子任务的生命周期也随之结束，所以我们使用 `TaskGroup` 来管理它们。
+There's no better use case than a `TCP Server`. The server continuously accepts new connections, each requiring a subtask for handling. We can't wait for subtasks, but we can't completely discard them either. We want all subtasks' lifecycles to end when the function returns, so we use `TaskGroup` to manage them.
 
-> 当上层取消任务后，`co_await group` 将会自动取消组内所有子任务，并等待它们完成。
+> When an upper-level cancels the task, `co_await group` will automatically cancel all subtasks in the group and wait for them to complete.
 
 ### Method `cancelled`
 
@@ -417,7 +418,7 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
 [[nodiscard]] bool cancelled() const;
 ```
 
-返回任务组是否已取消。
+Returns whether the task group has been cancelled.
 
 ### Method `cancel`
 
@@ -425,9 +426,9 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
 std::expected<void, std::error_code> cancel();
 ```
 
-取消任务组，取消操作将会作用到组内所有任务上；如果失败，仅返回最后一次失败的原因，所有任务依旧会被标记为取消状态，恢复运行后将在下一次挂起点再次尝试取消。
+Cancels the task group. The cancellation operation applies to all tasks in the group. If it fails, only the last failure reason is returned, but all tasks will still be marked as cancelled and will attempt to cancel again at the next suspension point when resumed.
 
-> 任务组被标记为取消后，新加入的子任务将会立刻被取消。
+> After a task group is marked as cancelled, newly added subtasks will be cancelled immediately.
 
 ### Method `add`
 
@@ -437,16 +438,16 @@ template<typename T>
 void add(T &&task);
 ```
 
-添加一个任务到组内。
+Adds a task to the group.
 
-> 可以一直往组内添加任务，任务完成后会自动从组内移除，所以不必担心它会溢出或占用太多内存。
+> You can keep adding tasks to the group. Tasks are automatically removed from the group upon completion, so there's no need to worry about overflow or excessive memory usage.
 
 ## Function `all`
 
-等待所有任务，所有任务都成功时返回成功，任何一个失败则返回失败并取消剩余任务。
+Waits for all tasks. Returns success if all tasks succeed. Returns failure and cancels remaining tasks if any task fails.
 
-> 每一个聚合函数都有三种重载，参数可以是 `iterator` 或 `range`，也可以是可变参数包（支持不同的任务类型），具体使用方式请参考此项目的单元测试。
-> 所有聚合函数都保证，函数返回时所有子任务都已完成。
+> Each aggregation function has three overloads: parameters can be an `iterator` or `range`, or a variadic parameter pack (supporting different task types). See the unit tests in this project for specific usage.
+> All aggregation functions guarantee that when the function returns, all subtasks have completed.
 
 ```cpp
 template<std::input_iterator I, std::sentinel_for<I> S>
@@ -464,8 +465,8 @@ auto all(R &&tasks) {
 }
 ```
 
-- 子任务类型是 `Task<void, E>` 时，返回值类型是 `Task<void, E>`。
-- 子任务类型是 `Task<T, E>` 时，返回值类型是 `Task<std::vector<T>, E>`。
+- When subtask type is `Task<void, E>`, return value type is `Task<void, E>`.
+- When subtask type is `Task<T, E>`, return value type is `Task<std::vector<T>, E>`.
 
 ```cpp
 template<typename... Ts>
@@ -477,13 +478,13 @@ Task<
 all(Ts &&... tasks);
 ```
 
-- 子任务类型都是 `Task<void, E>` 时，返回值类型是 `Task<void, E>`。
-- 子任务类型都是 `Task<T, E>` 时，返回值类型是 `Task<std::array<T, N>, E>`。
-- 子任务类型不同时，返回值类型是 `Task<std::tuple<T1, T2, ...>, E>`，`std::tuple` 中不能包含 `void`，所以如果 `T` 是 `void`，那么它将被转为 `std::nullptr_t`。
+- When all subtask types are `Task<void, E>`, return value type is `Task<void, E>`.
+- When all subtask types are `Task<T, E>`, return value type is `Task<std::array<T, N>, E>`.
+- When subtask types differ, return value type is `Task<std::tuple<T1, T2, ...>, E>`. `std::tuple` cannot contain `void`, so if `T` is `void`, it will be converted to `std::nullptr_t`.
 
 ## Function `allSettled`
 
-等待所有任务完成，返回所有任务结果，永远不会失败。
+Waits for all tasks to complete, returns all task results, never fails.
 
 ```cpp
 template<std::input_iterator I, std::sentinel_for<I> S>
@@ -498,7 +499,7 @@ auto allSettled(R &&tasks) {
 }
 ```
 
-返回值类型永远是 `std::vector<Task<T, E>>`。
+Return value type is always `std::vector<Task<T, E>>`.
 
 ```cpp
 template<typename... Ts>
@@ -507,11 +508,11 @@ Task<all_settled_variadic_value_t<Ts...>>
 allSettled(Ts &&... tasks);
 ```
 
-返回值类型永远是 `std::tuple<Task<T1, E>, Task<T2, E>, ...>`。
+Return value type is always `std::tuple<Task<T1, E>, Task<T2, E>, ...>`.
 
 ## Function `any`
 
-任何一个任务成功则成功，并取消剩余任务。
+Succeeds if any task succeeds, cancelling remaining tasks.
 
 ```cpp
 template<std::input_iterator I, std::sentinel_for<I> S>
@@ -529,7 +530,7 @@ auto any(R &&tasks) {
 }
 ```
 
-返回值类型永远是 `Task<T, std::vector<E>>`。
+Return value type is always `Task<T, std::vector<E>>`.
 
 ```cpp
 template<typename... Ts>
@@ -541,12 +542,12 @@ Task<
 any(Ts &&... tasks);
 ```
 
-- 子任务类型都是 `Task<T, E>` 时，返回值类型是 `Task<T, std::vector<E>>`。
-- 子任务类型不同时，返回值类型是 `Task<std::any, std::vector<E>>`。
+- When all subtask types are `Task<T, E>`, return value type is `Task<T, std::vector<E>>`.
+- When subtask types differ, return value type is `Task<std::any, std::vector<E>>`.
 
 ## Function `race`
 
-使用最快完成的作为结果，并取消其它任务。
+Uses the fastest-completing task as the result, cancelling other tasks.
 
 ```cpp
 template<std::input_iterator I, std::sentinel_for<I> S>
@@ -564,7 +565,7 @@ auto race(R &&tasks) {
 }
 ```
 
-返回值类型永远是 `Task<T, E>`。
+Return value type is always `Task<T, E>`.
 
 ```cpp
 template<typename... Ts>
@@ -576,8 +577,8 @@ Task<
 race(Ts &&... tasks);
 ```
 
-- 子任务类型都是 `Task<T, E>` 时，返回值类型是 `Task<T, E>`。
-- 子任务类型不同时，返回值类型是 `Task<std::any, E>`。
+- When all subtask types are `Task<T, E>`, return value type is `Task<T, E>`.
+- When subtask types differ, return value type is `Task<std::any, E>`.
 
 ## Function `from`
 
@@ -592,7 +593,7 @@ template<typename T, typename E>
 Task<T, E> from(zero::async::promise::CancellableTask<T, E> task);
 ```
 
-将 `Future`、`CancellableFuture`、`CancellableTask` 转换为 `Task`；`asyncio` 的 `API` 都是针对 `Task` 的，转换后我们才能调用。
+Converts `Future`, `CancellableFuture`, `CancellableTask` to `Task`. The `asyncio` APIs are designed for `Task`, so conversion is needed before calling.
 
 ```cpp
 const auto status = zero::flattenWith<std::error_code>(
@@ -618,7 +619,7 @@ std::invoke_result_t<F> spawn(F f) {
 }
 ```
 
-从可调用对象创建任务。它好像什么也没做，只是简单地调用，那为什么我们不在外层直接调用呢？
+Creates a task from a callable object. It seems to do nothing but simply call - why not call it directly in the outer layer?
 
 ```cpp
 asyncio::task::Task<void> func(std::string host) {
@@ -632,9 +633,9 @@ asyncio::task::Task<void> func(std::string host) {
 }
 ```
 
-使用具有捕获的 `lambda` 创建协程，在执行 `co_await task` 时，临时的 `lambda` 对象已经消亡，而它捕获的 `host` 生命周期也随之结束；那么未结束的 `task` 在恢复执行后将会访问到一个未知值，虽然大多数情况下栈上的数据还没有被改写，`host` 所指向的内存还是有效的，但恰恰是这暗藏祸根的代码会带来未知的风险。
+Using a capturing lambda to create a coroutine, when executing `co_await task`, the temporary lambda object has been destroyed, and the captured `host`'s lifetime has ended. The unfinished `task` will access an unknown value after resuming, and although most of the time the data on the stack hasn't been overwritten and the memory `host` points to is still valid, this hidden danger can cause unknown risks.
 
-虽然极其不优雅，但是如果想使用具有捕获的 `lambda` 创建协程只能显式地传参：
+Although extremely inelegant, if you want to use a capturing lambda to create a coroutine, you can only explicitly pass parameters:
 
 ```cpp
 Task<void> func(std::string host) {
@@ -648,9 +649,9 @@ Task<void> func(std::string host) {
 }
 ```
 
-> [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rcoro-capture) 建议尽量使用普通函数创建协程。
+> [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rcoro-capture) recommends using regular functions to create coroutines whenever possible.
 
-我们还可以使用 `deducing this` 来解决这个问题，但是编译器的支持并不完善：
+We can also use `deducing this` to solve this problem, but compiler support isn't complete:
 
 ```cpp
 auto task = [host]<typename Self>(this Self self) -> asyncio::task::Task<void> {
@@ -660,7 +661,7 @@ auto task = [host]<typename Self>(this Self self) -> asyncio::task::Task<void> {
 }();
 ```
 
-所以我们使用 `spawn` 函数来创建任务，将临时的 `lambda` 保存在 `spawn` 的协程栈上以延长其生命周期：
+So we use the `spawn` function to create tasks, saving the temporary lambda on `spawn`'s coroutine stack to extend its lifetime:
 
 ```cpp
 asyncio::task::spawn([=]() -> asyncio::task::Task<void> {
