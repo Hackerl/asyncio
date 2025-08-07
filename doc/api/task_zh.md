@@ -636,7 +636,7 @@ asyncio::task::Task<void> func(std::string host) {
 
 虽然极其不优雅，但是如果想使用具有捕获的 `lambda` 创建协程只能显式地传参：
 
-```cpp=
+```cpp
 Task<void> func(std::string host) {
     auto task = [](auto host) -> Task<void> {
         auto socket = co_await connect(host, 443);
