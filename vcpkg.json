@@ -1,7 +1,7 @@
 {
   "name": "asyncio",
   "version": "1.0.4",
-  "builtin-baseline": "ef7dbf94b9198bc58f45951adcf1f041fcbc5ea0",
+  "builtin-baseline": "6b3172d1a7be062b3d0278369aac9a0258cefc65",
   "dependencies": [
     "curl",
     "libuv",
@@ -20,11 +20,5 @@
         "catch2"
       ]
     }
-  },
-  "overrides": [
-    {
-      "name": "fmt",
-      "version": "10.2.1"
-    }
-  ]
+  }
 }

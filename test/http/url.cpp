@@ -122,8 +122,8 @@ TEST_CASE("URL", "[http]") {
                 REQUIRE(url->path() == R"(/test/路径/with spaces/and!@#$%^&*()_+-=[]{}|;':",./<>?)");
                 REQUIRE(
                     url->rawPath() ==
-                    "/test/%e8%b7%af%e5%be%84/with%20spaces"
-                    "/and%21%40%23%24%25%5e%26%2a%28%29_%2b-%3d%5b%5d%7b%7d%7c%3b%27%3a%22%2c./%3c%3e%3f"
+                    "/test/%E8%B7%AF%E5%BE%84/with%20spaces"
+                    "/and%21%40%23%24%25%5E%26%2A%28%29_%2B-%3D%5B%5D%7B%7D%7C%3B%27%3A%22%2C./%3C%3E%3F"
                 );
             }
         }
@@ -203,15 +203,14 @@ TEST_CASE("URL", "[http]") {
             SECTION("encoded") {
                 url->appendQuery("name", "测试");
                 REQUIRE(url->query() == "name=测试");
-                REQUIRE(url->rawQuery() == "name=%e6%b5%8b%e8%af%95");
+                REQUIRE(url->rawQuery() == "name=%E6%B5%8B%E8%AF%95");
 
                 url->appendQuery("description", R"(special chars !@#$%^&*()_+-=[]{}|;':",./<>? and spaces)");
-                REQUIRE(url->query() == R"(name=测试&description=special chars !@#$%^&*()_+-=[]{}|;':",./<>? and spaces)")
-                ;
+                REQUIRE(url->query() == R"(name=测试&description=special chars !@#$%^&*()_+-=[]{}|;':",./<>? and spaces)");
                 REQUIRE(
                     url->rawQuery() ==
-                    "name=%e6%b5%8b%e8%af%95&description=special+chars+%21%40%23%24%25%5e%26%2a%28%29_"
-                    "%2b-%3d%5b%5d%7b%7d%7c%3b%27%3a%22%2c.%2f%3c%3e%3f+and+spaces"
+                    "name=%E6%B5%8B%E8%AF%95&description=special+chars+%21%40%23%24%25%5E%26%2A%28%29_"
+                    "%2B-%3D%5B%5D%7B%7D%7C%3B%27%3A%22%2C.%2F%3C%3E%3F+and+spaces"
                 );
             }
         }

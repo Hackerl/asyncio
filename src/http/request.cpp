@@ -1,6 +1,7 @@
 #include <asyncio/http/request.h>
 #include <asyncio/fs.h>
 #include <zero/defer.h>
+#include <fmt/ranges.h>
 
 #ifdef __linux__
 #include <asyncio/net/tls.h>
