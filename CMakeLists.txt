@@ -3,7 +3,7 @@ project(asyncio)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-set(ASYNCIO_VERSION 1.0.4)
+set(ASYNCIO_VERSION 1.0.5)
 
 option(BUILD_SAMPLES "Build asyncio samples" ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
