@@ -2,7 +2,7 @@
 #include <asyncio/net/dns.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
-ASYNC_TEST_CASE("get address info", "[net]") {
+ASYNC_TEST_CASE("get address info", "[net::dns]") {
     const auto result = co_await asyncio::net::dns::getAddressInfo(
         "localhost",
         "http",

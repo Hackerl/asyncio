@@ -2,7 +2,7 @@
 #include <asyncio/sync/condition.h>
 #include <asyncio/time.h>
 
-ASYNC_TEST_CASE("condition variable", "[sync]") {
+ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
     asyncio::sync::Condition condition;
     asyncio::sync::Mutex mutex;
 

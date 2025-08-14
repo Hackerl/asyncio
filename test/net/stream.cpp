@@ -7,9 +7,7 @@
 #include <asyncio/fs.h>
 #endif
 
-constexpr std::string_view MESSAGE = "hello world";
-
-ASYNC_TEST_CASE("TCP stream", "[net]") {
+ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
     auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 0);
     REQUIRE(listener);
 
@@ -46,24 +44,28 @@ ASYNC_TEST_CASE("TCP stream", "[net]") {
         REQUIRE(std::get<asyncio::net::IPv4Address>(*address) == std::get<asyncio::net::IPv4Address>(*serverAddress));
     }
 
+    const auto input = GENERATE(take(1, randomBytes(1, 102400)));
+
     SECTION("read") {
-        REQUIRE(co_await server.writeAll(std::as_bytes(std::span{MESSAGE})));
+        auto task = server.writeAll(input);
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        REQUIRE(co_await client.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.readExactly(data));
+        REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("write") {
-        REQUIRE(co_await client.writeAll(std::as_bytes(std::span{MESSAGE})));
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        auto task = server.readExactly(data);
 
-        REQUIRE(co_await server.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.writeAll(input));
+        REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("shutdown") {
@@ -90,7 +92,7 @@ ASYNC_TEST_CASE("TCP stream", "[net]") {
 
 #ifdef _WIN32
 ASYNC_TEST_CASE("named pipe stream", "[net]") {
-    constexpr auto name = R"(\\.\pipe\asyncio-net-named-pipe)";
+    const auto name = fmt::format(R"(\\.\pipe\asyncio-{})", GENERATE(take(1, randomAlphanumericString(8, 64))));
 
     auto listener = asyncio::net::NamedPipeListener::listen(name);
     REQUIRE(listener);
@@ -121,24 +123,28 @@ ASYNC_TEST_CASE("named pipe stream", "[net]") {
         REQUIRE(client.clientProcessID() == GetCurrentProcessId());
     }
 
+    const auto input = GENERATE(take(1, randomBytes(1, 102400)));
+
     SECTION("read") {
-        REQUIRE(co_await server.writeAll(std::as_bytes(std::span{MESSAGE})));
+        auto task = server.writeAll(input);
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        REQUIRE(co_await client.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.readExactly(data));
+        REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("write") {
-        REQUIRE(co_await client.writeAll(std::as_bytes(std::span{MESSAGE})));
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        auto task = server.readExactly(data);
 
-        REQUIRE(co_await server.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.writeAll(input));
+        REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("close") {
@@ -155,7 +161,7 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
     const auto temp = co_await asyncio::fs::temporaryDirectory();
     REQUIRE(temp);
 
-    const auto path = *temp / "asyncio-net-unix.sock";
+    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
 
     auto listener = asyncio::net::UnixListener::listen(path.string());
     REQUIRE(listener);
@@ -200,24 +206,28 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
         REQUIRE(*credential->pid == getpid());
     }
 
+    const auto input = GENERATE(take(1, randomBytes(1, 102400)));
+
     SECTION("read") {
-        REQUIRE(co_await server.writeAll(std::as_bytes(std::span{MESSAGE})));
+        auto task = server.writeAll(input);
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        REQUIRE(co_await client.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.readExactly(data));
+        REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("write") {
-        REQUIRE(co_await client.writeAll(std::as_bytes(std::span{MESSAGE})));
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        auto task = server.readExactly(data);
 
-        REQUIRE(co_await server.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.writeAll(input));
+        REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("close") {
@@ -231,7 +241,7 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
 
 #if defined(__linux__)
 ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
-    constexpr auto name = "@asyncio-net-abstract-unix.sock.sock";
+    const auto name = fmt::format("@asyncio-{}", GENERATE(take(1, randomAlphanumericString(8, 64))));
 
     auto listener = asyncio::net::UnixListener::listen(name);
     REQUIRE(listener);
@@ -278,24 +288,28 @@ ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
         REQUIRE(*credential->pid == getpid());
     }
 
+    const auto input = GENERATE(take(1, randomBytes(1, 102400)));
+
     SECTION("read") {
-        REQUIRE(co_await server.writeAll(std::as_bytes(std::span{MESSAGE})));
+        auto task = server.writeAll(input);
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        REQUIRE(co_await client.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.readExactly(data));
+        REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("write") {
-        REQUIRE(co_await client.writeAll(std::as_bytes(std::span{MESSAGE})));
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        auto task = server.readExactly(data);
 
-        REQUIRE(co_await server.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.writeAll(input));
+        REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("close") {

@@ -2,7 +2,7 @@
 #include <asyncio/time.h>
 #include <asyncio/sync/mutex.h>
 
-ASYNC_TEST_CASE("mutex", "[sync]") {
+ASYNC_TEST_CASE("mutex", "[sync::mutex]") {
     asyncio::sync::Mutex mutex;
     REQUIRE_FALSE(mutex.locked());
 

@@ -9,15 +9,13 @@ ASYNC_TEST_CASE("signal", "[signal]") {
     REQUIRE(signal);
 
     SECTION("normal") {
-        using namespace std::chrono_literals;
-
         std::thread thread{
             [] {
-                std::this_thread::sleep_for(20ms);
+                using namespace std::chrono_literals;
+                std::this_thread::sleep_for(10ms);
                 kill(getpid(), SIGINT);
             }
         };
-
         DEFER(thread.join());
         REQUIRE(co_await signal->on(SIGINT));
     }

@@ -1,5 +1,4 @@
 #include <asyncio/task.h>
-#include <zero/formatter.h>
 #include <fmt/std.h>
 
 asyncio::task::Task<void, std::error_code> asyncMain(int argc, char *argv[]);

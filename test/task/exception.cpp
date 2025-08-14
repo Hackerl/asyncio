@@ -262,16 +262,16 @@ ASYNC_TEST_CASE("task all - exception", "[task]") {
         });
 
         SECTION("success") {
-            promise1.resolve(10);
-            promise2.resolve(100);
+            promise1.resolve(1);
+            promise2.resolve(2);
 
             const auto result = co_await task;
-            REQUIRE(result[0] == 10);
-            REQUIRE(result[1] == 100);
+            REQUIRE(result[0] == 1);
+            REQUIRE(result[1] == 2);
         }
 
         SECTION("failure") {
-            promise1.resolve(10);
+            promise1.resolve(1);
             promise2.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::invalid_argument)}));
 
             REQUIRE_THROWS_MATCHES(
@@ -384,12 +384,12 @@ ASYNC_TEST_CASE("task variadic all - exception", "[task]") {
             );
 
             SECTION("success") {
-                promise1.resolve(10);
-                promise2.resolve(100);
+                promise1.resolve(1);
+                promise2.resolve(2);
 
                 const auto result = co_await task;
-                REQUIRE(result[0] == 10);
-                REQUIRE(result[1] == 100);
+                REQUIRE(result[0] == 1);
+                REQUIRE(result[1] == 2);
             }
 
             SECTION("failure") {
@@ -456,17 +456,17 @@ ASYNC_TEST_CASE("task variadic all - exception", "[task]") {
         );
 
         SECTION("success") {
-            promise1.resolve(10);
+            promise1.resolve(1);
             promise2.resolve();
-            promise3.resolve(100);
+            promise3.resolve(2);
 
             const auto result = co_await task;
-            REQUIRE(std::get<0>(result) == 10);
-            REQUIRE(std::get<2>(result) == 100);
+            REQUIRE(std::get<0>(result) == 1);
+            REQUIRE(std::get<2>(result) == 2);
         }
 
         SECTION("failure") {
-            promise1.resolve(100);
+            promise1.resolve(1);
             promise2.resolve();
             promise3.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::invalid_argument)}));
 
@@ -588,11 +588,11 @@ ASYNC_TEST_CASE("task allSettled - exception", "[task]") {
         });
 
         SECTION("normal") {
-            promise1.resolve(100);
+            promise1.resolve(1);
             promise2.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::invalid_argument)}));
 
             const auto result = co_await task;
-            REQUIRE(result[0] == 100);
+            REQUIRE(result[0] == 1);
             REQUIRE_FALSE(result[1]);
 
             REQUIRE_THROWS_MATCHES(
@@ -666,12 +666,12 @@ ASYNC_TEST_CASE("task variadic allSettled - exception", "[task]") {
     );
 
     SECTION("normal") {
-        promise1.resolve(10);
+        promise1.resolve(1);
         promise2.resolve();
         promise3.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::invalid_argument)}));
 
         const auto result = co_await task;
-        REQUIRE(std::get<0>(result) == 10);
+        REQUIRE(std::get<0>(result) == 1);
         REQUIRE(std::get<1>(result));
         REQUIRE_FALSE(std::get<2>(result));
 
@@ -827,8 +827,8 @@ ASYNC_TEST_CASE("task any - exception", "[task]") {
 
         SECTION("success") {
             promise1.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::invalid_argument)}));
-            promise2.resolve(100);
-            REQUIRE(co_await task == 100);
+            promise2.resolve(1);
+            REQUIRE(co_await task == 1);
         }
 
         SECTION("failure") {
@@ -994,8 +994,8 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
                 promise1.reject(
                     std::make_exception_ptr(std::system_error{make_error_code(std::errc::invalid_argument)})
                 );
-                promise2.resolve(100);
-                REQUIRE(co_await task == 100);
+                promise2.resolve(1);
+                REQUIRE(co_await task == 1);
             }
 
             SECTION("failure") {
@@ -1107,7 +1107,7 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
                 promise2.reject(
                     std::make_exception_ptr(std::system_error{make_error_code(std::errc::io_error)})
                 );
-                promise3.resolve(1000);
+                promise3.resolve(1);
 
                 const auto result = co_await task;
                 REQUIRE(result);
@@ -1116,13 +1116,13 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
 #if defined(_CPPRTTI) || defined(__GXX_RTTI)
                 REQUIRE(result->type() == typeid(long));
 #endif
-                REQUIRE(std::any_cast<long>(*result) == 1000);
+                REQUIRE(std::any_cast<long>(*result) == 1);
             }
         }
 
         SECTION("failure") {
-            promise1.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::io_error)}));
-            promise2.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::invalid_argument)}));
+            promise1.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::invalid_argument)}));
+            promise2.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::io_error)}));
             promise3.reject(std::make_exception_ptr(std::system_error{make_error_code(std::errc::bad_message)}));
 
             const auto result = co_await task;
@@ -1132,7 +1132,7 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
                 std::rethrow_exception(result.error()[0]),
                 std::system_error,
                 Catch::Matchers::Predicate<std::system_error>([](const auto &error) {
-                    return error.code() == std::errc::io_error;
+                    return error.code() == std::errc::invalid_argument;
                 })
             );
 
@@ -1140,7 +1140,7 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
                 std::rethrow_exception(result.error()[1]),
                 std::system_error,
                 Catch::Matchers::Predicate<std::system_error>([](const auto &error) {
-                    return error.code() == std::errc::invalid_argument;
+                    return error.code() == std::errc::io_error;
                 })
             );
 
@@ -1267,8 +1267,8 @@ ASYNC_TEST_CASE("task race - exception", "[task]") {
         });
 
         SECTION("success") {
-            promise1.resolve(10);
-            REQUIRE(co_await task == 10);
+            promise1.resolve(1);
+            REQUIRE(co_await task == 1);
         }
 
         SECTION("failure") {
@@ -1379,8 +1379,8 @@ ASYNC_TEST_CASE("task variadic race - exception", "[task]") {
             );
 
             SECTION("success") {
-                promise1.resolve(10);
-                REQUIRE(co_await task == 10);
+                promise1.resolve(1);
+                REQUIRE(co_await task == 1);
             }
 
             SECTION("failure") {
@@ -1453,7 +1453,7 @@ ASYNC_TEST_CASE("task variadic race - exception", "[task]") {
             }
 
             SECTION("has value") {
-                promise1.resolve(10);
+                promise1.resolve(1);
 
                 const auto result = co_await task;
                 REQUIRE(result.has_value());
@@ -1461,7 +1461,7 @@ ASYNC_TEST_CASE("task variadic race - exception", "[task]") {
 #if defined(_CPPRTTI) || defined(__GXX_RTTI)
                 REQUIRE(result.type() == typeid(int));
 #endif
-                REQUIRE(std::any_cast<int>(result) == 10);
+                REQUIRE(std::any_cast<int>(result) == 1);
             }
         }
 

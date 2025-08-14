@@ -1,6 +1,5 @@
 #include "catch_extensions.h"
 #include <asyncio/io.h>
-#include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("copy", "[io]") {
     const auto input = GENERATE(take(10, randomBytes(1, 102400)));
@@ -28,7 +27,7 @@ ASYNC_TEST_CASE("read exactly", "[io]") {
         data.resize(input.size());
 
         REQUIRE(co_await reader.readExactly(data));
-        REQUIRE_THAT(data, Catch::Matchers::RangeEquals(input));
+        REQUIRE(data == input);
     }
 
     SECTION("unexpected eof") {
@@ -73,7 +72,7 @@ ASYNC_TEST_CASE("bytes reader", "[io]") {
     data.resize(input.size());
 
     REQUIRE(co_await reader.read(data) == input.size());
-    REQUIRE_THAT(data, Catch::Matchers::RangeEquals(input));
+    REQUIRE(data == input);
 
     REQUIRE(co_await reader.read(data) == 0);
 }
@@ -82,7 +81,7 @@ ASYNC_TEST_CASE("bytes writer", "[io]") {
     const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
     asyncio::BytesWriter writer;
-    REQUIRE(co_await writer.writeAll(std::as_bytes(std::span{input})));
-    REQUIRE_THAT(writer.data(), Catch::Matchers::RangeEquals(input));
-    REQUIRE_THAT(*writer, Catch::Matchers::RangeEquals(input));
+    REQUIRE(co_await writer.writeAll(input));
+    REQUIRE(writer.data() == input);
+    REQUIRE(*writer == input);
 }

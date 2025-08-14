@@ -1,9 +1,7 @@
 #include <catch_extensions.h>
 #include <asyncio/net/dgram.h>
 
-constexpr std::string_view MESSAGE = "hello world";
-
-ASYNC_TEST_CASE("UDP socket", "[net]") {
+ASYNC_TEST_CASE("UDP socket", "[net::dgram]") {
     auto socket = asyncio::net::UDPSocket::bind("127.0.0.1", 0);
     REQUIRE(socket);
 
@@ -26,6 +24,8 @@ ASYNC_TEST_CASE("UDP socket", "[net]") {
         REQUIRE_ERROR(socket->remoteAddress(), std::errc::not_connected);
     }
 
+    const auto input = GENERATE(take(1, randomBytes(1, 1024)));
+
     SECTION("read") {
         auto peer = asyncio::net::UDPSocket::bind("127.0.0.1", 0);
         REQUIRE(peer);
@@ -33,20 +33,17 @@ ASYNC_TEST_CASE("UDP socket", "[net]") {
         const auto destination = socket->localAddress();
         REQUIRE(destination);
 
-        REQUIRE(co_await peer->writeTo(std::as_bytes(std::span{MESSAGE}), *destination) == MESSAGE.size());
+        REQUIRE(co_await peer->writeTo(input, *destination) == input.size());
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        REQUIRE(co_await socket->read(std::as_writable_bytes(std::span{message})) == MESSAGE.size());
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await socket->read(data) == input.size());
+        REQUIRE(data == input);
     }
 
     SECTION("write") {
-        REQUIRE_ERROR(
-            co_await socket->write(std::as_bytes(std::span{MESSAGE})),
-            std::errc::destination_address_required
-        );
+        REQUIRE_ERROR(co_await socket->write(input), std::errc::destination_address_required);
     }
 
     SECTION("read from") {
@@ -56,15 +53,15 @@ ASYNC_TEST_CASE("UDP socket", "[net]") {
         const auto destination = socket->localAddress();
         REQUIRE(destination);
 
-        REQUIRE(co_await peer->writeTo(std::as_bytes(std::span{MESSAGE}), *destination) == MESSAGE.size());
+        REQUIRE(co_await peer->writeTo(input, *destination) == input.size());
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        const auto result = co_await socket->readFrom(std::as_writable_bytes(std::span{message}));
+        const auto result = co_await socket->readFrom(data);
         REQUIRE(result);
-        REQUIRE(result->first == MESSAGE.size());
-        REQUIRE(message == MESSAGE);
+        REQUIRE(result->first == input.size());
+        REQUIRE(data == input);
 
         const auto address = peer->localAddress();
         REQUIRE(address);
@@ -78,15 +75,15 @@ ASYNC_TEST_CASE("UDP socket", "[net]") {
         const auto destination = peer->localAddress();
         REQUIRE(destination);
 
-        REQUIRE(co_await socket->writeTo(std::as_bytes(std::span{MESSAGE}), *destination) == MESSAGE.size());
+        REQUIRE(co_await socket->writeTo(input, *destination) == input.size());
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        const auto result = co_await peer->readFrom(std::as_writable_bytes(std::span{message}));
+        const auto result = co_await peer->readFrom(data);
         REQUIRE(result);
-        REQUIRE(result->first == MESSAGE.size());
-        REQUIRE(message == MESSAGE);
+        REQUIRE(result->first == input.size());
+        REQUIRE(data == input);
 
         const auto address = socket->localAddress();
         REQUIRE(address);
@@ -113,15 +110,17 @@ ASYNC_TEST_CASE("UDP socket connect", "[net]") {
     }
 
     SECTION("write") {
-        REQUIRE(co_await socket->write(std::as_bytes(std::span{MESSAGE})) == MESSAGE.size());
+        const auto input = GENERATE(take(1, randomBytes(1, 1024)));
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        REQUIRE(co_await socket->write(input) == input.size());
 
-        const auto result = co_await peer->readFrom(std::as_writable_bytes(std::span{message}));
+        std::vector<std::byte> data;
+        data.resize(input.size());
+
+        const auto result = co_await peer->readFrom(data);
         REQUIRE(result);
-        REQUIRE(result->first == MESSAGE.size());
-        REQUIRE(message == MESSAGE);
+        REQUIRE(result->first == input.size());
+        REQUIRE(data == input);
 
         const auto address = socket->localAddress();
         REQUIRE(address);

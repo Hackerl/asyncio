@@ -59,7 +59,7 @@ namespace {
     }
 }
 
-ASYNC_TEST_CASE("requests", "[http]") {
+ASYNC_TEST_CASE("requests", "[http::request]") {
     const auto temp = co_await asyncio::fs::temporaryDirectory();
     REQUIRE(temp);
 

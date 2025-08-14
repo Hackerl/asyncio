@@ -20,18 +20,22 @@ ASYNC_TEST_CASE("timeout", "[time]") {
     }
 
     SECTION("expired but cannot be cancelled") {
-        const auto promise = std::make_shared<asyncio::Promise<void, std::error_code>>();
+        asyncio::Promise<void, std::error_code> promise;
+
         auto task = asyncio::timeout(
             from(asyncio::task::CancellableFuture{
-                promise->getFuture(),
-                [=]() -> std::expected<void, std::error_code> {
+                promise.getFuture(),
+                []() -> std::expected<void, std::error_code> {
                     return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
                 }
             }),
             10ms
         );
 
-        promise->resolve();
+        REQUIRE(co_await asyncio::sleep(20ms));
+        REQUIRE_FALSE(task.done());
+
+        promise.resolve();
 
         const auto result = co_await task;
         REQUIRE(result);

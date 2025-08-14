@@ -3,7 +3,6 @@
 #include <zero/os/os.h>
 #include <zero/strings/strings.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
-#include <fmt/format.h>
 
 #ifdef _WIN32
 #include <asyncio/thread.h>

@@ -2,7 +2,7 @@
 #include <asyncio/sync/event.h>
 #include <asyncio/time.h>
 
-ASYNC_TEST_CASE("event", "[sync]") {
+ASYNC_TEST_CASE("event", "[sync::event]") {
     asyncio::sync::Event event;
     REQUIRE_FALSE(event.isSet());
 

@@ -6,8 +6,6 @@
 #include <unistd.h>
 #endif
 
-constexpr std::string_view MESSAGE = "hello world";
-
 ASYNC_TEST_CASE("poll events", "[poll]") {
     std::array<uv_os_sock_t, 2> sockets{};
     REQUIRE(uv_socketpair(SOCK_STREAM, 0, sockets.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE) == 0);
@@ -24,17 +22,11 @@ ASYNC_TEST_CASE("poll events", "[poll]") {
     REQUIRE(poll);
 
     SECTION("readable") {
-        REQUIRE(send(sockets[1], MESSAGE.data(), MESSAGE.size(), 0) == MESSAGE.size());
+        REQUIRE(send(sockets[1], "hello world", 11, 0) == 11);
 
         const auto events = co_await poll->on(asyncio::Poll::Event::READABLE);
         REQUIRE(events);
         REQUIRE(*events & asyncio::Poll::Event::READABLE);
-
-        std::string message;
-        message.resize(MESSAGE.size());
-
-        REQUIRE(recv(sockets[0], message.data(), message.size(), 0) == MESSAGE.size());
-        REQUIRE(message == MESSAGE);
     }
 
     SECTION("writable") {

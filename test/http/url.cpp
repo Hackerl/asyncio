@@ -1,7 +1,7 @@
 #include <catch_extensions.h>
 #include <asyncio/http/url.h>
 
-TEST_CASE("URL escape", "[http]") {
+TEST_CASE("URL escape", "[http::url]") {
     REQUIRE(
         asyncio::http::urlEscape(R"("测试&hello world!@#$%^&*()_+[]{}|;':\",.<>?")") ==
         "%22%E6%B5%8B%E8%AF%95%26hello%20world%21%40%23%24%25%5E%26%2A%28%29_"
@@ -9,7 +9,7 @@ TEST_CASE("URL escape", "[http]") {
     );
 }
 
-TEST_CASE("URL unescape", "[http]") {
+TEST_CASE("URL unescape", "[http::url]") {
     REQUIRE(
         asyncio::http::urlUnescape(
             "%22%E6%B5%8B%E8%AF%95%26hello%20world%21%40%23%24%25%5E%26%2A%28%29_"
@@ -18,7 +18,7 @@ TEST_CASE("URL unescape", "[http]") {
     );
 }
 
-TEST_CASE("URL", "[http]") {
+TEST_CASE("URL", "[http::url]") {
     auto url = asyncio::http::URL::from("http://root:123456@localhost:8080/login?name=rose#page=1");
     REQUIRE(url);
 
@@ -242,7 +242,7 @@ TEST_CASE("URL", "[http]") {
     }
 }
 
-TEST_CASE("URL comparison") {
+TEST_CASE("URL comparison", "[http::url]") {
     SECTION("equal") {
         const auto url = asyncio::http::URL::from("http://localhost:8080");
         REQUIRE(url);

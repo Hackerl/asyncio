@@ -123,9 +123,7 @@ Et4LoWkYWPBHwIiBqwh4VIA1Jri8N2vlqLRJyxSZniMAzIGTx1Irb/EW4BxsxUoV
 FReHT5LzsIm40VPPdsITh6c=
 -----END PRIVATE KEY-----)";
 
-constexpr std::string_view MESSAGE = "hello world";
-
-ASYNC_TEST_CASE("tls stream", "[net]") {
+ASYNC_TEST_CASE("tls stream", "[net::tls]") {
     auto ca = asyncio::net::tls::Certificate::load(CA_CERT);
     REQUIRE(ca);
 
@@ -173,26 +171,28 @@ ASYNC_TEST_CASE("tls stream", "[net]") {
     auto &server = result->at(0);
     auto &client = result->at(1);
 
+    const auto input = GENERATE(take(1, randomBytes(1, 102400)));
+
     SECTION("read") {
-        auto task = server.writeAll(std::as_bytes(std::span{MESSAGE}));
+        auto task = server.writeAll(input);
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        REQUIRE(co_await client.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.readExactly(data));
         REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("write") {
-        auto task = client.writeAll(std::as_bytes(std::span{MESSAGE}));
+        std::vector<std::byte> data;
+        data.resize(input.size());
 
-        std::string message;
-        message.resize(MESSAGE.size());
+        auto task = server.readExactly(data);
 
-        REQUIRE(co_await server.readExactly(std::as_writable_bytes(std::span{message})));
-        REQUIRE(message == MESSAGE);
+        REQUIRE(co_await client.writeAll(input));
         REQUIRE(co_await task);
+        REQUIRE(data == input);
     }
 
     SECTION("shutdown") {
@@ -205,14 +205,14 @@ ASYNC_TEST_CASE("tls stream", "[net]") {
         }
 
         {
-            auto task = server.writeAll(std::as_bytes(std::span{MESSAGE}));
+            auto task = server.writeAll(input);
 
-            std::string message;
-            message.resize(MESSAGE.size());
+            std::vector<std::byte> data;
+            data.resize(input.size());
 
-            REQUIRE(co_await client.readExactly(std::as_writable_bytes(std::span{message})));
-            REQUIRE(message == MESSAGE);
+            REQUIRE(co_await client.readExactly(data));
             REQUIRE(co_await task);
+            REQUIRE(data == input);
         }
 
         {
