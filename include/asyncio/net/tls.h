@@ -213,7 +213,11 @@ namespace asyncio::net::tls {
     )
 
     template<typename T>
-        requires (zero::detail::Trait<T, IReader> && zero::detail::Trait<T, IWriter>)
+        requires (
+            zero::detail::Trait<T, IReader> &&
+            zero::detail::Trait<T, IWriter> &&
+            zero::detail::Trait<T, ICloseable>
+        )
     class TLS final : public IReader, public IWriter, public ICloseable, public IHalfCloseable {
     public:
         TLS(T stream, std::unique_ptr<SSL, decltype(&SSL_free)> ssl)
@@ -378,8 +382,10 @@ namespace asyncio::net::tls {
                     continue;
                 }
 
-                if (result == 1)
-                    co_return co_await transferOut();
+                if (result == 1) {
+                    CO_EXPECT(co_await transferOut());
+                    break;
+                }
 
                 if (const auto error = SSL_get_error(mSSL.get(), result); error == SSL_ERROR_WANT_READ) {
                     CO_EXPECT(co_await transferOut());
@@ -395,6 +401,9 @@ namespace asyncio::net::tls {
                     co_return std::unexpected{make_error_code(static_cast<OpenSSLError>(error))};
                 }
             }
+
+            CO_EXPECT(co_await std::invoke(&ICloseable::close, mStream));
+            co_return {};
         }
 
     private:
