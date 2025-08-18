@@ -92,7 +92,7 @@ ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
 
 #ifdef _WIN32
 ASYNC_TEST_CASE("named pipe stream", "[net]") {
-    const auto name = fmt::format(R"(\\.\pipe\asyncio-{})", GENERATE(take(1, randomAlphanumericString(8, 64))));
+    const auto name = fmt::format(R"(\\.\pipe\asyncio-{})", GENERATE(take(1, randomAlphanumericString(8, 16))));
 
     auto listener = asyncio::net::NamedPipeListener::listen(name);
     REQUIRE(listener);
@@ -161,7 +161,7 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
     const auto temp = co_await asyncio::fs::temporaryDirectory();
     REQUIRE(temp);
 
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 16)));
 
     auto listener = asyncio::net::UnixListener::listen(path.string());
     REQUIRE(listener);
@@ -241,7 +241,7 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
 
 #if defined(__linux__)
 ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
-    const auto name = fmt::format("@asyncio-{}", GENERATE(take(1, randomAlphanumericString(8, 64))));
+    const auto name = fmt::format("@asyncio-{}", GENERATE(take(1, randomAlphanumericString(8, 16))));
 
     auto listener = asyncio::net::UnixListener::listen(name);
     REQUIRE(listener);
