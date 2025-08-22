@@ -16,7 +16,7 @@ int main(const int argc, char *argv[]) {
         throw std::system_error{result.error()};
 
     if (!*result) {
-        fmt::print(stderr, "Error: {} ({})\n", result->error().message(), result->error());
+        fmt::print(stderr, "Error: {:s} ({})\n", result->error(), result->error());
         return EXIT_FAILURE;
     }
 

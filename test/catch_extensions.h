@@ -62,7 +62,7 @@ struct Catch::StringMaker<std::expected<T, E>> {
 template<>
 struct Catch::StringMaker<std::error_code> {
     static std::string convert(const std::error_code &ec) {
-        return fmt::format("{} ({})", ec.message(), ec);
+        return fmt::format("{:s} ({})", ec, ec);
     }
 };
 

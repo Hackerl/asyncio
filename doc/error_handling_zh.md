@@ -19,17 +19,17 @@
 // POSIX
 const std::error_code ec{EAGAIN, std::generic_category()};
 assert(ec.value() == EAGAIN);
-fmt::print("{}", ec.message());
+fmt::print("{:s}", ec);
 
 // Linux
 const std::error_code ec{EOPNOTSUPP, std::system_category()};
 assert(ec.value() == EOPNOTSUPP);
-fmt::print("{}", ec.message());
+fmt::print("{:s}", ec);
 
 // Windows
 const std::error_code ec{ERROR_FILE_NOT_FOUND, std::system_category()};
 assert(ec.value() == ERROR_FILE_NOT_FOUND);
-fmt::print("{}", ec.message());
+fmt::print("{:s}", ec);
 ```
 
 在编写跨平台的代码时，我们应该如何选择错误种类呢：
@@ -179,7 +179,7 @@ const std::error_code ec{static_cast<OpenSSLError>(ERR_get_error())};
 if (ec == static_cast<OpenSSLError>(OPENSSL_ERROR_CONSTANT))
     xxxx;
 
-fmt::print("{}", ec.message());
+fmt::print("{:s}", ec);
 ```
 
 当然，在上面的 `transformer` 中，我们只是表明了错误号该如何转为错误描述，我们并没有定义与错误条件的映射关系，所以只能将之与具体的错误数进行比较。

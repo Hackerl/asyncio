@@ -18,17 +18,17 @@ The standard library already defines `POSIX` error types with [`std::generic_cat
 // POSIX
 const std::error_code ec{EAGAIN, std::generic_category()};
 assert(ec.value() == EAGAIN);
-fmt::print("{}", ec.message());
+fmt::print("{:s}", ec);
 
 // Linux
 const std::error_code ec{EOPNOTSUPP, std::system_category()};
 assert(ec.value() == EOPNOTSUPP);
-fmt::print("{}", ec.message());
+fmt::print("{:s}", ec);
 
 // Windows
 const std::error_code ec{ERROR_FILE_NOT_FOUND, std::system_category()};
 assert(ec.value() == ERROR_FILE_NOT_FOUND);
-fmt::print("{}", ec.message());
+fmt::print("{:s}", ec);
 ```
 
 When writing cross-platform code, how should we choose error categories?
@@ -178,7 +178,7 @@ const std::error_code ec{static_cast<OpenSSLError>(ERR_get_error())};
 if (ec == static_cast<OpenSSLError>(OPENSSL_ERROR_CONSTANT))
     xxxx;
 
-fmt::print("{}", ec.message());
+fmt::print("{:s}", ec);
 ```
 
 In the above `transformer`, we specify how the error code should be converted to an error description, but we haven't defined the mapping to error conditions. Therefore, we can only compare it with specific error codes. The main reason is that `OpenSSL`'s error system is complex, with many types, making it difficult to handle.

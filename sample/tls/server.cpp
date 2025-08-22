@@ -49,7 +49,7 @@ namespace {
 
             group.add(task);
             task.future().fail([](const auto &ec) {
-                fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
+                fmt::print(stderr, "unhandled error: {:s} ({})\n", ec, ec);
             });
         }
 
