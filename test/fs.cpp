@@ -198,10 +198,7 @@ ASYNC_TEST_CASE("seekable file", "[fs]") {
 
         const auto data = co_await file->readAll();
         REQUIRE(data);
-        REQUIRE_THAT(
-            *data,
-            Catch::Matchers::RangeEquals(std::span{content.begin() + offset, content.end()})
-        );
+        REQUIRE_THAT(*data, Catch::Matchers::RangeEquals(std::span{content.begin() + offset, content.end()}));
     }
 
     REQUIRE(co_await asyncio::fs::remove(path));

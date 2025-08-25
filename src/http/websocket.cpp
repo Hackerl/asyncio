@@ -265,7 +265,9 @@ asyncio::task::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     CO_EXPECT(co_await mMutex->lock());
     DEFER(mMutex->unlock());
-    assert(mState != State::CLOSED);
+
+    if (mState == State::CLOSED || (mState == State::CLOSING && message.opcode != Opcode::CLOSE))
+        co_return std::unexpected{Error::CONNECTION_CLOSED};
 
     Header header;
 
@@ -353,9 +355,6 @@ asyncio::http::ws::WebSocket::readMessage() {
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMessage(Message message) {
     assert(message.opcode == Opcode::TEXT || message.opcode == Opcode::BINARY);
 
-    if (mState != State::CONNECTED)
-        co_return std::unexpected{Error::CONNECTION_CLOSED};
-
     if (message.opcode == Opcode::TEXT) {
         const auto &text = std::get<std::string>(message.data);
         co_return co_await writeInternalMessage({
@@ -384,9 +383,6 @@ asyncio::http::ws::WebSocket::sendBinary(const std::span<const std::byte> data) 
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
-    if (mState == State::CLOSED)
-        co_return co_await mCloseable->close();
-
     assert(mState == State::CONNECTED);
 
     mState = State::CLOSING;
