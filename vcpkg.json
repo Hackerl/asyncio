@@ -8,7 +8,8 @@
     "nlohmann-json",
     "openssl",
     "treehh",
-    "zero"
+    "zero",
+    "zlib"
   ],
   "default-features": [
     "tests"

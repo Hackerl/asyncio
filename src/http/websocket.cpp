@@ -3,8 +3,10 @@
 #include <asyncio/net/tls.h>
 #include <asyncio/binary.h>
 #include <asyncio/buffer.h>
-#include <zero/encoding/base64.h>
+#include <asyncio/thread.h>
 #include <zero/defer.h>
+#include <zero/utility.h>
+#include <zero/encoding/base64.h>
 #include <openssl/sha.h>
 #include <random>
 #include <map>
@@ -23,6 +25,7 @@ constexpr auto MAX_SINGLE_BYTE_PAYLOAD_LENGTH = 125;
 constexpr auto MAX_TWO_BYTE_PAYLOAD_LENGTH = (std::numeric_limits<std::uint16_t>::max)();
 
 constexpr auto OPCODE_MASK = std::byte{0x0f};
+constexpr auto RSV1_BIT = std::byte{0x40};
 constexpr auto FINAL_BIT = std::byte{0x80};
 constexpr auto LENGTH_MASK = std::byte{0x7f};
 constexpr auto MASK_BIT = std::byte{0x80};
@@ -31,8 +34,73 @@ constexpr auto WS_SCHEME = "http";
 constexpr auto WS_SECURE_SCHEME = "https";
 constexpr auto WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
+constexpr auto WEBSOCKET_COMPRESSION_THRESHOLD = 128;
+
+DEFINE_ERROR_TRANSFORMER(ZLIBError, "zlib", zError)
+DECLARE_ERROR_CODE(ZLIBError)
+
+DEFINE_ERROR_CATEGORY_INSTANCE(ZLIBError)
+
+namespace {
+    std::expected<void, std::error_code>
+    validateWebsocketAccept(const std::map<std::string, std::string> &headers, const std::string &key) {
+        const auto it = headers.find("Sec-WebSocket-Accept");
+
+        if (it == headers.end())
+            return std::unexpected{asyncio::http::ws::WebSocket::Error::NO_ACCEPT_HEADER};
+
+        std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
+        const auto data = key + WS_MAGIC;
+
+        SHA1(
+            reinterpret_cast<const unsigned char *>(data.data()),
+            data.size(),
+            reinterpret_cast<unsigned char *>(digest.data())
+        );
+
+        if (it->second != zero::encoding::base64::encode(digest))
+            return std::unexpected{asyncio::http::ws::WebSocket::Error::HASH_MISMATCH};
+
+        return {};
+    }
+
+    std::expected<std::optional<asyncio::http::ws::DeflateConfig>, std::error_code>
+    parseExtensionConfig(const std::map<std::string, std::string> &headers) {
+        const auto it = headers.find("Sec-WebSocket-Extensions");
+
+        if (it == headers.end())
+            return std::nullopt;
+
+        const auto items = zero::strings::split(it->second, ';')
+            | std::views::transform(zero::strings::trim)
+            | std::ranges::to<std::vector>();
+
+        if (std::ranges::find(items, "permessage-deflate") == items.end())
+            return std::nullopt;
+
+        asyncio::http::ws::DeflateConfig config;
+
+        for (const auto &item: items) {
+            if (item == "server_no_context_takeover") {
+                config.serverNoContextTakeover = true;
+            }
+            else if (item.starts_with("client_max_window_bits=")) {
+                const auto windowBits = zero::strings::toNumber<int>(item.substr(23));
+                EXPECT(windowBits);
+                config.clientMaxWindowBits = *windowBits;
+            }
+        }
+
+        return config;
+    }
+}
+
 asyncio::http::ws::Opcode asyncio::http::ws::Header::opcode() const {
     return static_cast<Opcode>(mBytes[0] & OPCODE_MASK);
+}
+
+bool asyncio::http::ws::Header::rsv1() const {
+    return std::to_integer<int>(mBytes[0] & RSV1_BIT);
 }
 
 bool asyncio::http::ws::Header::final() const {
@@ -50,6 +118,15 @@ bool asyncio::http::ws::Header::mask() const {
 void asyncio::http::ws::Header::opcode(const Opcode opcode) {
     mBytes[0] &= ~OPCODE_MASK;
     mBytes[0] |= static_cast<std::byte>(opcode) & OPCODE_MASK;
+}
+
+void asyncio::http::ws::Header::rsv1(const bool rsv1) {
+    if (!rsv1) {
+        mBytes[0] &= ~RSV1_BIT;
+        return;
+    }
+
+    mBytes[0] |= RSV1_BIT;
 }
 
 void asyncio::http::ws::Header::final(const bool final) {
@@ -73,6 +150,142 @@ void asyncio::http::ws::Header::mask(const bool mask) {
     }
 
     mBytes[1] |= MASK_BIT;
+}
+
+asyncio::http::ws::Compressor::Compressor(std::unique_ptr<z_stream, void(*)(z_stream *)> stream)
+    : mStream{std::move(stream)} {
+}
+
+std::expected<asyncio::http::ws::Compressor, std::error_code>
+asyncio::http::ws::Compressor::make(const int windowBits) {
+    auto stream = std::make_unique<z_stream>();
+
+    if (const auto result = deflateInit2(
+        stream.get(),
+        Z_DEFAULT_COMPRESSION,
+        Z_DEFLATED,
+        -windowBits,
+        8,
+        Z_DEFAULT_STRATEGY
+    ); result != Z_OK)
+        return std::unexpected{static_cast<ZLIBError>(result)};
+
+    return Compressor{
+        {
+            stream.release(),
+            [](auto *s) {
+                deflateEnd(s);
+                delete s;
+            }
+        }
+    };
+}
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+asyncio::task::Task<std::vector<std::byte>, std::error_code>
+asyncio::http::ws::Compressor::compress(const std::span<const std::byte> data) {
+    co_return zero::flattenWith<std::error_code>(
+        co_await toThreadPool([&]() -> std::expected<std::vector<std::byte>, std::error_code> {
+            std::vector<std::byte> output;
+
+            mStream->avail_in = data.size();
+            mStream->next_in = reinterpret_cast<Bytef *>(const_cast<std::byte *>(data.data()));
+
+            do {
+                std::array<std::byte, 16384> buffer; // NOLINT(*-pro-type-member-init)
+
+                mStream->avail_out = buffer.size();
+                mStream->next_out = reinterpret_cast<Bytef *>(buffer.data());
+
+                if (const auto result = deflate(mStream.get(), Z_SYNC_FLUSH); result != Z_OK && result != Z_BUF_ERROR)
+                    return std::unexpected{static_cast<ZLIBError>(result)};
+
+                output.insert(output.end(), buffer.begin(), buffer.begin() + buffer.size() - mStream->avail_out);
+            }
+            while (mStream->avail_out == 0);
+            assert(mStream->avail_in == 0);
+
+            return output;
+        })
+    );
+}
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+std::expected<void, std::error_code> asyncio::http::ws::Compressor::reset() {
+    if (const auto result = deflateReset(mStream.get()); result != Z_OK)
+        return std::unexpected{static_cast<ZLIBError>(result)};
+
+    return {};
+}
+
+asyncio::http::ws::Decompressor::Decompressor(std::unique_ptr<z_stream, void(*)(z_stream *)> stream)
+    : mStream{std::move(stream)} {
+}
+
+std::expected<asyncio::http::ws::Decompressor, std::error_code>
+asyncio::http::ws::Decompressor::make(const int windowBits) {
+    auto stream = std::make_unique<z_stream>();
+
+    if (const auto result = inflateInit2(stream.get(), -windowBits); result != Z_OK)
+        return std::unexpected{static_cast<ZLIBError>(result)};
+
+    return Decompressor{
+        {
+            stream.release(),
+            [](auto *s) {
+                inflateEnd(s);
+                delete s;
+            }
+        }
+    };
+}
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+asyncio::task::Task<std::vector<std::byte>, std::error_code>
+asyncio::http::ws::Decompressor::decompress(const std::span<const std::byte> data) {
+    co_return zero::flattenWith<std::error_code>(
+        co_await toThreadPool([&]() -> std::expected<std::vector<std::byte>, std::error_code> {
+            std::vector<std::byte> output;
+            output.reserve(data.size() * 2);
+
+            mStream->avail_in = data.size();
+            mStream->next_in = reinterpret_cast<Bytef *>(const_cast<std::byte *>(data.data()));
+
+            do {
+                std::array<std::byte, 16384> buffer; // NOLINT(*-pro-type-member-init)
+
+                mStream->avail_out = buffer.size();
+                mStream->next_out = reinterpret_cast<Bytef *>(buffer.data());
+
+                if (const auto result = inflate(mStream.get(), Z_SYNC_FLUSH);
+                    result != Z_OK && result != Z_STREAM_END && result != Z_BUF_ERROR)
+                    return std::unexpected{static_cast<ZLIBError>(result)};
+
+                output.insert(output.end(), buffer.begin(), buffer.begin() + buffer.size() - mStream->avail_out);
+            }
+            while (mStream->avail_out == 0);
+
+            return output;
+        })
+    );
+}
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+std::expected<void, std::error_code> asyncio::http::ws::Decompressor::reset() {
+    if (const auto result = inflateReset(mStream.get()); result != Z_OK)
+        return std::unexpected{static_cast<ZLIBError>(result)};
+
+    return {};
+}
+
+asyncio::http::ws::WebSocket::WebSocket(
+    std::shared_ptr<IReader> reader,
+    std::shared_ptr<IWriter> writer,
+    std::shared_ptr<ICloseable> closeable,
+    std::optional<DeflateExtension> deflateExtension
+) : mState{State::CONNECTED}, mMutex{std::make_unique<sync::Mutex>()},
+    mReader{std::move(reader)}, mWriter{std::move(writer)}, mCloseable{std::move(closeable)},
+    mDeflateExtension{std::move(deflateExtension)} {
 }
 
 asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::WebSocket::connect(const URL url) {
@@ -137,6 +350,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         "Connection: upgrade\r\n"
         "Sec-WebSocket-Key: {}\r\n"
         "Sec-WebSocket-Version: 13\r\n"
+        "Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits\r\n"
         "Origin: {}://{}:{}\r\n\r\n",
         !query ? path : path + "?" + *query,
         *host, *port,
@@ -146,30 +360,32 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
 
     CO_EXPECT(co_await writer->writeAll(std::as_bytes(std::span{header})));
 
-    auto line = co_await bufReader.readLine();
-    CO_EXPECT(line);
+    {
+        const auto line = co_await bufReader.readLine();
+        CO_EXPECT(line);
 
-    auto tokens = zero::strings::split(*line);
+        const auto tokens = zero::strings::split(*line);
 
-    if (tokens.size() < 2)
-        co_return std::unexpected{Error::INVALID_RESPONSE};
+        if (tokens.size() < 2)
+            co_return std::unexpected{Error::INVALID_RESPONSE};
 
-    const auto code = zero::strings::toNumber<int>(tokens[1]);
-    CO_EXPECT(code);
+        const auto code = zero::strings::toNumber<int>(tokens[1]);
+        CO_EXPECT(code);
 
-    if (code != SWITCHING_PROTOCOLS_STATUS)
-        co_return std::unexpected{Error::UNEXPECTED_STATUS_CODE};
+        if (code != SWITCHING_PROTOCOLS_STATUS)
+            co_return std::unexpected{Error::UNEXPECTED_STATUS_CODE};
+    }
 
     std::map<std::string, std::string> headers;
 
     while (true) {
-        line = co_await bufReader.readLine();
+        const auto line = co_await bufReader.readLine();
         CO_EXPECT(line);
 
         if (line->empty())
             break;
 
-        tokens = zero::strings::split(*line, ":", 1);
+        const auto tokens = zero::strings::split(*line, ":", 1);
 
         if (tokens.size() != 2)
             co_return std::unexpected{Error::INVALID_HTTP_HEADER};
@@ -177,36 +393,29 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         headers[tokens[0]] = zero::strings::trim(tokens[1]);
     }
 
-    const auto it = headers.find("Sec-WebSocket-Accept");
+    CO_EXPECT(validateWebsocketAccept(headers, key));
 
-    if (it == headers.end())
-        co_return std::unexpected{Error::NO_ACCEPT_HEADER};
+    const auto config = parseExtensionConfig(headers);
+    CO_EXPECT(config);
 
-    std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
-    const auto data = key + WS_MAGIC;
+    std::optional<DeflateExtension> deflateExtension;
 
-    SHA1(
-        reinterpret_cast<const unsigned char *>(data.data()),
-        data.size(),
-        reinterpret_cast<unsigned char *>(digest.data())
-    );
+    if (const auto &deflateConfig = *config) {
+        auto compressor = Compressor::make(deflateConfig->clientMaxWindowBits);
+        CO_EXPECT(compressor);
 
-    if (it->second != zero::encoding::base64::encode(digest))
-        co_return std::unexpected{Error::HASH_MISMATCH};
+        auto decompressor = Decompressor::make(deflateConfig->serverMaxWindowBits);
+        CO_EXPECT(decompressor);
+
+        deflateExtension.emplace(*deflateConfig, *std::move(compressor), *std::move(decompressor));
+    }
 
     co_return WebSocket{
         std::make_shared<BufReader<std::shared_ptr<IReader>>>(std::move(bufReader)),
         std::move(writer),
-        std::move(closeable)
+        std::move(closeable),
+        std::move(deflateExtension)
     };
-}
-
-asyncio::http::ws::WebSocket::WebSocket(
-    std::shared_ptr<IReader> reader,
-    std::shared_ptr<IWriter> writer,
-    std::shared_ptr<ICloseable> closeable
-) : mState{State::CONNECTED}, mMutex{std::make_unique<sync::Mutex>()},
-    mReader{std::move(reader)}, mWriter{std::move(writer)}, mCloseable{std::move(closeable)} {
 }
 
 asyncio::task::Task<asyncio::http::ws::Frame, std::error_code>
@@ -245,17 +454,31 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
     auto frame = co_await readFrame();
     CO_EXPECT(frame);
 
-    if (frame->header.final())
-        co_return InternalMessage{frame->header.opcode(), std::move(frame->data)};
+    auto final = frame->header.final();
 
-    while (true) {
+    while (!final) {
         auto fragment = co_await readFrame();
         CO_EXPECT(fragment);
 
         frame->data.insert(frame->data.end(), fragment->data.begin(), fragment->data.end());
+        final = fragment->header.final();
+    }
 
-        if (fragment->header.final())
-            break;
+    if (frame->header.rsv1()) {
+        if (!mDeflateExtension)
+            co_return std::unexpected{Error::UNEXPECTED_COMPRESSED_MESSAGE};
+
+        frame->data.insert(frame->data.end(), {std::byte{0x00}, std::byte{0x00}, std::byte{0xff}, std::byte{0xff}});
+
+        auto &[config, compressor, decompressor] = *mDeflateExtension;
+        auto decompressed = co_await decompressor.decompress(frame->data);
+        CO_EXPECT(decompressed);
+
+        frame->data = std::move(*decompressed);
+
+        if (config.serverNoContextTakeover) {
+            CO_EXPECT(decompressor.reset());
+        }
     }
 
     co_return InternalMessage{frame->header.opcode(), std::move(frame->data)};
@@ -274,6 +497,18 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     header.opcode(message.opcode);
     header.final(true);
     header.mask(true);
+
+    if (mDeflateExtension && (message.opcode == Opcode::TEXT || message.opcode == Opcode::BINARY)
+        && message.data.size() >= WEBSOCKET_COMPRESSION_THRESHOLD) {
+        auto compressed = co_await mDeflateExtension->compressor.compress(message.data);
+        CO_EXPECT(compressed);
+
+        assert(compressed->size() > 4);
+        compressed->resize(compressed->size() - 4);
+
+        message.data = std::move(*compressed);
+        header.rsv1(true);
+    }
 
     std::size_t extendedBytes{};
     const auto length = message.data.size();

@@ -16,6 +16,7 @@ include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+find_package(ZLIB REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(zero CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
@@ -68,6 +69,7 @@ target_link_libraries(
         $<$<PLATFORM_ID:Windows>:Crypt32>
         PUBLIC
         zero::zero
+        ZLIB::ZLIB
         OpenSSL::SSL
         OpenSSL::Crypto
         CURL::libcurl

@@ -5,6 +5,7 @@
 #include <asyncio/io.h>
 #include <asyncio/http/url.h>
 #include <asyncio/sync/mutex.h>
+#include <zlib.h>
 
 namespace asyncio::http::ws {
     enum class CloseCode {
@@ -108,11 +109,13 @@ namespace asyncio::http::ws {
     class Header {
     public:
         [[nodiscard]] Opcode opcode() const;
+        [[nodiscard]] bool rsv1() const;
         [[nodiscard]] bool final() const;
         [[nodiscard]] std::size_t length() const;
         [[nodiscard]] bool mask() const;
 
         void opcode(Opcode opcode);
+        void rsv1(bool rsv1);
         void final(bool final);
         void length(std::size_t length);
         void mask(bool mask);
@@ -124,6 +127,45 @@ namespace asyncio::http::ws {
     struct Frame {
         Header header;
         std::vector<std::byte> data;
+    };
+
+    class Compressor {
+    public:
+        explicit Compressor(std::unique_ptr<z_stream, void (*)(z_stream *)> stream);
+
+        static std::expected<Compressor, std::error_code> make(int windowBits);
+
+        task::Task<std::vector<std::byte>, std::error_code> compress(std::span<const std::byte> data);
+        std::expected<void, std::error_code> reset();
+
+    private:
+        std::unique_ptr<z_stream, void (*)(z_stream *)> mStream;
+    };
+
+    class Decompressor {
+    public:
+        explicit Decompressor(std::unique_ptr<z_stream, void (*)(z_stream *)> stream);
+
+        static std::expected<Decompressor, std::error_code> make(int windowBits);
+
+        task::Task<std::vector<std::byte>, std::error_code> decompress(std::span<const std::byte> data);
+        std::expected<void, std::error_code> reset();
+
+    private:
+        std::unique_ptr<z_stream, void (*)(z_stream *)> mStream;
+    };
+
+    struct DeflateConfig {
+        bool serverNoContextTakeover{false};
+        bool clientNoContextTakeover{false};
+        int serverMaxWindowBits{15};
+        int clientMaxWindowBits{15};
+    };
+
+    struct DeflateExtension {
+        DeflateConfig config;
+        Compressor compressor;
+        Decompressor decompressor;
     };
 
     class WebSocket {
@@ -146,13 +188,15 @@ namespace asyncio::http::ws {
             HASH_MISMATCH, "hash mismatch",
             UNSUPPORTED_MASKED_FRAME, "unsupported masked frame",
             UNSUPPORTED_OPCODE, "unsupported opcode",
-            CONNECTION_CLOSED, "connection closed"
+            CONNECTION_CLOSED, "connection closed",
+            UNEXPECTED_COMPRESSED_MESSAGE, "unexpected compressed message"
         )
 
         WebSocket(
             std::shared_ptr<IReader> reader,
             std::shared_ptr<IWriter> writer,
-            std::shared_ptr<ICloseable> closeable
+            std::shared_ptr<ICloseable> closeable,
+            std::optional<DeflateExtension> deflateExtension
         );
 
         static task::Task<WebSocket, std::error_code> connect(URL url);
@@ -177,6 +221,7 @@ namespace asyncio::http::ws {
         std::shared_ptr<IReader> mReader;
         std::shared_ptr<IWriter> mWriter;
         std::shared_ptr<ICloseable> mCloseable;
+        std::optional<DeflateExtension> mDeflateExtension;
     };
 }
 

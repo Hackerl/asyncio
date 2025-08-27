@@ -249,3 +249,23 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
         REQUIRE_ERROR(co_await task, asyncio::http::ws::CloseCode::NORMAL_CLOSURE);
     }
 }
+
+ASYNC_TEST_CASE("message deflate", "[http::websocket]") {
+    const auto windowBits = GENERATE(9, 10, 11, 12, 13, 14, 15);
+
+    auto compressor = asyncio::http::ws::Compressor::make(windowBits);
+    REQUIRE(compressor);
+
+    auto decompressor = asyncio::http::ws::Decompressor::make(windowBits);
+    REQUIRE(decompressor);
+
+    const auto times = GENERATE(take(1, random(1, 64)));
+
+    for (int i{0}; i < times; ++i) {
+        const auto input = GENERATE(take(1, randomBytes(1, 102400)));
+
+        const auto compressed = co_await compressor->compress(input);
+        REQUIRE(compressed);
+        REQUIRE(co_await decompressor->decompress(*compressed) == input);
+    }
+}
