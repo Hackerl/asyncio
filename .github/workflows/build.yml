@@ -33,7 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install musl toolchains
-        run: curl -fsSL https://github.com/Hackerl/musl-cross-make/releases/download/gcc-14.2.0/x86_64-linux-musl-native-gcc14.2.0.tar.gz | tar -xz -C /opt
+        run: curl -fsSL https://github.com/Hackerl/musl-cross-make/releases/download/gcc-15.2.0/x86_64-linux-musl-native-gcc15.2.0.tar.gz | tar -xz -C /opt
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
       - name: Build
@@ -43,8 +43,8 @@ jobs:
           configurePresetAdditionalArgs: "['-DCMAKE_EXE_LINKER_FLAGS=-static-pie']"
           buildPreset: debug
         env:
-          CC: /opt/x86_64-linux-musl-native-gcc14.2.0/bin/x86_64-linux-musl-gcc
-          CXX: /opt/x86_64-linux-musl-native-gcc14.2.0/bin/x86_64-linux-musl-g++
+          CC: /opt/x86_64-linux-musl-native-gcc15.2.0/bin/x86_64-linux-musl-gcc
+          CXX: /opt/x86_64-linux-musl-native-gcc15.2.0/bin/x86_64-linux-musl-g++
 
   windows:
     runs-on: windows-latest

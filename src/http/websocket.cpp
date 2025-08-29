@@ -200,7 +200,7 @@ asyncio::http::ws::Compressor::compress(const std::span<const std::byte> data) {
                 if (const auto result = deflate(mStream.get(), Z_SYNC_FLUSH); result != Z_OK && result != Z_BUF_ERROR)
                     return std::unexpected{static_cast<ZLIBError>(result)};
 
-                output.insert(output.end(), buffer.begin(), buffer.begin() + buffer.size() - mStream->avail_out);
+                output.append_range(std::span{buffer.data(), buffer.size() - mStream->avail_out});
             }
             while (mStream->avail_out == 0);
             assert(mStream->avail_in == 0);
@@ -261,7 +261,7 @@ asyncio::http::ws::Decompressor::decompress(const std::span<const std::byte> dat
                     result != Z_OK && result != Z_STREAM_END && result != Z_BUF_ERROR)
                     return std::unexpected{static_cast<ZLIBError>(result)};
 
-                output.insert(output.end(), buffer.begin(), buffer.begin() + buffer.size() - mStream->avail_out);
+                output.append_range(std::span{buffer.data(), buffer.size() - mStream->avail_out});
             }
             while (mStream->avail_out == 0);
 
@@ -457,10 +457,10 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
     auto final = frame->header.final();
 
     while (!final) {
-        auto fragment = co_await readFrame();
+        const auto fragment = co_await readFrame();
         CO_EXPECT(fragment);
 
-        frame->data.insert(frame->data.end(), fragment->data.begin(), fragment->data.end());
+        frame->data.append_range(fragment->data);
         final = fragment->header.final();
     }
 
@@ -468,7 +468,7 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
         if (!mDeflateExtension)
             co_return std::unexpected{Error::UNEXPECTED_COMPRESSED_MESSAGE};
 
-        frame->data.insert(frame->data.end(), {std::byte{0x00}, std::byte{0x00}, std::byte{0xff}, std::byte{0xff}});
+        frame->data.append_range(std::array{std::byte{0x00}, std::byte{0x00}, std::byte{0xff}, std::byte{0xff}});
 
         auto &[config, compressor, decompressor] = *mDeflateExtension;
         auto decompressed = co_await decompressor.decompress(frame->data);

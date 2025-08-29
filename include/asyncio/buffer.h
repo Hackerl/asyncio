@@ -75,12 +75,12 @@ namespace asyncio {
                 const auto last = mBuffer.get() + mTail;
 
                 if (const auto it = std::find(first, last, byte); it != last) {
-                    data.insert(data.end(), first, it);
+                    data.append_range(std::ranges::subrange{first, it});
                     mHead += std::distance(first, it) + 1;
                     co_return data;
                 }
 
-                data.insert(data.end(), first, last);
+                data.append_range(std::ranges::subrange{first, last});
 
                 mHead = 0;
                 mTail = 0;

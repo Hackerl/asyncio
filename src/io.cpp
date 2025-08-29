@@ -28,7 +28,7 @@ asyncio::task::Task<std::vector<std::byte>, std::error_code> asyncio::IReader::r
         if (*n == 0)
             break;
 
-        data.insert(data.end(), buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(*n));
+        data.append_range(std::span{buffer.data(), *n});
     }
 
     co_return data;
@@ -107,7 +107,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::BytesReader::read(con
 }
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::BytesWriter::write(const std::span<const std::byte> data) {
-    mBytes.insert(mBytes.end(), data.begin(), data.end());
+    mBytes.append_range(data);
     co_return data.size();
 }
 
