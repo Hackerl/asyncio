@@ -221,7 +221,7 @@ std::expected<void, std::error_code> asyncio::process::PseudoConsole::resize(con
 
 std::expected<asyncio::process::ChildProcess, std::error_code>
 asyncio::process::PseudoConsole::spawn(const Command &command) {
-    return mPseudoConsole.spawn(command.mCommand).transform([](auto process) {
+    return mPseudoConsole.spawn(command.mCommand).transform([](zero::os::process::ChildProcess &&process) {
         return ChildProcess{zero::os::process::Process{std::move(process.impl())}, {}};
     });
 }

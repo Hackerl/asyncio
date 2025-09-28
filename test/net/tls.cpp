@@ -159,10 +159,10 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
     REQUIRE(address);
 
     auto result = co_await all(
-        listener->accept().andThen([&](auto stream) {
+        listener->accept().andThen([&](asyncio::net::TCPStream &&stream) {
             return asyncio::net::tls::accept(std::move(stream), *std::move(serverContext));
         }),
-        asyncio::net::TCPStream::connect(*address).andThen([&](auto stream) {
+        asyncio::net::TCPStream::connect(*address).andThen([&](asyncio::net::TCPStream &&stream) {
             return asyncio::net::tls::connect(std::move(stream), *std::move(clientContext));
         })
     );
