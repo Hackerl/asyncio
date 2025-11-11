@@ -45,9 +45,9 @@ ASYNC_TEST_CASE("spawn child process with pseudo console", "[process]") {
 #endif
 
     auto &master = pc->master();
-    REQUIRE(co_await master.writeAll(std::as_bytes(std::span{"echo hello\rexit\r"sv})));
-
     auto task = master.readAll();
+
+    REQUIRE(co_await master.writeAll(std::as_bytes(std::span{"echo hello\rexit\r"sv})));
     REQUIRE(co_await child->wait());
 
 #ifdef _WIN32
