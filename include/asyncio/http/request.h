@@ -248,36 +248,36 @@ namespace asyncio::http {
         }
 
         task::Task<Response, std::error_code>
-        get(const URL &url, const std::optional<Options> &options = std::nullopt) {
-            return request("GET", url, options);
+        get(URL url, std::optional<Options> options = std::nullopt) {
+            return request("GET", std::move(url), std::move(options));
         }
 
         task::Task<Response, std::error_code>
-        head(const URL &url, const std::optional<Options> &options = std::nullopt) {
-            return request("HEAD", url, options);
+        head(URL url, std::optional<Options> options = std::nullopt) {
+            return request("HEAD", std::move(url), std::move(options));
         }
 
         task::Task<Response, std::error_code>
-        del(const URL &url, const std::optional<Options> &options = std::nullopt) {
-            return request("DELETE", url, options);
-        }
-
-        template<typename T>
-        task::Task<Response, std::error_code>
-        post(const URL &url, T &&payload, const std::optional<Options> &options = std::nullopt) {
-            return request("POST", url, options, std::forward<T>(payload));
+        del(URL url, std::optional<Options> options = std::nullopt) {
+            return request("DELETE", std::move(url), std::move(options));
         }
 
         template<typename T>
         task::Task<Response, std::error_code>
-        put(const URL &url, T &&payload, const std::optional<Options> &options = std::nullopt) {
-            return request("PUT", url, options, std::forward<T>(payload));
+        post(URL url, T &&payload, std::optional<Options> options = std::nullopt) {
+            return request("POST", std::move(url), std::move(options), std::forward<T>(payload));
         }
 
         template<typename T>
         task::Task<Response, std::error_code>
-        patch(const URL &url, T &&payload, const std::optional<Options> &options = std::nullopt) {
-            return request("PATCH", url, options, std::forward<T>(payload));
+        put(URL url, T &&payload, std::optional<Options> options = std::nullopt) {
+            return request("PUT", std::move(url), std::move(options), std::forward<T>(payload));
+        }
+
+        template<typename T>
+        task::Task<Response, std::error_code>
+        patch(URL url, T &&payload, std::optional<Options> options = std::nullopt) {
+            return request("PATCH", std::move(url), std::move(options), std::forward<T>(payload));
         }
 
     private:
