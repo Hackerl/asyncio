@@ -201,18 +201,20 @@ namespace asyncio::task {
             return mFrame->trace();
         }
 
-        // ReSharper disable once CppMemberFunctionMayBeConst
-        void addCallback(std::function<void()> callback) {
-            if (done()) {
+        template<typename Self>
+            requires (!std::is_const_v<Self>)
+        Self &&addCallback(this Self &&self, std::function<void()> callback) {
+            if (self.done()) {
                 if (const auto result = getEventLoop()->post([callback = std::move(callback)] {
                     callback();
                 }); !result)
                     throw std::system_error{result.error()};
 
-                return;
+                return std::forward<Self>(self);
             }
 
-            mFrame->callbacks.push_back(std::move(callback));
+            self.mFrame->callbacks.push_back(std::move(callback));
+            return std::forward<Self>(self);
         }
 
         template<typename F>

@@ -174,8 +174,7 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
         REQUIRE(message);
         REQUIRE(message->first == asyncio::http::ws::Opcode::TEXT);
         REQUIRE(
-            std::string_view{reinterpret_cast<const char *>(message->second.data()), message->second.size()}
-            == payload
+            std::string_view{reinterpret_cast<const char *>(message->second.data()), message->second.size()} == payload
         );
 
         REQUIRE(co_await task);

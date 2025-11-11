@@ -5,7 +5,6 @@
 #include <map>
 #include <variant>
 #include <asyncio/io.h>
-#include <asyncio/sync/event.h>
 #include <nlohmann/json.hpp>
 
 namespace asyncio::http {
