@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install LLVM
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -14,6 +14,15 @@ jobs:
           sudo apt install -y libc++abi-19-dev libc++-19-dev
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-binary-cache-
       - name: Build and test
         uses: lukka/run-cmake@v10
         with:
@@ -31,11 +40,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install musl toolchains
         run: curl -fsSL https://github.com/Hackerl/musl-cross-make/releases/download/gcc-15.2.0/x86_64-linux-musl-native-gcc15.2.0.tar.gz | tar -xz -C /opt
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-binary-cache-
       - name: Build
         uses: lukka/run-cmake@v10
         with:
@@ -50,9 +68,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-binary-cache-
       - name: Create custom triplet
         # https://github.com/microsoft/vcpkg/issues/29132
         run: |
@@ -75,9 +102,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-binary-cache-
       - name: Create custom triplet
         # https://github.com/microsoft/vcpkg/issues/29132
         run: |
@@ -102,13 +138,22 @@ jobs:
     runs-on: macos-13
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install LLVM
         run: |
           brew install llvm@19
           echo "LLVM_HOME=$(brew --prefix llvm@19)" >> $GITHUB_ENV
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-binary-cache-
       - name: Build and test
         uses: lukka/run-cmake@v10
         with:
@@ -134,7 +179,7 @@ jobs:
             triplet: arm-neon-android
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup NDK
         uses: nttld/setup-ndk@v1
         id: setup-ndk
@@ -142,6 +187,15 @@ jobs:
           ndk-version: r27c
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-binary-cache-
       - name: Create custom triplet
         run: |
           cp "${VCPKG_ROOT}/triplets/${{ matrix.platform.triplet }}.cmake" android-${{ matrix.api }}.cmake
