@@ -244,11 +244,7 @@ namespace asyncio::task {
                 !zero::detail::is_specialization_v<callback_result_t<F, T>, Task>
             )
         Task<callback_result_t<F, T>, E> transform(F f) && {
-#if defined(__GNUC__) && !defined(__clang__)
-            co_return auto(co_await *this).transform(f);
-#else
             co_return (co_await *this).transform(f);
-#endif
         }
 
         template<typename F>
@@ -276,12 +272,7 @@ namespace asyncio::task {
                 zero::detail::is_specialization_v<callback_result_t<F, T>, std::expected>
             )
         Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) && {
-#if defined(__GNUC__) && !defined(__clang__)
-            // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=112341
-            co_return auto(co_await *this).and_then(f);
-#else
             co_return (co_await *this).and_then(f);
-#endif
         }
 
         template<typename F>
@@ -310,11 +301,7 @@ namespace asyncio::task {
                 !zero::detail::is_specialization_v<callback_result_t<F, E>, Task>
             )
         Task<T, callback_result_t<F, E>> transformError(F f) && {
-#if defined(__GNUC__) && !defined(__clang__)
-            co_return auto(co_await *this).transform_error(f);
-#else
             co_return (co_await *this).transform_error(f);
-#endif
         }
 
         template<typename F>
@@ -341,11 +328,7 @@ namespace asyncio::task {
                 zero::detail::is_specialization_v<callback_result_t<F, E>, std::expected>
             )
         Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) && {
-#if defined(__GNUC__) && !defined(__clang__)
-            co_return auto(co_await *this).or_else(f);
-#else
             co_return (co_await *this).or_else(f);
-#endif
         }
 
         [[nodiscard]] bool done() const {
