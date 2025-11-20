@@ -120,10 +120,12 @@ namespace asyncio::http {
                 curl_socket_t s{};
             };
 
+            ~Core();
+
             int running{};
             Options options;
             uv::Handle<uv_timer_t> timer;
-            std::unique_ptr<CURLM, decltype(&curl_multi_cleanup)> multi;
+            CURLM *multi;
 
             void recycle();
             std::expected<void, std::error_code> setTimer(long ms);

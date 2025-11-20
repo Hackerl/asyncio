@@ -20,7 +20,7 @@ asyncio::http::Response::~Response() {
     if (!mConnection)
         return;
 
-    curl_multi_remove_handle(mRequests->mCore->multi.get(), mConnection->easy.get());
+    curl_multi_remove_handle(mRequests->mCore->multi, mConnection->easy.get());
 }
 
 long asyncio::http::Response::statusCode() const {
@@ -128,11 +128,15 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
     };
 }
 
+asyncio::http::Requests::Core::~Core() {
+    curl_multi_cleanup(multi);
+}
+
 // ReSharper disable once CppMemberFunctionMayBeConst
 void asyncio::http::Requests::Core::recycle() {
     int n{};
 
-    while (const auto msg = curl_multi_info_read(multi.get(), &n)) {
+    while (const auto msg = curl_multi_info_read(multi, &n)) {
         if (msg->msg != CURLMSG_DONE)
             continue;
 
@@ -184,7 +188,7 @@ std::expected<void, std::error_code> asyncio::http::Requests::Core::setTimer(con
             [](auto *handle) {
                 uv_timer_stop(handle);
                 auto &core = *static_cast<Core *>(handle->data);
-                curl_multi_socket_action(core.multi.get(), CURL_SOCKET_TIMEOUT, 0, &core.running);
+                curl_multi_socket_action(core.multi, CURL_SOCKET_TIMEOUT, 0, &core.running);
                 core.recycle();
             },
             ms,
@@ -203,7 +207,7 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
 
         uv_poll_stop(context->poll.raw());
         delete context;
-        curl_multi_assign(multi.get(), s, nullptr);
+        curl_multi_assign(multi, s, nullptr);
         return {};
     }
 
@@ -216,7 +220,7 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
 
         context = new Context{uv::Handle{std::move(poll)}, this, s};
         context->poll->data = context;
-        curl_multi_assign(multi.get(), s, context);
+        curl_multi_assign(multi, s, context);
     }
 
     EXPECT(uv::expected([&] {
@@ -233,7 +237,7 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
                  * so save the core pointer in advance.
                  */
                 curl_multi_socket_action(
-                    core->multi.get(),
+                    core->multi,
                     ctx->s,
                     status < 0
                         ? CURL_CSELECT_ERR
@@ -277,11 +281,11 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
         0,
         std::move(options),
         uv::Handle{std::move(timer)},
-        std::move(ptr)
+        ptr.release()
     );
 
     core->timer->data = core.get();
-    const auto multi = core->multi.get();
+    const auto multi = core->multi;
 
     curl_multi_setopt(
         multi,
@@ -512,7 +516,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
 asyncio::task::Task<asyncio::http::Response, std::error_code>
 asyncio::http::Requests::perform(std::shared_ptr<Connection> connection) {
     const auto easy = connection->easy.get();
-    const auto multi = mCore->multi.get();
+    const auto multi = mCore->multi;
 
     CO_EXPECT(expected([&] {
         return curl_multi_add_handle(multi, easy);

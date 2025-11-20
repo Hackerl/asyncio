@@ -43,7 +43,7 @@ std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
             loop.get(),
             async.get(),
             [](auto *handle) {
-                auto &[async, mutex, queue] = *static_cast<TaskQueue *>(handle->data);
+                auto &[h, mutex, queue] = *static_cast<TaskQueue *>(handle->data);
 
                 while (true) {
                     mutex.lock();
