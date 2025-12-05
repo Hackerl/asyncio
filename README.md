@@ -107,26 +107,14 @@ Required compiler:
 * MSVC >= 19.38
 
 Export environment variables:
-* VCPKG_INSTALLATION_ROOT
+* VCPKG_ROOT
 * ANDROID_NDK_HOME(Android)
 
 ### Build
 
-* Linux
-  ```sh
-  cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" && cmake --build build -j$(nproc)
-  ```
-
-* Android
-  ```sh
-  # set "ANDROID_PLATFORM" for dependencies installed by vcpkg: echo 'set(VCPKG_CMAKE_SYSTEM_VERSION 24)' >> "${VCPKG_INSTALLATION_ROOT}/triplets/community/arm64-android.cmake"
-  cmake -B build -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake" -DVCPKG_TARGET_TRIPLET=arm64-android -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 && cmake --build build -j$(nproc)
-  ```
-
-* Windows(Developer PowerShell)
-  ```sh
-  cmake -B build -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" && cmake --build build -j $env:NUMBER_OF_PROCESSORS
-  ```
+```sh
+cmake --workflow --preset debug
+```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -142,7 +130,7 @@ Install `asyncio` from the [`vcpkg` private registry](https://github.com/Hackerl
        {
          "kind": "git",
          "repository": "https://github.com/Hackerl/vcpkg-registry",
-         "baseline": "56e949885c4f22d5711523f360ac92d73f7a8495",
+         "baseline": "aa3865a8ad99b5265c824b0b550fc71bea9a90b1",
          "packages": [
            "asyncio",
            "zero"
@@ -160,7 +148,7 @@ Install `asyncio` from the [`vcpkg` private registry](https://github.com/Hackerl
    {
      "name": "project name",
      "version-string": "1.0.0",
-     "builtin-baseline": "9224b3bbd8df24999d85720b1d005dd6f969ade0",
+     "builtin-baseline": "6b3172d1a7be062b3d0278369aac9a0258cefc65",
      "dependencies": [
        "asyncio"
      ]
