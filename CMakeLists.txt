@@ -103,7 +103,7 @@ install(
 
 install(
         EXPORT ${PROJECT_NAME}Targets
-        NAMESPACE asyncio::
+        NAMESPACE ${PROJECT_NAME}::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
