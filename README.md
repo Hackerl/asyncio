@@ -82,6 +82,13 @@
 
 Based on the `libuv` event loop, use C++20 stackless `coroutines` to implement network components, and provide `channel` to send and receive data between tasks.
 
+`asyncio` might be better than existing coroutine network libraries in the following ways:
+- A unified error handling method based on `std::expected<T, std::error_code>`, but also supports exception handling.
+- A simple and direct cancellation method similar to `Python`'s `asyncio` - `task.cancel()`.
+- Lessons learned from `JavaScript`'s `Promise.all`, `Promise.any`, `Promise.race`, etc., subtask management methods.
+- Lessons learned from `Golang`'s `WaitGroup` dynamic task management groups.
+- Built-in call stack tracing allows for better debugging and analysis.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
@@ -369,7 +376,7 @@ if (!signal)
     co_return std::unexpected{signal.error()};
 ```
 
-If you feel that exceptions can better handle error propagation and you don't need this roundabout approach, that's fine; `asyncio` can certainly support it as well.
+If you feel that exceptions can better handle error propagation, and you don't need this roundabout approach, that's fine; `asyncio` can certainly support it as well.
 
 ```c++
 #include <asyncio/net/stream.h>
@@ -489,7 +496,7 @@ namespace {
 
             group.add(task);
             task.future().fail([](const auto &e) {
-                fmt::print(stderr, "unhandled error: {}\n", e);
+                fmt::print(stderr, "unhandled exception: {}\n", e);
             });
         }
 
@@ -543,7 +550,7 @@ int main(const int argc, char *argv[]) {
 }
 ```
 
-> It seems like a good idea. I'm not against exceptions, but the reason the `asyncio` API uses `std::error_code` is that it's easy to convert from `std::error_code` to an exception, but not vice versa.
+> It seems to look better. I'm not against exceptions, but the reason the `asyncio` API uses `std::error_code` is that it's easy to convert from `std::error_code` to an exception, but not vice versa.
 
 _For more examples, please refer to the [Documentation](https://github.com/Hackerl/asyncio/tree/master/doc)_
 
