@@ -102,7 +102,7 @@ Based on the `libuv` event loop, use C++20 stackless `coroutines` to implement n
 ### Prerequisites
 
 Required compiler:
-* GCC >= 14
+* GCC >= 15
 * LLVM >= 18
 * MSVC >= 19.38
 
@@ -167,89 +167,140 @@ Install `asyncio` from the [`vcpkg` private registry](https://github.com/Hackerl
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-### HTTP Client
-
-Using the `HTTP Client` in a `C++` project has never been easier:
+I'm using a typical TCP echo server to demonstrate the features of asyncio as much as possible.
 
 ```c++
-#include <asyncio/http/request.h>
+#include <asyncio/net/stream.h> // streaming network components
+#include <asyncio/thread.h> // thread and thread pool components
+#include <asyncio/signal.h> // signal component
+#include <asyncio/time.h> // time component
+#include <zero/cmdline.h> // command line parsing component
+#include <zero/os/resource.h> // operating system fd/handle wrapper
 
-asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
-    const auto url = asyncio::http::URL::from("https://www.google.com");
-    CO_EXPECT(url);
+#ifdef _WIN32
+#include <zero/os/windows/error.h> // Windows API call wrapper
+#endif
 
-    auto requests = asyncio::http::Requests::make();
-    CO_EXPECT(requests);
+namespace {
+    // Receive event or signal, print the task's call stack.
+    // For the top-level task, complex subtasks will branch out and form a tree.
+    asyncio::task::Task<void, std::error_code> tracing(const auto &task) {
+#ifdef _WIN32
+        const auto handle = CreateEventA(nullptr, false, false, "Global\\AsyncIOBacktraceEvent");
 
-    auto response = co_await requests->get(*url);
-    CO_EXPECT(response);
+        if (!handle)
+            co_return std::unexpected{
+                std::error_code{static_cast<int>(GetLastError()), std::system_category()}
+            };
 
-    const auto content = co_await response->string();
-    CO_EXPECT(content);
+        const zero::os::Resource event{handle};
 
-    fmt::print("{}", *content);
-    co_return {};
-}
-```
+        while (true) {
+            bool cancelled{false};
 
-> We use `asyncMain` instead of `main` as the entry point, and `CO_EXPECT` is used to check for errors and throw them upwards.
+            // `WaitForSingleObject` cannot be integrated into EventLoop, so we use a separate thread to call it,
+            // and a custom cancellation function allows it to be seamlessly integrated into coroutine management.
+            CO_EXPECT(co_await asyncio::toThread(
+                [&, &cancelled = std::as_const(cancelled)]() -> std::expected<void, std::error_code> {
+                    if (WaitForSingleObject(*event, INFINITE) != WAIT_OBJECT_0)
+                        return std::unexpected{
+                            std::error_code{static_cast<int>(GetLastError()), std::system_category()}
+                        };
 
-### TCP
+                    if (cancelled)
+                        return std::unexpected{asyncio::task::Error::CANCELLED};
 
-#### Server
+                    return {};
+                },
+                [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
+                    cancelled = true;
+                    return zero::os::windows::expected([&] {
+                        return SetEvent(*event);
+                    });
+                }
+            ));
 
-```c++
-#include <asyncio/net/stream.h>
-#include <asyncio/signal.h>
-#include <zero/cmdline.h>
+            // print the task's formatted call stack
+            fmt::print(stderr, "{}\n", task.trace());
+        }
+#else
+        // On UNIX, the Signal component can be used directly.
+        auto signal = asyncio::Signal::make();
+        CO_EXPECT(signal);
 
-asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
-    const auto address = stream.remoteAddress();
-    CO_EXPECT(address);
-
-    fmt::print("connection[{}]\n", *address);
-
-    while (true) {
-        std::string message;
-        message.resize(1024);
-
-        const auto n = co_await stream.read(std::as_writable_bytes(std::span{message}));
-        CO_EXPECT(n);
-
-        if (*n == 0)
-            break;
-
-        message.resize(*n);
-
-        fmt::print("receive message: {}\n", message);
-        CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{message})));
+        while (true) {
+            CO_EXPECT(co_await signal->on(SIGUSR1));
+            fmt::print(stderr, "{}\n", task.trace());
+        }
+#endif
     }
 
-    co_return {};
-}
+    asyncio::task::Task<void, std::error_code> doSomething() {
+        using namespace std::chrono_literals;
 
-asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
-    std::expected<void, std::error_code> result;
-    asyncio::task::TaskGroup group;
+        while (true) {
+            CO_EXPECT(co_await asyncio::sleep(1s));
+            fmt::print("do some thing\n");
+        }
+    }
 
-    while (true) {
-        auto stream = co_await listener.accept();
+    asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
+        const auto address = stream.remoteAddress();
+        CO_EXPECT(address);
 
-        if (!stream) {
-            result = std::unexpected{stream.error()};
-            break;
+        fmt::print("connection[{}]\n", *address);
+
+        while (true) {
+            std::string message;
+            message.resize(1024);
+
+            const auto n = co_await stream.read(std::as_writable_bytes(std::span{message}));
+            CO_EXPECT(n);
+
+            if (*n == 0)
+                break;
+
+            message.resize(*n);
+
+            fmt::print("receive message: {}\n", message);
+            CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{message})));
         }
 
-        auto task = handle(*std::move(stream));
-
-        group.add(task);
-        task.future().fail([](const auto &ec) {
-            fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
-        });
+        co_return {};
     }
 
-    co_await group;
-    co_return result;
+    asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
+        std::expected<void, std::error_code> result;
+
+        // By adding each dynamic task to a `TaskGroup`,
+        // we can cancel them all at once and wait for them during graceful shutdown,
+        // ensuring that no resources or subtasks are leaked.
+        asyncio::task::TaskGroup group;
+
+        while (true) {
+            auto stream = co_await listener.accept();
+
+            if (!stream) {
+                result = std::unexpected{stream.error()};
+                break;
+            }
+
+            auto task = handle(*std::move(stream));
+
+            group.add(task);
+
+            // Since the `TaskGroup` doesn't care about the results of the subtasks, we can use future to bind callbacks.
+            // Callback binding is very flexible, just like JavaScript's Promise.
+            task.future().fail([](const auto &ec) {
+                fmt::print(stderr, "unhandled error: {:s} ({})\n", ec, ec);
+            });
+        }
+
+        // This function waits for all tasks in the `TaskGroup`.
+        // When the parent task is canceled, all tasks in the group will be automatically canceled here and will wait for them to complete.
+        co_await group;
+        co_return result;
+    }
 }
 
 asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
@@ -269,27 +320,185 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     auto signal = asyncio::Signal::make();
     CO_EXPECT(signal);
 
-    co_return co_await race(
-        serve(*std::move(listener)),
+    // This is the main task of our program.
+    auto task = race(
+        // A TCP server was started, along with a `doSomething` task to do something else.
+        // They are aggregated by `all`, just like `Promise.all` in JavaScript, where failure is returned if either task fails, and the remaining tasks are canceled.
+        all(
+            serve(*std::move(listener)),
+            doSomething()
+        ),
+        // We wait for the `SIGINT` signal to gracefully shut down.
+        // `race` will use the result of the task that completes fastest, so when the signal arrives,
+        // the task is complete, `race` returns success and cancels the remaining subtasks.
         signal->on(SIGINT).transform([](const int) {
         })
+    );
+
+    // Debugging coroutines is always difficult, so we use the built-in traceback functionality of `asyncio` to assist us.
+    co_return co_await race(
+        task,
+        tracing(task)
     );
 }
 ```
 
 > Start the server with `./server 127.0.0.1 8000`, and gracefully exit by pressing `ctrl + c` in the terminal.
+> You can also send signal or event to make it perform traceback.
 
-#### Client
+You may have noticed the prominent `CO_EXPECT`, but what exactly is it?
+
+```c++
+#define CO_EXPECT(...)                                              \
+    if (auto &&_result = __VA_ARGS__; !_result)                     \
+        co_return std::unexpected{std::move(_result).error()}
+```
+
+Because C++ lacks Rust's question mark syntactic sugar, we cannot conveniently propagate std::expected errors upwards without using macros.
+Of course, if you absolutely hate macros, you can also explicitly handle each error like in `Golang`:
+
+```c++
+auto listener = asyncio::net::TCPListener::listen(host, port);
+
+if (!listener)
+    co_return std::unexpected{listener.error()};
+
+auto signal = asyncio::Signal::make();
+
+if (!signal)
+    co_return std::unexpected{signal.error()};
+```
+
+If you feel that exceptions can better handle error propagation and you don't need this roundabout approach, that's fine; `asyncio` can certainly support it as well.
 
 ```c++
 #include <asyncio/net/stream.h>
+#include <asyncio/thread.h>
+#include <asyncio/signal.h>
 #include <asyncio/time.h>
 #include <zero/cmdline.h>
+#include <zero/formatter.h>
+#include <zero/os/resource.h>
 
-asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
-    using namespace std::chrono_literals;
-    using namespace std::string_view_literals;
+#ifdef _WIN32
+#include <zero/os/windows/error.h>
+#endif
 
+template<typename T>
+T guard(std::expected<T, std::error_code> &&expected) {
+    if (!expected)
+        throw std::system_error{expected.error()};
+
+    if constexpr (std::is_void_v<T>)
+        return;
+    else
+        return *std::move(expected);
+}
+
+namespace {
+    asyncio::task::Task<void> tracing(const auto &task) {
+#ifdef _WIN32
+        const auto handle = CreateEventA(nullptr, false, false, "Global\\AsyncIOBacktraceEvent");
+
+        if (!handle)
+            throw std::system_error{
+                std::error_code{static_cast<int>(GetLastError()), std::system_category()}
+            };
+
+        const zero::os::Resource event{handle};
+
+        while (true) {
+            bool cancelled{false};
+
+            guard(co_await asyncio::toThread(
+                [&, &cancelled = std::as_const(cancelled)]() -> std::expected<void, std::error_code> {
+                    if (WaitForSingleObject(*event, INFINITE) != WAIT_OBJECT_0)
+                        return std::unexpected{
+                            std::error_code{static_cast<int>(GetLastError()), std::system_category()}
+                        };
+
+                    if (cancelled)
+                        return std::unexpected{asyncio::task::Error::CANCELLED};
+
+                    return {};
+                },
+                [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
+                    cancelled = true;
+                    return zero::os::windows::expected([&] {
+                        return SetEvent(*event);
+                    });
+                }
+            ));
+
+            fmt::print(stderr, "{}\n", task.trace());
+        }
+#else
+        auto signal = guard(asyncio::Signal::make());
+
+        while (true) {
+            guard(co_await signal.on(SIGUSR1));
+            fmt::print(stderr, "{}\n", task.trace());
+        }
+#endif
+    }
+
+    asyncio::task::Task<void> doSomething() {
+        using namespace std::chrono_literals;
+
+        while (true) {
+            guard(co_await asyncio::sleep(1s));
+            fmt::print("do some thing\n");
+        }
+    }
+
+    asyncio::task::Task<void> handle(asyncio::net::TCPStream stream) {
+        const auto address = guard(stream.remoteAddress());
+        fmt::print("connection[{}]\n", address);
+
+        while (true) {
+            std::string message;
+            message.resize(1024);
+
+            const auto n = guard(co_await stream.read(std::as_writable_bytes(std::span{message})));
+
+            if (n == 0)
+                break;
+
+            message.resize(n);
+
+            fmt::print("receive message: {}\n", message);
+            guard(co_await stream.writeAll(std::as_bytes(std::span{message})));
+        }
+
+        co_return;
+    }
+
+    asyncio::task::Task<void> serve(asyncio::net::TCPListener listener) {
+        std::expected<void, std::error_code> result;
+        asyncio::task::TaskGroup group;
+
+        while (true) {
+            auto stream = co_await listener.accept();
+
+            if (!stream) {
+                result = std::unexpected{stream.error()};
+                break;
+            }
+
+            auto task = handle(*std::move(stream));
+
+            group.add(task);
+            task.future().fail([](const auto &e) {
+                fmt::print(stderr, "unhandled error: {}\n", e);
+            });
+        }
+
+        co_await group;
+        guard(std::move(result));
+    }
+}
+
+asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
     cmdline.add<std::string>("host", "remote host");
@@ -300,32 +509,41 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     const auto host = cmdline.get<std::string>("host");
     const auto port = cmdline.get<std::uint16_t>("port");
 
-    auto stream = co_await asyncio::net::TCPStream::connect(host, port);
-    CO_EXPECT(stream);
+    auto listener = guard(asyncio::net::TCPListener::listen(host, port));
+    auto signal = guard(asyncio::Signal::make());
 
-    while (true) {
-        CO_EXPECT(co_await stream->writeAll(std::as_bytes(std::span{"hello world"sv})));
+    auto task = race(
+        all(
+            serve(std::move(listener)),
+            doSomething()
+        ),
+        asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+            guard(co_await signal.on(SIGINT));
+        })
+    );
 
-        std::string message;
-        message.resize(1024);
+    co_return co_await race(
+        task,
+        tracing(task)
+    );
+}
 
-        const auto n = co_await stream->read(std::as_writable_bytes(std::span{message}));
-        CO_EXPECT(n);
+int main(const int argc, char *argv[]) {
+    const auto result = asyncio::run([=] {
+        return asyncMain(argc, argv);
+    });
 
-        if (*n == 0)
-            break;
+    if (!result)
+        throw std::system_error{result.error()};
 
-        message.resize(*n);
+    if (!*result)
+        std::rethrow_exception(result->error());
 
-        fmt::print("receive message: {}\n", message);
-        co_await asyncio::sleep(1s);
-    }
-
-    co_return {};
+    return EXIT_SUCCESS;
 }
 ```
 
-> Connect to the server with `./client 127.0.0.1 8000`.
+> It seems like a good idea. I'm not against exceptions, but the reason the `asyncio` API uses `std::error_code` is that it's easy to convert from `std::error_code` to an exception, but not vice versa.
 
 _For more examples, please refer to the [Documentation](https://github.com/Hackerl/asyncio/tree/master/doc)_
 
