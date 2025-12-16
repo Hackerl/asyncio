@@ -32,16 +32,16 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 
     if (caFile) {
         auto ca = co_await asyncio::net::tls::Certificate::loadFile(*caFile);
-        CO_EXPECT(ca);
+        Z_CO_EXPECT(ca);
         config.rootCAs({*std::move(ca)});
     }
 
     if (certFile && keyFile) {
         auto cert = co_await asyncio::net::tls::Certificate::loadFile(*certFile);
-        CO_EXPECT(cert);
+        Z_CO_EXPECT(cert);
 
         auto key = co_await asyncio::net::tls::PrivateKey::loadFile(*keyFile);
-        CO_EXPECT(key);
+        Z_CO_EXPECT(key);
 
         config.certKeyPairs({{*std::move(cert), *std::move(key)}});
     }
@@ -49,22 +49,22 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     auto context = config
                    .insecure(insecure)
                    .build();
-    CO_EXPECT(context);
+    Z_CO_EXPECT(context);
 
     auto stream = co_await asyncio::net::TCPStream::connect(host, port);
-    CO_EXPECT(stream);
+    Z_CO_EXPECT(stream);
 
     auto tls = co_await asyncio::net::tls::connect(*std::move(stream), *std::move(context), host);
-    CO_EXPECT(tls);
+    Z_CO_EXPECT(tls);
 
     while (true) {
-        CO_EXPECT(co_await tls->writeAll(std::as_bytes(std::span{"hello world"sv})));
+        Z_CO_EXPECT(co_await tls->writeAll(std::as_bytes(std::span{"hello world"sv})));
 
         std::string message;
         message.resize(1024);
 
         const auto n = co_await tls->read(std::as_writable_bytes(std::span{message}));
-        CO_EXPECT(n);
+        Z_CO_EXPECT(n);
 
         if (*n == 0)
             break;
@@ -72,7 +72,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
         message.resize(*n);
 
         fmt::print("receive message: {}\n", message);
-        CO_EXPECT(co_await asyncio::sleep(1s));
+        Z_CO_EXPECT(co_await asyncio::sleep(1s));
     }
 
     co_return {};

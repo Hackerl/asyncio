@@ -6,19 +6,19 @@
 namespace {
     asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream, asyncio::net::tls::Context context) {
         const auto address = stream.remoteAddress();
-        CO_EXPECT(address);
+        Z_CO_EXPECT(address);
 
         fmt::print("connection[{}]\n", *address);
 
         auto tls = co_await asyncio::net::tls::accept(std::move(stream), std::move(context));
-        CO_EXPECT(tls);
+        Z_CO_EXPECT(tls);
 
         while (true) {
             std::string message;
             message.resize(1024);
 
             const auto n = co_await tls->read(std::as_writable_bytes(std::span{message}));
-            CO_EXPECT(n);
+            Z_CO_EXPECT(n);
 
             if (*n == 0)
                 break;
@@ -26,7 +26,7 @@ namespace {
             message.resize(*n);
 
             fmt::print("receive message: {}\n", message);
-            CO_EXPECT(co_await tls->writeAll(std::as_bytes(std::span{message})));
+            Z_CO_EXPECT(co_await tls->writeAll(std::as_bytes(std::span{message})));
         }
 
         co_return {};
@@ -81,16 +81,16 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     const auto verifyClient = cmdline.exist("verify");
 
     auto cert = co_await asyncio::net::tls::Certificate::loadFile(certFile);
-    CO_EXPECT(cert);
+    Z_CO_EXPECT(cert);
 
     auto key = co_await asyncio::net::tls::PrivateKey::loadFile(keyFile);
-    CO_EXPECT(key);
+    Z_CO_EXPECT(key);
 
     asyncio::net::tls::ServerConfig config;
 
     if (caFile) {
         auto ca = co_await asyncio::net::tls::Certificate::loadFile(*caFile);
-        CO_EXPECT(ca);
+        Z_CO_EXPECT(ca);
         config.rootCAs({*std::move(ca)});
     }
 
@@ -98,13 +98,13 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
                    .verifyClient(verifyClient)
                    .certKeyPairs({{*std::move(cert), *std::move(key)}})
                    .build();
-    CO_EXPECT(context);
+    Z_CO_EXPECT(context);
 
     auto listener = asyncio::net::TCPListener::listen(ip, port);
-    CO_EXPECT(listener);
+    Z_CO_EXPECT(listener);
 
     auto signal = asyncio::Signal::make();
-    CO_EXPECT(signal);
+    Z_CO_EXPECT(signal);
 
     co_return co_await race(
         serve(*std::move(listener), *std::move(context)),

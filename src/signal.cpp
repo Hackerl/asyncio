@@ -6,7 +6,7 @@ asyncio::Signal::Signal(uv::Handle<uv_signal_t> signal) : mSignal{std::move(sign
 std::expected<asyncio::Signal, std::error_code> asyncio::Signal::make() {
     auto signal = std::make_unique<uv_signal_t>();
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_signal_init(getEventLoop()->raw(), signal.get());
     }));
 
@@ -17,7 +17,7 @@ asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
     Promise<int, std::error_code> promise;
     mSignal->data = &promise;
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_signal_start_oneshot(
             mSignal.raw(),
             [](auto *handle, const int s) {

@@ -71,24 +71,24 @@ namespace asyncio {
         }
     };
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         TrySendError,
         "asyncio::Sender::trySend",
-        DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
+        DISCONNECTED, "sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
         FULL, "sending on a full channel", std::errc::operation_would_block
     )
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         SendSyncError,
         "asyncio::Sender::sendSync",
-        DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
+        DISCONNECTED, "sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
         TIMEOUT, "timed out waiting on send operation", std::errc::timed_out
     )
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         SendError,
         "asyncio::Sender::send",
-        DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
+        DISCONNECTED, "sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
         CANCELLED, "send operation has been cancelled", std::errc::operation_canceled
     )
 
@@ -367,24 +367,24 @@ namespace asyncio {
         std::shared_ptr<ChannelCore<T>> mCore;
     };
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         TryReceiveError,
         "asyncio::Receiver::tryReceive",
-        DISCONNECTED, "receiving on an empty and disconnected channel", DEFAULT_ERROR_CONDITION,
+        DISCONNECTED, "receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
         EMPTY, "receiving on an empty channel", std::errc::operation_would_block
     )
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         ReceiveSyncError,
         "asyncio::Receiver::receiveSync",
-        DISCONNECTED, "channel is empty and disconnected", DEFAULT_ERROR_CONDITION,
+        DISCONNECTED, "channel is empty and disconnected", Z_DEFAULT_ERROR_CONDITION,
         TIMEOUT, "timed out waiting on receive operation", std::errc::timed_out
     )
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         ReceiveError,
         "asyncio::Receiver::receive",
-        DISCONNECTED, "channel is empty and disconnected", DEFAULT_ERROR_CONDITION,
+        DISCONNECTED, "channel is empty and disconnected", Z_DEFAULT_ERROR_CONDITION,
         CANCELLED, "receive operation has been cancelled", std::errc::operation_canceled
     )
 
@@ -542,7 +542,7 @@ namespace asyncio {
         std::shared_ptr<ChannelCore<T>> mCore;
     };
 
-    DEFINE_ERROR_CONDITION_EX(
+    Z_DEFINE_ERROR_CONDITION_EX(
         ChannelError,
         "asyncio::channel",
         DISCONNECTED,
@@ -572,7 +572,7 @@ namespace asyncio {
     }
 }
 
-DECLARE_ERROR_CODES(
+Z_DECLARE_ERROR_CODES(
     asyncio::TrySendError,
     asyncio::SendSyncError,
     asyncio::SendError,
@@ -581,6 +581,6 @@ DECLARE_ERROR_CODES(
     asyncio::ReceiveError
 )
 
-DECLARE_ERROR_CONDITION(asyncio::ChannelError)
+Z_DECLARE_ERROR_CONDITION(asyncio::ChannelError)
 
 #endif //ASYNCIO_CHANNEL_H

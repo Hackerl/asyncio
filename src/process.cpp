@@ -67,7 +67,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
             const auto id = zero::os::unix::ensure([&] {
                 return waitpid(pid, &s, 0);
             });
-            EXPECT(id);
+            Z_EXPECT(id);
             assert(*id == pid);
 
             return ExitStatus{s};
@@ -100,7 +100,7 @@ std::expected<std::optional<asyncio::process::ExitStatus>, std::error_code> asyn
     const auto id = zero::os::unix::expected([&] {
         return waitpid(pid, &s, WNOHANG);
     });
-    EXPECT(id);
+    Z_EXPECT(id);
 
     if (*id == 0)
         return std::nullopt;
@@ -125,7 +125,7 @@ asyncio::process::PseudoConsole::Pipe::write(const std::span<const std::byte> da
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::process::PseudoConsole::Pipe::close() {
-    CO_EXPECT(co_await mReader.close());
+    Z_CO_EXPECT(co_await mReader.close());
     co_return co_await mWriter.close();
 }
 #else
@@ -151,7 +151,7 @@ asyncio::process::PseudoConsole::PseudoConsole(zero::os::process::PseudoConsole 
 std::expected<asyncio::process::PseudoConsole, std::error_code>
 asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     auto pc = zero::os::process::PseudoConsole::make(rows, columns);
-    EXPECT(pc);
+    Z_EXPECT(pc);
 
 #ifdef _WIN32
     auto &[reader, writer] = pc->master();
@@ -159,7 +159,7 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     const auto firstFD = uv::expected([&] {
         return uv_open_osfhandle(reader.fd());
     });
-    EXPECT(firstFD);
+    Z_EXPECT(firstFD);
     std::ignore = reader.release();
 
     auto first = asyncio::Pipe::from(*firstFD);
@@ -174,7 +174,7 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     const auto secondFD = uv::expected([&] {
         return uv_open_osfhandle(writer.fd());
     });
-    EXPECT(secondFD);
+    Z_EXPECT(secondFD);
     std::ignore = writer.release();
 
     auto second = asyncio::Pipe::from(*secondFD);
@@ -193,7 +193,7 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     const auto fd = uv::expected([&] {
         return uv_open_osfhandle(resource.fd());
     });
-    EXPECT(fd);
+    Z_EXPECT(fd);
     std::ignore = resource.release();
 
     auto pipe = asyncio::Pipe::from(*fd);
@@ -236,7 +236,7 @@ asyncio::process::Command::Command(std::filesystem::path path) : mCommand{std::m
 std::expected<asyncio::process::ChildProcess, std::error_code>
 asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) const {
     auto child = mCommand.spawn(defaultTypes);
-    EXPECT(child);
+    Z_EXPECT(child);
 
     std::array<std::optional<Pipe>, 3> stdio;
 
@@ -313,13 +313,13 @@ std::expected<asyncio::process::ChildProcess, std::error_code> asyncio::process:
 
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::Command::status() const {
     auto child = spawn();
-    CO_EXPECT(child);
+    Z_CO_EXPECT(child);
     co_return co_await child->wait();
 }
 
 asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process::Command::output() const {
     auto child = spawn({StdioType::NUL, StdioType::PIPED, StdioType::PIPED});
-    CO_EXPECT(child);
+    Z_CO_EXPECT(child);
 
     if (auto input = std::exchange(child->stdInput(), std::nullopt))
         std::ignore = co_await input->close();
@@ -350,7 +350,7 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     }
 
     const auto status = co_await child->wait();
-    CO_EXPECT(status);
+    Z_CO_EXPECT(status);
 
     co_return Output{
         *status,

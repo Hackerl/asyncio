@@ -23,7 +23,7 @@ asyncio::task::Task<void, std::error_code> test2() {
         if (co_await task::cancelled)
             co_return std::unexpected{task::Error::CANCELLED};
 
-        CO_EXPECT(co_await asyncio::sleep(1s));
+        Z_CO_EXPECT(co_await asyncio::sleep(1s));
         fmt::print("hello world\n");
     }
 }
@@ -71,7 +71,7 @@ namespace asyncio {
         const auto eventLoop = EventLoop::make().transform([](EventLoop &&value) {
             return std::make_shared<EventLoop>(std::move(value));
         });
-        EXPECT(eventLoop);
+        Z_EXPECT(eventLoop);
 
         setEventLoop(*eventLoop);
 
@@ -98,7 +98,7 @@ If you've ever used `libuv`, you might have guessed that `sleep` internally uses
 asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
     auto ptr = std::make_unique<uv_timer_t>();
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_timer_init(getEventLoop()->raw(), ptr.get());
     }));
 
@@ -107,7 +107,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
     Promise<void, std::error_code> promise;
     timer->data = &promise;
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_timer_start(
             timer.raw(),
             [](auto *handle) {
@@ -186,7 +186,7 @@ If you’ve read carefully, you’ll have noticed the cancellation function regi
 > Why check `promise.isFulfilled()`? Because after a `promise` is fulfilled, the callback won’t be triggered immediately; it waits for the next event loop, and during this time, cancellation can no longer occur.
 > This shows that cancellations don’t always succeed. If an error occurs, `task.cancel()` will return a `std::error_code`.
 
-Once the cancellation is successful, the `CANCELLED` error is returned from `sleep`. The `CO_EXPECT(sleep(1s))` statement at the higher level will propagate the error up, layer by layer, until it is handled.
+Once the cancellation is successful, the `CANCELLED` error is returned from `sleep`. The `Z_CO_EXPECT(sleep(1s))` statement at the higher level will propagate the error up, layer by layer, until it is handled.
 
 Most coroutine libraries prefer `context` for finer-grained control over tasks because, in practice, tasks aren’t usually simple chains. They’re more like branching trees. When `context` is passed to numerous complex sub-tasks, cancellation initiated at the top can flow down to every branch. Does this mean `task.cancel()` can’t provide fine-grained control? Can it only cancel a single task chain?
 
@@ -255,7 +255,7 @@ asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream
 asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
     while (true) {
         auto stream = co_await listener.accept();
-        CO_EXPECT(stream);
+        Z_CO_EXPECT(stream);
 
         handle(*std::move(stream)).future().fail([](const auto &ec) {
             fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
@@ -265,10 +265,10 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
 
 asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
     auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 8000);
-    CO_EXPECT(listener);
+    Z_CO_EXPECT(listener);
 
     auto signal = asyncio::Signal::make();
-    CO_EXPECT(signal);
+    Z_CO_EXPECT(signal);
 
     co_return co_await race(
         serve(*std::move(listener)),

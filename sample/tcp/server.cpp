@@ -5,7 +5,7 @@
 namespace {
     asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
         const auto address = stream.remoteAddress();
-        CO_EXPECT(address);
+        Z_CO_EXPECT(address);
 
         fmt::print("connection[{}]\n", *address);
 
@@ -14,7 +14,7 @@ namespace {
             message.resize(1024);
 
             const auto n = co_await stream.read(std::as_writable_bytes(std::span{message}));
-            CO_EXPECT(n);
+            Z_CO_EXPECT(n);
 
             if (*n == 0)
                 break;
@@ -22,7 +22,7 @@ namespace {
             message.resize(*n);
 
             fmt::print("receive message: {}\n", message);
-            CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{message})));
+            Z_CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{message})));
         }
 
         co_return {};
@@ -65,10 +65,10 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     const auto port = cmdline.get<std::uint16_t>("port");
 
     auto listener = asyncio::net::TCPListener::listen(host, port);
-    CO_EXPECT(listener);
+    Z_CO_EXPECT(listener);
 
     auto signal = asyncio::Signal::make();
-    CO_EXPECT(signal);
+    Z_CO_EXPECT(signal);
 
     co_return co_await race(
         serve(*std::move(listener)),

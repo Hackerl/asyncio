@@ -6,7 +6,7 @@
 namespace asyncio {
     task::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         TimeoutError,
         "asyncio::timeout",
         ELAPSED, "deadline has elapsed", std::errc::timed_out
@@ -40,6 +40,6 @@ namespace asyncio {
     }
 }
 
-DECLARE_ERROR_CODE(asyncio::TimeoutError)
+Z_DECLARE_ERROR_CODE(asyncio::TimeoutError)
 
 #endif //ASYNCIO_TIME_H

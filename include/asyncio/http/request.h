@@ -8,13 +8,13 @@
 #include <nlohmann/json.hpp>
 
 namespace asyncio::http {
-    DEFINE_ERROR_TRANSFORMER(
+    Z_DEFINE_ERROR_TRANSFORMER(
         CURLError,
         "asyncio::http::curl",
         [](const int value) { return curl_easy_strerror(static_cast<CURLcode>(value)); }
     )
 
-    DEFINE_ERROR_TRANSFORMER(
+    Z_DEFINE_ERROR_TRANSFORMER(
         CURLMError,
         "asyncio::http::curl::multi",
         [](const int value) { return curl_multi_strerror(static_cast<CURLMcode>(value)); }
@@ -186,7 +186,7 @@ namespace asyncio::http {
             opt.headers["Content-Type"] = "application/json";
 
             auto connection = prepare(std::move(method), url, std::move(opt));
-            CO_EXPECT(connection);
+            Z_CO_EXPECT(connection);
 
             std::string body;
 
@@ -212,7 +212,7 @@ namespace asyncio::http {
             T payload
         ) {
             auto connection = prepare(method, url, options);
-            CO_EXPECT(connection);
+            Z_CO_EXPECT(connection);
 
             const auto easy = connection.value()->easy.get();
 
@@ -288,6 +288,6 @@ namespace asyncio::http {
     };
 }
 
-DECLARE_ERROR_CODES(asyncio::http::CURLError, asyncio::http::CURLMError)
+Z_DECLARE_ERROR_CODES(asyncio::http::CURLError, asyncio::http::CURLMError)
 
 #endif //ASYNCIO_REQUEST_H

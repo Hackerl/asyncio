@@ -7,7 +7,7 @@ asyncio::net::UDPSocket::UDPSocket(uv::Handle<uv_udp_t> udp) : mUDP{std::move(ud
 std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::make() {
     auto udp = std::make_unique<uv_udp_t>();
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_init(getEventLoop()->raw(), udp.get());
     }));
 
@@ -17,9 +17,9 @@ std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket:
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::bind(const SocketAddress &address) {
     auto udp = make();
-    EXPECT(udp);
+    Z_EXPECT(udp);
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_bind(udp->mUDP.raw(), address.first.get(), 0);
     }));
 
@@ -29,9 +29,9 @@ asyncio::net::UDPSocket::bind(const SocketAddress &address) {
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::connect(const SocketAddress &address) {
     auto udp = make();
-    EXPECT(udp);
+    Z_EXPECT(udp);
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_connect(udp->mUDP.raw(), address.first.get());
     }));
 
@@ -40,9 +40,9 @@ asyncio::net::UDPSocket::connect(const SocketAddress &address) {
 
 std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::from(const uv_os_sock_t socket) {
     auto udp = make();
-    EXPECT(udp);
+    Z_EXPECT(udp);
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_open(udp->mUDP.raw(), socket);
     }));
 
@@ -52,7 +52,7 @@ std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket:
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::bind(const std::string &ip, const std::uint16_t port) {
     const auto address = ipAddressFrom(ip, port);
-    EXPECT(address);
+    Z_EXPECT(address);
 
     auto socketAddress = std::visit(
         [](const auto &arg) {
@@ -60,7 +60,7 @@ asyncio::net::UDPSocket::bind(const std::string &ip, const std::uint16_t port) {
         },
         *address
     );
-    EXPECT(socketAddress);
+    Z_EXPECT(socketAddress);
 
     return bind(*std::move(socketAddress));
 }
@@ -68,14 +68,14 @@ asyncio::net::UDPSocket::bind(const std::string &ip, const std::uint16_t port) {
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::bind(const IPv4Address &address) {
     auto socketAddress = socketAddressFrom(address);
-    EXPECT(socketAddress);
+    Z_EXPECT(socketAddress);
     return bind(*std::move(socketAddress));
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::bind(const IPv6Address &address) {
     auto socketAddress = socketAddressFrom(address);
-    EXPECT(socketAddress);
+    Z_EXPECT(socketAddress);
     return bind(*std::move(socketAddress));
 }
 
@@ -89,14 +89,14 @@ asyncio::net::UDPSocket::connect(const std::string host, const std::uint16_t por
             .ai_socktype = SOCK_DGRAM
         }
     );
-    CO_EXPECT(addresses);
+    Z_CO_EXPECT(addresses);
     assert(!addresses->empty());
 
     auto it = addresses->begin();
 
     while (true) {
         auto socketAddress = socketAddressFrom(*it);
-        CO_EXPECT(socketAddress);
+        Z_CO_EXPECT(socketAddress);
 
         auto result = connect(*std::move(socketAddress));
 
@@ -111,14 +111,14 @@ asyncio::net::UDPSocket::connect(const std::string host, const std::uint16_t por
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::connect(const IPv4Address &address) {
     auto socketAddress = socketAddressFrom(address);
-    EXPECT(socketAddress);
+    Z_EXPECT(socketAddress);
     return connect(*std::move(socketAddress));
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::connect(const IPv6Address &address) {
     auto socketAddress = socketAddressFrom(address);
-    EXPECT(socketAddress);
+    Z_EXPECT(socketAddress);
     return connect(*std::move(socketAddress));
 }
 
@@ -132,7 +132,7 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::UDPSocket::l
     sockaddr_storage storage{};
     auto length = static_cast<int>(sizeof(sockaddr_storage));
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_getsockname(mUDP.raw(), reinterpret_cast<sockaddr *>(&storage), &length);
     }));
 
@@ -143,7 +143,7 @@ std::expected<asyncio::net::Address, std::error_code> asyncio::net::UDPSocket::r
     sockaddr_storage storage{};
     auto length = static_cast<int>(sizeof(sockaddr_storage));
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_getpeername(mUDP.raw(), reinterpret_cast<sockaddr *>(&storage), &length);
     }));
 
@@ -156,7 +156,7 @@ asyncio::net::UDPSocket::setMembership(
     const std::string &interfaceAddress,
     const Membership membership
 ) {
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_set_membership(
             mUDP.raw(),
             multicastAddress.c_str(),
@@ -173,7 +173,7 @@ std::expected<void, std::error_code> asyncio::net::UDPSocket::setSourceMembershi
     const std::string &sourceAddress,
     const Membership membership
 ) {
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_set_source_membership(
             mUDP.raw(),
             multicastAddress.c_str(),
@@ -186,14 +186,14 @@ std::expected<void, std::error_code> asyncio::net::UDPSocket::setSourceMembershi
 }
 
 std::expected<void, std::error_code> asyncio::net::UDPSocket::setMulticastLoop(const bool on) {
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_set_multicast_loop(mUDP.raw(), on);
     }));
     return {};
 }
 
 std::expected<void, std::error_code> asyncio::net::UDPSocket::setMulticastTTL(const int ttl) {
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_set_multicast_ttl(mUDP.raw(), ttl);
     }));
     return {};
@@ -201,21 +201,21 @@ std::expected<void, std::error_code> asyncio::net::UDPSocket::setMulticastTTL(co
 
 std::expected<void, std::error_code>
 asyncio::net::UDPSocket::setMulticastInterface(const std::string &interfaceAddress) {
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_set_multicast_interface(mUDP.raw(), interfaceAddress.c_str());
     }));
     return {};
 }
 
 std::expected<void, std::error_code> asyncio::net::UDPSocket::setBroadcast(const bool on) {
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_set_broadcast(mUDP.raw(), on);
     }));
     return {};
 }
 
 std::expected<void, std::error_code> asyncio::net::UDPSocket::setTTL(const int ttl) {
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_udp_set_ttl(mUDP.raw(), ttl);
     }));
     return {};
@@ -233,7 +233,7 @@ asyncio::net::UDPSocket::write(const std::span<const std::byte> data) {
     Promise<void, std::error_code> promise;
     uv_udp_send_t request{.data = &promise};
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         uv_buf_t buffer;
 
         buffer.base = reinterpret_cast<char *>(const_cast<std::byte *>(data.data()));
@@ -258,7 +258,7 @@ asyncio::net::UDPSocket::write(const std::span<const std::byte> data) {
         );
     }));
 
-    CO_EXPECT(co_await promise.getFuture());
+    Z_CO_EXPECT(co_await promise.getFuture());
     co_return data.size();
 }
 
@@ -272,7 +272,7 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
     Context context{data};
     mUDP->data = &context;
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_udp_recv_start(
             mUDP.raw(),
             [](auto *handle, const size_t, uv_buf_t *buf) {
@@ -318,12 +318,12 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, const Address address) {
     const auto socketAddress = socketAddressFrom(address);
-    CO_EXPECT(socketAddress);
+    Z_CO_EXPECT(socketAddress);
 
     Promise<void, std::error_code> promise;
     uv_udp_send_t request{.data = &promise};
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         uv_buf_t buffer;
 
         buffer.base = reinterpret_cast<char *>(const_cast<std::byte *>(data.data()));
@@ -348,7 +348,7 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, const Ad
         );
     }));
 
-    CO_EXPECT(co_await promise.getFuture());
+    Z_CO_EXPECT(co_await promise.getFuture());
     co_return data.size();
 }
 
@@ -362,7 +362,7 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, std::str
             .ai_socktype = SOCK_DGRAM
         }
     );
-    CO_EXPECT(addresses);
+    Z_CO_EXPECT(addresses);
     assert(!addresses->empty());
 
     auto it = addresses->begin();

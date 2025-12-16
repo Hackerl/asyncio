@@ -5,7 +5,7 @@
 ## Error Condition `IOError`
 
 ```cpp
-DEFINE_ERROR_CONDITION(
+Z_DEFINE_ERROR_CONDITION(
     IOError,
     "asyncio::io",
     UNEXPECTED_EOF, "unexpected end of file"
@@ -58,7 +58,7 @@ public:
 ```cpp
 class IReader : public virtual zero::Interface {
 public:
-    DEFINE_ERROR_CODE_INNER_EX(
+    Z_DEFINE_ERROR_CODE_INNER_EX(
         ReadExactlyError,
         "asyncio::IReader",
         UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)

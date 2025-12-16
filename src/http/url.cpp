@@ -57,7 +57,7 @@ std::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(cons
     if (!url)
         return std::unexpected{std::error_code{errno, std::generic_category()}};
 
-    EXPECT(expected([&] {
+    Z_EXPECT(expected([&] {
         return curl_url_set(url.get(), CURLUPART_URL, str.c_str(), CURLU_NON_SUPPORT_SCHEME);
     }));
 
@@ -236,4 +236,4 @@ std::expected<asyncio::http::URL, std::error_code> zero::scan(const std::string_
     return asyncio::http::URL::from({input.begin(), input.end()});
 }
 
-DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::http::URL::Error)
+Z_DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::http::URL::Error)

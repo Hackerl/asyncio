@@ -6,7 +6,7 @@
 #include <zero/interface.h>
 
 namespace asyncio {
-    DEFINE_ERROR_CONDITION(
+    Z_DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
         UNEXPECTED_EOF, "unexpected end of file"
@@ -31,7 +31,7 @@ namespace asyncio {
 
     class IReader : public virtual zero::Interface {
     public:
-        DEFINE_ERROR_CODE_INNER_EX(
+        Z_DEFINE_ERROR_CODE_INNER_EX(
             ReadExactlyError,
             "asyncio::IReader",
             UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
@@ -87,13 +87,13 @@ namespace asyncio {
             std::array<std::byte, 20480> data; // NOLINT(*-pro-type-member-init)
 
             const auto n = co_await std::invoke(&IReader::read, reader, data);
-            CO_EXPECT(n);
+            Z_CO_EXPECT(n);
 
             if (*n == 0)
                 break;
 
             co_await task::lock;
-            CO_EXPECT(co_await std::invoke(&IWriter::writeAll, writer, std::span{data.data(), *n}));
+            Z_CO_EXPECT(co_await std::invoke(&IWriter::writeAll, writer, std::span{data.data(), *n}));
             co_await task::unlock;
 
             written += *n;
@@ -159,7 +159,7 @@ namespace asyncio {
     };
 }
 
-DECLARE_ERROR_CONDITION(asyncio::IOError)
-DECLARE_ERROR_CODE(asyncio::IReader::ReadExactlyError)
+Z_DECLARE_ERROR_CONDITION(asyncio::IOError)
+Z_DECLARE_ERROR_CODE(asyncio::IReader::ReadExactlyError)
 
 #endif //ASYNCIO_IO_H

@@ -62,7 +62,7 @@ namespace asyncio {
         const auto eventLoop = EventLoop::make().transform([](EventLoop &&value) {
             return std::make_shared<EventLoop>(std::move(value));
         });
-        EXPECT(eventLoop);
+        Z_EXPECT(eventLoop);
 
         setEventLoop(*eventLoop);
 

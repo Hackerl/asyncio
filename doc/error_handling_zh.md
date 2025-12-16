@@ -67,20 +67,20 @@ fmt::print(stderr, "error: {} ({})\n", ec.message(), ec);
 
 // .h
 namespace asyncio::task {
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         Error,
         "asyncio::task",
         CANCELLED, "task has been cancelled", std::errc::operation_canceled,
         CANCELLATION_NOT_SUPPORTED, "task does not support cancellation", std::errc::operation_not_supported,
         LOCKED, "task has been locked", std::errc::resource_unavailable_try_again,
-        WILL_BE_DONE, "operation will be done soon", DEFAULT_ERROR_CONDITION
+        WILL_BE_DONE, "operation will be done soon", Z_DEFAULT_ERROR_CONDITION
     )
 }
 
-DECLARE_ERROR_CODE(asyncio::task::Error)
+Z_DECLARE_ERROR_CODE(asyncio::task::Error)
 
 // .cpp
-DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::task::Error)
+Z_DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::task::Error)
 ```
 
 上面就是 `asyncio` 中真实存在的代码，使用三个宏我们轻松定义了一个新的错误种类，还有错误码及对应的错误信息。
@@ -94,13 +94,13 @@ DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::task::Error)
 细心的你可能已经注意到了，在上一节自定义错误码的代码中，使用到了 `std::errc`：
 
 ```c++
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
     CANCELLED, "task has been cancelled", std::errc::operation_canceled,
     CANCELLATION_NOT_SUPPORTED, "task does not support cancellation", std::errc::operation_not_supported,
     LOCKED, "task has been locked", std::errc::resource_unavailable_try_again,
-    WILL_BE_DONE, "operation will be done soon", DEFAULT_ERROR_CONDITION
+    WILL_BE_DONE, "operation will be done soon", Z_DEFAULT_ERROR_CONDITION
 )
 ```
 
@@ -115,7 +115,7 @@ assert(std::error_code{asyncio::task::CANCELLED} == std::errc::operation_cancele
 
 ```c++
 namespace asyncio {
-    DEFINE_ERROR_CONDITION(
+    Z_DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
         UNEXPECTED_EOF, "unexpected end of file"
@@ -131,7 +131,7 @@ namespace asyncio {
 namespace asyncio {
     class IReader : public virtual zero::Interface {
     public:
-        DEFINE_ERROR_CODE_INNER_EX(
+        Z_DEFINE_ERROR_CODE_INNER_EX(
             ReadExactlyError,
             "asyncio::IReader",
             UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
@@ -159,7 +159,7 @@ assert(std::error_code{asyncio::ReadExactlyError::UNEXPECTED_EOF} == asyncio::IO
 
 ```c++
 namespace asyncio::net::tls {
-    DEFINE_ERROR_TRANSFORMER(
+    Z_DEFINE_ERROR_TRANSFORMER(
         OpenSSLError,
         "asyncio::net::tls::openssl",
         ([](const int value) -> std::string {
@@ -189,7 +189,7 @@ fmt::print("{:s}", ec);
 
 ```c++
 namespace asyncio::uv {
-    DEFINE_ERROR_TRANSFORMER_EX(
+    Z_DEFINE_ERROR_TRANSFORMER_EX(
         Error,
         "asyncio::uv",
         ([](const int value) -> std::string {
@@ -286,11 +286,11 @@ const auto result2 = CO_TRY(co_await func1());
 可惜，`MSVC` 并不支持该拓展语法，`GCC` 的相关支持也差强人意，于是我便只能退而求其次：
 
 ```c++
-#define EXPECT(...)                                                 \
+#define Z_EXPECT(...)                                                 \
     if (auto &&_result = __VA_ARGS__; !_result)                     \
         return std::unexpected{std::move(_result).error()}
 
-#define CO_EXPECT(...)                                              \
+#define Z_CO_EXPECT(...)                                              \
     if (auto &&_result = __VA_ARGS__; !_result)                     \
         co_return std::unexpected{std::move(_result).error()}
 ```
@@ -302,7 +302,7 @@ const auto result1 = func();
 EXPECT(result1);
 
 const auto result2 = co_await func1();
-CO_EXPECT(result2);
+Z_CO_EXPECT(result2);
 ```
 
 > 我依旧保留了 `TRY` 的相关实现，如果你的项目确定只会使用 `Clang` 编译，使用它们也未尝不可。

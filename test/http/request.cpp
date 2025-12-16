@@ -17,14 +17,14 @@ namespace {
         using namespace std::string_view_literals;
 
         auto stream = co_await listener.accept();
-        CO_EXPECT(stream);
+        Z_CO_EXPECT(stream);
 
         std::string rawRequest;
 
         while (true) {
             std::array<std::byte, 1024> data{};
             const auto n = co_await stream->read(data);
-            CO_EXPECT(n);
+            Z_CO_EXPECT(n);
 
             rawRequest.append(reinterpret_cast<const char *>(data.data()), *n);
 
@@ -34,15 +34,15 @@ namespace {
 
         if (std::smatch match; std::regex_search(rawRequest, match, std::regex(R"(Content-Length: (\d+))"))) {
             const auto length = zero::strings::toNumber<std::size_t>(match.str(1));
-            CO_EXPECT(length);
+            Z_CO_EXPECT(length);
 
             std::vector<std::byte> remain(*length - (rawRequest.size() - rawRequest.find("\r\n\r\n") - 4));
-            CO_EXPECT(co_await stream->readExactly(remain));
+            Z_CO_EXPECT(co_await stream->readExactly(remain));
 
             rawRequest.append(reinterpret_cast<const char *>(remain.data()), remain.size());
         }
 
-        CO_EXPECT(co_await stream->writeAll(
+        Z_CO_EXPECT(co_await stream->writeAll(
             std::as_bytes(
                 std::span{
                     "HTTP/1.1 200 OK\r\n"

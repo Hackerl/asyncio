@@ -24,7 +24,7 @@ namespace asyncio {
                 }
             }
         };
-        DEFER(thread.join());
+        Z_DEFER(thread.join());
 
         co_return *co_await promise.getFuture();
     }
@@ -51,7 +51,7 @@ namespace asyncio {
                 }
             }
         };
-        DEFER(thread.join());
+        Z_DEFER(thread.join());
 
         co_return *co_await task::CancellableFuture{
             promise.getFuture(),
@@ -61,7 +61,7 @@ namespace asyncio {
         };
     }
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         ToThreadPoolError,
         "asyncio::toThreadPool",
         CANCELLED, "request has been cancelled", std::errc::operation_canceled
@@ -96,7 +96,7 @@ namespace asyncio {
             if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
-                    EXPECT(uv::expected([&] {
+                    Z_EXPECT(uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }));
                     return {};
@@ -134,7 +134,7 @@ namespace asyncio {
             if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
-                    EXPECT(uv::expected([&] {
+                    Z_EXPECT(uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }));
                     return {};
@@ -235,6 +235,6 @@ namespace asyncio {
     }
 }
 
-DECLARE_ERROR_CODE(asyncio::ToThreadPoolError)
+Z_DECLARE_ERROR_CODE(asyncio::ToThreadPoolError)
 
 #endif //ASYNCIO_THREAD_H

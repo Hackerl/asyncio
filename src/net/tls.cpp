@@ -92,11 +92,11 @@ asyncio::net::tls::Config::loadSystemCerts(X509_STORE *store, const std::string 
     if (!systemStore)
         return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
 
-    DEFER(CertCloseStore(systemStore, 0));
+    Z_DEFER(CertCloseStore(systemStore, 0));
 
     PCCERT_CONTEXT ctx{};
 
-    DEFER(
+    Z_DEFER(
         if (ctx)
             CertFreeCertificateContext(ctx);
     );
@@ -116,8 +116,8 @@ asyncio::net::tls::Config::loadSystemCerts(X509_STORE *store, const std::string 
         if (!cert)
             return std::unexpected{openSSLError()};
 
-        DEFER(X509_free(cert));
-        EXPECT(asyncio::net::tls::expected([&] {
+        Z_DEFER(X509_free(cert));
+        Z_EXPECT(asyncio::net::tls::expected([&] {
             return X509_STORE_add_cert(store, cert);
         }));
     }
@@ -128,4 +128,4 @@ asyncio::net::tls::ServerConfig::ServerConfig() : Config{} {
     mInsecure = true;
 }
 
-DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::net::tls::OpenSSLError, asyncio::net::tls::TLSError)
+Z_DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::net::tls::OpenSSLError, asyncio::net::tls::TLSError)

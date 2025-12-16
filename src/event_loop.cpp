@@ -32,13 +32,13 @@ const uv_loop_t *asyncio::EventLoop::raw() const {
 std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
     auto loop = std::make_unique<uv_loop_t>();
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_loop_init(loop.get());
     }));
 
     auto async = std::make_unique<uv_async_t>();
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_async_init(
             loop.get(),
             async.get(),
@@ -83,7 +83,7 @@ std::expected<void, std::error_code> asyncio::EventLoop::post(std::function<void
     const std::lock_guard guard{mTaskQueue->mutex};
     mTaskQueue->queue.push(std::move(function));
 
-    EXPECT(uv::expected([this] {
+    Z_EXPECT(uv::expected([this] {
         return uv_async_send(mTaskQueue->async.raw());
     }));
 
@@ -114,7 +114,7 @@ void asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
 asyncio::task::Task<void, std::error_code> asyncio::reschedule() {
     auto ptr = std::make_unique<uv_idle_t>();
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_idle_init(getEventLoop()->raw(), ptr.get());
     }));
 
@@ -123,7 +123,7 @@ asyncio::task::Task<void, std::error_code> asyncio::reschedule() {
     Promise<void, std::error_code> promise;
     idle->data = &promise;
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_idle_start(
             idle.raw(),
             [](auto *handle) {

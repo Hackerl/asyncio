@@ -1,3 +1,3 @@
 #include <asyncio/thread.h>
 
-DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::ToThreadPoolError)
+Z_DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::ToThreadPoolError)

@@ -84,7 +84,7 @@ namespace asyncio::http::ws {
     };
 
     inline std::error_code make_error_code(const CloseCode e) {
-        return {std::to_underlying(e), errorCategoryInstance<CloseCodeCategory>()};
+        return {std::to_underlying(e), zero::error::categoryInstance<CloseCodeCategory>()};
     }
 
     enum class Opcode {
@@ -176,7 +176,7 @@ namespace asyncio::http::ws {
         };
 
     public:
-        DEFINE_ERROR_CODE_INNER(
+        Z_DEFINE_ERROR_CODE_INNER(
             Error,
             "asyncio::http::ws::WebSocket",
             INVALID_URL, "invalid url",
@@ -225,6 +225,6 @@ namespace asyncio::http::ws {
     };
 }
 
-DECLARE_ERROR_CODES(asyncio::http::ws::CloseCode, asyncio::http::ws::WebSocket::Error)
+Z_DECLARE_ERROR_CODES(asyncio::http::ws::CloseCode, asyncio::http::ws::WebSocket::Error)
 
 #endif //ASYNCIO_WEBSOCKET_H

@@ -13,7 +13,7 @@ std::expected<asyncio::Pipe, std::error_code> asyncio::Pipe::from(const uv_file 
     if (!pipe)
         return std::unexpected{std::error_code{errno, std::generic_category()}};
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
@@ -24,7 +24,7 @@ std::expected<asyncio::Pipe, std::error_code> asyncio::Pipe::from(const uv_file 
         }
     };
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_pipe_open(reinterpret_cast<uv_pipe_t *>(handle.raw()), file);
     }));
 
@@ -57,7 +57,7 @@ std::expected<std::string, std::error_code> asyncio::Pipe::localAddress() const 
 
     address.resize(size);
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_pipe_getsockname(reinterpret_cast<const uv_pipe_t *>(mStream.raw()), address.data(), &size);
     }));
 
@@ -85,7 +85,7 @@ std::expected<std::string, std::error_code> asyncio::Pipe::remoteAddress() const
 
     address.resize(size);
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_pipe_getpeername(reinterpret_cast<const uv_pipe_t *>(mStream.raw()), address.data(), &size);
     }));
 
@@ -96,11 +96,11 @@ std::expected<std::string, std::error_code> asyncio::Pipe::remoteAddress() const
 std::expected<std::array<asyncio::Pipe, 2>, std::error_code> asyncio::pipe() {
     std::array<uv_file, 2> fds{};
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_pipe(fds.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE);
     }));
 
-    DEFER(
+    Z_DEFER(
         for (const auto &fd: fds) {
             if (fd == -1)
                 continue;
@@ -112,11 +112,11 @@ std::expected<std::array<asyncio::Pipe, 2>, std::error_code> asyncio::pipe() {
     );
 
     auto reader = Pipe::from(fds[0]);
-    EXPECT(reader);
+    Z_EXPECT(reader);
     fds[0] = -1;
 
     auto writer = Pipe::from(fds[1]);
-    EXPECT(writer);
+    Z_EXPECT(writer);
     fds[1] = -1;
 
     return std::array{*std::move(reader), *std::move(writer)};
@@ -151,7 +151,7 @@ std::expected<std::string, std::error_code> asyncio::PipeListener::address() con
 
     address.resize(size);
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_pipe_getsockname(reinterpret_cast<const uv_pipe_t *>(mCore->stream.raw()), address.data(), &size);
     }));
 
@@ -161,7 +161,7 @@ std::expected<std::string, std::error_code> asyncio::PipeListener::address() con
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 std::expected<void, std::error_code> asyncio::PipeListener::chmod(const int mode) {
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_pipe_chmod(reinterpret_cast<uv_pipe_t *>(mCore->stream.raw()), mode);
     }));
     return {};

@@ -49,7 +49,7 @@ co_await asyncio::toThread(
 ## Function `toThreadPool`
 
 ```cpp
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     ToThreadPoolError,
     "asyncio::toThreadPool",
     CANCELLED, "request has been cancelled", std::errc::operation_canceled

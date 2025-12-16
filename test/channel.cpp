@@ -611,7 +611,7 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
 
     const auto produce = [&]() -> asyncio::task::Task<void, std::error_code> {
         for (int i{0}; i < times; ++i) {
-            CO_EXPECT(co_await sender.send(element));
+            Z_CO_EXPECT(co_await sender.send(element));
         }
 
         co_return {};
@@ -619,7 +619,7 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
 
     const auto produceSync = [&]() -> std::expected<void, std::error_code> {
         for (int i{0}; i < times; ++i) {
-            EXPECT(sender.sendSync(element));
+            Z_EXPECT(sender.sendSync(element));
         }
 
         return {};

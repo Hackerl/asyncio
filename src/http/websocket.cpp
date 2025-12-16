@@ -36,10 +36,10 @@ constexpr auto WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 constexpr auto WEBSOCKET_COMPRESSION_THRESHOLD = 128;
 
-DEFINE_ERROR_TRANSFORMER(ZLIBError, "zlib", zError)
-DECLARE_ERROR_CODE(ZLIBError)
+Z_DEFINE_ERROR_TRANSFORMER(ZLIBError, "zlib", zError)
+Z_DECLARE_ERROR_CODE(ZLIBError)
 
-DEFINE_ERROR_CATEGORY_INSTANCE(ZLIBError)
+Z_DEFINE_ERROR_CATEGORY_INSTANCE(ZLIBError)
 
 namespace {
     std::expected<void, std::error_code>
@@ -86,7 +86,7 @@ namespace {
             }
             else if (item.starts_with("client_max_window_bits=")) {
                 const auto windowBits = zero::strings::toNumber<int>(item.substr(23));
-                EXPECT(windowBits);
+                Z_EXPECT(windowBits);
                 config.clientMaxWindowBits = *windowBits;
             }
         }
@@ -305,23 +305,23 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
             .transform([](net::TCPStream &&value) {
                 return std::make_shared<net::TCPStream>(std::move(value));
             });
-        CO_EXPECT(stream);
+        Z_CO_EXPECT(stream);
         reader = *stream;
         writer = *stream;
         closeable = *std::move(stream);
     }
     else if (scheme == WS_SECURE_SCHEME) {
         auto stream = co_await net::TCPStream::connect(*host, *port);
-        CO_EXPECT(stream);
+        Z_CO_EXPECT(stream);
 
         auto context = net::tls::ClientConfig().build();
-        CO_EXPECT(context);
+        Z_CO_EXPECT(context);
 
         auto tls = co_await net::tls::connect(*std::move(stream), *std::move(context), *host)
             .transform([](net::tls::TLS<net::TCPStream> &&value) {
                 return std::make_shared<net::tls::TLS<net::TCPStream>>(std::move(value));
             });
-        CO_EXPECT(tls);
+        Z_CO_EXPECT(tls);
         reader = *tls;
         writer = *tls;
         closeable = *std::move(tls);
@@ -358,11 +358,11 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         scheme, *host, *port
     );
 
-    CO_EXPECT(co_await writer->writeAll(std::as_bytes(std::span{header})));
+    Z_CO_EXPECT(co_await writer->writeAll(std::as_bytes(std::span{header})));
 
     {
         const auto line = co_await bufReader.readLine();
-        CO_EXPECT(line);
+        Z_CO_EXPECT(line);
 
         const auto tokens = zero::strings::split(*line);
 
@@ -370,7 +370,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
             co_return std::unexpected{Error::INVALID_RESPONSE};
 
         const auto code = zero::strings::toNumber<int>(tokens[1]);
-        CO_EXPECT(code);
+        Z_CO_EXPECT(code);
 
         if (code != SWITCHING_PROTOCOLS_STATUS)
             co_return std::unexpected{Error::UNEXPECTED_STATUS_CODE};
@@ -380,7 +380,7 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
 
     while (true) {
         const auto line = co_await bufReader.readLine();
-        CO_EXPECT(line);
+        Z_CO_EXPECT(line);
 
         if (line->empty())
             break;
@@ -393,19 +393,19 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         headers[tokens[0]] = zero::strings::trim(tokens[1]);
     }
 
-    CO_EXPECT(validateWebsocketAccept(headers, key));
+    Z_CO_EXPECT(validateWebsocketAccept(headers, key));
 
     const auto config = parseExtensionConfig(headers);
-    CO_EXPECT(config);
+    Z_CO_EXPECT(config);
 
     std::optional<DeflateExtension> deflateExtension;
 
     if (const auto &deflateConfig = *config) {
         auto compressor = Compressor::make(deflateConfig->clientMaxWindowBits);
-        CO_EXPECT(compressor);
+        Z_CO_EXPECT(compressor);
 
         auto decompressor = Decompressor::make(deflateConfig->serverMaxWindowBits);
-        CO_EXPECT(decompressor);
+        Z_CO_EXPECT(decompressor);
 
         deflateExtension.emplace(*deflateConfig, *std::move(compressor), *std::move(decompressor));
     }
@@ -422,7 +422,7 @@ asyncio::task::Task<asyncio::http::ws::Frame, std::error_code>
 asyncio::http::ws::WebSocket::readFrame() {
     Header header;
 
-    CO_EXPECT(co_await mReader->readExactly({reinterpret_cast<std::byte *>(&header), sizeof(Header)}));
+    Z_CO_EXPECT(co_await mReader->readExactly({reinterpret_cast<std::byte *>(&header), sizeof(Header)}));
 
     if (header.mask())
         co_return std::unexpected{Error::UNSUPPORTED_MASKED_FRAME};
@@ -431,19 +431,19 @@ asyncio::http::ws::WebSocket::readFrame() {
 
     if (const auto length = header.length(); length == EIGHT_BYTE_PAYLOAD_LENGTH) {
         const auto n = co_await binary::readBE<std::uint64_t>(mReader);
-        CO_EXPECT(n);
+        Z_CO_EXPECT(n);
         data.resize(*n);
     }
     else if (length == TWO_BYTE_PAYLOAD_LENGTH) {
         const auto n = co_await binary::readBE<std::uint16_t>(mReader);
-        CO_EXPECT(n);
+        Z_CO_EXPECT(n);
         data.resize(*n);
     }
     else {
         data.resize(length);
     }
 
-    CO_EXPECT(co_await mReader->readExactly(data));
+    Z_CO_EXPECT(co_await mReader->readExactly(data));
     co_return Frame{header, std::move(data)};
 }
 
@@ -452,13 +452,13 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
     assert(mState != State::CLOSED);
 
     auto frame = co_await readFrame();
-    CO_EXPECT(frame);
+    Z_CO_EXPECT(frame);
 
     auto final = frame->header.final();
 
     while (!final) {
         const auto fragment = co_await readFrame();
-        CO_EXPECT(fragment);
+        Z_CO_EXPECT(fragment);
 
         frame->data.append_range(fragment->data);
         final = fragment->header.final();
@@ -472,12 +472,12 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
 
         auto &[config, compressor, decompressor] = *mDeflateExtension;
         auto decompressed = co_await decompressor.decompress(frame->data);
-        CO_EXPECT(decompressed);
+        Z_CO_EXPECT(decompressed);
 
         frame->data = std::move(*decompressed);
 
         if (config.serverNoContextTakeover) {
-            CO_EXPECT(decompressor.reset());
+            Z_CO_EXPECT(decompressor.reset());
         }
     }
 
@@ -486,8 +486,8 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
 
 asyncio::task::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
-    CO_EXPECT(co_await mMutex->lock());
-    DEFER(mMutex->unlock());
+    Z_CO_EXPECT(co_await mMutex->lock());
+    Z_DEFER(mMutex->unlock());
 
     if (mState == State::CLOSED || (mState == State::CLOSING && message.opcode != Opcode::CLOSE))
         co_return std::unexpected{Error::CONNECTION_CLOSED};
@@ -501,7 +501,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     if (mDeflateExtension && (message.opcode == Opcode::TEXT || message.opcode == Opcode::BINARY)
         && message.data.size() >= WEBSOCKET_COMPRESSION_THRESHOLD) {
         auto compressed = co_await mDeflateExtension->compressor.compress(message.data);
-        CO_EXPECT(compressed);
+        Z_CO_EXPECT(compressed);
 
         assert(compressed->size() > 4);
         compressed->resize(compressed->size() - 4);
@@ -525,13 +525,13 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
         header.length(length);
     }
 
-    CO_EXPECT(co_await mWriter->writeAll({reinterpret_cast<const std::byte *>(&header), sizeof(Header)}));
+    Z_CO_EXPECT(co_await mWriter->writeAll({reinterpret_cast<const std::byte *>(&header), sizeof(Header)}));
 
     if (extendedBytes == 2) {
-        CO_EXPECT(co_await binary::writeBE(mWriter, static_cast<std::uint16_t>(length)));
+        Z_CO_EXPECT(co_await binary::writeBE(mWriter, static_cast<std::uint16_t>(length)));
     }
     else if (extendedBytes == 8) {
-        CO_EXPECT(co_await binary::writeBE<std::uint64_t>(mWriter, length));
+        Z_CO_EXPECT(co_await binary::writeBE<std::uint64_t>(mWriter, length));
     }
 
     std::random_device rd;
@@ -541,7 +541,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     std::array<std::byte, MASKING_KEY_LENGTH> key{};
     std::ranges::generate(key, [&] { return static_cast<std::byte>(dist(gen)); });
 
-    CO_EXPECT(co_await mWriter->writeAll(key));
+    Z_CO_EXPECT(co_await mWriter->writeAll(key));
 
     for (std::size_t i{0}; i < length; ++i)
         message.data[i] ^= key[i % 4];
@@ -555,7 +555,7 @@ asyncio::http::ws::WebSocket::readMessage() {
 
     while (true) {
         auto message = co_await readInternalMessage();
-        CO_EXPECT(message);
+        Z_CO_EXPECT(message);
 
         if (const auto opcode = message->opcode; opcode == Opcode::TEXT) {
             co_return Message{
@@ -567,11 +567,11 @@ asyncio::http::ws::WebSocket::readMessage() {
             co_return Message{message->opcode, std::move(message->data)};
         }
         else if (opcode == Opcode::PING) {
-            CO_EXPECT(co_await writeInternalMessage({Opcode::PONG, std::move(message->data)}));
+            Z_CO_EXPECT(co_await writeInternalMessage({Opcode::PONG, std::move(message->data)}));
         }
         else if (opcode == Opcode::CLOSE) {
             mState = State::CLOSING;
-            CO_EXPECT(co_await writeInternalMessage({Opcode::CLOSE, message->data}));
+            Z_CO_EXPECT(co_await writeInternalMessage({Opcode::CLOSE, message->data}));
             mState = State::CLOSED;
 
             if (message->data.size() < 2)
@@ -623,14 +623,14 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(c
     mState = State::CLOSING;
     const auto c = htons(static_cast<std::uint16_t>(code));
 
-    CO_EXPECT(co_await writeInternalMessage({
+    Z_CO_EXPECT(co_await writeInternalMessage({
         Opcode::CLOSE,
         {reinterpret_cast<const std::byte *>(&c), reinterpret_cast<const std::byte *>(&c) + sizeof(c)}}
     ));
 
     while (true) {
         const auto message = co_await readInternalMessage();
-        CO_EXPECT(message);
+        Z_CO_EXPECT(message);
 
         if (message->opcode == Opcode::CLOSE) {
             mState = State::CLOSED;
@@ -638,8 +638,8 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(c
         }
     }
 
-    CO_EXPECT(co_await mCloseable->close());
+    Z_CO_EXPECT(co_await mCloseable->close());
     co_return {};
 }
 
-DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::http::ws::WebSocket::Error, asyncio::http::ws::CloseCode)
+Z_DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::http::ws::WebSocket::Error, asyncio::http::ws::CloseCode)

@@ -126,4 +126,4 @@ std::expected<void, std::error_code> asyncio::task::TaskGroup::cancel() {
     return {};
 }
 
-DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::task::Error)
+Z_DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::task::Error)

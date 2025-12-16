@@ -55,7 +55,7 @@ ASYNC_TEST_CASE("automatically cancel at next suspension point - error", "[task]
     asyncio::Promise<void, std::error_code> promise2;
 
     auto task = asyncio::task::spawn([&]() -> asyncio::task::Task<void, std::error_code> {
-        CO_EXPECT(co_await promise1.getFuture());
+        Z_CO_EXPECT(co_await promise1.getFuture());
         co_return co_await asyncio::task::CancellableFuture{
             promise2.getFuture(),
             [&]() -> std::expected<void, std::error_code> {
@@ -1198,7 +1198,7 @@ ASYNC_TEST_CASE("task and then - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .andThen([](const auto &value) -> asyncio::task::Task<int, std::error_code> {
-                CO_EXPECT(co_await asyncio::reschedule());
+                Z_CO_EXPECT(co_await asyncio::reschedule());
 
                 if (value % 2)
                     co_return std::unexpected{make_error_code(std::errc::invalid_argument)};
@@ -1258,7 +1258,7 @@ ASYNC_TEST_CASE("task or else - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .orElse([](const auto &ec) -> asyncio::task::Task<int, std::error_code> {
-                CO_EXPECT(co_await asyncio::reschedule());
+                Z_CO_EXPECT(co_await asyncio::reschedule());
 
                 if (ec != std::errc::io_error)
                     co_return std::unexpected{ec};

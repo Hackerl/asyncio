@@ -5,13 +5,13 @@ This module contains the core code for tasks.
 ## Error Code `Error`
 
 ```cpp
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
     CANCELLED, "task has been cancelled", std::errc::operation_canceled,
     CANCELLATION_NOT_SUPPORTED, "task does not support cancellation", std::errc::operation_not_supported,
     LOCKED, "task has been locked", std::errc::resource_unavailable_try_again,
-    WILL_BE_DONE, "operation will be done soon", DEFAULT_ERROR_CONDITION
+    WILL_BE_DONE, "operation will be done soon", Z_DEFAULT_ERROR_CONDITION
 )
 ```
 
@@ -223,7 +223,7 @@ struct CancellableFuture {
 asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
     auto ptr = std::make_unique<uv_timer_t>();
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_timer_init(getEventLoop()->raw(), ptr.get());
     }));
 
@@ -232,7 +232,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
     Promise<void, std::error_code> promise;
     timer->data = &promise;
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_timer_start(
             timer.raw(),
             [](auto *handle) {
@@ -284,7 +284,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
             const auto id = zero::os::unix::ensure([&] {
                 return waitpid(pid, &s, 0);
             });
-            EXPECT(id);
+            Z_EXPECT(id);
             assert(*id == pid);
 
             return ExitStatus{s};
@@ -331,7 +331,7 @@ asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std:
             co_return std::unexpected{task::Error::CANCELLED};
 
         const auto n = co_await write(data.subspan(offset));
-        CO_EXPECT(n);
+        Z_CO_EXPECT(n);
 
         assert(*n != 0);
         offset += *n;

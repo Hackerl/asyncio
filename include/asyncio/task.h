@@ -10,13 +10,13 @@
 #include <treehh/tree.hh>
 
 namespace asyncio::task {
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         Error,
         "asyncio::task",
         CANCELLED, "task has been cancelled", std::errc::operation_canceled,
         CANCELLATION_NOT_SUPPORTED, "task does not support cancellation", std::errc::operation_not_supported,
         LOCKED, "task has been locked", std::errc::resource_unavailable_try_again,
-        WILL_BE_DONE, "operation will be done soon", DEFAULT_ERROR_CONDITION
+        WILL_BE_DONE, "operation will be done soon", Z_DEFAULT_ERROR_CONDITION
     )
 
     template<typename T, typename E>
@@ -1123,6 +1123,6 @@ namespace asyncio::task {
     }
 }
 
-DECLARE_ERROR_CODE(asyncio::task::Error)
+Z_DECLARE_ERROR_CODE(asyncio::task::Error)
 
 #endif //ASYNCIO_TASK_H

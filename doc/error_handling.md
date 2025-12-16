@@ -66,20 +66,20 @@ At the early stages of the project, I attempted to define them by hand, but it b
 
 // .h
 namespace asyncio::task {
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         Error,
         "asyncio::task",
         CANCELLED, "task has been cancelled", std::errc::operation_canceled,
         CANCELLATION_NOT_SUPPORTED, "task does not support cancellation", std::errc::operation_not_supported,
         LOCKED, "task has been locked", std::errc::resource_unavailable_try_again,
-        WILL_BE_DONE, "operation will be done soon", DEFAULT_ERROR_CONDITION
+        WILL_BE_DONE, "operation will be done soon", Z_DEFAULT_ERROR_CONDITION
     )
 }
 
-DECLARE_ERROR_CODE(asyncio::task::Error)
+Z_DECLARE_ERROR_CODE(asyncio::task::Error)
 
 // .cpp
-DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::task::Error)
+Z_DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::task::Error)
 ```
 
 The above code is part of `asyncio`, where we define a new error category, error codes, and corresponding messages using three macros.
@@ -93,13 +93,13 @@ In C++'s error system, `std::error_code` represents the specific error that occu
 If you've been paying attention, you might have noticed that in the previous section on custom error codes, we used `std::errc`:
 
 ```c++
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
     CANCELLED, "task has been cancelled", std::errc::operation_canceled,
     CANCELLATION_NOT_SUPPORTED, "task does not support cancellation", std::errc::operation_not_supported,
     LOCKED, "task has been locked", std::errc::resource_unavailable_try_again,
-    WILL_BE_DONE, "operation will be done soon", DEFAULT_ERROR_CONDITION
+    WILL_BE_DONE, "operation will be done soon", Z_DEFAULT_ERROR_CONDITION
 )
 ```
 
@@ -115,7 +115,7 @@ We can also define custom error conditions:
 
 ```c++
 namespace asyncio {
-    DEFINE_ERROR_CONDITION(
+    Z_DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
         UNEXPECTED_EOF, "unexpected end of file"
@@ -131,7 +131,7 @@ The specific error code is defined when implementing the interface:
 namespace asyncio {
     class IReader : public virtual zero::Interface {
     public:
-        DEFINE_ERROR_CODE_INNER_EX(
+        Z_DEFINE_ERROR_CODE_INNER_EX(
             ReadExactlyError,
             "asyncio::IReader",
             UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
@@ -158,7 +158,7 @@ As mentioned in the first section, third-party libraries use a variety of error 
 
 ```c++
 namespace asyncio::net::tls {
-    DEFINE_ERROR_TRANSFORMER(
+    Z_DEFINE_ERROR_TRANSFORMER(
         OpenSSLError,
         "asyncio::net::tls::openssl",
         ([](const int value) -> std::string {
@@ -187,7 +187,7 @@ If you have the patience, you can explicitly list the mappings as follows:
 
 ```c++
 namespace asyncio::uv {
-    DEFINE_ERROR_TRANSFORMER_EX(
+    Z_DEFINE_ERROR_TRANSFORMER_EX(
         Error,
         "asyncio::uv",
         ([](const int value) -> std::string {
@@ -285,11 +285,11 @@ const auto result2 = CO_TRY(co_await func1());
 Unfortunately, `MSVC` does not support this extended syntax, and GCC's support is not ideal either. So, I had to settle for an alternative:
 
 ```c++
-#define EXPECT(...)                                                 \
+#define Z_EXPECT(...)                                                 \
     if (auto &&_result = __VA_ARGS__; !_result)                     \
         return std::unexpected{std::move(_result).error()}
 
-#define CO_EXPECT(...)                                              \
+#define Z_CO_EXPECT(...)                                              \
     if (auto &&_result = __VA_ARGS__; !_result)                     \
         co_return std::unexpected{std::move(_result).error()}
 ```
@@ -301,7 +301,7 @@ const auto result1 = func();
 EXPECT(result1);
 
 const auto result2 = co_await func1();
-CO_EXPECT(result2);
+Z_CO_EXPECT(result2);
 ```
 
 > I have kept the `TRY` implementation as well. If your project is guaranteed to only use the `Clang` compiler, using them is also a viable option.

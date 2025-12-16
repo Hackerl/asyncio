@@ -8,7 +8,7 @@ namespace asyncio::binary {
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
     task::Task<T, std::error_code> readLE(zero::detail::Trait<IReader> auto &reader) {
         std::array<std::byte, sizeof(T)> bytes{};
-        CO_EXPECT(co_await std::invoke(&IReader::readExactly, reader, bytes));
+        Z_CO_EXPECT(co_await std::invoke(&IReader::readExactly, reader, bytes));
 
         T v{};
 
@@ -22,7 +22,7 @@ namespace asyncio::binary {
         requires (std::is_arithmetic_v<T> && sizeof(T) > 1)
     task::Task<T, std::error_code> readBE(zero::detail::Trait<IReader> auto &reader) {
         std::array<std::byte, sizeof(T)> bytes{};
-        CO_EXPECT(co_await std::invoke(&IReader::readExactly, reader, bytes));
+        Z_CO_EXPECT(co_await std::invoke(&IReader::readExactly, reader, bytes));
 
         T v{};
 

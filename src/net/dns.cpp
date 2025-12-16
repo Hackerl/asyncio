@@ -10,7 +10,7 @@ asyncio::net::dns::getAddressInfo(
     Promise<std::vector<Address>, uv::Error> promise;
     uv_getaddrinfo_t request{.data = &promise};
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_getaddrinfo(
             getEventLoop()->raw(),
             &request,
@@ -22,7 +22,7 @@ asyncio::net::dns::getAddressInfo(
                     return;
                 }
 
-                DEFER(uv_freeaddrinfo(result));
+                Z_DEFER(uv_freeaddrinfo(result));
                 std::vector<Address> addresses;
 
                 for (const auto *ptr = result; ptr; ptr = ptr->ai_next) {
@@ -49,7 +49,7 @@ asyncio::net::dns::getAddressInfo(
     co_return co_await task::CancellableFuture{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
-            EXPECT(uv::expected([&] {
+            Z_EXPECT(uv::expected([&] {
                 return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
             }));
             return {};

@@ -77,7 +77,7 @@ std::optional<std::string> asyncio::http::Response::header(const std::string &na
 
 asyncio::task::Task<std::string, std::error_code> asyncio::http::Response::string() {
     StringWriter writer;
-    CO_EXPECT(co_await copy(*this, writer));
+    Z_CO_EXPECT(co_await copy(*this, writer));
     co_return *std::move(writer);
 }
 
@@ -85,8 +85,8 @@ asyncio::task::Task<std::string, std::error_code> asyncio::http::Response::strin
 asyncio::task::Task<void, std::error_code>
 asyncio::http::Response::output(std::filesystem::path path) {
     auto file = co_await fs::open(std::move(path), O_WRONLY | O_CREAT | O_TRUNC);
-    CO_EXPECT(file);
-    CO_EXPECT(co_await copy(*this, *file));
+    Z_CO_EXPECT(file);
+    Z_CO_EXPECT(co_await copy(*this, *file));
     co_return {};
 }
 
@@ -106,7 +106,7 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
 
     auto future = downstream.promise->getFuture();
 
-    CO_EXPECT(expected([&] {
+    Z_CO_EXPECT(expected([&] {
         return curl_easy_pause(mConnection->easy.get(), CURLPAUSE_RECV_CONT);
     }));
 
@@ -118,7 +118,7 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
             if (!promise)
                 return std::unexpected{task::Error::WILL_BE_DONE};
 
-            EXPECT(expected([&] {
+            Z_EXPECT(expected([&] {
                 return curl_easy_pause(mConnection->easy.get(), CURLPAUSE_RECV);
             }));
 
@@ -182,7 +182,7 @@ std::expected<void, std::error_code> asyncio::http::Requests::Core::setTimer(con
         return {};
     }
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_timer_start(
             timer.raw(),
             [](auto *handle) {
@@ -214,7 +214,7 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
     if (!context) {
         auto poll = std::make_unique<uv_poll_t>();
 
-        EXPECT(uv::expected([&] {
+        Z_EXPECT(uv::expected([&] {
             return uv_poll_init_socket(getEventLoop()->raw(), poll.get(), s);
         }));
 
@@ -223,7 +223,7 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
         curl_multi_assign(multi, s, context);
     }
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_poll_start(
             context->poll.raw(),
             (action & CURL_POLL_IN ? UV_READABLE : 0) | (action & CURL_POLL_OUT ? UV_WRITABLE : 0),
@@ -273,7 +273,7 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
 
     auto timer = std::make_unique<uv_timer_t>();
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_timer_init(getEventLoop()->raw(), timer.get());
     }));
 
@@ -507,7 +507,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         curl_easy_setopt(easy, CURLOPT_KEYPASSWD, password->c_str());
 
     for (const auto &hook: hooks) {
-        EXPECT(hook(*connection));
+        Z_EXPECT(hook(*connection));
     }
 
     return connection;
@@ -518,16 +518,16 @@ asyncio::http::Requests::perform(std::shared_ptr<Connection> connection) {
     const auto easy = connection->easy.get();
     const auto multi = mCore->multi;
 
-    CO_EXPECT(expected([&] {
+    Z_CO_EXPECT(expected([&] {
         return curl_multi_add_handle(multi, easy);
     }));
 
-    DEFER(
+    Z_DEFER(
         if (connection)
             curl_multi_remove_handle(multi, easy);
     );
 
-    CO_EXPECT(co_await task::CancellableFuture{
+    Z_CO_EXPECT(co_await task::CancellableFuture{
         connection->promise.getFuture(),
         [&promise = connection->promise]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
@@ -552,7 +552,7 @@ const asyncio::http::Options &asyncio::http::Requests::options() const {
 asyncio::task::Task<asyncio::http::Response, std::error_code>
 asyncio::http::Requests::request(std::string method, const URL url, const std::optional<Options> options) {
     auto connection = prepare(std::move(method), url, options);
-    CO_EXPECT(connection);
+    Z_CO_EXPECT(connection);
     co_return co_await perform(*std::move(connection));
 }
 
@@ -564,7 +564,7 @@ asyncio::http::Requests::request(
     const std::string payload
 ) {
     auto connection = prepare(std::move(method), url, options);
-    CO_EXPECT(connection);
+    Z_CO_EXPECT(connection);
 
     const auto easy = connection.value()->easy.get();
 
@@ -582,7 +582,7 @@ asyncio::http::Requests::request(
     std::map<std::string, std::string> payload
 ) {
     auto connection = prepare(std::move(method), url, options);
-    CO_EXPECT(connection);
+    Z_CO_EXPECT(connection);
 
     curl_easy_setopt(
         connection.value()->easy.get(),
@@ -604,7 +604,7 @@ asyncio::http::Requests::request(
     std::map<std::string, std::variant<std::string, std::filesystem::path>> payload
 ) {
     auto connection = prepare(std::move(method), url, options);
-    CO_EXPECT(connection);
+    Z_CO_EXPECT(connection);
 
     const auto easy = connection.value()->easy.get();
 
@@ -618,13 +618,13 @@ asyncio::http::Requests::request(
         curl_mime_name(field, k.c_str());
 
         if (std::holds_alternative<std::string>(v)) {
-            CO_EXPECT(expected([&] {
+            Z_CO_EXPECT(expected([&] {
                 return curl_mime_data(field, std::get<std::string>(v).c_str(), CURL_ZERO_TERMINATED);
             }));
             continue;
         }
 
-        CO_EXPECT(expected([&] {
+        Z_CO_EXPECT(expected([&] {
             return curl_mime_filedata(field, zero::filesystem::stringify(std::get<std::filesystem::path>(v)).c_str());
         }));
     }
@@ -638,4 +638,4 @@ asyncio::http::Requests::request(
     co_return co_await perform(*std::move(connection));
 }
 
-DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::http::CURLError, asyncio::http::CURLMError)
+Z_DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::http::CURLError, asyncio::http::CURLMError)

@@ -41,7 +41,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     }
 
     auto requests = asyncio::http::Requests::make(options);
-    CO_EXPECT(requests);
+    Z_CO_EXPECT(requests);
 
     auto response = co_await [&] {
         if (!body)
@@ -70,14 +70,14 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 
         return requests->request(*method, url, options, *body);
     }();
-    CO_EXPECT(response);
+    Z_CO_EXPECT(response);
 
     if (output) {
-        CO_EXPECT(co_await response->output(*output));
+        Z_CO_EXPECT(co_await response->output(*output));
     }
 
     const auto content = co_await response->string();
-    CO_EXPECT(content);
+    Z_CO_EXPECT(content);
 
     fmt::print("{}", *content);
     co_return {};

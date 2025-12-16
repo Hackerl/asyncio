@@ -33,10 +33,10 @@ REQUIRE(co_await receiver.receive() == "hello world");
 ### Method `trySend`
 
 ```cpp
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     TrySendError,
     "asyncio::Sender::trySend",
-    DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
+    DISCONNECTED, "sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
     FULL, "sending on a full channel", std::errc::operation_would_block
 )
 
@@ -51,10 +51,10 @@ Attempts to send data without waiting when the `channel` is full, returning a `T
 ### Method `sendSync`
 
 ```cpp
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     SendSyncError,
     "asyncio::Sender::sendSync",
-    DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
+    DISCONNECTED, "sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
     TIMEOUT, "timed out waiting on send operation", std::errc::timed_out
 )
 
@@ -83,10 +83,10 @@ co_await asyncio::toThread([&] {
 ### Method `send`
 
 ```cpp
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     SendError,
     "asyncio::Sender::send",
-    DISCONNECTED, "sending on a disconnected channel", DEFAULT_ERROR_CONDITION,
+    DISCONNECTED, "sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
     CANCELLED, "send operation has been cancelled", std::errc::operation_canceled
 )
 
@@ -168,10 +168,10 @@ Checks if the `channel` has been closed.
 
 
 ```cpp
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     TryReceiveError,
     "asyncio::Receiver::tryReceive",
-    DISCONNECTED, "receiving on an empty and disconnected channel", DEFAULT_ERROR_CONDITION,
+    DISCONNECTED, "receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
     EMPTY, "receiving on an empty channel", std::errc::operation_would_block
 )
 
@@ -185,10 +185,10 @@ Attempts to receive data without waiting when the `channel` is empty, returning 
 ### Method `receiveSync`
 
 ```cpp
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     ReceiveSyncError,
     "asyncio::Receiver::receiveSync",
-    DISCONNECTED, "channel is empty and disconnected", DEFAULT_ERROR_CONDITION,
+    DISCONNECTED, "channel is empty and disconnected", Z_DEFAULT_ERROR_CONDITION,
     TIMEOUT, "timed out waiting on receive operation", std::errc::timed_out
 )
 
@@ -216,10 +216,10 @@ co_await asyncio::toThread([&] {
 ### Method `receive`
 
 ```cpp
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     ReceiveError,
     "asyncio::Receiver::receive",
-    DISCONNECTED, "channel is empty and disconnected", DEFAULT_ERROR_CONDITION,
+    DISCONNECTED, "channel is empty and disconnected", Z_DEFAULT_ERROR_CONDITION,
     CANCELLED, "receive operation has been cancelled", std::errc::operation_canceled
 )
 
@@ -296,7 +296,7 @@ Checks if the `channel` has been closed.
 ## Error Condition `ChannelError`
 
 ```cpp
-DEFINE_ERROR_CONDITION_EX(
+Z_DEFINE_ERROR_CONDITION_EX(
     ChannelError,
     "asyncio::channel",
     DISCONNECTED,

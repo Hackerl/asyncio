@@ -11,7 +11,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     const auto url = cmdline.get<asyncio::http::URL>("url");
 
     auto ws = co_await asyncio::http::ws::WebSocket::connect(url);
-    CO_EXPECT(ws);
+    Z_CO_EXPECT(ws);
 
     while (true) {
         auto message = co_await ws->readMessage();
@@ -39,7 +39,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
             std::abort();
         }
 
-        CO_EXPECT(co_await ws->writeMessage(*std::move(message)));
+        Z_CO_EXPECT(co_await ws->writeMessage(*std::move(message)));
     }
 
     co_return {};

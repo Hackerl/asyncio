@@ -17,7 +17,7 @@ co_await asyncio::sleep(1s);
 ## Function `timeout`
 
 ```cpp
-DEFINE_ERROR_CODE_EX(
+Z_DEFINE_ERROR_CODE_EX(
     TimeoutError,
     "asyncio::timeout",
     ELAPSED, "deadline has elapsed", std::errc::timed_out

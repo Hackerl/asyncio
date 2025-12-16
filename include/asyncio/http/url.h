@@ -14,7 +14,7 @@ namespace asyncio::http {
 
     class URL {
     public:
-        DEFINE_ERROR_TRANSFORMER_INNER(
+        Z_DEFINE_ERROR_TRANSFORMER_INNER(
             Error,
             "asyncio::http::url",
             [](const int value) { return curl_url_strerror(static_cast<CURLUcode>(value)); }
@@ -213,7 +213,7 @@ namespace asyncio::http {
     bool operator==(const URL &lhs, const URL &rhs);
 }
 
-DECLARE_ERROR_CODE(asyncio::http::URL::Error)
+Z_DECLARE_ERROR_CODE(asyncio::http::URL::Error)
 
 template<>
 std::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input);

@@ -100,7 +100,7 @@ namespace asyncio::net {
         );
     }
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         ParseAddressError,
         "asyncio::net::addressFrom",
         INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
@@ -110,7 +110,7 @@ namespace asyncio::net {
     std::expected<IPAddress, std::error_code> ipAddressFrom(const std::string &ip, std::uint16_t port);
     std::expected<Address, std::error_code> addressFrom(const sockaddr *addr, socklen_t length);
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         ConvertToSocketAddressError,
         "asyncio::net::socketAddressFrom",
         INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
@@ -148,14 +148,14 @@ namespace asyncio::net {
         co_return co_await all(
             task::spawn([&]() -> task::Task<std::size_t, std::error_code> {
                 const auto result = co_await copy(first, second);
-                CO_EXPECT(result);
-                CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, second));
+                Z_CO_EXPECT(result);
+                Z_CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, second));
                 co_return *result;
             }),
             task::spawn([&]() -> task::Task<std::size_t, std::error_code> {
                 const auto result = co_await copy(second, first);
-                CO_EXPECT(result);
-                CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, first));
+                Z_CO_EXPECT(result);
+                Z_CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, first));
                 co_return *result;
             })
         );
@@ -208,6 +208,6 @@ struct fmt::formatter<asyncio::net::UnixAddress, Char> {
     }
 };
 
-DECLARE_ERROR_CODES(asyncio::net::ParseAddressError, asyncio::net::ConvertToSocketAddressError)
+Z_DECLARE_ERROR_CODES(asyncio::net::ParseAddressError, asyncio::net::ConvertToSocketAddressError)
 
 #endif //ASYNCIO_NET_H

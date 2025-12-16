@@ -10,7 +10,7 @@
 #include <asyncio/sync/mutex.h>
 
 namespace asyncio::net::tls {
-    DEFINE_ERROR_TRANSFORMER(
+    Z_DEFINE_ERROR_TRANSFORMER(
         OpenSSLError,
         "asyncio::net::tls::openssl",
         ([](const int value) -> std::string {
@@ -110,11 +110,11 @@ namespace asyncio::net::tls {
             if (!context)
                 return std::unexpected{openSSLError()};
 
-            EXPECT(expected([&] {
+            Z_EXPECT(expected([&] {
                 return SSL_CTX_set_min_proto_version(context.get(), std::to_underlying(self.mMinVersion));
             }));
 
-            EXPECT(expected([&] {
+            Z_EXPECT(expected([&] {
                 return SSL_CTX_set_max_proto_version(context.get(), std::to_underlying(self.mMaxVersion));
             }));
 
@@ -125,16 +125,16 @@ namespace asyncio::net::tls {
                 if (!store)
                     return std::unexpected{openSSLError()};
 
-                EXPECT(loadSystemCerts(store, "CA"));
-                EXPECT(loadSystemCerts(store, "AuthRoot"));
-                EXPECT(loadSystemCerts(store, "ROOT"));
+                Z_EXPECT(loadSystemCerts(store, "CA"));
+                Z_EXPECT(loadSystemCerts(store, "AuthRoot"));
+                Z_EXPECT(loadSystemCerts(store, "ROOT"));
 #else
-                EXPECT(expected([&] {
+                Z_EXPECT(expected([&] {
                     return SSL_CTX_set_default_verify_paths(context.get());
                 }));
 #ifdef __linux__
                 if (const auto bundle = systemCABundle()) {
-                    EXPECT(expected([&] {
+                    Z_EXPECT(expected([&] {
                         return SSL_CTX_load_verify_locations(context.get(), bundle->c_str(), nullptr);
                     }));
                 }
@@ -147,17 +147,17 @@ namespace asyncio::net::tls {
                     return std::unexpected{openSSLError()};
 
                 for (const auto &[cert]: self.mRootCAs) {
-                    EXPECT(expected([&] {
+                    Z_EXPECT(expected([&] {
                         return X509_STORE_add_cert(store, cert.get());
                     }));
                 }
             }
 
             for (const auto &[cert, key]: self.mCertKeyPairs) {
-                EXPECT(expected([&] {
+                Z_EXPECT(expected([&] {
                     return SSL_CTX_use_certificate(context.get(), cert.inner.get());
                 }));
-                EXPECT(expected([&] {
+                Z_EXPECT(expected([&] {
                     return SSL_CTX_use_PrivateKey(context.get(), key.inner.get());
                 }));
             }
@@ -206,7 +206,7 @@ namespace asyncio::net::tls {
         }
     };
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         TLSError,
         "asyncio::net::tls",
         UNEXPECTED_EOF, "unexpected end of file", IOError::UNEXPECTED_EOF
@@ -229,15 +229,15 @@ namespace asyncio::net::tls {
             auto &mutex = mMutexes[0];
             const auto locked = mutex.locked();
 
-            CO_EXPECT(co_await mutex.lock());
-            DEFER(mutex.unlock());
+            Z_CO_EXPECT(co_await mutex.lock());
+            Z_DEFER(mutex.unlock());
 
             if (locked)
                 co_return {};
 
             std::array<std::byte, 10240> data; // NOLINT(*-pro-type-member-init)
             const auto n = co_await std::invoke(&IReader::read, mStream, data);
-            CO_EXPECT(n);
+            Z_CO_EXPECT(n);
 
             if (*n == 0)
                 co_return std::unexpected{make_error_code(TLSError::UNEXPECTED_EOF)};
@@ -250,8 +250,8 @@ namespace asyncio::net::tls {
         task::Task<void, std::error_code> transferOut() {
             auto &mutex = mMutexes[1];
 
-            CO_EXPECT(co_await mutex.lock());
-            DEFER(mutex.unlock());
+            Z_CO_EXPECT(co_await mutex.lock());
+            Z_DEFER(mutex.unlock());
 
             std::array<std::byte, 10240> data; // NOLINT(*-pro-type-member-init)
 
@@ -261,7 +261,7 @@ namespace asyncio::net::tls {
                 if (n <= 0)
                     break;
 
-                CO_EXPECT(co_await std::invoke(
+                Z_CO_EXPECT(co_await std::invoke(
                     &IWriter::writeAll,
                     mStream,
                     std::span{data.data(), static_cast<std::size_t>(n)}
@@ -277,16 +277,16 @@ namespace asyncio::net::tls {
                 const auto result = SSL_do_handshake(mSSL.get());
 
                 if (result == 1) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                     co_return {};
                 }
 
                 if (const auto error = SSL_get_error(mSSL.get(), result); error == SSL_ERROR_WANT_READ) {
-                    CO_EXPECT(co_await transferOut());
-                    CO_EXPECT(co_await transferIn());
+                    Z_CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferIn());
                 }
                 else if (error == SSL_ERROR_WANT_WRITE) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                 }
                 else if (error == SSL_ERROR_SSL) {
                     co_return std::unexpected{openSSLError()};
@@ -302,7 +302,7 @@ namespace asyncio::net::tls {
                 const auto result = SSL_read(mSSL.get(), data.data(), static_cast<int>(data.size()));
 
                 if (result > 0) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                     co_return result;
                 }
 
@@ -310,11 +310,11 @@ namespace asyncio::net::tls {
                     co_return 0;
 
                 if (const auto error = SSL_get_error(mSSL.get(), result); error == SSL_ERROR_WANT_READ) {
-                    CO_EXPECT(co_await transferOut());
-                    CO_EXPECT(co_await transferIn());
+                    Z_CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferIn());
                 }
                 else if (error == SSL_ERROR_WANT_WRITE) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                 }
                 else if (error == SSL_ERROR_SSL) {
                     co_return std::unexpected{openSSLError()};
@@ -330,16 +330,16 @@ namespace asyncio::net::tls {
                 const auto result = SSL_write(mSSL.get(), data.data(), static_cast<int>(data.size()));
 
                 if (result > 0) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                     co_return result;
                 }
 
                 if (const auto error = SSL_get_error(mSSL.get(), result); error == SSL_ERROR_WANT_READ) {
-                    CO_EXPECT(co_await transferOut());
-                    CO_EXPECT(co_await transferIn());
+                    Z_CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferIn());
                 }
                 else if (error == SSL_ERROR_WANT_WRITE) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                 }
                 else if (error == SSL_ERROR_SSL) {
                     co_return std::unexpected{openSSLError()};
@@ -358,11 +358,11 @@ namespace asyncio::net::tls {
                     co_return co_await transferOut();
 
                 if (const auto error = SSL_get_error(mSSL.get(), result); error == SSL_ERROR_WANT_READ) {
-                    CO_EXPECT(co_await transferOut());
-                    CO_EXPECT(co_await transferIn());
+                    Z_CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferIn());
                 }
                 else if (error == SSL_ERROR_WANT_WRITE) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                 }
                 else if (error == SSL_ERROR_SSL) {
                     co_return std::unexpected{openSSLError()};
@@ -378,21 +378,21 @@ namespace asyncio::net::tls {
                 const auto result = SSL_shutdown(mSSL.get());
 
                 if (result == 0) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                     continue;
                 }
 
                 if (result == 1) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                     break;
                 }
 
                 if (const auto error = SSL_get_error(mSSL.get(), result); error == SSL_ERROR_WANT_READ) {
-                    CO_EXPECT(co_await transferOut());
-                    CO_EXPECT(co_await transferIn());
+                    Z_CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferIn());
                 }
                 else if (error == SSL_ERROR_WANT_WRITE) {
-                    CO_EXPECT(co_await transferOut());
+                    Z_CO_EXPECT(co_await transferOut());
                 }
                 else if (error == SSL_ERROR_SSL) {
                     co_return std::unexpected{openSSLError()};
@@ -402,7 +402,7 @@ namespace asyncio::net::tls {
                 }
             }
 
-            CO_EXPECT(co_await std::invoke(&ICloseable::close, mStream));
+            Z_CO_EXPECT(co_await std::invoke(&ICloseable::close, mStream));
             co_return {};
         }
 
@@ -432,7 +432,7 @@ namespace asyncio::net::tls {
             SSL_set_tlsext_host_name(ssl.get(), serverName->c_str());
             SSL_set_hostflags(ssl.get(), X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
-            CO_EXPECT(expected([&] {
+            Z_CO_EXPECT(expected([&] {
                 return SSL_set1_host(ssl.get(), serverName->c_str());
             }));
         }
@@ -451,7 +451,7 @@ namespace asyncio::net::tls {
         SSL_set_connect_state(ssl.get());
 
         TLS tls{std::move(stream), std::move(ssl)};
-        CO_EXPECT(co_await tls.handshake());
+        Z_CO_EXPECT(co_await tls.handshake());
         co_return tls;
     }
 
@@ -481,11 +481,11 @@ namespace asyncio::net::tls {
         SSL_set_accept_state(ssl.get());
 
         TLS tls{std::move(stream), std::move(ssl)};
-        CO_EXPECT(co_await tls.handshake());
+        Z_CO_EXPECT(co_await tls.handshake());
         co_return tls;
     }
 }
 
-DECLARE_ERROR_CODES(asyncio::net::tls::OpenSSLError, asyncio::net::tls::TLSError)
+Z_DECLARE_ERROR_CODES(asyncio::net::tls::OpenSSLError, asyncio::net::tls::TLSError)
 
 #endif //ASYNCIO_TLS_H

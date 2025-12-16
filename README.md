@@ -207,7 +207,7 @@ namespace {
 
             // `WaitForSingleObject` cannot be integrated into EventLoop, so we use a separate thread to call it,
             // and a custom cancellation function allows it to be seamlessly integrated into coroutine management.
-            CO_EXPECT(co_await asyncio::toThread(
+            Z_CO_EXPECT(co_await asyncio::toThread(
                 [&, &cancelled = std::as_const(cancelled)]() -> std::expected<void, std::error_code> {
                     if (WaitForSingleObject(*event, INFINITE) != WAIT_OBJECT_0)
                         return std::unexpected{
@@ -233,10 +233,10 @@ namespace {
 #else
         // On UNIX, the Signal component can be used directly.
         auto signal = asyncio::Signal::make();
-        CO_EXPECT(signal);
+        Z_CO_EXPECT(signal);
 
         while (true) {
-            CO_EXPECT(co_await signal->on(SIGUSR1));
+            Z_CO_EXPECT(co_await signal->on(SIGUSR1));
             fmt::print(stderr, "{}\n", task.trace());
         }
 #endif
@@ -246,14 +246,14 @@ namespace {
         using namespace std::chrono_literals;
 
         while (true) {
-            CO_EXPECT(co_await asyncio::sleep(1s));
+            Z_CO_EXPECT(co_await asyncio::sleep(1s));
             fmt::print("do some thing\n");
         }
     }
 
     asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
         const auto address = stream.remoteAddress();
-        CO_EXPECT(address);
+        Z_CO_EXPECT(address);
 
         fmt::print("connection[{}]\n", *address);
 
@@ -262,7 +262,7 @@ namespace {
             message.resize(1024);
 
             const auto n = co_await stream.read(std::as_writable_bytes(std::span{message}));
-            CO_EXPECT(n);
+            Z_CO_EXPECT(n);
 
             if (*n == 0)
                 break;
@@ -270,7 +270,7 @@ namespace {
             message.resize(*n);
 
             fmt::print("receive message: {}\n", message);
-            CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{message})));
+            Z_CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{message})));
         }
 
         co_return {};
@@ -322,10 +322,10 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     const auto port = cmdline.get<std::uint16_t>("port");
 
     auto listener = asyncio::net::TCPListener::listen(host, port);
-    CO_EXPECT(listener);
+    Z_CO_EXPECT(listener);
 
     auto signal = asyncio::Signal::make();
-    CO_EXPECT(signal);
+    Z_CO_EXPECT(signal);
 
     // This is the main task of our program.
     auto task = race(
@@ -353,10 +353,10 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 > Start the server with `./server 127.0.0.1 8000`, and gracefully exit by pressing `ctrl + c` in the terminal.
 > You can also send signal or event to make it perform traceback.
 
-You may have noticed the prominent `CO_EXPECT`, but what exactly is it?
+You may have noticed the prominent `Z_CO_EXPECT`, but what exactly is it?
 
 ```c++
-#define CO_EXPECT(...)                                              \
+#define Z_CO_EXPECT(...)                                              \
     if (auto &&_result = __VA_ARGS__; !_result)                     \
         co_return std::unexpected{std::move(_result).error()}
 ```

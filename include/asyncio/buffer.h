@@ -4,7 +4,7 @@
 #include "io.h"
 
 namespace asyncio {
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         BufReaderError,
         "asyncio::BufReader",
         INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
@@ -34,7 +34,7 @@ namespace asyncio {
                 mTail = 0;
 
                 const auto n = co_await std::invoke(&IReader::read, mReader, std::span{mBuffer.get(), mCapacity});
-                CO_EXPECT(n);
+                Z_CO_EXPECT(n);
 
                 if (*n == 0)
                     co_return 0;
@@ -56,7 +56,7 @@ namespace asyncio {
 
         task::Task<std::string, std::error_code> readLine() override {
             auto data = co_await readUntil(std::byte{'\n'});
-            CO_EXPECT(data);
+            Z_CO_EXPECT(data);
 
             if (!data->empty() && data->back() == std::byte{'\r'})
                 data->pop_back();
@@ -86,7 +86,7 @@ namespace asyncio {
                 mTail = 0;
 
                 const auto n = co_await std::invoke(&IReader::read, mReader, std::span{mBuffer.get(), mCapacity});
-                CO_EXPECT(n);
+                Z_CO_EXPECT(n);
 
                 if (*n == 0)
                     co_return std::unexpected{make_error_code(BufReaderError::UNEXPECTED_EOF)};
@@ -115,7 +115,7 @@ namespace asyncio {
                         mReader,
                         std::span{mBuffer.get() + mTail, mCapacity - mTail}
                     );
-                    CO_EXPECT(n);
+                    Z_CO_EXPECT(n);
 
                     if (*n == 0)
                         co_return std::unexpected{make_error_code(BufReaderError::UNEXPECTED_EOF)};
@@ -152,7 +152,7 @@ namespace asyncio {
             assert(mPending <= mCapacity);
 
             if (mPending == mCapacity) {
-                CO_EXPECT(co_await flush());
+                Z_CO_EXPECT(co_await flush());
             }
 
             const auto size = (std::min)(mCapacity - mPending, data.size());
@@ -213,7 +213,7 @@ namespace asyncio {
                     mWriter,
                     std::span{mBuffer.get() + offset, mPending - offset}
                 );
-                CO_EXPECT(n);
+                Z_CO_EXPECT(n);
 
                 offset += *n;
             }
@@ -233,6 +233,6 @@ namespace asyncio {
     };
 }
 
-DECLARE_ERROR_CODES(asyncio::BufReaderError)
+Z_DECLARE_ERROR_CODES(asyncio::BufReaderError)
 
 #endif //ASYNCIO_BUFFER_H

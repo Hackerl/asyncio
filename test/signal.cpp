@@ -16,7 +16,7 @@ ASYNC_TEST_CASE("signal", "[signal]") {
                 kill(getpid(), SIGINT);
             }
         };
-        DEFER(thread.join());
+        Z_DEFER(thread.join());
         REQUIRE(co_await signal->on(SIGINT));
     }
 

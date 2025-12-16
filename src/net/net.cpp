@@ -18,7 +18,7 @@ std::expected<asyncio::net::IPv4Address, std::error_code>
 asyncio::net::IPv4Address::from(const std::string &ip, const std::uint16_t port) {
     IPv4 ipv4{};
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_inet_pton(AF_INET, ip.c_str(), ipv4.data());
     }));
 
@@ -42,7 +42,7 @@ asyncio::net::IPv6Address::from(const std::string &ip, const std::uint16_t port)
     IPv6 ipv6{};
     const auto pos = ip.find_last_of('%');
 
-    EXPECT(uv::expected([&] {
+    Z_EXPECT(uv::expected([&] {
         return uv_inet_pton(AF_INET6, ip.substr(0, pos).c_str(), ipv6.data());
     }));
 
@@ -194,4 +194,4 @@ asyncio::net::socketAddressFrom(const Address &address) {
     );
 }
 
-DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::net::ParseAddressError, asyncio::net::ConvertToSocketAddressError)
+Z_DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::net::ParseAddressError, asyncio::net::ConvertToSocketAddressError)

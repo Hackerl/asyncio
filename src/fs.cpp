@@ -39,7 +39,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const 
     Promise<std::size_t, std::error_code> promise;
     uv_fs_t request{.data = &promise};
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         uv_buf_t buffer;
 
         buffer.base = reinterpret_cast<char *>(data.data());
@@ -64,7 +64,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const 
             }
         );
     }));
-    DEFER(uv_fs_req_cleanup(&request));
+    Z_DEFER(uv_fs_req_cleanup(&request));
 
     co_return co_await promise.getFuture();
 }
@@ -73,7 +73,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const
     Promise<std::size_t, std::error_code> promise{mEventLoop};
     uv_fs_t request{.data = &promise};
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         uv_buf_t buffer;
 
         buffer.base = reinterpret_cast<char *>(const_cast<std::byte *>(data.data()));
@@ -98,7 +98,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const
             }
         );
     }));
-    DEFER(uv_fs_req_cleanup(&request));
+    Z_DEFER(uv_fs_req_cleanup(&request));
 
     co_return co_await promise.getFuture();
 }
@@ -107,7 +107,7 @@ asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
     Promise<void, std::error_code> promise{mEventLoop};
     uv_fs_t request{.data = &promise};
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_fs_close(
             mEventLoop->raw(),
             &request,
@@ -124,7 +124,7 @@ asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
             }
         );
     }));
-    DEFER(uv_fs_req_cleanup(&request));
+    Z_DEFER(uv_fs_req_cleanup(&request));
 
     mFile = -1;
     co_return co_await promise.getFuture();
@@ -137,7 +137,7 @@ asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
 #ifdef _WIN32
             LARGE_INTEGER pos{};
 
-            EXPECT(zero::os::windows::expected([&] {
+            Z_EXPECT(zero::os::windows::expected([&] {
                 return SetFilePointerEx(
                     uv_get_osfhandle(mFile),
                     LARGE_INTEGER{.QuadPart = offset},
@@ -159,7 +159,7 @@ asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
                     whence == Whence::BEGIN ? SEEK_SET : whence == Whence::CURRENT ? SEEK_CUR : SEEK_END
                 );
             });
-            EXPECT(pos);
+            Z_EXPECT(pos);
 
             return *pos;
 #endif
@@ -173,7 +173,7 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
 
     uv_fs_t request{.data = &promise};
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_fs_open(
             getEventLoop()->raw(),
             &request,
@@ -192,10 +192,10 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
             }
         );
     }));
-    DEFER(uv_fs_req_cleanup(&request));
+    Z_DEFER(uv_fs_req_cleanup(&request));
 
     const auto file = co_await promise.getFuture();
-    CO_EXPECT(file);
+    Z_CO_EXPECT(file);
 
     co_return File{*file};
 }
@@ -206,10 +206,10 @@ asyncio::task::Task<std::vector<std::byte>, std::error_code> asyncio::fs::read(s
 
 asyncio::task::Task<std::string, std::error_code> asyncio::fs::readString(std::filesystem::path path) {
     auto file = co_await open(std::move(path), O_RDONLY);
-    CO_EXPECT(file);
+    Z_CO_EXPECT(file);
 
     StringWriter writer;
-    CO_EXPECT(co_await copy(*file, writer));
+    Z_CO_EXPECT(co_await copy(*file, writer));
 
     co_return *std::move(writer);
 }
@@ -217,14 +217,14 @@ asyncio::task::Task<std::string, std::error_code> asyncio::fs::readString(std::f
 asyncio::task::Task<void, std::error_code>
 asyncio::fs::write(std::filesystem::path path, const std::span<const std::byte> content) {
     auto file = co_await open(std::move(path), O_WRONLY | O_CREAT | O_TRUNC);
-    CO_EXPECT(file);
+    Z_CO_EXPECT(file);
     co_return co_await file->writeAll(content);
 }
 
 asyncio::task::Task<void, std::error_code>
 asyncio::fs::write(std::filesystem::path path, const std::string content) {
     auto file = co_await open(std::move(path), O_WRONLY | O_CREAT | O_TRUNC);
-    CO_EXPECT(file);
+    Z_CO_EXPECT(file);
     co_return co_await file->writeAll(std::as_bytes(std::span{content}));
 }
 
@@ -655,7 +655,7 @@ asyncio::task::Task<std::optional<asyncio::fs::DirectoryEntry>, std::error_code>
         co_return DirectoryEntry{zero::filesystem::DirectoryEntry{*mIterator}};
     }
 
-    CO_EXPECT(zero::flattenWith<std::error_code>(
+    Z_CO_EXPECT(zero::flattenWith<std::error_code>(
         co_await toThreadPool([this]() -> std::expected<void, std::error_code> {
             std::error_code ec;
             mIterator.increment(ec);

@@ -17,16 +17,16 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     const auto port = cmdline.get<std::uint16_t>("port");
 
     auto stream = co_await asyncio::net::TCPStream::connect(host, port);
-    CO_EXPECT(stream);
+    Z_CO_EXPECT(stream);
 
     while (true) {
-        CO_EXPECT(co_await stream->writeAll(std::as_bytes(std::span{"hello world"sv})));
+        Z_CO_EXPECT(co_await stream->writeAll(std::as_bytes(std::span{"hello world"sv})));
 
         std::string message;
         message.resize(1024);
 
         const auto n = co_await stream->read(std::as_writable_bytes(std::span{message}));
-        CO_EXPECT(n);
+        Z_CO_EXPECT(n);
 
         if (*n == 0)
             break;
@@ -34,7 +34,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
         message.resize(*n);
 
         fmt::print("receive message: {}\n", message);
-        CO_EXPECT(co_await asyncio::sleep(1s));
+        Z_CO_EXPECT(co_await asyncio::sleep(1s));
     }
 
     co_return {};

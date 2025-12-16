@@ -11,11 +11,11 @@ ASYNC_TEST_CASE("poll events", "[poll]") {
     REQUIRE(uv_socketpair(SOCK_STREAM, 0, sockets.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE) == 0);
 
 #ifdef _WIN32
-    DEFER(REQUIRE(closesocket(sockets[0]) == 0));
-    DEFER(REQUIRE(closesocket(sockets[1]) == 0));
+    Z_DEFER(REQUIRE(closesocket(sockets[0]) == 0));
+    Z_DEFER(REQUIRE(closesocket(sockets[1]) == 0));
 #else
-    DEFER(REQUIRE(close(sockets[0]) == 0));
-    DEFER(REQUIRE(close(sockets[1]) == 0));
+    Z_DEFER(REQUIRE(close(sockets[0]) == 0));
+    Z_DEFER(REQUIRE(close(sockets[1]) == 0));
 #endif
 
     auto poll = asyncio::Poll::make(sockets[0]);
