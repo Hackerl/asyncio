@@ -27,7 +27,11 @@ asyncio::fs::File::~File() {
         return;
 
     uv_fs_t request{};
-    uv_fs_close(nullptr, &request, mFile, nullptr);
+
+    zero::error::guard(uv::expected([&] {
+        return uv_fs_close(nullptr, &request, mFile, nullptr);
+    }));
+
     uv_fs_req_cleanup(&request);
 }
 

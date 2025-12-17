@@ -20,12 +20,17 @@ asyncio::http::Response::~Response() {
     if (!mConnection)
         return;
 
-    curl_multi_remove_handle(mRequests->mCore->multi, mConnection->easy.get());
+    zero::error::guard(expected([this] {
+        return curl_multi_remove_handle(mRequests->mCore->multi, mConnection->easy.get());
+    }));
 }
 
 long asyncio::http::Response::statusCode() const {
     long status{};
-    curl_easy_getinfo(mConnection->easy.get(), CURLINFO_RESPONSE_CODE, &status);
+
+    zero::error::guard(expected([&] {
+        return curl_easy_getinfo(mConnection->easy.get(), CURLINFO_RESPONSE_CODE, &status);
+    }));
 
     return status;
 }
@@ -33,20 +38,25 @@ long asyncio::http::Response::statusCode() const {
 std::optional<std::uint64_t> asyncio::http::Response::contentLength() const {
     curl_off_t length{};
 
-    if (!expected([&] {
+    zero::error::guard(expected([&] {
         return curl_easy_getinfo(mConnection->easy.get(), CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &length);
-    }) || length < 0)
+    }));
+
+    if (length == -1)
         return std::nullopt;
 
+    assert(length >= 0);
     return length;
 }
 
 std::optional<std::string> asyncio::http::Response::contentType() const {
     const char *type{};
 
-    if (!expected([&] {
+    zero::error::guard(expected([&] {
         return curl_easy_getinfo(mConnection->easy.get(), CURLINFO_CONTENT_TYPE, &type);
-    }) || !type)
+    }));
+
+    if (!type)
         return std::nullopt;
 
     return type;
@@ -54,7 +64,10 @@ std::optional<std::string> asyncio::http::Response::contentType() const {
 
 std::vector<std::string> asyncio::http::Response::cookies() const {
     curl_slist *list{};
-    curl_easy_getinfo(mConnection->easy.get(), CURLINFO_COOKIELIST, &list);
+
+    zero::error::guard(expected([&] {
+        return curl_easy_getinfo(mConnection->easy.get(), CURLINFO_COOKIELIST, &list);
+    }));
 
     std::vector<std::string> cookies;
 
@@ -129,7 +142,9 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
 }
 
 asyncio::http::Requests::Core::~Core() {
-    curl_multi_cleanup(multi);
+    zero::error::guard(expected([this] {
+        return curl_multi_cleanup(multi);
+    }));
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
@@ -141,7 +156,10 @@ void asyncio::http::Requests::Core::recycle() {
             continue;
 
         Connection *connection{};
-        curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &connection);
+
+        zero::error::guard(expected([&] {
+            return curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &connection);
+        }));
 
         connection->finished = true;
 
@@ -178,7 +196,9 @@ void asyncio::http::Requests::Core::recycle() {
 
 std::expected<void, std::error_code> asyncio::http::Requests::Core::setTimer(const long ms) {
     if (ms == -1) {
-        uv_timer_stop(timer.raw());
+        zero::error::guard(uv::expected([&] {
+            return uv_timer_stop(timer.raw());
+        }));
         return {};
     }
 
@@ -186,9 +206,16 @@ std::expected<void, std::error_code> asyncio::http::Requests::Core::setTimer(con
         return uv_timer_start(
             timer.raw(),
             [](auto *handle) {
-                uv_timer_stop(handle);
+                zero::error::guard(uv::expected([&] {
+                    return uv_timer_stop(handle);
+                }));
+
                 auto &core = *static_cast<Core *>(handle->data);
-                curl_multi_socket_action(core.multi, CURL_SOCKET_TIMEOUT, 0, &core.running);
+
+                zero::error::guard(expected([&] {
+                    return curl_multi_socket_action(core.multi, CURL_SOCKET_TIMEOUT, 0, &core.running);
+                }));
+
                 core.recycle();
             },
             ms,
@@ -205,9 +232,16 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
         if (!context)
             return {};
 
-        uv_poll_stop(context->poll.raw());
+        zero::error::guard(uv::expected([&] {
+            return uv_poll_stop(context->poll.raw());
+        }));
+
         delete context;
-        curl_multi_assign(multi, s, nullptr);
+
+        zero::error::guard(expected([&] {
+            return curl_multi_assign(multi, s, nullptr);
+        }));
+
         return {};
     }
 
@@ -220,7 +254,10 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
 
         context = new Context{uv::Handle{std::move(poll)}, this, s};
         context->poll->data = context;
-        curl_multi_assign(multi, s, context);
+
+        zero::error::guard(expected([&] {
+            return curl_multi_assign(multi, s, context);
+        }));
     }
 
     Z_EXPECT(uv::expected([&] {
@@ -236,14 +273,16 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
                  * causing the Context to be deleted and no longer accessible,
                  * so save the core pointer in advance.
                  */
-                curl_multi_socket_action(
-                    core->multi,
-                    ctx->s,
-                    status < 0
-                        ? CURL_CSELECT_ERR
-                        : (e & UV_READABLE ? CURL_CSELECT_IN : 0) | (e & UV_WRITABLE ? CURL_CSELECT_OUT : 0),
-                    &core->running
-                );
+                zero::error::guard(expected([&] {
+                    return curl_multi_socket_action(
+                        core->multi,
+                        ctx->s,
+                        status < 0
+                            ? CURL_CSELECT_ERR
+                            : (e & UV_READABLE ? CURL_CSELECT_IN : 0) | (e & UV_WRITABLE ? CURL_CSELECT_OUT : 0),
+                        &core->running
+                    );
+                }));
 
                 core->recycle();
             }
@@ -260,7 +299,10 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
     static std::once_flag flag;
 
     std::call_once(flag, [] {
-        curl_global_init(CURL_GLOBAL_DEFAULT);
+        zero::error::guard(expected([] {
+            return curl_global_init(CURL_GLOBAL_DEFAULT);
+        }));
+
         std::atexit([] {
             curl_global_cleanup();
         });
@@ -287,33 +329,41 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
     core->timer->data = core.get();
     const auto multi = core->multi;
 
-    curl_multi_setopt(
-        multi,
-        CURLMOPT_SOCKETFUNCTION,
-        static_cast<curl_socket_callback>(
-            [](CURL *, const curl_socket_t s, const int action, void *ctx, void *socketContext) {
-                if (!static_cast<Core *>(ctx)->handle(s, action, static_cast<Core::Context *>(socketContext)))
+    zero::error::guard(expected([&] {
+        return curl_multi_setopt(
+            multi,
+            CURLMOPT_SOCKETFUNCTION,
+            static_cast<curl_socket_callback>(
+                [](CURL *, const curl_socket_t s, const int action, void *ctx, void *socketContext) {
+                    if (!static_cast<Core *>(ctx)->handle(s, action, static_cast<Core::Context *>(socketContext)))
+                        return -1;
+
+                    return 0;
+                }
+            )
+        );
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_multi_setopt(multi, CURLMOPT_SOCKETDATA, core.get());
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_multi_setopt(
+            multi,
+            CURLMOPT_TIMERFUNCTION,
+            static_cast<curl_multi_timer_callback>([](CURLM *, const long ms, void *ctx) {
+                if (!static_cast<Core *>(ctx)->setTimer(ms))
                     return -1;
 
                 return 0;
-            }
-        )
-    );
+            })
+        );
+    }));
 
-    curl_multi_setopt(multi, CURLMOPT_SOCKETDATA, core.get());
-
-    curl_multi_setopt(
-        multi,
-        CURLMOPT_TIMERFUNCTION,
-        static_cast<curl_multi_timer_callback>([](CURLM *, const long ms, void *ctx) {
-            if (!static_cast<Core *>(ctx)->setTimer(ms))
-                return -1;
-
-            return 0;
-        })
-    );
-
-    curl_multi_setopt(multi, CURLMOPT_TIMERDATA, core.get());
+    zero::error::guard(expected([&] {
+        return curl_multi_setopt(multi, CURLMOPT_TIMERDATA, core.get());
+    }));
 
     return Requests{std::move(core)};
 }
@@ -350,7 +400,9 @@ std::size_t asyncio::http::Requests::onRead(char *buffer, const std::size_t size
 
             // The `onRead` callback will not be executed immediately,
             // otherwise it needs to be put into the next event loop.
-            curl_easy_pause(easy, CURLPAUSE_SEND_CONT);
+            zero::error::guard(expected([&] {
+                return curl_easy_pause(easy, CURLPAUSE_SEND_CONT);
+            }));
         });
 
         return CURL_READFUNC_PAUSE;
@@ -427,84 +479,161 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
 
     method = zero::strings::toupper(method);
 
-    if (method == "HEAD")
-        curl_easy_setopt(easy, CURLOPT_NOBODY, 1L);
-    else if (method == "GET")
-        curl_easy_setopt(easy, CURLOPT_HTTPGET, 1L);
-    else if (method == "POST")
-        curl_easy_setopt(easy, CURLOPT_POST, 1L);
-    else
-        curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
+    if (method == "HEAD") {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_NOBODY, 1L);
+        }));
+    }
+    else if (method == "GET") {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_HTTPGET, 1L);
+        }));
+    }
+    else if (method == "POST") {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_POST, 1L);
+        }));
+    }
+    else {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
+        }));
+    }
 
-    curl_easy_setopt(easy, CURLOPT_URL, url.string().c_str());
-    curl_easy_setopt(easy, CURLOPT_COOKIEFILE, "");
-    curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, onWrite);
-    curl_easy_setopt(easy, CURLOPT_WRITEDATA, connection.get());
-    curl_easy_setopt(easy, CURLOPT_PRIVATE, connection.get());
-    curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
-    curl_easy_setopt(easy, CURLOPT_USERAGENT, userAgent.value_or("asyncio requests").c_str());
-    curl_easy_setopt(easy, CURLOPT_ACCEPT_ENCODING, "");
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_URL, url.string().c_str());
+    }));
 
-    curl_easy_setopt(
-        easy,
-        CURLOPT_CONNECTTIMEOUT,
-        static_cast<long>(connectTimeout.value_or(DEFAULT_CONNECT_TIMEOUT).count())
-    );
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_COOKIEFILE, "");
+    }));
 
-    curl_easy_setopt(
-        easy,
-        CURLOPT_TIMEOUT,
-        static_cast<long>(timeout.value_or(DEFAULT_TRANSFER_TIMEOUT).count())
-    );
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, onWrite);
+    }));
 
-    if (proxy)
-        curl_easy_setopt(easy, CURLOPT_PROXY, proxy->c_str());
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_WRITEDATA, connection.get());
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_PRIVATE, connection.get());
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_FOLLOWLOCATION, 1L);
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_USERAGENT, userAgent.value_or("asyncio requests").c_str());
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_ACCEPT_ENCODING, "");
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(
+            easy,
+            CURLOPT_CONNECTTIMEOUT,
+            static_cast<long>(connectTimeout.value_or(DEFAULT_CONNECT_TIMEOUT).count())
+        );
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(
+            easy,
+            CURLOPT_TIMEOUT,
+            static_cast<long>(timeout.value_or(DEFAULT_TRANSFER_TIMEOUT).count())
+        );
+    }));
+
+    if (proxy) {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_PROXY, proxy->c_str());
+        }));
+    }
 
     if (!cookies.empty()) {
-        curl_easy_setopt(
-            easy,
-            CURLOPT_COOKIE,
-            to_string(fmt::join(
-                cookies | std::views::transform([](const auto &it) { return it.first + "=" + it.second; }),
-                "; "
-            )).c_str()
-        );
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(
+                easy,
+                CURLOPT_COOKIE,
+                to_string(fmt::join(
+                    cookies | std::views::transform([](const auto &it) { return it.first + "=" + it.second; }),
+                    "; "
+                )).c_str()
+            );
+        }));
     }
 
     curl_slist *list{nullptr};
 
-    for (const auto &[k, v]: headers)
-        list = curl_slist_append(list, fmt::format("{}: {}", k, v).c_str());
+    Z_DEFER(
+        if (list)
+            curl_slist_free_all(list);
+    );
+
+    for (const auto &[k, v]: headers) {
+        const auto l = curl_slist_append(list, fmt::format("{}: {}", k, v).c_str());
+
+        if (!l)
+            throw std::system_error{errno, std::generic_category()};
+
+        list = l;
+    }
 
     if (list) {
-        curl_easy_setopt(easy, CURLOPT_HTTPHEADER, list);
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_HTTPHEADER, list);
+        }));
 
-        connection->defers.emplace_back([list] {
+        connection->defers.emplace_back([list = std::exchange(list, nullptr)] {
             curl_slist_free_all(list);
         });
     }
 
     const auto &[insecure, ca, cert, privateKey, password] = tls;
 
-    curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L);
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L);
+    }));
 
 #ifdef __linux__
-    if (const auto bundle = net::tls::systemCABundle())
-        curl_easy_setopt(easy, CURLOPT_CAINFO, bundle->c_str());
+    if (const auto bundle = net::tls::systemCABundle()) {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_CAINFO, bundle->c_str());
+        }));
+    }
 #endif
 
-    if (ca)
-        curl_easy_setopt(easy, CURLOPT_CAINFO, ca->c_str());
+    if (ca) {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_CAINFO, ca->c_str());
+        }));
+    }
 
-    if (cert)
-        curl_easy_setopt(easy, CURLOPT_SSLCERT, cert->c_str());
+    if (cert) {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_SSLCERT, cert->c_str());
+        }));
+    }
 
-    if (privateKey)
-        curl_easy_setopt(easy, CURLOPT_SSLKEY, privateKey->c_str());
+    if (privateKey) {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_SSLKEY, privateKey->c_str());
+        }));
+    }
 
-    if (password)
-        curl_easy_setopt(easy, CURLOPT_KEYPASSWD, password->c_str());
+    if (password) {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_KEYPASSWD, password->c_str());
+        }));
+    }
 
     for (const auto &hook: hooks) {
         Z_EXPECT(hook(*connection));
@@ -523,8 +652,11 @@ asyncio::http::Requests::perform(std::shared_ptr<Connection> connection) {
     }));
 
     Z_DEFER(
-        if (connection)
-            curl_multi_remove_handle(multi, easy);
+        if (connection) {
+            zero::error::guard(expected([&] {
+                return curl_multi_remove_handle(multi, easy);
+            }));
+        }
     );
 
     Z_CO_EXPECT(co_await task::CancellableFuture{
@@ -568,8 +700,13 @@ asyncio::http::Requests::request(
 
     const auto easy = connection.value()->easy.get();
 
-    curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, static_cast<long>(payload.length()));
-    curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload.c_str());
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, static_cast<long>(payload.length()));
+    }));
+
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_COPYPOSTFIELDS, payload.c_str());
+    }));
 
     co_return co_await perform(*std::move(connection));
 }
@@ -584,14 +721,16 @@ asyncio::http::Requests::request(
     auto connection = prepare(std::move(method), url, options);
     Z_CO_EXPECT(connection);
 
-    curl_easy_setopt(
-        connection.value()->easy.get(),
-        CURLOPT_COPYPOSTFIELDS,
-        to_string(fmt::join(
-            payload | std::views::transform([](const auto &it) { return it.first + "=" + it.second; }),
-            "&"
-        )).c_str()
-    );
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(
+            connection.value()->easy.get(),
+            CURLOPT_COPYPOSTFIELDS,
+            to_string(fmt::join(
+                payload | std::views::transform([](const auto &it) { return it.first + "=" + it.second; }),
+                "&"
+            )).c_str()
+        );
+    }));
 
     co_return co_await perform(*std::move(connection));
 }
@@ -613,23 +752,34 @@ asyncio::http::Requests::request(
         curl_mime_free
     };
 
+    if (!form)
+        throw std::system_error{errno, std::generic_category()};
+
     for (const auto &[k, v]: payload) {
         const auto field = curl_mime_addpart(form.get());
-        curl_mime_name(field, k.c_str());
+
+        if (!field)
+            throw std::system_error{errno, std::generic_category()};
+
+        zero::error::guard(expected([&] {
+            return curl_mime_name(field, k.c_str());
+        }));
 
         if (std::holds_alternative<std::string>(v)) {
-            Z_CO_EXPECT(expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_mime_data(field, std::get<std::string>(v).c_str(), CURL_ZERO_TERMINATED);
             }));
             continue;
         }
 
-        Z_CO_EXPECT(expected([&] {
+        zero::error::guard(expected([&] {
             return curl_mime_filedata(field, zero::filesystem::stringify(std::get<std::filesystem::path>(v)).c_str());
         }));
     }
 
-    curl_easy_setopt(easy, CURLOPT_MIMEPOST, form.get());
+    zero::error::guard(expected([&] {
+        return curl_easy_setopt(easy, CURLOPT_MIMEPOST, form.get());
+    }));
 
     connection.value()->defers.emplace_back([form = form.release()] {
         curl_mime_free(form);

@@ -429,7 +429,10 @@ namespace asyncio::net::tls {
             co_return std::unexpected{openSSLError()};
 
         if (serverName) {
-            SSL_set_tlsext_host_name(ssl.get(), serverName->c_str());
+            Z_CO_EXPECT(expected([&] {
+                return SSL_set_tlsext_host_name(ssl.get(), serverName->c_str());
+            }));
+
             SSL_set_hostflags(ssl.get(), X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
             Z_CO_EXPECT(expected([&] {

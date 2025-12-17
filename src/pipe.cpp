@@ -106,7 +106,11 @@ std::expected<std::array<asyncio::Pipe, 2>, std::error_code> asyncio::pipe() {
                 continue;
 
             uv_fs_t request{};
-            uv_fs_close(nullptr, &request, fd, nullptr);
+
+            zero::error::guard(uv::expected([&] {
+                return uv_fs_close(nullptr, &request, fd, nullptr);
+            }));
+
             uv_fs_req_cleanup(&request);
         }
     );

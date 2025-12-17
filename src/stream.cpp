@@ -3,6 +3,7 @@
 
 #ifndef _WIN32
 #include <unistd.h>
+#include <zero/os/unix/error.h>
 #endif
 
 asyncio::Stream::Stream(uv::Handle<uv_stream_t> stream) : mStream{std::move(stream)} {
@@ -20,7 +21,8 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
             if (fd == -1)
                 continue;
 
-            closesocket(fd);
+            if (closesocket(fd) != 0)
+                throw std::system_error{WSAGetLastError(), std::system_category()};
         }
     );
 
@@ -79,7 +81,9 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
             if (fd == -1)
                 continue;
 
-            ::close(fd);
+            zero::error::guard(zero::os::unix::expected([&] {
+                return ::close(fd);
+            }));
         }
     );
 
@@ -153,7 +157,10 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
                 buf->len = static_cast<decltype(uv_buf_t::len)>(span.size());
             },
             [](auto *handle, const ssize_t n, const uv_buf_t *) {
-                uv_read_stop(handle);
+                zero::error::guard(uv::expected([&] {
+                    return uv_read_stop(handle);
+                }));
+
                 auto &promise = static_cast<Context *>(handle->data)->promise;
 
                 if (n < 0) {
@@ -177,7 +184,10 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
             if (context.promise.isFulfilled())
                 return std::unexpected{task::Error::WILL_BE_DONE};
 
-            uv_read_stop(mStream.raw());
+            zero::error::guard(uv::expected([&] {
+                return uv_read_stop(mStream.raw());
+            }));
+
             context.promise.reject(task::Error::CANCELLED);
             return {};
         }

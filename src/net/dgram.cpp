@@ -281,7 +281,10 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
                 buf->len = static_cast<decltype(uv_buf_t::len)>(span.size());
             },
             [](auto *handle, const ssize_t n, const uv_buf_t *, const sockaddr *addr, const unsigned) {
-                uv_udp_recv_stop(handle);
+                zero::error::guard(uv::expected([&] {
+                    return uv_udp_recv_stop(handle);
+                }));
+
                 auto &promise = static_cast<Context *>(handle->data)->promise;
 
                 if (n < 0) {
@@ -308,7 +311,10 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
             if (context.promise.isFulfilled())
                 return std::unexpected{task::Error::WILL_BE_DONE};
 
-            uv_udp_recv_stop(mUDP.raw());
+            zero::error::guard(uv::expected([&] {
+                return uv_udp_recv_stop(mUDP.raw());
+            }));
+
             context.promise.reject(task::Error::CANCELLED);
             return {};
         }

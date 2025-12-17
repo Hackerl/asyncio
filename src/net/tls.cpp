@@ -1,6 +1,10 @@
 #include <asyncio/net/tls.h>
 #include <asyncio/fs.h>
 
+#ifdef _WIN32
+#include <zero/os/windows/error.h>
+#endif
+
 #ifdef __linux__
 constexpr auto SYSTEM_CA_BUNDLE_PATHS = {
     "/etc/ssl/certs/ca-certificates.crt",
@@ -92,13 +96,18 @@ asyncio::net::tls::Config::loadSystemCerts(X509_STORE *store, const std::string 
     if (!systemStore)
         return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
 
-    Z_DEFER(CertCloseStore(systemStore, 0));
+    Z_DEFER(zero::error::guard(zero::os::windows::expected([&] {
+        return CertCloseStore(systemStore, 0);
+    })));
 
     PCCERT_CONTEXT ctx{};
 
     Z_DEFER(
-        if (ctx)
-            CertFreeCertificateContext(ctx);
+        if (ctx) {
+            zero::error::guard(zero::os::windows::expected([&] {
+                return CertFreeCertificateContext(ctx);
+            }));
+        }
     );
 
     while (true) {

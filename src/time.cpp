@@ -16,7 +16,9 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         return uv_timer_start(
             timer.raw(),
             [](auto *handle) {
-                uv_timer_stop(handle);
+                zero::error::guard(uv::expected([&] {
+                    return uv_timer_stop(handle);
+                }));
                 static_cast<Promise<void, std::error_code> *>(handle->data)->resolve();
             },
             ms.count(),
@@ -30,7 +32,10 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
             if (promise.isFulfilled())
                 return std::unexpected{task::Error::WILL_BE_DONE};
 
-            uv_timer_stop(timer.raw());
+            zero::error::guard(uv::expected([&] {
+                return uv_timer_stop(timer.raw());
+            }));
+
             promise.reject(task::Error::CANCELLED);
             return {};
         }

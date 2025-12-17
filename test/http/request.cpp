@@ -171,7 +171,9 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
         SECTION("hook") {
             options.hooks.emplace_back(
                 [](const asyncio::http::Connection &connection) -> std::expected<void, std::error_code> {
-                    curl_easy_setopt(connection.easy.get(), CURLOPT_USERAGENT, "Custom Agent");
+                    Z_EXPECT(asyncio::http::expected([&] {
+                        return curl_easy_setopt(connection.easy.get(), CURLOPT_USERAGENT, "Custom Agent");
+                    }));
                     return {};
                 }
             );

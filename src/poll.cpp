@@ -41,7 +41,10 @@ asyncio::task::Task<int, std::error_code> asyncio::Poll::on(const int events) {
             mPoll.raw(),
             events,
             [](auto *handle, const int status, const int e) {
-                uv_poll_stop(handle);
+                zero::error::guard(uv::expected([&] {
+                    return uv_poll_stop(handle);
+                }));
+
                 const auto p = static_cast<Promise<int, std::error_code> *>(handle->data);
 
                 if (status < 0) {
@@ -60,7 +63,10 @@ asyncio::task::Task<int, std::error_code> asyncio::Poll::on(const int events) {
             if (promise.isFulfilled())
                 return std::unexpected{task::Error::WILL_BE_DONE};
 
-            uv_poll_stop(mPoll.raw());
+            zero::error::guard(uv::expected([&] {
+                return uv_poll_stop(mPoll.raw());
+            }));
+
             promise.reject(task::Error::CANCELLED);
             return {};
         }

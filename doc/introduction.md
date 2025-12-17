@@ -6,7 +6,7 @@ My work mainly revolves around `C++` client development, where I often find myse
 
 `C++` and network programming seem inherently incompatible. I have tried several open-source libraries like `libevent`, `libcurl`, and `gRPC`. Every time I decide to stick with one solution, I end up getting lost in the overwhelming maze of callbacks.
 
-> Can’t `C++` network asynchronous programming be simpler?
+> Can't `C++` network asynchronous programming be simpler?
 
 I wanted to change this, so not long ago, I created the [`aio`](https://github.com/Hackerl/aio) project, an asynchronous network library based on `promises`. However, as the project progressed, I escaped from callback hell, only to fall into the swamp of managing lifecycles. `C++` is just not as carefree as `JavaScript`—it has many more considerations to account for.
 

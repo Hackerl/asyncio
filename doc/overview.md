@@ -51,7 +51,7 @@ This is roughly how it works. After suspending itself, the task binds a callback
 
 ## Event Loop
 
-You might be wondering what the internal workings of the `sleep` task are. How does it complete after 1 second, and what state is it in during that time? Before uncovering this, we need to understand some background. `asyncio` uses `libuv`’s event loop at its core. After the main thread creates the event loop, it starts the top-level task and blocks on `uv_run` until the task completes:
+You might be wondering what the internal workings of the `sleep` task are. How does it complete after 1 second, and what state is it in during that time? Before uncovering this, we need to understand some background. `asyncio` uses `libuv`'s event loop at its core. After the main thread creates the event loop, it starts the top-level task and blocks on `uv_run` until the task completes:
 
 ```c++
 namespace asyncio {
@@ -108,7 +108,9 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         return uv_timer_start(
             timer.raw(),
             [](auto *handle) {
-                uv_timer_stop(handle);
+                zero::error::guard(uv::expected([&] {
+                    return uv_timer_stop(handle);
+                }));
                 static_cast<Promise<void, std::error_code> *>(handle->data)->resolve();
             },
             ms.count(),
@@ -122,7 +124,10 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
             if (promise.isFulfilled())
                 return std::unexpected{task::Error::WILL_BE_DONE};
 
-            uv_timer_stop(timer.raw());
+            zero::error::guard(uv::expected([&] {
+                return uv_timer_stop(timer.raw());
+            }));
+
             promise.reject(task::Error::CANCELLED);
             return {};
         }
@@ -134,7 +139,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
 
 ## Cancellation
 
-What if a program starts a `sleep(1h)` task but then encounters an error and needs to exit? To exit gracefully, it’s essential to wait for all child tasks to complete. Of course, we don’t want to wait for an hour needlessly. Can the task be cancelled? Yes, it can. Most coroutine libraries use `context` to propagate cancellation signals:
+What if a program starts a `sleep(1h)` task but then encounters an error and needs to exit? To exit gracefully, it's essential to wait for all child tasks to complete. Of course, we don't want to wait for an hour needlessly. Can the task be cancelled? Yes, it can. Most coroutine libraries use `context` to propagate cancellation signals:
 
 ```go
 select {
@@ -150,7 +155,7 @@ case <-ctx.Done():
 }
 ```
 
-However, as the project’s name suggests, I’ve chosen a different approach:
+However, as the project's name suggests, I've chosen a different approach:
 
 ```c++
 auto task = asyncio::sleep(1h);
@@ -170,7 +175,10 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
             if (promise.isFulfilled())
                 return std::unexpected{task::Error::WILL_BE_DONE};
 
-            uv_timer_stop(timer.raw());
+            zero::error::guard(uv::expected([&] {
+                return uv_timer_stop(timer.raw());
+            }));
+
             promise.reject(task::Error::CANCELLED);
             return {};
         }
@@ -178,14 +186,14 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
 }
 ```
 
-If you’ve read carefully, you’ll have noticed the cancellation function registered in `sleep`. `uv_timer_stop` stops the timer, and `promise.reject(task::Error::CANCELLED)` makes the `promise` return a cancellation error.
+If you've read carefully, you'll have noticed the cancellation function registered in `sleep`. `uv_timer_stop` stops the timer, and `promise.reject(task::Error::CANCELLED)` makes the `promise` return a cancellation error.
 
-> Why check `promise.isFulfilled()`? Because after a `promise` is fulfilled, the callback won’t be triggered immediately; it waits for the next event loop, and during this time, cancellation can no longer occur.
-> This shows that cancellations don’t always succeed. If an error occurs, `task.cancel()` will return a `std::error_code`.
+> Why check `promise.isFulfilled()`? Because after a `promise` is fulfilled, the callback won't be triggered immediately; it waits for the next event loop, and during this time, cancellation can no longer occur.
+> This shows that cancellations don't always succeed. If an error occurs, `task.cancel()` will return a `std::error_code`.
 
 Once the cancellation is successful, the `CANCELLED` error is returned from `sleep`. The `Z_CO_EXPECT(sleep(1s))` statement at the higher level will propagate the error up, layer by layer, until it is handled.
 
-Most coroutine libraries prefer `context` for finer-grained control over tasks because, in practice, tasks aren’t usually simple chains. They’re more like branching trees. When `context` is passed to numerous complex sub-tasks, cancellation initiated at the top can flow down to every branch. Does this mean `task.cancel()` can’t provide fine-grained control? Can it only cancel a single task chain?
+Most coroutine libraries prefer `context` for finer-grained control over tasks because, in practice, tasks aren't usually simple chains. They're more like branching trees. When `context` is passed to numerous complex sub-tasks, cancellation initiated at the top can flow down to every branch. Does this mean `task.cancel()` can't provide fine-grained control? Can it only cancel a single task chain?
 
 ## Task Tree
 
@@ -213,14 +221,14 @@ co_await asyncio::task::race(std::vector{test1(), test2()});
 > When these functions return, all sub-tasks are guaranteed to have finished.
 > More detailed explanations will be added in later chapters and will not be discussed here.
 
-These aggregation operations merge multiple sub-tasks into one, making the task structure resemble a tree, constantly branching out from the top. What we’re waiting for at the top is essentially a subtree, and cancelling it means cancelling all of its branches.
+These aggregation operations merge multiple sub-tasks into one, making the task structure resemble a tree, constantly branching out from the top. What we're waiting for at the top is essentially a subtree, and cancelling it means cancelling all of its branches.
 
 ```c++
 auto task = asyncio::task::all(test1(), test2(), ...);
 task.cancel();
 ```
 
-After aggregation, `asyncio` quietly keeps track of this at the lower level, but users don’t need to worry about these details. When `task.cancel()` is called, `test1`, `test2`, and all their sub-tasks will be cancelled.
+After aggregation, `asyncio` quietly keeps track of this at the lower level, but users don't need to worry about these details. When `task.cancel()` is called, `test1`, `test2`, and all their sub-tasks will be cancelled.
 
 ```text
 task
@@ -241,7 +249,7 @@ The cancellation operation will be applied to each leaf node of the subtree (3, 
 ## Task Group
 
 How are sub-tasks aggregated into one task? How are sub-tasks managed?  
-Before answering this question, let’s look at an example:
+Before answering this question, let's look at an example:
 
 ```c++
 asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
@@ -276,7 +284,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 ```
 
 The above example demonstrates a simple `TCP` server. In the `serve` sub-task, it continuously calls `accept` to receive new connections, and then starts a `handle` task to process the connection.  
-After starting `handle`, we do not wait for it because we need to continuously call `accept` and cannot block on it. Therefore, we will not know if the `handle` task returns an error, so we bind a callback function to the task’s `future` to print any errors.
+After starting `handle`, we do not wait for it because we need to continuously call `accept` and cannot block on it. Therefore, we will not know if the `handle` task returns an error, so we bind a callback function to the task's `future` to print any errors.
 
 When the terminal presses `ctrl + c`, the sub-task listening for signals in `race` will complete, at which point `race` will return successfully and cancel the `serve` sub-task. The program will exit and return from the main function.  
 While it seems perfect, the downside is that when the main function exits, there may still be N `handle` tasks running. In most cases, this is not an issue, but if `handle` uses some resource that the program destroys during exit, it could lead to unexpected errors.  

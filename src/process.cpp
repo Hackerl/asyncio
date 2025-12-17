@@ -166,7 +166,11 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
 
     if (!first) {
         uv_fs_t request{};
-        uv_fs_close(nullptr, &request, *firstFD, nullptr);
+
+        zero::error::guard(uv::expected([&] {
+            return uv_fs_close(nullptr, &request, *firstFD, nullptr);
+        }));
+
         uv_fs_req_cleanup(&request);
         return std::unexpected{first.error()};
     }
@@ -181,7 +185,11 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
 
     if (!second) {
         uv_fs_t request{};
-        uv_fs_close(nullptr, &request, *secondFD, nullptr);
+
+        zero::error::guard(uv::expected([&] {
+            return uv_fs_close(nullptr, &request, *secondFD, nullptr);
+        }));
+
         uv_fs_req_cleanup(&request);
         return std::unexpected{second.error()};
     }
@@ -200,7 +208,11 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
 
     if (!pipe) {
         uv_fs_t request{};
-        uv_fs_close(nullptr, &request, *fd, nullptr);
+
+        zero::error::guard(uv::expected([&] {
+            return uv_fs_close(nullptr, &request, *fd, nullptr);
+        }));
+
         uv_fs_req_cleanup(&request);
         return std::unexpected{pipe.error()};
     }
@@ -271,7 +283,11 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
             std::ignore = child->wait();
 
             uv_fs_t request{};
-            uv_fs_close(nullptr, &request, *fd, nullptr);
+
+            zero::error::guard(uv::expected([&] {
+                return uv_fs_close(nullptr, &request, *fd, nullptr);
+            }));
+
             uv_fs_req_cleanup(&request);
 
             return std::unexpected{pipe.error()};

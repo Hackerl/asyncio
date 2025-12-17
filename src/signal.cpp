@@ -33,7 +33,10 @@ asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
             if (promise.isFulfilled())
                 return std::unexpected{task::Error::WILL_BE_DONE};
 
-            uv_signal_stop(mSignal.raw());
+            zero::error::guard(uv::expected([&] {
+                return uv_signal_stop(mSignal.raw());
+            }));
+
             promise.reject(task::Error::CANCELLED);
             return {};
         }

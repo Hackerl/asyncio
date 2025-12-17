@@ -195,11 +195,13 @@ namespace asyncio::http {
             else
                 body = nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
 
-            curl_easy_setopt(
-                connection->get()->easy.get(),
-                CURLOPT_COPYPOSTFIELDS,
-                body.c_str()
-            );
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(
+                    connection->get()->easy.get(),
+                    CURLOPT_COPYPOSTFIELDS,
+                    body.c_str()
+                );
+            }));
 
             co_return co_await perform(*std::move(connection));
         }
@@ -216,16 +218,28 @@ namespace asyncio::http {
 
             const auto easy = connection.value()->easy.get();
 
-            curl_easy_setopt(easy, CURLOPT_UPLOAD, 1L);
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(easy, CURLOPT_UPLOAD, 1L);
+            }));
 
             // `CURLOPT_UPLOAD` will cause the http method to become `PUT`.
-            curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
-            curl_easy_setopt(easy, CURLOPT_READFUNCTION, onRead);
-            curl_easy_setopt(easy, CURLOPT_READDATA, connection->get());
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
+            }));
+
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(easy, CURLOPT_READFUNCTION, onRead);
+            }));
+
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(easy, CURLOPT_READDATA, connection->get());
+            }));
 
             if constexpr (zero::detail::Trait<T, ISeekable>) {
                 if (const auto length = co_await std::invoke(&ISeekable::length, payload)) {
-                    curl_easy_setopt(easy, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(*length));
+                    zero::error::guard(expected([&] {
+                        return curl_easy_setopt(easy, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(*length));
+                    }));
                 }
             }
 
