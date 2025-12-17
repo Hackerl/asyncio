@@ -279,7 +279,7 @@ std::expected<asyncio::Listener, std::error_code> asyncio::Listener::make(uv::Ha
             stream.raw(),
             256,
             [](auto *handle, const int status) {
-                auto &[stream, event, ec] = *static_cast<Core *>(handle->data);
+                auto &[h, event, ec] = *static_cast<Core *>(handle->data);
 
                 if (status < 0)
                     ec = static_cast<uv::Error>(status);

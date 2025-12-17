@@ -206,7 +206,7 @@ namespace asyncio::http {
 
         template<zero::detail::Trait<IReader> T>
         task::Task<Response, std::error_code> request(
-            std::string method,
+            const std::string method,
             const URL url,
             const std::optional<Options> options,
             T payload

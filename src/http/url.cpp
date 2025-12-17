@@ -38,6 +38,9 @@ asyncio::http::URL::URL(URL &&rhs) noexcept: mURL{std::move(rhs.mURL)} {
 }
 
 asyncio::http::URL &asyncio::http::URL::operator=(const URL &rhs) {
+    if (this == &rhs)
+        return *this;
+
     mURL = {curl_url_dup(rhs.mURL.get()), curl_url_cleanup};
 
     if (!mURL)

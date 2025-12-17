@@ -101,7 +101,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::BytesReader::read(con
     const auto n = (std::min)(data.size(), mBytes.size());
 
     std::copy_n(mBytes.begin(), n, data.begin());
-    mBytes.erase(mBytes.begin(), mBytes.begin() + n);
+    mBytes.erase(mBytes.begin(), mBytes.begin() + static_cast<std::ptrdiff_t>(n));
 
     co_return n;
 }

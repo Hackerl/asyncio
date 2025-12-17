@@ -728,10 +728,10 @@ namespace asyncio::task {
     );
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using all_ranges_value_t = typename all_ranges_future_t<I, S>::value_type;
+    using all_ranges_value_t = all_ranges_future_t<I, S>::value_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using all_ranges_error_t = typename all_ranges_future_t<I, S>::error_type;
+    using all_ranges_error_t = all_ranges_future_t<I, S>::error_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
         requires zero::detail::is_specialization_v<std::iter_value_t<I>, Task>
@@ -783,10 +783,10 @@ namespace asyncio::task {
     using all_variadic_future_t = decltype(zero::async::promise::all(std::declval<Ts>().future()...));
 
     template<typename... Ts>
-    using all_variadic_value_t = typename all_variadic_future_t<Ts...>::value_type;
+    using all_variadic_value_t = all_variadic_future_t<Ts...>::value_type;
 
     template<typename... Ts>
-    using all_variadic_error_t = typename all_variadic_future_t<Ts...>::error_type;
+    using all_variadic_error_t = all_variadic_future_t<Ts...>::error_type;
 
     template<typename... Ts>
         requires (zero::detail::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
@@ -836,7 +836,7 @@ namespace asyncio::task {
     );
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using all_settled_ranges_value_t = typename all_settled_ranges_future_t<I, S>::value_type;
+    using all_settled_ranges_value_t = all_settled_ranges_future_t<I, S>::value_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
         requires zero::detail::is_specialization_v<std::iter_value_t<I>, Task>
@@ -870,7 +870,7 @@ namespace asyncio::task {
     using all_settled_variadic_future_t = decltype(zero::async::promise::allSettled(std::declval<Ts>().future()...));
 
     template<typename... Ts>
-    using all_settled_variadic_value_t = typename all_settled_variadic_future_t<Ts...>::value_type;
+    using all_settled_variadic_value_t = all_settled_variadic_future_t<Ts...>::value_type;
 
     template<typename... Ts>
         requires (zero::detail::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
@@ -902,10 +902,10 @@ namespace asyncio::task {
     );
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using any_ranges_value_t = typename any_ranges_future_t<I, S>::value_type;
+    using any_ranges_value_t = any_ranges_future_t<I, S>::value_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using any_ranges_error_t = typename any_ranges_future_t<I, S>::error_type;
+    using any_ranges_error_t = any_ranges_future_t<I, S>::error_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
         requires zero::detail::is_specialization_v<std::iter_value_t<I>, Task>
@@ -942,10 +942,10 @@ namespace asyncio::task {
     using any_variadic_future_t = decltype(zero::async::promise::any(std::declval<Ts>().future()...));
 
     template<typename... Ts>
-    using any_variadic_value_t = typename any_variadic_future_t<Ts...>::value_type;
+    using any_variadic_value_t = any_variadic_future_t<Ts...>::value_type;
 
     template<typename... Ts>
-    using any_variadic_error_t = typename any_variadic_future_t<Ts...>::error_type;
+    using any_variadic_error_t = any_variadic_future_t<Ts...>::error_type;
 
     template<typename... Ts>
         requires (zero::detail::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
@@ -980,10 +980,10 @@ namespace asyncio::task {
     );
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using race_ranges_value_t = typename race_ranges_future_t<I, S>::value_type;
+    using race_ranges_value_t = race_ranges_future_t<I, S>::value_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using race_ranges_error_t = typename race_ranges_future_t<I, S>::error_type;
+    using race_ranges_error_t = race_ranges_future_t<I, S>::error_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
         requires zero::detail::is_specialization_v<std::iter_value_t<I>, Task>
@@ -1035,10 +1035,10 @@ namespace asyncio::task {
     using race_variadic_future_t = decltype(zero::async::promise::race(std::declval<Ts>().future()...));
 
     template<typename... Ts>
-    using race_variadic_value_t = typename race_variadic_future_t<Ts...>::value_type;
+    using race_variadic_value_t = race_variadic_future_t<Ts...>::value_type;
 
     template<typename... Ts>
-    using race_variadic_error_t = typename race_variadic_future_t<Ts...>::error_type;
+    using race_variadic_error_t = race_variadic_future_t<Ts...>::error_type;
 
     template<typename... Ts>
         requires (zero::detail::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)

@@ -131,6 +131,7 @@ TEST_CASE("convert network address to socket address", "[net]") {
 #if defined(__unix__) || defined(__APPLE__)
     SECTION("unix") {
         SECTION("filesystem") {
+            // ReSharper disable once CppVariableCanBeMadeConstexpr
             const std::string path{"/tmp/test.sock"};
 
             const auto address = socketAddressFrom(asyncio::net::UnixAddress{path});
@@ -144,6 +145,7 @@ TEST_CASE("convert network address to socket address", "[net]") {
 
 #ifdef __linux__
         SECTION("abstract") {
+            // ReSharper disable once CppVariableCanBeMadeConstexpr
             const std::string path{"@test.sock"};
 
             const auto address = socketAddressFrom(asyncio::net::UnixAddress{path});
@@ -190,6 +192,7 @@ TEST_CASE("convert socket address to network address", "[net]") {
 #if defined(__unix__) || defined(__APPLE__)
     SECTION("unix") {
         SECTION("filesystem") {
+            // ReSharper disable once CppVariableCanBeMadeConstexpr
             const std::string path{"/tmp/test.sock"};
 
             sockaddr_un addr{};
@@ -207,6 +210,7 @@ TEST_CASE("convert socket address to network address", "[net]") {
 
 #ifdef __linux__
         SECTION("abstract") {
+            // ReSharper disable once CppVariableCanBeMadeConstexpr
             const std::string path{"@test.sock"};
 
             sockaddr_un addr{};

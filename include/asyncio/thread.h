@@ -122,8 +122,8 @@ namespace asyncio {
                 getEventLoop()->raw(),
                 &request,
                 [](auto *req) {
-                    auto &[function, promise, result] = *static_cast<Context *>(req->data);
-                    result.emplace(function());
+                    auto &[function, promise, res] = *static_cast<Context *>(req->data);
+                    res.emplace(function());
                 },
                 [](auto *req, const int status) {
                     static_cast<Context *>(req->data)->promise.resolve(status);
@@ -206,8 +206,8 @@ namespace asyncio {
                 getEventLoop()->raw(),
                 &request,
                 [](auto *req) {
-                    auto &[function, promise, result] = *static_cast<Context *>(req->data);
-                    result.emplace(function());
+                    auto &[function, promise, res] = *static_cast<Context *>(req->data);
+                    res.emplace(function());
                 },
                 [](auto *req, const int status) {
                     static_cast<Context *>(req->data)->promise.resolve(status);
