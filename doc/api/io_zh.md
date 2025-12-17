@@ -8,7 +8,7 @@
 Z_DEFINE_ERROR_CONDITION(
     IOError,
     "asyncio::io",
-    UNEXPECTED_EOF, "unexpected end of file"
+    UNEXPECTED_EOF, "Unexpected end of file"
 )
 ```
 
@@ -61,7 +61,7 @@ public:
     Z_DEFINE_ERROR_CODE_INNER_EX(
         ReadExactlyError,
         "asyncio::IReader",
-        UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
+        UNEXPECTED_EOF, "Unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
     )
 
     virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;

@@ -9,7 +9,7 @@ namespace asyncio {
     Z_DEFINE_ERROR_CODE_EX(
         TimeoutError,
         "asyncio::timeout",
-        ELAPSED, "deadline has elapsed", std::errc::timed_out
+        ELAPSED, "Deadline has elapsed", std::errc::timed_out
     )
 
     template<typename T, typename E>

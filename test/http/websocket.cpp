@@ -23,7 +23,7 @@ namespace {
         Z_DEFINE_ERROR_CODE_INNER(
             Error,
             "WebsocketServer",
-            NO_KEY_HEADER, "no websocket key header"
+            NO_KEY_HEADER, "No websocket key header"
         )
 
         explicit Server(asyncio::net::TCPStream stream) : mStream{std::move(stream)} {

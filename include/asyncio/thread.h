@@ -64,7 +64,7 @@ namespace asyncio {
     Z_DEFINE_ERROR_CODE_EX(
         ToThreadPoolError,
         "asyncio::toThreadPool",
-        CANCELLED, "request has been cancelled", std::errc::operation_canceled
+        CANCELLED, "Request has been cancelled", std::errc::operation_canceled
     )
 
     template<typename F>

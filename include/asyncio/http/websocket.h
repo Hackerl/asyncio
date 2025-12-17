@@ -36,49 +36,49 @@ namespace asyncio::http::ws {
         [[nodiscard]] std::string message(const int value) const override {
             switch (static_cast<CloseCode>(value)) {
             case CloseCode::NORMAL_CLOSURE:
-                return "normal closure";
+                return "Normal closure";
 
             case CloseCode::GOING_AWAY:
-                return "going away";
+                return "Going away";
 
             case CloseCode::PROTOCOL_ERROR:
-                return "protocol error";
+                return "Protocol error";
 
             case CloseCode::UNSUPPORTED_DATA:
-                return "unsupported data";
+                return "Unsupported data";
 
             case CloseCode::NO_STATUS_RECEIVED:
-                return "no status received";
+                return "No status received";
 
             case CloseCode::ABNORMAL_CLOSURE:
-                return "abnormal closure";
+                return "Abnormal closure";
 
             case CloseCode::INVALID_FRAME_PAYLOAD_DATA:
-                return "invalid frame payload data";
+                return "Invalid frame payload data";
 
             case CloseCode::POLICY_VIOLATION:
-                return "policy violation";
+                return "Policy violation";
 
             case CloseCode::MESSAGE_TOO_BIG:
-                return "message too big";
+                return "Message too big";
 
             case CloseCode::MANDATORY_EXTENSION:
-                return "mandatory extension";
+                return "Mandatory extension";
 
             case CloseCode::INTERNAL_ERROR:
-                return "internal error";
+                return "Internal error";
 
             case CloseCode::SERVICE_RESTART:
-                return "service restart";
+                return "Service restart";
 
             case CloseCode::TRY_AGAIN_LATER:
-                return "try again later";
+                return "Try again later";
 
             case CloseCode::BAD_GATEWAY:
-                return "bad gateway";
+                return "Bad gateway";
 
             default:
-                return "unknown";
+                return "Unknown";
             }
         }
     };
@@ -179,17 +179,17 @@ namespace asyncio::http::ws {
         Z_DEFINE_ERROR_CODE_INNER(
             Error,
             "asyncio::http::ws::WebSocket",
-            INVALID_URL, "invalid url",
-            UNSUPPORTED_SCHEME, "unsupported websocket scheme",
-            INVALID_RESPONSE, "invalid http response",
-            UNEXPECTED_STATUS_CODE, "unexpected http response status code",
-            INVALID_HTTP_HEADER, "invalid http header",
-            NO_ACCEPT_HEADER, "no websocket accept header",
-            HASH_MISMATCH, "hash mismatch",
-            UNSUPPORTED_MASKED_FRAME, "unsupported masked frame",
-            UNSUPPORTED_OPCODE, "unsupported opcode",
-            CONNECTION_CLOSED, "connection closed",
-            UNEXPECTED_COMPRESSED_MESSAGE, "unexpected compressed message"
+            INVALID_URL, "Invalid URL",
+            UNSUPPORTED_SCHEME, "Unsupported WebSocket scheme",
+            INVALID_RESPONSE, "Invalid HTTP response",
+            UNEXPECTED_STATUS_CODE, "Unexpected HTTP response status code",
+            INVALID_HTTP_HEADER, "Invalid HTTP header",
+            NO_ACCEPT_HEADER, "No WebSocket accept header",
+            HASH_MISMATCH, "Hash mismatch",
+            UNSUPPORTED_MASKED_FRAME, "Unsupported masked frame",
+            UNSUPPORTED_OPCODE, "Unsupported opcode",
+            CONNECTION_CLOSED, "Connection closed",
+            UNEXPECTED_COMPRESSED_MESSAGE, "Unexpected compressed message"
         )
 
         WebSocket(

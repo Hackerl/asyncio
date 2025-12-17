@@ -44,7 +44,7 @@ namespace asyncio {
 
             if (state != zero::async::promise::State::ONLY_CALLBACK ||
                 !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
-                throw std::logic_error{fmt::format("unexpected state: {}", std::to_underlying(state))};
+                throw std::logic_error{fmt::format("Unexpected promise state: {}", std::to_underlying(state))};
 
             this->mCore->event.set();
 
@@ -71,7 +71,7 @@ namespace asyncio {
 
             if (state != zero::async::promise::State::ONLY_CALLBACK ||
                 !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
-                throw std::logic_error{fmt::format("unexpected state: {}", std::to_underlying(state))};
+                throw std::logic_error{fmt::format("Unexpected promise state: {}", std::to_underlying(state))};
 
             this->mCore->event.set();
 

@@ -48,7 +48,7 @@ The error categories provided by the standard library are far from sufficient. M
 However, if we define custom error categories and error messages, we can alleviate this issue somewhat.
 
 ```c++
-fmt::print(stderr, "error: {} ({})\n", ec.message(), ec);
+fmt::print(stderr, "Error: {} ({})\n", ec.message(), ec);
 ```
 
 When the upper layers print the error code, the terminal might display something like:
@@ -69,10 +69,10 @@ namespace asyncio::task {
     Z_DEFINE_ERROR_CODE_EX(
         Error,
         "asyncio::task",
-        CANCELLED, "task has been cancelled", std::errc::operation_canceled,
-        CANCELLATION_NOT_SUPPORTED, "task does not support cancellation", std::errc::operation_not_supported,
-        LOCKED, "task has been locked", std::errc::resource_unavailable_try_again,
-        WILL_BE_DONE, "operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+        CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
+        CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
+        LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
+        WILL_BE_DONE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
     )
 }
 
@@ -96,10 +96,10 @@ If you've been paying attention, you might have noticed that in the previous sec
 Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
-    CANCELLED, "task has been cancelled", std::errc::operation_canceled,
-    CANCELLATION_NOT_SUPPORTED, "task does not support cancellation", std::errc::operation_not_supported,
-    LOCKED, "task has been locked", std::errc::resource_unavailable_try_again,
-    WILL_BE_DONE, "operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+    CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
+    CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
+    LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
+    WILL_BE_DONE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
 )
 ```
 
@@ -118,7 +118,7 @@ namespace asyncio {
     Z_DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
-        UNEXPECTED_EOF, "unexpected end of file"
+        UNEXPECTED_EOF, "Unexpected end of file"
     )
 }
 ```
@@ -134,7 +134,7 @@ namespace asyncio {
         Z_DEFINE_ERROR_CODE_INNER_EX(
             ReadExactlyError,
             "asyncio::IReader",
-            UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
+            UNEXPECTED_EOF, "Unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
         )
 
         virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;

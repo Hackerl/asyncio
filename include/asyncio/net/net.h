@@ -103,8 +103,8 @@ namespace asyncio::net {
     Z_DEFINE_ERROR_CODE_EX(
         ParseAddressError,
         "asyncio::net::addressFrom",
-        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
-        ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
+        INVALID_ARGUMENT, "Invalid argument", std::errc::invalid_argument,
+        ADDRESS_FAMILY_NOT_SUPPORTED, "Address family not supported", std::errc::address_family_not_supported
     )
 
     std::expected<IPAddress, std::error_code> ipAddressFrom(const std::string &ip, std::uint16_t port);
@@ -113,8 +113,8 @@ namespace asyncio::net {
     Z_DEFINE_ERROR_CODE_EX(
         ConvertToSocketAddressError,
         "asyncio::net::socketAddressFrom",
-        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
-        ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
+        INVALID_ARGUMENT, "Invalid argument", std::errc::invalid_argument,
+        ADDRESS_FAMILY_NOT_SUPPORTED, "Address family not supported", std::errc::address_family_not_supported
     )
 
     std::expected<SocketAddress, std::error_code> socketAddressFrom(const Address &address);

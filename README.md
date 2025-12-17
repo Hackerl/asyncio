@@ -299,7 +299,7 @@ namespace {
             // Since the `TaskGroup` doesn't care about the results of the subtasks, we can use future to bind callbacks.
             // Callback binding is very flexible, just like JavaScript's Promise.
             task.future().fail([](const auto &ec) {
-                fmt::print(stderr, "unhandled error: {:s} ({})\n", ec, ec);
+                fmt::print(stderr, "Unhandled error: {:s} ({})\n", ec, ec);
             });
         }
 
@@ -485,7 +485,7 @@ namespace {
 
             group.add(task);
             task.future().fail([](const auto &e) {
-                fmt::print(stderr, "unhandled exception: {}\n", e);
+                fmt::print(stderr, "Unhandled exception: {}\n", e);
             });
         }
 

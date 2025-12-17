@@ -209,7 +209,7 @@ namespace asyncio::net::tls {
     Z_DEFINE_ERROR_CODE_EX(
         TLSError,
         "asyncio::net::tls",
-        UNEXPECTED_EOF, "unexpected end of file", IOError::UNEXPECTED_EOF
+        UNEXPECTED_EOF, "Unexpected end of file", IOError::UNEXPECTED_EOF
     )
 
     template<typename T>

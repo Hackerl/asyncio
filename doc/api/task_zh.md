@@ -8,10 +8,10 @@
 Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
-    CANCELLED, "task has been cancelled", std::errc::operation_canceled,
-    CANCELLATION_NOT_SUPPORTED, "task does not support cancellation", std::errc::operation_not_supported,
-    LOCKED, "task has been locked", std::errc::resource_unavailable_try_again,
-    WILL_BE_DONE, "operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+    CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
+    CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
+    LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
+    WILL_BE_DONE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
 )
 ```
 
@@ -200,7 +200,7 @@ task.future()
         fmt::print("done\n");
     })
     .fail([](const auto &ec) {
-        fmt:print("unhandled error: {} ({})\n", ec.message(), ec);
+        fmt:print("Unhandled error: {} ({})\n", ec.message(), ec);
     });;
 ```
 
@@ -398,7 +398,7 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
 
         group.add(task);
         task.future().fail([](const auto &ec) {
-            fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
+            fmt::print(stderr, "Unhandled error: {} ({})\n", ec.message(), ec);
         });
     }
 

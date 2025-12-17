@@ -7,8 +7,8 @@ namespace asyncio {
     Z_DEFINE_ERROR_CODE_EX(
         BufReaderError,
         "asyncio::BufReader",
-        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
-        UNEXPECTED_EOF, "unexpected end of file", IOError::UNEXPECTED_EOF
+        INVALID_ARGUMENT, "Invalid argument", std::errc::invalid_argument,
+        UNEXPECTED_EOF, "Unexpected end of file", IOError::UNEXPECTED_EOF
     )
 
     template<zero::detail::Trait<IReader> T>

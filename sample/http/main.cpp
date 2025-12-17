@@ -32,7 +32,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
             const auto tokens = zero::strings::split(header, "=");
 
             if (tokens.size() != 2) {
-                fmt::print(stderr, "invalid header[{}]\n", header);
+                fmt::print(stderr, "Invalid header[{}]\n", header);
                 continue;
             }
 

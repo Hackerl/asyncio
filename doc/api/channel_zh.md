@@ -36,8 +36,8 @@ REQUIRE(co_await receiver.receive() == "hello world");
 Z_DEFINE_ERROR_CODE_EX(
     TrySendError,
     "asyncio::Sender::trySend",
-    DISCONNECTED, "sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    FULL, "sending on a full channel", std::errc::operation_would_block
+    DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    FULL, "Sending on a full channel", std::errc::operation_would_block
 )
 
 template<typename U = T>
@@ -54,8 +54,8 @@ std::expected<void, TrySendError> trySend(U &&element);
 Z_DEFINE_ERROR_CODE_EX(
     SendSyncError,
     "asyncio::Sender::sendSync",
-    DISCONNECTED, "sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    TIMEOUT, "timed out waiting on send operation", std::errc::timed_out
+    DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    TIMEOUT, "Send operation timed out", std::errc::timed_out
 )
 
 template<typename U = T>
@@ -86,8 +86,8 @@ co_await asyncio::toThread([&] {
 Z_DEFINE_ERROR_CODE_EX(
     SendError,
     "asyncio::Sender::send",
-    DISCONNECTED, "sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    CANCELLED, "send operation has been cancelled", std::errc::operation_canceled
+    DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    CANCELLED, "Send operation has been cancelled", std::errc::operation_canceled
 )
 
 task::Task<void, SendError> send(T element);
@@ -171,8 +171,8 @@ void close();
 Z_DEFINE_ERROR_CODE_EX(
     TryReceiveError,
     "asyncio::Receiver::tryReceive",
-    DISCONNECTED, "receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    EMPTY, "receiving on an empty channel", std::errc::operation_would_block
+    DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    EMPTY, "Receiving on an empty channel", std::errc::operation_would_block
 )
 
 std::expected<T, TryReceiveError> tryReceive();
@@ -188,8 +188,8 @@ std::expected<T, TryReceiveError> tryReceive();
 Z_DEFINE_ERROR_CODE_EX(
     ReceiveSyncError,
     "asyncio::Receiver::receiveSync",
-    DISCONNECTED, "channel is empty and disconnected", Z_DEFAULT_ERROR_CONDITION,
-    TIMEOUT, "timed out waiting on receive operation", std::errc::timed_out
+    DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    TIMEOUT, "Receive operation timed out", std::errc::timed_out
 )
 
 std::expected<T, ReceiveSyncError>
@@ -219,8 +219,8 @@ co_await asyncio::toThread([&] {
 Z_DEFINE_ERROR_CODE_EX(
     ReceiveError,
     "asyncio::Receiver::receive",
-    DISCONNECTED, "channel is empty and disconnected", Z_DEFAULT_ERROR_CONDITION,
-    CANCELLED, "receive operation has been cancelled", std::errc::operation_canceled
+    DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    CANCELLED, "Receive operation has been cancelled", std::errc::operation_canceled
 )
 
 task::Task<T, ReceiveError> receive();
@@ -300,7 +300,7 @@ Z_DEFINE_ERROR_CONDITION_EX(
     ChannelError,
     "asyncio::channel",
     DISCONNECTED,
-    "channel disconnected",
+    "Channel disconnected",
     [](const std::error_code &ec) {
         return ec == make_error_code(TrySendError::DISCONNECTED) ||
             ec == make_error_code(SendSyncError::DISCONNECTED) ||

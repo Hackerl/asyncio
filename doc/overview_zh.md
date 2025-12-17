@@ -263,7 +263,7 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
         Z_CO_EXPECT(stream);
 
         handle(*std::move(stream)).future().fail([](const auto &ec) {
-            fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
+            fmt::print(stderr, "Unhandled error: {} ({})\n", ec.message(), ec);
         });
     }
 }
@@ -311,7 +311,7 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
 
         group.add(task);
         task.future().fail([](const auto &ec) {
-            fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
+            fmt::print(stderr, "Unhandled error: {} ({})\n", ec.message(), ec);
         });
     }
 

@@ -44,7 +44,7 @@ namespace {
 
             group.add(task);
             task.future().fail([](const auto &ec) {
-                fmt::print(stderr, "unhandled error: {:s} ({})\n", ec, ec);
+                fmt::print(stderr, "Unhandled error: {:s} ({})\n", ec, ec);
             });
         }
 
