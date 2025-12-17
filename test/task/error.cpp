@@ -1106,9 +1106,7 @@ ASYNC_TEST_CASE("task transform - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .transform([](const auto &value) -> asyncio::task::Task<int> {
-                if (const auto result = co_await asyncio::reschedule(); !result)
-                    throw std::system_error{result.error()};
-
+                zero::error::guard(co_await asyncio::reschedule());
                 co_return value * 2;
             });
 
@@ -1147,9 +1145,7 @@ ASYNC_TEST_CASE("task transform error - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .transformError([](const auto &ec) -> asyncio::task::Task<int> {
-                if (const auto result = co_await asyncio::reschedule(); !result)
-                    throw std::system_error{result.error()};
-
+                zero::error::guard(co_await asyncio::reschedule());
                 co_return ec.value();
             });
 

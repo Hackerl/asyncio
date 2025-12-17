@@ -67,10 +67,9 @@ std::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(cons
 std::string asyncio::http::URL::string() const {
     char *url{};
 
-    if (const auto result = expected([&] {
+    zero::error::guard(expected([&] {
         return curl_url_get(mURL.get(), CURLUPART_URL, &url, 0);
-    }); !result)
-        throw std::system_error{result.error()};
+    }));
 
     return std::unique_ptr<char, decltype(&curl_free)>{url, curl_free}.get();
 }
@@ -78,10 +77,9 @@ std::string asyncio::http::URL::string() const {
 std::string asyncio::http::URL::scheme() const {
     char *scheme{};
 
-    if (const auto result = expected([&] {
+    zero::error::guard(expected([&] {
         return curl_url_get(mURL.get(), CURLUPART_SCHEME, &scheme, 0);
-    }); !result)
-        throw std::system_error{result.error()};
+    }));
 
     return std::unique_ptr<char, decltype(&curl_free)>{scheme, curl_free}.get();
 }
@@ -134,10 +132,9 @@ std::optional<std::string> asyncio::http::URL::host() const {
 std::string asyncio::http::URL::path() const {
     char *path{};
 
-    if (const auto result = expected([&] {
+    zero::error::guard(expected([&] {
         return curl_url_get(mURL.get(), CURLUPART_PATH, &path, CURLU_URLDECODE);
-    }); !result)
-        throw std::system_error{result.error()};
+    }));
 
     return std::unique_ptr<char, decltype(&curl_free)>{path, curl_free}.get();
 }
@@ -145,10 +142,9 @@ std::string asyncio::http::URL::path() const {
 std::string asyncio::http::URL::rawPath() const {
     char *path{};
 
-    if (const auto result = expected([&] {
+    zero::error::guard(expected([&] {
         return curl_url_get(mURL.get(), CURLUPART_PATH, &path, 0);
-    }); !result)
-        throw std::system_error{result.error()};
+    }));
 
     return std::unique_ptr<char, decltype(&curl_free)>{path, curl_free}.get();
 }
@@ -210,17 +206,14 @@ std::optional<std::uint16_t> asyncio::http::URL::port() const {
         throw std::system_error{result.error()};
     }
 
-    const auto number = zero::strings::toNumber<std::uint16_t>(
+    const auto number = zero::error::guard(zero::strings::toNumber<std::uint16_t>(
         std::unique_ptr<char, decltype(&curl_free)>{port, curl_free}.get()
-    );
+    ));
 
-    if (!number)
-        throw std::system_error{number.error()};
-
-    if (*number == 0)
+    if (number == 0)
         return std::nullopt;
 
-    return *number;
+    return number;
 }
 
 std::strong_ordering asyncio::http::operator<=>(const URL &lhs, const URL &rhs) {

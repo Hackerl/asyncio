@@ -4,7 +4,6 @@
 #include <uv.h>
 #include <memory>
 #include <optional>
-#include <expected>
 #include <functional>
 #include <zero/error.h>
 #include <zero/expect.h>

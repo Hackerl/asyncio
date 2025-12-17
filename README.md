@@ -391,17 +391,6 @@ If you feel that exceptions can better handle error propagation, and you don't n
 #include <zero/os/windows/error.h>
 #endif
 
-template<typename T>
-T guard(std::expected<T, std::error_code> &&expected) {
-    if (!expected)
-        throw std::system_error{expected.error()};
-
-    if constexpr (std::is_void_v<T>)
-        return;
-    else
-        return *std::move(expected);
-}
-
 namespace {
     asyncio::task::Task<void> tracing(const auto &task) {
 #ifdef _WIN32
@@ -417,7 +406,7 @@ namespace {
         while (true) {
             bool cancelled{false};
 
-            guard(co_await asyncio::toThread(
+            zero::error::guard(co_await asyncio::toThread(
                 [&, &cancelled = std::as_const(cancelled)]() -> std::expected<void, std::error_code> {
                     if (WaitForSingleObject(*event, INFINITE) != WAIT_OBJECT_0)
                         return std::unexpected{
@@ -440,10 +429,10 @@ namespace {
             fmt::print(stderr, "{}\n", task.trace());
         }
 #else
-        auto signal = guard(asyncio::Signal::make());
+        auto signal = zero::error::guard(asyncio::Signal::make());
 
         while (true) {
-            guard(co_await signal.on(SIGUSR1));
+            zero::error::guard(co_await signal.on(SIGUSR1));
             fmt::print(stderr, "{}\n", task.trace());
         }
 #endif
@@ -453,20 +442,20 @@ namespace {
         using namespace std::chrono_literals;
 
         while (true) {
-            guard(co_await asyncio::sleep(1s));
+            zero::error::guard(co_await asyncio::sleep(1s));
             fmt::print("do some thing\n");
         }
     }
 
     asyncio::task::Task<void> handle(asyncio::net::TCPStream stream) {
-        const auto address = guard(stream.remoteAddress());
+        const auto address = zero::error::guard(stream.remoteAddress());
         fmt::print("connection[{}]\n", address);
 
         while (true) {
             std::string message;
             message.resize(1024);
 
-            const auto n = guard(co_await stream.read(std::as_writable_bytes(std::span{message})));
+            const auto n = zero::error::guard(co_await stream.read(std::as_writable_bytes(std::span{message})));
 
             if (n == 0)
                 break;
@@ -474,7 +463,7 @@ namespace {
             message.resize(n);
 
             fmt::print("receive message: {}\n", message);
-            guard(co_await stream.writeAll(std::as_bytes(std::span{message})));
+            zero::error::guard(co_await stream.writeAll(std::as_bytes(std::span{message})));
         }
 
         co_return;
@@ -501,7 +490,7 @@ namespace {
         }
 
         co_await group;
-        guard(std::move(result));
+        zero::error::guard(std::move(result));
     }
 }
 
@@ -516,8 +505,8 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     const auto host = cmdline.get<std::string>("host");
     const auto port = cmdline.get<std::uint16_t>("port");
 
-    auto listener = guard(asyncio::net::TCPListener::listen(host, port));
-    auto signal = guard(asyncio::Signal::make());
+    auto listener = zero::error::guard(asyncio::net::TCPListener::listen(host, port));
+    auto signal = zero::error::guard(asyncio::Signal::make());
 
     auto task = race(
         all(
@@ -525,7 +514,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
             doSomething()
         ),
         asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
-            guard(co_await signal.on(SIGINT));
+            zero::error::guard(co_await signal.on(SIGINT));
         })
     );
 

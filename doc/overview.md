@@ -10,10 +10,7 @@ asyncio::task::Task<void> test1() {
         if (co_await task::cancelled)
             throw std::system_error{task::Error::CANCELLED};
 
-
-        if (const auto result = co_await asyncio::sleep(1s); !result)
-            throw std::system_error{result.error()};
-
+        zero::error::guard(co_await asyncio::sleep(1s));
         fmt::print("hello world\n");
     }
 }
