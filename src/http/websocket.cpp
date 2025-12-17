@@ -288,7 +288,8 @@ asyncio::http::ws::WebSocket::WebSocket(
     mDeflateExtension{std::move(deflateExtension)} {
 }
 
-asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http::ws::WebSocket::connect(const URL url) {
+asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code>
+asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Context> context) {
     const auto scheme = url.scheme();
     const auto host = url.host();
     const auto port = url.port();
@@ -314,8 +315,11 @@ asyncio::task::Task<asyncio::http::ws::WebSocket, std::error_code> asyncio::http
         auto stream = co_await net::TCPStream::connect(*host, *port);
         Z_CO_EXPECT(stream);
 
-        auto context = net::tls::ClientConfig().build();
-        Z_CO_EXPECT(context);
+        if (!context) {
+            auto ctx = net::tls::ClientConfig().build();
+            Z_CO_EXPECT(ctx);
+            context = *std::move(ctx);
+        }
 
         auto tls = co_await net::tls::connect(*std::move(stream), *std::move(context), *host)
             .transform([](net::tls::TLS<net::TCPStream> &&value) {

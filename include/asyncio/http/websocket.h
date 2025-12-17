@@ -3,6 +3,7 @@
 
 #include <variant>
 #include <asyncio/io.h>
+#include <asyncio/net/tls.h>
 #include <asyncio/http/url.h>
 #include <asyncio/sync/mutex.h>
 #include <zlib.h>
@@ -199,7 +200,8 @@ namespace asyncio::http::ws {
             std::optional<DeflateExtension> deflateExtension
         );
 
-        static task::Task<WebSocket, std::error_code> connect(URL url);
+        static task::Task<WebSocket, std::error_code>
+        connect(URL url, std::optional<net::tls::Context> context = std::nullopt);
 
     private:
         [[nodiscard]] task::Task<Frame, std::error_code> readFrame();
