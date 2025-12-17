@@ -177,12 +177,12 @@ Install `asyncio` from the [`vcpkg` private registry](https://github.com/Hackerl
 I'm using a typical TCP echo server to demonstrate the features of asyncio as much as possible.
 
 ```c++
-#include <asyncio/net/stream.h> // streaming network components
-#include <asyncio/thread.h> // thread and thread pool components
-#include <asyncio/signal.h> // signal component
-#include <asyncio/time.h> // time component
-#include <zero/cmdline.h> // command line parsing component
-#include <zero/os/resource.h> // operating system fd/handle wrapper
+#include <asyncio/net/stream.h> // Streaming network components
+#include <asyncio/thread.h> // Thread and thread pool components
+#include <asyncio/signal.h> // Signal component
+#include <asyncio/time.h> // Time component
+#include <zero/cmdline.h> // Command line parsing component
+#include <zero/os/resource.h> // Operating system fd/handle wrapper
 
 #ifdef _WIN32
 #include <zero/os/windows/error.h> // Windows API call wrapper
@@ -227,7 +227,7 @@ namespace {
                 }
             ));
 
-            // print the task's formatted call stack
+            // Print the task's formatted call stack
             fmt::print(stderr, "{}\n", task.trace());
         }
 #else

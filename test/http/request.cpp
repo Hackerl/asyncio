@@ -121,7 +121,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
             REQUIRE(content == "hello world");
         }
 
-        // avoid response not being written completely
+        // Avoid response not being written completely
         REQUIRE(co_await response->readAll());
         REQUIRE(co_await task);
     }

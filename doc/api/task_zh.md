@@ -356,7 +356,7 @@ inline constexpr Lock lock;
 
 ```cpp
 co_await asyncio::task::lock;
-// write file.
+// Write file.
 co_await asyncio::task::unlock;
 ```
 

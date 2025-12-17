@@ -61,7 +61,7 @@ std::vector<std::string> asyncio::http::Response::cookies() const {
     for (const auto *ptr = list; ptr; ptr = ptr->next)
         cookies.emplace_back(ptr->data);
 
-    // passing a null pointer is ok
+    // Passing a null pointer is ok
     curl_slist_free_all(list);
     return cookies;
 }

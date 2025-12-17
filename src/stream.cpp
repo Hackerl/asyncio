@@ -213,7 +213,7 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
         );
     }));
 
-    // if an error occurs but some data has been written, the amount written should be returned,
+    // If an error occurs but some data has been written, the amount written should be returned,
     // but I have no way of knowing how much data has been written.
     Z_CO_EXPECT(co_await promise.getFuture());
     co_return data.size();

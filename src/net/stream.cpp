@@ -40,7 +40,7 @@ std::expected<asyncio::net::TCPStream, std::error_code> asyncio::net::TCPStream:
 }
 
 // TODO
-// except for MSVC, adding const will fail to compile.
+// Except for MSVC, adding const will fail to compile.
 // ReSharper disable once CppParameterMayBeConst
 asyncio::task::Task<asyncio::net::TCPStream, std::error_code>
 asyncio::net::TCPStream::connect(SocketAddress address) {

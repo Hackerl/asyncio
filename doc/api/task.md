@@ -357,7 +357,7 @@ If we're performing atomic operations, such as writing critical content to a fil
 
 ```cpp
 co_await asyncio::task::lock;
-// write file.
+// Write file.
 co_await asyncio::task::unlock;
 ```
 
