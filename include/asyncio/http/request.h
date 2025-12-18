@@ -134,7 +134,7 @@ namespace asyncio::http {
 
     public:
         explicit Requests(std::unique_ptr<Core> core);
-        static std::expected<Requests, std::error_code> make(Options options = {});
+        static Requests make(Options options = {});
 
     private:
         static std::size_t onRead(char *buffer, std::size_t size, std::size_t n, void *userdata);

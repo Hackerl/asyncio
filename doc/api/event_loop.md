@@ -9,7 +9,7 @@ An `Event Loop` encapsulated around `uv_loop_t`. Almost all functionality depend
 ### Static Method `make`
 
 ```cpp
-static std::expected<EventLoop, std::error_code> make();
+static EventLoop make();
 ```
 
 Creates a new `Event Loop`.

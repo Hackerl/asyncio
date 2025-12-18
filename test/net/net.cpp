@@ -235,15 +235,12 @@ ASYNC_TEST_CASE("copy bidirectional", "[net]") {
     const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
     auto pair1 = asyncio::Stream::pair();
-    REQUIRE(pair1);
-
     auto pair2 = asyncio::Stream::pair();
-    REQUIRE(pair2);
 
-    auto task = asyncio::net::copyBidirectional(pair1->at(1), pair2->at(0));
+    auto task = asyncio::net::copyBidirectional(pair1.at(1), pair2.at(0));
 
-    auto &stream1 = pair1->at(0);
-    auto &stream2 = pair2->at(1);
+    auto &stream1 = pair1.at(0);
+    auto &stream2 = pair2.at(1);
 
     auto task1 = stream2.readAll();
 

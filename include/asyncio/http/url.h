@@ -10,7 +10,7 @@
 
 namespace asyncio::http {
     std::string urlEscape(const std::string &str);
-    std::expected<std::string, std::error_code> urlUnescape(const std::string &str);
+    std::string urlUnescape(const std::string &str);
 
     class URL {
     public:

@@ -3,10 +3,10 @@
 asyncio::Signal::Signal(uv::Handle<uv_signal_t> signal) : mSignal{std::move(signal)} {
 }
 
-std::expected<asyncio::Signal, std::error_code> asyncio::Signal::make() {
+asyncio::Signal asyncio::Signal::make() {
     auto signal = std::make_unique<uv_signal_t>();
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_signal_init(getEventLoop()->raw(), signal.get());
     }));
 

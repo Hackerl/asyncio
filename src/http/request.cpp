@@ -295,7 +295,7 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
 asyncio::http::Requests::Requests(std::unique_ptr<Core> core) : mCore{std::move(core)} {
 }
 
-std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests::make(Options options) {
+asyncio::http::Requests asyncio::http::Requests::make(Options options) {
     static std::once_flag flag;
 
     std::call_once(flag, [] {
@@ -311,11 +311,11 @@ std::expected<asyncio::http::Requests, std::error_code> asyncio::http::Requests:
     std::unique_ptr<CURLM, decltype(&curl_multi_cleanup)> ptr{curl_multi_init(), curl_multi_cleanup};
 
     if (!ptr)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
     auto timer = std::make_unique<uv_timer_t>();
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_timer_init(getEventLoop()->raw(), timer.get());
     }));
 
@@ -461,7 +461,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> ptr{curl_easy_init(), curl_easy_cleanup};
 
     if (!ptr)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
     const auto [
         proxy,
@@ -582,7 +582,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         const auto l = curl_slist_append(list, fmt::format("{}: {}", k, v).c_str());
 
         if (!l)
-            throw std::system_error{errno, std::generic_category()};
+            throw zero::error::SystemError{errno, std::generic_category()};
 
         list = l;
     }
@@ -753,13 +753,13 @@ asyncio::http::Requests::request(
     };
 
     if (!form)
-        throw std::system_error{errno, std::generic_category()};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
     for (const auto &[k, v]: payload) {
         const auto field = curl_mime_addpart(form.get());
 
         if (!field)
-            throw std::system_error{errno, std::generic_category()};
+            throw zero::error::SystemError{errno, std::generic_category()};
 
         zero::error::guard(expected([&] {
             return curl_mime_name(field, k.c_str());

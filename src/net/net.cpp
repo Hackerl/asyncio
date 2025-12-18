@@ -134,7 +134,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
             );
 
             if (!addr)
-                return std::unexpected{std::error_code{errno, std::generic_category()}};
+                throw zero::error::SystemError{errno, std::generic_category()};
 
             std::memset(addr.get(), 0, sizeof(sockaddr_storage));
 

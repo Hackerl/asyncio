@@ -4,10 +4,10 @@
 asyncio::net::UDPSocket::UDPSocket(uv::Handle<uv_udp_t> udp) : mUDP{std::move(udp)} {
 }
 
-std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::make() {
+asyncio::net::UDPSocket asyncio::net::UDPSocket::make() {
     auto udp = std::make_unique<uv_udp_t>();
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_udp_init(getEventLoop()->raw(), udp.get());
     }));
 
@@ -17,36 +17,33 @@ std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket:
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::bind(const SocketAddress &address) {
     auto udp = make();
-    Z_EXPECT(udp);
 
     Z_EXPECT(uv::expected([&] {
-        return uv_udp_bind(udp->mUDP.raw(), address.first.get(), 0);
+        return uv_udp_bind(udp.mUDP.raw(), address.first.get(), 0);
     }));
 
-    return *std::move(udp);
+    return udp;
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::connect(const SocketAddress &address) {
     auto udp = make();
-    Z_EXPECT(udp);
 
     Z_EXPECT(uv::expected([&] {
-        return uv_udp_connect(udp->mUDP.raw(), address.first.get());
+        return uv_udp_connect(udp.mUDP.raw(), address.first.get());
     }));
 
-    return *std::move(udp);
+    return udp;
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::from(const uv_os_sock_t socket) {
     auto udp = make();
-    Z_EXPECT(udp);
 
     Z_EXPECT(uv::expected([&] {
-        return uv_udp_open(udp->mUDP.raw(), socket);
+        return uv_udp_open(udp.mUDP.raw(), socket);
     }));
 
-    return *std::move(udp);
+    return udp;
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code>

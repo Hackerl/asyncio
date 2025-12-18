@@ -7,7 +7,7 @@
 ### Static Method `make`
 
 ```cpp
-static std::expected<EventLoop, std::error_code> make();
+static EventLoop make();
 ```
 
 创建一个全新的 `Event Loop`。

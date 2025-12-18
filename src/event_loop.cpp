@@ -29,16 +29,16 @@ const uv_loop_t *asyncio::EventLoop::raw() const {
     return mLoop.get();
 }
 
-std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
+asyncio::EventLoop asyncio::EventLoop::make() {
     auto loop = std::make_unique<uv_loop_t>();
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_loop_init(loop.get());
     }));
 
     auto async = std::make_unique<uv_async_t>();
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_async_init(
             loop.get(),
             async.get(),

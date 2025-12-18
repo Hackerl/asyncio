@@ -8,7 +8,7 @@
 asyncio::task::Task<void> test1() {
     while (true) {
         if (co_await task::cancelled)
-            throw std::system_error{task::Error::CANCELLED};
+            throw zero::error::SystemError{task::Error::CANCELLED};
 
         zero::error::guard(co_await asyncio::sleep(1s));
         fmt::print("hello world\n");
@@ -65,18 +65,14 @@ namespace asyncio {
         std::error_code
     >
     run(F &&f) {
-        const auto eventLoop = EventLoop::make().transform([](EventLoop &&value) {
-            return std::make_shared<EventLoop>(std::move(value));
-        });
-        Z_EXPECT(eventLoop);
-
-        setEventLoop(*eventLoop);
+        const auto eventLoop = std::make_shared<EventLoop>(EventLoop::make());
+        setEventLoop(eventLoop);
 
         auto future = f().future().finally([&] {
-            eventLoop.value()->stop();
+            eventLoop->stop();
         });
 
-        eventLoop.value()->run();
+        eventLoop->run();
         assert(future.isReady());
         return {std::move(future).result()};
     }
@@ -273,11 +269,10 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     Z_CO_EXPECT(listener);
 
     auto signal = asyncio::Signal::make();
-    Z_CO_EXPECT(signal);
 
     co_return co_await race(
         serve(*std::move(listener)),
-        signal->on(SIGINT).transform([](const int) {
+        signal.on(SIGINT).transform([](const int) {
         })
     );
 }

@@ -80,9 +80,8 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
 
     SECTION("response") {
         auto requests = asyncio::http::Requests::make();
-        REQUIRE(requests);
 
-        auto response = co_await requests->get(*url);
+        auto response = co_await requests.get(*url);
         REQUIRE(response);
 
         SECTION("status code") {
@@ -128,14 +127,13 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
 
     SECTION("options") {
         auto requests = asyncio::http::Requests::make();
-        REQUIRE(requests);
 
         asyncio::http::Options options;
 
         SECTION("headers") {
             options.headers["Custom-Header"] = "Custom-Value";
 
-            auto response = co_await requests->get(*url, options);
+            auto response = co_await requests.get(*url, options);
             REQUIRE(response);
             REQUIRE(co_await response->readAll());
 
@@ -147,7 +145,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
         SECTION("cookies") {
             options.cookies["Custom-Cookie"] = "Custom-Value";
 
-            auto response = co_await requests->get(*url, options);
+            auto response = co_await requests.get(*url, options);
             REQUIRE(response);
             REQUIRE(co_await response->readAll());
 
@@ -159,7 +157,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
         SECTION("user agent") {
             options.userAgent = "Custom Agent";
 
-            auto response = co_await requests->get(*url, options);
+            auto response = co_await requests.get(*url, options);
             REQUIRE(response);
             REQUIRE(co_await response->readAll());
 
@@ -178,7 +176,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
                 }
             );
 
-            auto response = co_await requests->get(*url, options);
+            auto response = co_await requests.get(*url, options);
             REQUIRE(response);
             REQUIRE(co_await response->readAll());
 
@@ -192,10 +190,9 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
         auto requests = asyncio::http::Requests::make({
             .userAgent = "Custom Agent"
         });
-        REQUIRE(requests);
 
         SECTION("default") {
-            auto response = co_await requests->get(*url);
+            auto response = co_await requests.get(*url);
             REQUIRE(response);
             REQUIRE(co_await response->readAll());
 
@@ -205,7 +202,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
         }
 
         SECTION("override") {
-            auto response = co_await requests->get(*url, asyncio::http::Options{.userAgent = "Override"});
+            auto response = co_await requests.get(*url, asyncio::http::Options{.userAgent = "Override"});
             REQUIRE(response);
             REQUIRE(co_await response->readAll());
 
@@ -217,11 +214,10 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
 
     SECTION("request") {
         auto requests = asyncio::http::Requests::make();
-        REQUIRE(requests);
 
         SECTION("methods") {
             SECTION("get") {
-                auto response = co_await requests->get(*url);
+                auto response = co_await requests.get(*url);
                 REQUIRE(response);
                 REQUIRE(co_await response->readAll());
 
@@ -231,7 +227,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
             }
 
             SECTION("post") {
-                auto response = co_await requests->post(*url, "");
+                auto response = co_await requests.post(*url, "");
                 REQUIRE(response);
                 REQUIRE(co_await response->readAll());
 
@@ -241,7 +237,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
             }
 
             SECTION("put") {
-                auto response = co_await requests->put(*url, "");
+                auto response = co_await requests.put(*url, "");
                 REQUIRE(response);
                 REQUIRE(co_await response->readAll());
 
@@ -251,7 +247,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
             }
 
             SECTION("delete") {
-                auto response = co_await requests->del(*url);
+                auto response = co_await requests.del(*url);
                 REQUIRE(response);
                 REQUIRE(co_await response->readAll());
 
@@ -263,7 +259,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
 
         SECTION("payload") {
             SECTION("string") {
-                auto response = co_await requests->post(*url, "hello world");
+                auto response = co_await requests.post(*url, "hello world");
                 REQUIRE(response);
                 REQUIRE(co_await response->readAll());
 
@@ -273,7 +269,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
             }
 
             SECTION("form") {
-                auto response = co_await requests->post(*url, std::map<std::string, std::string>{{"name", "jack"}});
+                auto response = co_await requests.post(*url, std::map<std::string, std::string>{{"name", "jack"}});
                 REQUIRE(response);
                 REQUIRE(co_await response->readAll());
 
@@ -285,7 +281,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
             SECTION("multipart") {
                 REQUIRE(co_await asyncio::fs::write(path, "hello world"));
 
-                auto response = co_await requests->post(
+                auto response = co_await requests.post(
                     *url,
                     std::map<std::string, std::variant<std::string, std::filesystem::path>>{
                         {"name", std::string{"jack"}},
@@ -306,13 +302,13 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
 
             SECTION("json") {
                 SECTION("json object") {
-                    auto response = co_await requests->post(*url, nlohmann::json{{"name", "jack"}, {"age", 18}});
+                    auto response = co_await requests.post(*url, nlohmann::json{{"name", "jack"}, {"age", 18}});
                     REQUIRE(response);
                     REQUIRE(co_await response->readAll());
                 }
 
                 SECTION("serializable object") {
-                    auto response = co_await requests->post(*url, People{"jack", 18});
+                    auto response = co_await requests.post(*url, People{"jack", 18});
                     REQUIRE(response);
                     REQUIRE(co_await response->readAll());
                 }
@@ -332,7 +328,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
                 auto file = co_await asyncio::fs::open(path, O_RDONLY);
                 REQUIRE(file);
 
-                auto response = co_await requests->request(method, *url, std::nullopt, *std::move(file));
+                auto response = co_await requests.request(method, *url, std::nullopt, *std::move(file));
                 REQUIRE(response);
                 REQUIRE(co_await response->readAll());
 

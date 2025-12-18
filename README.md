@@ -233,10 +233,9 @@ namespace {
 #else
         // On UNIX, the Signal component can be used directly.
         auto signal = asyncio::Signal::make();
-        Z_CO_EXPECT(signal);
 
         while (true) {
-            Z_CO_EXPECT(co_await signal->on(SIGUSR1));
+            Z_CO_EXPECT(co_await signal.on(SIGUSR1));
             fmt::print(stderr, "{}\n", task.trace());
         }
 #endif
@@ -325,7 +324,6 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     Z_CO_EXPECT(listener);
 
     auto signal = asyncio::Signal::make();
-    Z_CO_EXPECT(signal);
 
     // This is the main task of our program.
     auto task = race(
@@ -338,7 +336,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
         // We wait for the `SIGINT` signal to gracefully shut down.
         // `race` will use the result of the task that completes fastest, so when the signal arrives,
         // the task is complete, `race` returns success and cancels the remaining subtasks.
-        signal->on(SIGINT).transform([](const int) {
+        signal.on(SIGINT).transform([](const int) {
         })
     );
 
@@ -397,7 +395,7 @@ namespace {
         const auto handle = CreateEventA(nullptr, false, false, "Global\\AsyncIOBacktraceEvent");
 
         if (!handle)
-            throw std::system_error{
+            throw zero::error::SystemError{
                 std::error_code{static_cast<int>(GetLastError()), std::system_category()}
             };
 
@@ -429,7 +427,7 @@ namespace {
             fmt::print(stderr, "{}\n", task.trace());
         }
 #else
-        auto signal = zero::error::guard(asyncio::Signal::make());
+        auto signal = asyncio::Signal::make();
 
         while (true) {
             zero::error::guard(co_await signal.on(SIGUSR1));
@@ -506,7 +504,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     const auto port = cmdline.get<std::uint16_t>("port");
 
     auto listener = zero::error::guard(asyncio::net::TCPListener::listen(host, port));
-    auto signal = zero::error::guard(asyncio::Signal::make());
+    auto signal = asyncio::Signal::make();
 
     auto task = race(
         all(
@@ -530,7 +528,7 @@ int main(const int argc, char *argv[]) {
     });
 
     if (!result)
-        throw std::system_error{result.error()};
+        throw zero::error::SystemError{result.error()};
 
     if (!*result)
         std::rethrow_exception(result->error());

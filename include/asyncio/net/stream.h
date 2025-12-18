@@ -10,7 +10,7 @@ namespace asyncio::net {
         explicit TCPStream(Stream stream);
 
     private:
-        static std::expected<TCPStream, std::error_code> make();
+        static TCPStream make();
         static task::Task<TCPStream, std::error_code> connect(SocketAddress address);
 
     public:

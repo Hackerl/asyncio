@@ -7,12 +7,12 @@ std::string asyncio::http::urlEscape(const std::string &str) {
     };
 
     if (!ptr)
-        throw std::system_error{errno, std::generic_category()};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
     return ptr.get();
 }
 
-std::expected<std::string, std::error_code> asyncio::http::urlUnescape(const std::string &str) {
+std::string asyncio::http::urlUnescape(const std::string &str) {
     int length{};
 
     const std::unique_ptr<char, decltype(&curl_free)> ptr{
@@ -21,7 +21,7 @@ std::expected<std::string, std::error_code> asyncio::http::urlUnescape(const std
     };
 
     if (!ptr)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
     return std::string{ptr.get(), static_cast<std::size_t>(length)};
 }
@@ -31,7 +31,7 @@ asyncio::http::URL::URL(std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url)
 
 asyncio::http::URL::URL(const URL &rhs) : mURL{curl_url_dup(rhs.mURL.get()), curl_url_cleanup} {
     if (!mURL)
-        throw std::system_error{errno, std::generic_category()};
+        throw zero::error::SystemError{errno, std::generic_category()};
 }
 
 asyncio::http::URL::URL(URL &&rhs) noexcept: mURL{std::move(rhs.mURL)} {
@@ -44,7 +44,7 @@ asyncio::http::URL &asyncio::http::URL::operator=(const URL &rhs) {
     mURL = {curl_url_dup(rhs.mURL.get()), curl_url_cleanup};
 
     if (!mURL)
-        throw std::system_error{errno, std::generic_category()};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
     return *this;
 }
@@ -58,7 +58,7 @@ std::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(cons
     std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url{curl_url(), curl_url_cleanup};
 
     if (!url)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
     Z_EXPECT(expected([&] {
         return curl_url_set(url.get(), CURLUPART_URL, str.c_str(), CURLU_NON_SUPPORT_SCHEME);
@@ -96,7 +96,7 @@ std::optional<std::string> asyncio::http::URL::user() const {
         if (result.error() == static_cast<Error>(CURLUE_NO_USER))
             return std::nullopt;
 
-        throw std::system_error{result.error()};
+        throw zero::error::SystemError{result.error()};
     }
 
     return std::unique_ptr<char, decltype(&curl_free)>{user, curl_free}.get();
@@ -111,7 +111,7 @@ std::optional<std::string> asyncio::http::URL::password() const {
         if (result.error() == static_cast<Error>(CURLUE_NO_PASSWORD))
             return std::nullopt;
 
-        throw std::system_error{result.error()};
+        throw zero::error::SystemError{result.error()};
     }
 
     return std::unique_ptr<char, decltype(&curl_free)>{password, curl_free}.get();
@@ -126,7 +126,7 @@ std::optional<std::string> asyncio::http::URL::host() const {
         if (result.error() == static_cast<Error>(CURLUE_NO_HOST))
             return std::nullopt;
 
-        throw std::system_error{result.error()};
+        throw zero::error::SystemError{result.error()};
     }
 
     return std::unique_ptr<char, decltype(&curl_free)>{host, curl_free}.get();
@@ -161,7 +161,7 @@ std::optional<std::string> asyncio::http::URL::query() const {
         if (result.error() == static_cast<Error>(CURLUE_NO_QUERY))
             return std::nullopt;
 
-        throw std::system_error{result.error()};
+        throw zero::error::SystemError{result.error()};
     }
 
     return std::unique_ptr<char, decltype(&curl_free)>{query, curl_free}.get();
@@ -176,7 +176,7 @@ std::optional<std::string> asyncio::http::URL::rawQuery() const {
         if (result.error() == static_cast<Error>(CURLUE_NO_QUERY))
             return std::nullopt;
 
-        throw std::system_error{result.error()};
+        throw zero::error::SystemError{result.error()};
     }
 
     return std::unique_ptr<char, decltype(&curl_free)>{query, curl_free}.get();
@@ -191,7 +191,7 @@ std::optional<std::string> asyncio::http::URL::fragment() const {
         if (result.error() == static_cast<Error>(CURLUE_NO_FRAGMENT))
             return std::nullopt;
 
-        throw std::system_error{result.error()};
+        throw zero::error::SystemError{result.error()};
     }
 
     return std::unique_ptr<char, decltype(&curl_free)>{fragment, curl_free}.get();
@@ -206,7 +206,7 @@ std::optional<std::uint16_t> asyncio::http::URL::port() const {
         if (result.error() == static_cast<Error>(CURLUE_NO_PORT))
             return std::nullopt;
 
-        throw std::system_error{result.error()};
+        throw zero::error::SystemError{result.error()};
     }
 
     const auto number = zero::error::guard(zero::strings::toNumber<std::uint16_t>(

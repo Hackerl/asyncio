@@ -41,14 +41,13 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     }
 
     auto requests = asyncio::http::Requests::make(options);
-    Z_CO_EXPECT(requests);
 
     auto response = co_await [&] {
         if (!body)
-            return requests->request(*method, url, options);
+            return requests.request(*method, url, options);
 
         if (json)
-            return requests->request(*method, url, options, nlohmann::json::parse(*body));
+            return requests.request(*method, url, options, nlohmann::json::parse(*body));
 
         if (form) {
             std::map<std::string, std::variant<std::string, std::filesystem::path>> data;
@@ -65,10 +64,10 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
                     data[tokens[0]] = tokens[1];
             }
 
-            return requests->request(*method, url, options, data);
+            return requests.request(*method, url, options, data);
         }
 
-        return requests->request(*method, url, options, *body);
+        return requests.request(*method, url, options, *body);
     }();
     Z_CO_EXPECT(response);
 

@@ -68,11 +68,10 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     Z_CO_EXPECT(listener);
 
     auto signal = asyncio::Signal::make();
-    Z_CO_EXPECT(signal);
 
     co_return co_await race(
         serve(*std::move(listener)),
-        signal->on(SIGINT).transform([](const int) {
+        signal.on(SIGINT).transform([](const int) {
         })
     );
 }

@@ -26,7 +26,7 @@ namespace asyncio {
 
         ~EventLoop();
 
-        static std::expected<EventLoop, std::error_code> make();
+        static EventLoop make();
 
         uv_loop_t *raw();
         [[nodiscard]] const uv_loop_t *raw() const;
@@ -59,18 +59,14 @@ namespace asyncio {
         std::error_code
     >
     run(F &&f) {
-        const auto eventLoop = EventLoop::make().transform([](EventLoop &&value) {
-            return std::make_shared<EventLoop>(std::move(value));
-        });
-        Z_EXPECT(eventLoop);
-
-        setEventLoop(*eventLoop);
+        const auto eventLoop = std::make_shared<EventLoop>(EventLoop::make());
+        setEventLoop(eventLoop);
 
         auto future = f().future().finally([&] {
-            eventLoop.value()->stop();
+            eventLoop->stop();
         });
 
-        eventLoop.value()->run();
+        eventLoop->run();
         assert(future.isReady());
         return {std::move(future).result()};
     }

@@ -14,7 +14,7 @@ namespace asyncio::net {
         explicit UDPSocket(uv::Handle<uv_udp_t> udp);
 
     private:
-        static std::expected<UDPSocket, std::error_code> make();
+        static UDPSocket make();
         static std::expected<UDPSocket, std::error_code> bind(const SocketAddress &address);
         static std::expected<UDPSocket, std::error_code> connect(const SocketAddress &address);
 

@@ -9,10 +9,10 @@
 asyncio::Stream::Stream(uv::Handle<uv_stream_t> stream) : mStream{std::move(stream)} {
 }
 
-std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::pair() {
+std::array<asyncio::Stream, 2> asyncio::Stream::pair() {
     std::array<uv_os_sock_t, 2> sockets{};
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_socketpair(SOCK_STREAM, 0, sockets.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE);
     }));
 #ifdef _WIN32
@@ -22,7 +22,7 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
                 continue;
 
             if (closesocket(fd) != 0)
-                throw std::system_error{WSAGetLastError(), std::system_category()};
+                throw zero::error::SystemError{WSAGetLastError(), std::system_category()};
         }
     );
 
@@ -32,9 +32,9 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
     };
 
     if (!first)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), first.get());
     }));
 
@@ -45,7 +45,7 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     };
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(firstHandle.raw()), sockets[0]);
     }));
     sockets[0] = -1;
@@ -56,9 +56,9 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
     };
 
     if (!second)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), second.get());
     }));
 
@@ -69,7 +69,7 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     };
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(secondHandle.raw()), sockets[1]);
     }));
     sockets[1] = -1;
@@ -93,9 +93,9 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
     };
 
     if (!first)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), first.get(), 0);
     }));
 
@@ -106,7 +106,7 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     };
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe_open(reinterpret_cast<uv_pipe_t *>(firstHandle.raw()), sockets[0]);
     }));
     sockets[0] = -1;
@@ -117,9 +117,9 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
     };
 
     if (!second)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::SystemError{errno, std::generic_category()};
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), second.get(), 0);
     }));
 
@@ -130,7 +130,7 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     };
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe_open(reinterpret_cast<uv_pipe_t *>(secondHandle.raw()), sockets[1]);
     }));
     sockets[1] = -1;
@@ -283,8 +283,8 @@ std::expected<std::size_t, std::error_code> asyncio::Stream::tryWrite(const std:
 asyncio::Listener::Listener(std::unique_ptr<Core> core) : mCore{std::move(core)} {
 }
 
-std::expected<asyncio::Listener, std::error_code> asyncio::Listener::make(uv::Handle<uv_stream_t> stream) {
-    Z_EXPECT(uv::expected([&] {
+asyncio::Listener asyncio::Listener::make(uv::Handle<uv_stream_t> stream) {
+    zero::error::guard(uv::expected([&] {
         return uv_listen(
             stream.raw(),
             256,
