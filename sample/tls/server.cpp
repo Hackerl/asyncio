@@ -2,72 +2,67 @@
 #include <asyncio/net/tls.h>
 #include <asyncio/signal.h>
 #include <zero/cmdline.h>
+#include <zero/formatter.h>
 
-namespace {
-    asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream, asyncio::net::tls::Context context) {
-        const auto address = stream.remoteAddress();
-        Z_CO_EXPECT(address);
+asyncio::task::Task<void> handle(asyncio::net::TCPStream stream, asyncio::net::tls::Context context) {
+    const auto address = zero::error::guard(stream.remoteAddress());
+    fmt::print("connection[{}]\n", address);
 
-        fmt::print("connection[{}]\n", *address);
+    auto tls = zero::error::guard(co_await asyncio::net::tls::accept(std::move(stream), std::move(context)));
 
-        auto tls = co_await asyncio::net::tls::accept(std::move(stream), std::move(context));
-        Z_CO_EXPECT(tls);
+    while (true) {
+        std::string message;
+        message.resize(1024);
 
-        while (true) {
-            std::string message;
-            message.resize(1024);
+        const auto n = zero::error::guard(co_await tls.read(std::as_writable_bytes(std::span{message})));
 
-            const auto n = co_await tls->read(std::as_writable_bytes(std::span{message}));
-            Z_CO_EXPECT(n);
+        if (n == 0)
+            break;
 
-            if (*n == 0)
-                break;
+        message.resize(n);
 
-            message.resize(*n);
-
-            fmt::print("receive message: {}\n", message);
-            Z_CO_EXPECT(co_await tls->writeAll(std::as_bytes(std::span{message})));
-        }
-
-        co_return {};
+        fmt::print("receive message: {}\n", message);
+        zero::error::guard(co_await tls.writeAll(std::as_bytes(std::span{message})));
     }
 
-    asyncio::task::Task<void, std::error_code>
-    serve(asyncio::net::TCPListener listener, const asyncio::net::tls::Context context) {
-        std::expected<void, std::error_code> result;
-        asyncio::task::TaskGroup group;
-
-        while (true) {
-            auto stream = co_await listener.accept();
-
-            if (!stream) {
-                result = std::unexpected{stream.error()};
-                break;
-            }
-
-            auto task = handle(*std::move(stream), context);
-
-            group.add(task);
-            task.future().fail([](const auto &ec) {
-                fmt::print(stderr, "Unhandled error: {:s} ({})\n", ec, ec);
-            });
-        }
-
-        co_await group;
-        co_return result;
-    }
+    co_return;
 }
 
-asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
+asyncio::task::Task<void>
+serve(asyncio::net::TCPListener listener, const asyncio::net::tls::Context context) {
+    std::expected<void, std::error_code> result;
+    asyncio::task::TaskGroup group;
+
+    while (true) {
+        auto stream = co_await listener.accept();
+
+        if (!stream) {
+            result = std::unexpected{stream.error()};
+            break;
+        }
+
+        auto task = handle(*std::move(stream), context);
+
+        group.add(task);
+        task.future().fail([](const auto &e) {
+            fmt::print(stderr, "Unhandled exception: {}\n", e);
+        });
+    }
+
+    co_await group;
+    zero::error::guard(std::move(result));
+}
+
+asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
-    cmdline.add<std::string>("ip", "listen ip");
-    cmdline.add<std::uint16_t>("port", "listen port");
-    cmdline.add<std::filesystem::path>("cert", "cert path");
-    cmdline.add<std::filesystem::path>("key", "private key path");
+    cmdline.add<std::string>("ip", "IP address to bind");
+    cmdline.add<std::uint16_t>("port", "Port number to listen on");
+    cmdline.add<std::filesystem::path>("cert", "Path to server certificate file");
+    cmdline.add<std::filesystem::path>("key", "Path to private key file");
 
-    cmdline.addOptional("verify", '\0', "verify client cert");
-    cmdline.addOptional<std::filesystem::path>("ca", '\0', "CA cert path");
+    cmdline.addOptional("verify", '\0', "Enable client certificate verification");
+    cmdline.addOptional<std::filesystem::path>("ca", '\0', "Path to CA certificate file");
 
     cmdline.parse(argc, argv);
 
@@ -80,34 +75,28 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 
     const auto verifyClient = cmdline.exist("verify");
 
-    auto cert = co_await asyncio::net::tls::Certificate::loadFile(certFile);
-    Z_CO_EXPECT(cert);
-
-    auto key = co_await asyncio::net::tls::PrivateKey::loadFile(keyFile);
-    Z_CO_EXPECT(key);
+    auto cert = zero::error::guard(co_await asyncio::net::tls::Certificate::loadFile(certFile));
+    auto key = zero::error::guard(co_await asyncio::net::tls::PrivateKey::loadFile(keyFile));
 
     asyncio::net::tls::ServerConfig config;
 
-    if (caFile) {
-        auto ca = co_await asyncio::net::tls::Certificate::loadFile(*caFile);
-        Z_CO_EXPECT(ca);
-        config.rootCAs({*std::move(ca)});
-    }
+    if (caFile)
+        config.rootCAs({zero::error::guard(co_await asyncio::net::tls::Certificate::loadFile(*caFile))});
 
-    auto context = config
-                   .verifyClient(verifyClient)
-                   .certKeyPairs({{*std::move(cert), *std::move(key)}})
-                   .build();
-    Z_CO_EXPECT(context);
+    auto context = zero::error::guard(
+        config
+        .verifyClient(verifyClient)
+        .certKeyPairs({{std::move(cert), std::move(key)}})
+        .build()
+    );
 
-    auto listener = asyncio::net::TCPListener::listen(ip, port);
-    Z_CO_EXPECT(listener);
-
+    auto listener = zero::error::guard(asyncio::net::TCPListener::listen(ip, port));
     auto signal = asyncio::Signal::make();
 
     co_return co_await race(
-        serve(*std::move(listener), *std::move(context)),
-        signal.on(SIGINT).transform([](const int) {
+        serve(std::move(listener), std::move(context)),
+        asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+            zero::error::guard(co_await signal.on(SIGINT));
         })
     );
 }

@@ -17,7 +17,6 @@
     TEST_CASE(__VA_ARGS__) {                                \
         const auto _result = asyncio::run(func);            \
         REQUIRE(_result);                                   \
-        REQUIRE(*_result);                                  \
     }                                                       \
                                                             \
     asyncio::task::Task<void> func()
@@ -31,7 +30,6 @@
     TEMPLATE_TEST_CASE(__VA_ARGS__) {                       \
         const auto _result = asyncio::run(func<TestType>);  \
         REQUIRE(_result);                                   \
-        REQUIRE(*_result);                                  \
     }                                                       \
                                                             \
     template<typename TestType>                             \

@@ -3,19 +3,19 @@
 #include <asyncio/time.h>
 #include <zero/cmdline.h>
 
-asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
+asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     using namespace std::chrono_literals;
     using namespace std::string_view_literals;
 
     zero::Cmdline cmdline;
 
-    cmdline.add<std::string>("host", "remote host");
-    cmdline.add<std::uint16_t>("port", "remote port");
+    cmdline.add<std::string>("host", "Remote server address");
+    cmdline.add<std::uint16_t>("port", "Remote server port");
 
-    cmdline.addOptional("insecure", 'k', "skip verify server cert");
-    cmdline.addOptional<std::filesystem::path>("ca", '\0', "CA cert path");
-    cmdline.addOptional<std::filesystem::path>("cert", '\0', "cert path");
-    cmdline.addOptional<std::filesystem::path>("key", '\0', "private key path");
+    cmdline.addOptional("insecure", 'k', "Skip server certificate verification");
+    cmdline.addOptional<std::filesystem::path>("ca", '\0', "Path to CA certificate file");
+    cmdline.addOptional<std::filesystem::path>("cert", '\0', "Path to client certificate file");
+    cmdline.addOptional<std::filesystem::path>("key", '\0', "Path to private key file");
 
     cmdline.parse(argc, argv);
 
@@ -30,50 +30,39 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 
     asyncio::net::tls::ClientConfig config;
 
-    if (caFile) {
-        auto ca = co_await asyncio::net::tls::Certificate::loadFile(*caFile);
-        Z_CO_EXPECT(ca);
-        config.rootCAs({*std::move(ca)});
-    }
+    if (caFile)
+        config.rootCAs({zero::error::guard(co_await asyncio::net::tls::Certificate::loadFile(*caFile))});
 
     if (certFile && keyFile) {
-        auto cert = co_await asyncio::net::tls::Certificate::loadFile(*certFile);
-        Z_CO_EXPECT(cert);
-
-        auto key = co_await asyncio::net::tls::PrivateKey::loadFile(*keyFile);
-        Z_CO_EXPECT(key);
-
-        config.certKeyPairs({{*std::move(cert), *std::move(key)}});
+        auto cert = zero::error::guard(co_await asyncio::net::tls::Certificate::loadFile(*certFile));
+        auto key = zero::error::guard(co_await asyncio::net::tls::PrivateKey::loadFile(*keyFile));
+        config.certKeyPairs({{std::move(cert), std::move(key)}});
     }
 
-    auto context = config
-                   .insecure(insecure)
-                   .build();
-    Z_CO_EXPECT(context);
+    config.insecure(insecure);
 
-    auto stream = co_await asyncio::net::TCPStream::connect(host, port);
-    Z_CO_EXPECT(stream);
-
-    auto tls = co_await asyncio::net::tls::connect(*std::move(stream), *std::move(context), host);
-    Z_CO_EXPECT(tls);
+    auto tls = zero::error::guard(
+        co_await asyncio::net::tls::connect(
+            zero::error::guard(co_await asyncio::net::TCPStream::connect(host, port)),
+            zero::error::guard(config.build()),
+            host
+        )
+    );
 
     while (true) {
-        Z_CO_EXPECT(co_await tls->writeAll(std::as_bytes(std::span{"hello world"sv})));
+        zero::error::guard(co_await tls.writeAll(std::as_bytes(std::span{"hello world"sv})));
 
         std::string message;
         message.resize(1024);
 
-        const auto n = co_await tls->read(std::as_writable_bytes(std::span{message}));
-        Z_CO_EXPECT(n);
+        const auto n = zero::error::guard(co_await tls.read(std::as_writable_bytes(std::span{message})));
 
-        if (*n == 0)
+        if (n == 0)
             break;
 
-        message.resize(*n);
+        message.resize(n);
 
         fmt::print("receive message: {}\n", message);
-        Z_CO_EXPECT(co_await asyncio::sleep(1s));
+        zero::error::guard(co_await asyncio::sleep(1s));
     }
-
-    co_return {};
 }

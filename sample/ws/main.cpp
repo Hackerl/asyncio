@@ -2,23 +2,22 @@
 #include <zero/cmdline.h>
 #include <zero/encoding/hex.h>
 
-asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
+asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
-    cmdline.add<asyncio::http::URL>("url", "websocket url");
+    cmdline.add<asyncio::http::URL>("url", "WebSocket server URL");
     cmdline.parse(argc, argv);
 
     const auto url = cmdline.get<asyncio::http::URL>("url");
 
-    auto ws = co_await asyncio::http::ws::WebSocket::connect(url);
-    Z_CO_EXPECT(ws);
+    auto ws = zero::error::guard(co_await asyncio::http::ws::WebSocket::connect(url));
 
     while (true) {
-        auto message = co_await ws->readMessage();
+        auto message = co_await ws.readMessage();
 
         if (!message) {
             if (message.error() != asyncio::http::ws::CloseCode::NORMAL_CLOSURE)
-                co_return std::unexpected{message.error()};
+                throw zero::error::SystemError{message.error()};
 
             break;
         }
@@ -39,8 +38,6 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
             std::abort();
         }
 
-        Z_CO_EXPECT(co_await ws->writeMessage(*std::move(message)));
+        zero::error::guard(co_await ws.writeMessage(*std::move(message)));
     }
-
-    co_return {};
 }

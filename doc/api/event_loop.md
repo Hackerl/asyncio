@@ -53,24 +53,36 @@ Stops running.
 template<typename F>
     requires zero::detail::is_specialization_v<std::invoke_result_t<F>, task::Task>
 std::expected<
-    std::expected<
-        typename std::invoke_result_t<F>::value_type,
-        typename std::invoke_result_t<F>::error_type
-    >,
-    std::error_code
+    typename std::invoke_result_t<F>::value_type,
+    typename std::invoke_result_t<F>::error_type
 >
 run(F &&f);
 ```
 
 Creates a new `Event Loop`, runs an async task on it, and returns the result after completion.
 
+For `Task<T, std::error_code>`, returns `std::expected<T, std::error_code>`:
+
 ```cpp
 const auto result = asyncio::run([]() -> asyncio::task::Task<int, std::error_code> {
     using namespace std::chrono_literals;
-    co_await asyncio::sleep(10ms);
+    Z_CO_EXPECT(co_await asyncio::sleep(10ms));
     co_return 1024;
 });
-REQUIRE(result == 1024);
+REQUIRE(result);
+REQUIRE(*result == 1024);
+```
+
+For `Task<T>` (exception-based), returns `std::expected<T, std::exception_ptr>`:
+
+```cpp
+const auto result = asyncio::run([]() -> asyncio::task::Task<int> {
+    using namespace std::chrono_literals;
+    zero::error::guard(co_await asyncio::sleep(10ms));
+    co_return 1024;
+});
+REQUIRE(result);
+REQUIRE(*result == 1024);
 ```
 
 > It's equivalent to Python's `asyncio.run`.
@@ -82,5 +94,5 @@ target_link_libraries(demo PRIVATE asyncio::asyncio-main)
 ```
 
 ```cpp
-asyncio::task::Task<void, std::error_code> asyncMain(const int, char *[]);
+asyncio::task::Task<void> asyncMain(int argc, char *argv[]);
 ```

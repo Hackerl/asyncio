@@ -1,19 +1,20 @@
 #include <asyncio/task.h>
+#include <zero/formatter.h>
 #include <fmt/std.h>
 
-asyncio::task::Task<void, std::error_code> asyncMain(int argc, char *argv[]);
+asyncio::task::Task<void> asyncMain(int argc, char *argv[]);
 
 int main(const int argc, char *argv[]) {
 #if defined(__unix__) || defined(__APPLE__)
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-    const auto result = zero::error::guard(asyncio::run([=] {
+    const auto result = asyncio::run([=] {
         return asyncMain(argc, argv);
-    }));
+    });
 
     if (!result) {
-        fmt::print(stderr, "Error: {:s} ({})\n", result.error(), result.error());
+        fmt::print(stderr, "Exception: {}\n", result.error());
         return EXIT_FAILURE;
     }
 
