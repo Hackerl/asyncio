@@ -61,7 +61,7 @@ asyncio::task::Task<int, std::error_code> asyncio::Poll::on(const int events) {
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
 
             zero::error::guard(uv::expected([&] {
                 return uv_poll_stop(mPoll.raw());

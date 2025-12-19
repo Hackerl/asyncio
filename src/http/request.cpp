@@ -129,7 +129,7 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
             auto &promise = mConnection->downstream.promise;
 
             if (!promise)
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
 
             Z_EXPECT(expected([&] {
                 return curl_easy_pause(mConnection->easy.get(), CURLPAUSE_RECV);
@@ -663,7 +663,7 @@ asyncio::http::Requests::perform(std::shared_ptr<Connection> connection) {
         connection->promise.getFuture(),
         [&promise = connection->promise]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
 
             promise.reject(task::Error::CANCELLED);
             return {};

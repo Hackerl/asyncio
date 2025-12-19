@@ -11,7 +11,7 @@ Z_DEFINE_ERROR_CODE_EX(
     CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
     CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
     LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
-    WILL_BE_DONE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+    CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
 )
 ```
 
@@ -248,7 +248,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
 
             uv_timer_stop(timer.raw());
             promise.reject(task::Error::CANCELLED);

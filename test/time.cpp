@@ -26,7 +26,7 @@ ASYNC_TEST_CASE("timeout", "[time]") {
             from(asyncio::task::CancellableFuture{
                 promise.getFuture(),
                 []() -> std::expected<void, std::error_code> {
-                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                    return std::unexpected{asyncio::task::Error::CANCELLATION_TOO_LATE};
                 }
             }),
             10ms

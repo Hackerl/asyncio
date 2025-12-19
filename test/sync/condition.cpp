@@ -92,7 +92,7 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
         REQUIRE_FALSE(mutex.locked());
 
         condition.notify();
-        REQUIRE_ERROR(task.cancel(), asyncio::task::Error::WILL_BE_DONE);
+        REQUIRE_ERROR(task.cancel(), asyncio::task::Error::CANCELLATION_TOO_LATE);
 
         REQUIRE(co_await task);
         REQUIRE(mutex.locked());

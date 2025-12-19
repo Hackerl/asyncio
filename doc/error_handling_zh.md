@@ -73,7 +73,7 @@ namespace asyncio::task {
         CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
         CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
         LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
-        WILL_BE_DONE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+        CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
     )
 }
 
@@ -100,7 +100,7 @@ Z_DEFINE_ERROR_CODE_EX(
     CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
     CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
     LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
-    WILL_BE_DONE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+    CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
 )
 ```
 

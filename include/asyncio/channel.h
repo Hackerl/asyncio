@@ -276,7 +276,7 @@ namespace asyncio {
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())
-                            return std::unexpected{task::Error::WILL_BE_DONE};
+                            return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
 
                         promise->reject(task::Error::CANCELLED);
                         return {};
@@ -325,7 +325,7 @@ namespace asyncio {
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())
-                            return std::unexpected{task::Error::WILL_BE_DONE};
+                            return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
 
                         promise->reject(task::Error::CANCELLED);
                         return {};
@@ -504,7 +504,7 @@ namespace asyncio {
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())
-                            return std::unexpected{task::Error::WILL_BE_DONE};
+                            return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
 
                         promise->reject(task::Error::CANCELLED);
                         return {};
