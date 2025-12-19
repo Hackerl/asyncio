@@ -13,7 +13,7 @@ namespace asyncio::task {
     Z_DEFINE_ERROR_CODE_EX(
         Error,
         "asyncio::task",
-        CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
+        CANCELLED, "Task was cancelled", std::errc::operation_canceled,
         CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
         LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
         CANCELLATION_TOO_LATE, "Cancellation is too late", std::errc::operation_not_permitted,

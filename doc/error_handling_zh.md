@@ -54,9 +54,9 @@ fmt::print(stderr, "Error: {} ({})\n", ec.message(), ec);
 
 当上层打印出 `error code` 时，终端可能会显示：
 
-> error: task has been cancelled (asyncio::task:1)
+> Error: Task was cancelled (asyncio::task:1)
 
-从其中我们可以得知，错误种类是 `asyncio::task`，错误号是 1，错误信息是 `task has been cancelled`，错误产生的原因我们也应该心中有数了。
+从其中我们可以得知，错误种类是 `asyncio::task`，错误号是 1，错误信息是 `task was cancelled`，错误产生的原因我们也应该心中有数了。
 
 不幸的是，自定义错误种类、错误码是一件极其繁琐的事情，我们需要定义自己的错误号枚举类型，还需要继承 [`std::error_category`](https://en.cppreference.com/w/cpp/error/error_category) 并重载部分虚函数。
 
@@ -70,7 +70,7 @@ namespace asyncio::task {
     Z_DEFINE_ERROR_CODE_EX(
         Error,
         "asyncio::task",
-        CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
+        CANCELLED, "Task was cancelled", std::errc::operation_canceled,
         CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
         LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
         CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
@@ -97,7 +97,7 @@ Z_DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::task::Error)
 Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
-    CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
+    CANCELLED, "Task was cancelled", std::errc::operation_canceled,
     CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
     LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
     CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION

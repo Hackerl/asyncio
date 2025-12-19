@@ -89,7 +89,7 @@ namespace asyncio {
         SendError,
         "asyncio::Sender::send",
         DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-        CANCELLED, "Send operation has been cancelled", std::errc::operation_canceled
+        CANCELLED, "Send operation was cancelled", std::errc::operation_canceled
     )
 
     template<typename T>
@@ -385,7 +385,7 @@ namespace asyncio {
         ReceiveError,
         "asyncio::Receiver::receive",
         DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-        CANCELLED, "Receive operation has been cancelled", std::errc::operation_canceled
+        CANCELLED, "Receive operation was cancelled", std::errc::operation_canceled
     )
 
     template<typename T>

@@ -87,7 +87,7 @@ Z_DEFINE_ERROR_CODE_EX(
     SendError,
     "asyncio::Sender::send",
     DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    CANCELLED, "Send operation has been cancelled", std::errc::operation_canceled
+    CANCELLED, "Send operation was cancelled", std::errc::operation_canceled
 )
 
 task::Task<void, SendError> send(T element);
@@ -220,7 +220,7 @@ Z_DEFINE_ERROR_CODE_EX(
     ReceiveError,
     "asyncio::Receiver::receive",
     DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    CANCELLED, "Receive operation has been cancelled", std::errc::operation_canceled
+    CANCELLED, "Receive operation was cancelled", std::errc::operation_canceled
 )
 
 task::Task<T, ReceiveError> receive();

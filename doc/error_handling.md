@@ -53,9 +53,9 @@ fmt::print(stderr, "Error: {} ({})\n", ec.message(), ec);
 
 When the upper layers print the error code, the terminal might display something like:
 
-> error: task has been cancelled (asyncio::task:1)
+> Error: Task was cancelled (asyncio::task:1)
 
-From this, we can determine that the error category is `asyncio::task`, the error code is `1`, and the error message is `task has been cancelled`. We should have a good idea of the root cause.
+From this, we can determine that the error category is `asyncio::task`, the error code is `1`, and the error message is `task was cancelled`. We should have a good idea of the root cause.
 
 Unfortunately, defining custom error categories and codes is quite tedious. We need to define our own error code enumeration and also inherit from [`std::error_category`](https://en.cppreference.com/w/cpp/error/error_category) while overriding some virtual functions.
 
@@ -69,7 +69,7 @@ namespace asyncio::task {
     Z_DEFINE_ERROR_CODE_EX(
         Error,
         "asyncio::task",
-        CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
+        CANCELLED, "Task was cancelled", std::errc::operation_canceled,
         CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
         LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
         CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
@@ -96,7 +96,7 @@ If you've been paying attention, you might have noticed that in the previous sec
 Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
-    CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
+    CANCELLED, "Task was cancelled", std::errc::operation_canceled,
     CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
     LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
     CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION

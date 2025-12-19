@@ -52,7 +52,7 @@ co_await asyncio::toThread(
 Z_DEFINE_ERROR_CODE_EX(
     ToThreadPoolError,
     "asyncio::toThreadPool",
-    CANCELLED, "Request has been cancelled", std::errc::operation_canceled
+    CANCELLED, "Request was cancelled", std::errc::operation_canceled
 )
 
 template<typename F>
