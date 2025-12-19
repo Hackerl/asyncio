@@ -16,7 +16,8 @@ namespace asyncio::task {
         CANCELLED, "Task has been cancelled", std::errc::operation_canceled,
         CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
         LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
-        WILL_BE_DONE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+        WILL_BE_DONE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION,
+        ALREADY_COMPLETED, "Task is already completed", std::errc::operation_not_permitted
     )
 
     template<typename T, typename E>
@@ -123,11 +124,11 @@ namespace asyncio::task {
     class TaskGroup;
 
     struct Frame {
-        std::shared_ptr<Frame> next;
+        std::weak_ptr<Frame> parent;
+        std::list<std::shared_ptr<Frame>> children;
         std::optional<std::source_location> location;
         std::function<std::expected<void, std::error_code>()> cancel;
         std::list<std::function<void()>> callbacks;
-        TaskGroup *group{};
         bool finished{false};
         bool locked{false};
         bool cancelled{false};
@@ -373,21 +374,12 @@ namespace asyncio::task {
 
             task.addCallback([frame = std::move(frame), this] {
                 mFrames.remove(frame);
-
-                if (!mFrames.empty())
-                    return;
-
-                if (!mPromise)
-                    return;
-
-                std::exchange(mPromise, std::nullopt)->resolve();
             });
         }
 
     private:
         bool mCancelled{false};
         std::list<std::shared_ptr<Frame>> mFrames;
-        std::optional<asyncio::Promise<void, std::exception_ptr>> mPromise;
 
         template<typename T, typename E>
         friend class Promise;
@@ -459,7 +451,8 @@ namespace asyncio::task {
             CancellableTask<Result, Error> cancellable,
             const std::source_location location = std::source_location::current()
         ) {
-            mFrame->next = cancellable.task.mFrame;
+            cancellable.task.mFrame->parent = mFrame;
+            mFrame->children.push_back(cancellable.task.mFrame);
             mFrame->location = location;
 
             if (mFrame->cancelled && !mFrame->locked)
@@ -486,7 +479,8 @@ namespace asyncio::task {
             Task<Result, Error> &&task,
             const std::source_location location = std::source_location::current()
         ) {
-            mFrame->next = task.mFrame;
+            task.mFrame->parent = mFrame;
+            mFrame->children.push_back(task.mFrame);
             mFrame->location = location;
 
             if (mFrame->cancelled && !mFrame->locked)
@@ -501,7 +495,8 @@ namespace asyncio::task {
             Task<Result, Error> &task,
             const std::source_location location = std::source_location::current()
         ) {
-            mFrame->next = task.mFrame;
+            task.mFrame->parent = mFrame;
+            mFrame->children.push_back(task.mFrame);
             mFrame->location = location;
 
             if (mFrame->cancelled && !mFrame->locked)
@@ -515,19 +510,30 @@ namespace asyncio::task {
             if (group.mFrames.empty())
                 return {zero::async::promise::resolve<void, std::exception_ptr>()};
 
-            assert(!group.mPromise);
-            group.mPromise.emplace();
+            const auto promise = std::make_shared<asyncio::Promise<void, std::exception_ptr>>();
+            const auto count = std::make_shared<std::size_t>(group.mFrames.size());
 
-            mFrame->group = &group;
+            for (const auto &frame: group.mFrames) {
+                if (frame->finished) {
+                    --*count;
+                    continue;
+                }
+
+                frame->callbacks.emplace_back([=] {
+                    if (--*count > 0)
+                        return;
+
+                    promise->resolve();
+                });
+            }
+
+            mFrame->children = group.mFrames;
             mFrame->location = location;
-            mFrame->cancel = [&] {
-                return group.cancel();
-            };
 
             if (mFrame->cancelled && !mFrame->locked)
                 std::ignore = group.cancel();
 
-            return {group.mPromise->getFuture(), [this] { mFrame->step(); }};
+            return {promise->getFuture(), [this] { mFrame->step(); }};
         }
 
         template<typename U = T>
@@ -637,7 +643,8 @@ namespace asyncio::task {
             CancellableTask<Result, Error> cancellable,
             const std::source_location location = std::source_location::current()
         ) {
-            mFrame->next = cancellable.task.mFrame;
+            cancellable.task.mFrame->parent = mFrame;
+            mFrame->children.push_back(cancellable.task.mFrame);
             mFrame->location = location;
 
             if (mFrame->cancelled && !mFrame->locked)
@@ -664,7 +671,8 @@ namespace asyncio::task {
             Task<Result, Error> &&task,
             const std::source_location location = std::source_location::current()
         ) {
-            mFrame->next = task.mFrame;
+            task.mFrame->parent = mFrame;
+            mFrame->children.push_back(task.mFrame);
             mFrame->location = location;
 
             if (mFrame->cancelled && !mFrame->locked)
@@ -679,7 +687,8 @@ namespace asyncio::task {
             Task<Result, Error> &task,
             const std::source_location location = std::source_location::current()
         ) {
-            mFrame->next = task.mFrame;
+            task.mFrame->parent = mFrame;
+            mFrame->children.push_back(task.mFrame);
             mFrame->location = location;
 
             if (mFrame->cancelled && !mFrame->locked)
@@ -693,19 +702,30 @@ namespace asyncio::task {
             if (group.mFrames.empty())
                 return {zero::async::promise::resolve<void, std::exception_ptr>()};
 
-            assert(!group.mPromise);
-            group.mPromise.emplace();
+            const auto promise = std::make_shared<asyncio::Promise<void, std::exception_ptr>>();
+            const auto count = std::make_shared<std::size_t>(group.mFrames.size());
 
-            mFrame->group = &group;
+            for (const auto &frame: group.mFrames) {
+                if (frame->finished) {
+                    --*count;
+                    continue;
+                }
+
+                frame->callbacks.emplace_back([=] {
+                    if (--*count > 0)
+                        return;
+
+                    promise->resolve();
+                });
+            }
+
+            mFrame->children = group.mFrames;
             mFrame->location = location;
-            mFrame->cancel = [&] {
-                return group.cancel();
-            };
 
             if (mFrame->cancelled && !mFrame->locked)
                 std::ignore = group.cancel();
 
-            return {group.mPromise->getFuture(), [this] { mFrame->step(); }};
+            return {promise->getFuture(), [this] { mFrame->step(); }};
         }
 
         void return_void() {

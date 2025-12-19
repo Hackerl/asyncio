@@ -4,10 +4,9 @@
 #include <stack>
 
 void asyncio::task::Frame::step() {
-    next.reset();
+    children.clear();
     location.reset();
     cancel = nullptr;
-    group = nullptr;
 }
 
 void asyncio::task::Frame::end() {
@@ -23,22 +22,51 @@ void asyncio::task::Frame::end() {
 }
 
 std::expected<void, std::error_code> asyncio::task::Frame::cancelAll() {
-    auto frame = this;
+    std::list<std::error_code> errors;
 
-    while (true) {
-        frame->cancelled = true;
+    std::stack<Frame *> stack;
+    stack.push(this);
 
-        if (frame->locked)
-            return std::unexpected{Error::LOCKED};
+    while (!stack.empty()) {
+        auto frame = stack.top();
+        stack.pop();
 
-        if (frame->cancel)
-            return std::exchange(frame->cancel, nullptr)();
+        while (true) {
+            if (frame->finished) {
+                errors.emplace_back(Error::ALREADY_COMPLETED);
+                break;
+            }
 
-        if (!frame->next)
-            return std::unexpected{Error::CANCELLATION_NOT_SUPPORTED};
+            frame->cancelled = true;
 
-        frame = frame->next.get();
+            if (frame->locked) {
+                errors.emplace_back(Error::LOCKED);
+                break;
+            }
+
+            if (frame->cancel) {
+                if (const auto result = std::exchange(frame->cancel, nullptr)(); !result)
+                    errors.push_back(result.error());
+
+                break;
+            }
+
+            if (frame->children.empty()) {
+                errors.emplace_back(Error::CANCELLATION_NOT_SUPPORTED);
+                break;
+            }
+
+            for (const auto &f: frame->children | std::views::drop(1) | std::views::reverse)
+                stack.push(f.get());
+
+            frame = frame->children.front().get();
+        }
     }
+
+    if (!errors.empty())
+        return std::unexpected{errors.back()};
+
+    return {};
 }
 
 tree<std::source_location> asyncio::task::Frame::callTree() const {
@@ -51,25 +79,24 @@ tree<std::source_location> asyncio::task::Frame::callTree() const {
         auto [it, frame] = stack.top();
         stack.pop();
 
-        if (frame->finished)
-            continue;
+        while (true) {
+            if (frame->finished)
+                break;
 
-        assert(frame->location);
+            assert(frame->location);
 
-        while (frame) {
             if (tr.empty())
                 it = tr.insert(it, *frame->location);
             else
                 it = tr.append_child(it, *frame->location);
 
-            if (!frame->next && frame->group) {
-                for (const auto &f: frame->group->mFrames)
-                    stack.emplace(it, f.get());
-
+            if (frame->children.empty())
                 break;
-            }
 
-            frame = frame->next.get();
+            for (const auto &f: frame->children | std::views::drop(1) | std::views::reverse)
+                stack.emplace(it, f.get());
+
+            frame = frame->children.front().get();
         }
     }
 
