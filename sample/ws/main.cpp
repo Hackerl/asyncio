@@ -24,12 +24,12 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
 
         switch (message->opcode) {
         case asyncio::http::ws::Opcode::TEXT:
-            fmt::print("receive text message: {}\n", std::get<std::string>(message->data));
+            fmt::print("Receive text message: {}\n", std::get<std::string>(message->data));
             break;
 
         case asyncio::http::ws::Opcode::BINARY:
             fmt::print(
-                "receive binary message: {}\n",
+                "Receive binary message: {}\n",
                 zero::encoding::hex::encode(std::get<std::vector<std::byte>>(message->data))
             );
             break;

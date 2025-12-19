@@ -11,7 +11,7 @@ asyncio::task::Task<void> test1() {
             throw zero::error::SystemError{task::Error::CANCELLED};
 
         zero::error::guard(co_await asyncio::sleep(1s));
-        fmt::print("hello world\n");
+        fmt::print("Hello world\n");
     }
 }
 
@@ -21,7 +21,7 @@ asyncio::task::Task<void, std::error_code> test2() {
             co_return std::unexpected{task::Error::CANCELLED};
 
         Z_CO_EXPECT(co_await asyncio::sleep(1s));
-        fmt::print("hello world\n");
+        fmt::print("Hello world\n");
     }
 }
 ```
@@ -43,7 +43,7 @@ if (!task.done) {
 
 // 任务已完成，继续执行。
 tag:
-    fmt::print("hello world\n");
+    fmt::print("Hello world\n");
 ```
 
 它的执行流程大概就是这样，它将自身挂起后将回调函数绑定到 `sleep` 的 `future` 上，`sleep` 任务完成后 `promise` 被解决时，`future` 上绑定的回调函数就会被执行。

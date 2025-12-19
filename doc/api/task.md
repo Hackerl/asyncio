@@ -198,7 +198,7 @@ auto task = asyncio::sleep(1s);
 
 task.future()
     .then([] {
-        fmt::print("done\n");
+        fmt::print("Done\n");
     })
     .fail([](const auto &ec) {
         fmt:print("Unhandled error: {} ({})\n", ec.message(), ec);

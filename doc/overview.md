@@ -11,7 +11,7 @@ asyncio::task::Task<void> test1() {
             throw zero::error::SystemError{task::Error::CANCELLED};
 
         zero::error::guard(co_await asyncio::sleep(1s));
-        fmt::print("hello world\n");
+        fmt::print("Hello world\n");
     }
 }
 
@@ -21,7 +21,7 @@ asyncio::task::Task<void, std::error_code> test2() {
             co_return std::unexpected{task::Error::CANCELLED};
 
         Z_CO_EXPECT(co_await asyncio::sleep(1s));
-        fmt::print("hello world\n");
+        fmt::print("Hello world\n");
     }
 }
 ```
@@ -42,7 +42,7 @@ if (!task.done) {
 
 // Task is completed, continue execution.
 tag:
-    fmt::print("hello world\n");
+    fmt::print("Hello world\n");
 ```
 
 This is roughly how it works. After suspending itself, the task binds a callback to the `future` of `sleep`. Once the `sleep` task finishes and its `promise` is resolved, the callback function bound to the `future` is executed.

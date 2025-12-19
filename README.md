@@ -248,13 +248,13 @@ namespace {
 
         while (true) {
             zero::error::guard(co_await asyncio::sleep(1s));
-            fmt::print("do some thing\n");
+            fmt::print("Do some thing\n");
         }
     }
 
     asyncio::task::Task<void> handle(asyncio::net::TCPStream stream) {
         const auto address = zero::error::guard(stream.remoteAddress());
-        fmt::print("connection[{}]\n", address);
+        fmt::print("Connection: {}\n", address);
 
         while (true) {
             std::string message;
@@ -267,7 +267,7 @@ namespace {
 
             message.resize(n);
 
-            fmt::print("receive message: {}\n", message);
+            fmt::print("Receive message: {}\n", message);
             zero::error::guard(co_await stream.writeAll(std::as_bytes(std::span{message})));
         }
     }
