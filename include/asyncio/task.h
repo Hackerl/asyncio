@@ -162,9 +162,13 @@ namespace asyncio::task {
     struct Unlock {
     };
 
+    struct Backtrace {
+    };
+
     inline constexpr Cancelled cancelled;
     inline constexpr Lock lock;
     inline constexpr Unlock unlock;
+    inline constexpr Backtrace backtrace;
 
     template<typename F, typename T>
     using callback_result_t = zero::async::promise::callback_result_t<F, T>;
@@ -429,6 +433,21 @@ namespace asyncio::task {
             return {zero::async::promise::resolve<void, std::exception_ptr>()};
         }
 
+        [[nodiscard]] Awaitable<std::vector<std::source_location>, std::exception_ptr>
+        await_transform(const Backtrace, const std::source_location location = std::source_location::current()) const {
+            std::vector stacktrace{location};
+
+            auto frame = mFrame->parent.lock();
+
+            while (frame) {
+                assert(frame->location);
+                stacktrace.push_back(*frame->location);
+                frame = frame->parent.lock();
+            }
+
+            return {zero::async::promise::resolve<std::vector<std::source_location>, std::exception_ptr>(stacktrace)};
+        }
+
         template<typename Result, typename Error>
         NoExceptAwaitable<Result, Error>
         await_transform(
@@ -514,6 +533,8 @@ namespace asyncio::task {
             const auto count = std::make_shared<std::size_t>(group.mFrames.size());
 
             for (const auto &frame: group.mFrames) {
+                frame->parent = mFrame;
+
                 if (frame->finished) {
                     --*count;
                     continue;
@@ -621,6 +642,21 @@ namespace asyncio::task {
             return {zero::async::promise::resolve<void, std::exception_ptr>()};
         }
 
+        [[nodiscard]] Awaitable<std::vector<std::source_location>, std::exception_ptr>
+        await_transform(const Backtrace, const std::source_location location = std::source_location::current()) const {
+            std::vector stacktrace{location};
+
+            auto frame = mFrame->parent.lock();
+
+            while (frame) {
+                assert(frame->location);
+                stacktrace.push_back(*frame->location);
+                frame = frame->parent.lock();
+            }
+
+            return {zero::async::promise::resolve<std::vector<std::source_location>, std::exception_ptr>(stacktrace)};
+        }
+
         template<typename Result, typename Error>
         NoExceptAwaitable<Result, Error>
         await_transform(
@@ -706,6 +742,8 @@ namespace asyncio::task {
             const auto count = std::make_shared<std::size_t>(group.mFrames.size());
 
             for (const auto &frame: group.mFrames) {
+                frame->parent = mFrame;
+
                 if (frame->finished) {
                     --*count;
                     continue;

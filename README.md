@@ -248,7 +248,8 @@ namespace {
 
         while (true) {
             zero::error::guard(co_await asyncio::sleep(1s));
-            fmt::print("Do some thing\n");
+            // Trace back the coroutine call stack
+            fmt::print("Do some thing: {}\n", fmt::join(co_await asyncio::task::backtrace, "\n"));
         }
     }
 
@@ -345,7 +346,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
 ```
 
 > Start the server with `./server 0.0.0.0 8000`, and gracefully exit by pressing `ctrl + c` in the terminal.
-> You can also send signal or event to make it perform traceback.
+> You can also send signal or event to trace the call tree.
 
 _For more examples, please refer to the [Documentation](https://github.com/Hackerl/asyncio/tree/master/doc)_
 
