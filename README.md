@@ -137,7 +137,8 @@ Install `asyncio` from the [`vcpkg` private registry](https://github.com/Hackerl
        {
          "kind": "git",
          "repository": "https://github.com/Hackerl/vcpkg-registry",
-         "baseline": "aa3865a8ad99b5265c824b0b550fc71bea9a90b1",
+         "baseline": "183d1fa8f29bc159b83ae476f871b9e1db214527",
+         "reference": "pre",
          "packages": [
            "asyncio",
            "zero"
@@ -338,7 +339,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     );
 
     // Debugging coroutines is always difficult, so we use the built-in traceback functionality of `asyncio` to assist us.
-    co_return co_await race(
+    co_await race(
         task,
         tracing(task)
     );

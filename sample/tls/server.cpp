@@ -24,8 +24,6 @@ asyncio::task::Task<void> handle(asyncio::net::TCPStream stream, asyncio::net::t
         fmt::print("Receive message: {}\n", message);
         zero::error::guard(co_await tls.writeAll(std::as_bytes(std::span{message})));
     }
-
-    co_return;
 }
 
 asyncio::task::Task<void>
@@ -93,7 +91,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     auto listener = zero::error::guard(asyncio::net::TCPListener::listen(ip, port));
     auto signal = asyncio::Signal::make();
 
-    co_return co_await race(
+    co_await race(
         serve(std::move(listener), std::move(context)),
         asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
             zero::error::guard(co_await signal.on(SIGINT));
