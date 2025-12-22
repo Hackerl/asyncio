@@ -376,6 +376,7 @@ namespace asyncio::task {
             auto frame = task.mFrame;
             mFrames.push_back(frame);
 
+            // Although a circular reference is created, it will be broken after the task is completed.
             task.addCallback([frame = std::move(frame), this] {
                 mFrames.remove(frame);
             });
