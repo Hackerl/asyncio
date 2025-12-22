@@ -81,15 +81,13 @@ asyncio::EventLoop asyncio::EventLoop::make() {
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-std::expected<void, std::error_code> asyncio::EventLoop::post(std::function<void()> function) {
+void asyncio::EventLoop::post(std::function<void()> function) {
     const std::lock_guard guard{mTaskQueue->mutex};
     mTaskQueue->queue.push(std::move(function));
 
-    Z_EXPECT(uv::expected([this] {
+    zero::error::guard(uv::expected([this] {
         return uv_async_send(mTaskQueue->async.raw());
     }));
-
-    return {};
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst

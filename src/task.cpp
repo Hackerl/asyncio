@@ -15,9 +15,9 @@ void asyncio::task::Frame::end() {
     const auto eventLoop = getEventLoop();
 
     for (auto &callback: std::exchange(callbacks, {})) {
-        zero::error::guard(eventLoop->post([callback = std::move(callback)] {
+        eventLoop->post([callback = std::move(callback)] {
             callback();
-        }));
+        });
     }
 }
 

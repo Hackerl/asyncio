@@ -210,9 +210,9 @@ namespace asyncio::task {
             requires (!std::is_const_v<Self>)
         Self &&addCallback(this Self &&self, std::function<void()> callback) {
             if (self.done()) {
-                zero::error::guard(getEventLoop()->post([callback = std::move(callback)] {
+                getEventLoop()->post([callback = std::move(callback)] {
                     callback();
-                }));
+                });
 
                 return std::forward<Self>(self);
             }

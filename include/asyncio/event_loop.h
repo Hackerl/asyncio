@@ -31,7 +31,7 @@ namespace asyncio {
         uv_loop_t *raw();
         [[nodiscard]] const uv_loop_t *raw() const;
 
-        std::expected<void, std::error_code> post(std::function<void()> function);
+        void post(std::function<void()> function);
 
         void stop();
         void run();

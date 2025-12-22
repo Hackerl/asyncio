@@ -48,9 +48,9 @@ namespace asyncio {
 
             this->mCore->event.set();
 
-            zero::error::guard(mEventLoop->post([core = this->mCore] {
+            mEventLoop->post([core = this->mCore] {
                 core->trigger();
-            }));
+            });
         }
 
         template<typename... Ts>
@@ -75,9 +75,9 @@ namespace asyncio {
 
             this->mCore->event.set();
 
-            zero::error::guard(mEventLoop->post([core = this->mCore] {
+            mEventLoop->post([core = this->mCore] {
                 core->trigger();
-            }));
+            });
         }
 
     private:
