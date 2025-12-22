@@ -3,7 +3,7 @@
     {
       "kind": "git",
       "repository": "https://github.com/Hackerl/vcpkg-registry",
-      "baseline": "e54396f18b3ddbb74fec5c0a2b05c33e11b5e3a3",
+      "baseline": "a20cc8bc959687c174b27818e6a17d27a849face",
       "reference": "pre",
       "packages": [
         "zero"
