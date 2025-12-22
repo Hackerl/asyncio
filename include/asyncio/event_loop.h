@@ -59,13 +59,13 @@ namespace asyncio {
         const auto eventLoop = std::make_shared<EventLoop>(EventLoop::make());
         setEventLoop(eventLoop);
 
-        auto future = f().future().finally([&] {
+        auto task = f().addCallback([&] {
             eventLoop->stop();
         });
 
         eventLoop->run();
-        assert(future.isReady());
-        return {std::move(future).result()};
+        assert(task.done());
+        return {task.future().result()};
     }
 
     task::Task<void, std::error_code> reschedule();

@@ -19,22 +19,22 @@ namespace asyncio {
         if (ms == std::chrono::milliseconds::zero())
             co_return std::expected<std::expected<T, E>, TimeoutError>{co_await task};
 
-        auto timer = sleep(ms);
-        auto future = timer.future().then([&] {
-            return task.cancel();
-        });
+        auto timer = sleep(ms)
+            .andThen([&] {
+                return task.cancel();
+            });
 
         auto result = co_await task;
 
-        if (future.isReady()) {
-            if (!future.result())
+        if (timer.done()) {
+            if (!timer.future().result())
                 co_return std::expected<std::expected<T, E>, TimeoutError>{std::move(result)};
 
             co_return std::unexpected{TimeoutError::ELAPSED};
         }
 
         std::ignore = timer.cancel();
-        std::ignore = co_await std::move(future);
+        std::ignore = co_await timer;
 
         co_return std::expected<std::expected<T, E>, TimeoutError>{std::move(result)};
     }
