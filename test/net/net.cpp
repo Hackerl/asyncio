@@ -112,7 +112,7 @@ TEST_CASE("convert network address to socket address", "[net]") {
         REQUIRE(interfaces);
         REQUIRE_THAT(*interfaces, !Catch::Matchers::IsEmpty());
 
-        const auto &zone = std::views::keys(*interfaces).front();
+        const auto &zone = (*interfaces | std::views::keys).front();
         const auto index = if_nametoindex(zone.c_str());
         REQUIRE(index != 0);
 
