@@ -7,6 +7,7 @@ set(ASYNCIO_VERSION 1.0.6)
 
 option(BUILD_SAMPLES "Build asyncio samples" ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
+option(BUILD_MODULES "Build asyncio modules" OFF)
 
 if (BUILD_SHARED_LIBS AND MSVC)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -24,32 +25,32 @@ find_package(libuv CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
 add_library(
-        asyncio
-        src/uv.cpp
-        src/io.cpp
-        src/fs.cpp
-        src/time.cpp
-        src/poll.cpp
-        src/pipe.cpp
-        src/thread.cpp
-        src/signal.cpp
-        src/stream.cpp
-        src/buffer.cpp
-        src/channel.cpp
-        src/process.cpp
-        src/task.cpp
-        src/event_loop.cpp
-        src/net/net.cpp
-        src/net/dns.cpp
-        src/net/tls.cpp
-        src/net/dgram.cpp
-        src/net/stream.cpp
-        src/http/url.cpp
-        src/http/request.cpp
-        src/http/websocket.cpp
-        src/sync/mutex.cpp
-        src/sync/event.cpp
-        src/sync/condition.cpp
+    asyncio
+    src/uv.cpp
+    src/io.cpp
+    src/fs.cpp
+    src/time.cpp
+    src/poll.cpp
+    src/pipe.cpp
+    src/thread.cpp
+    src/signal.cpp
+    src/stream.cpp
+    src/buffer.cpp
+    src/channel.cpp
+    src/process.cpp
+    src/task.cpp
+    src/event_loop.cpp
+    src/net/net.cpp
+    src/net/dns.cpp
+    src/net/tls.cpp
+    src/net/dgram.cpp
+    src/net/stream.cpp
+    src/http/url.cpp
+    src/http/request.cpp
+    src/http/websocket.cpp
+    src/sync/mutex.cpp
+    src/sync/event.cpp
+    src/sync/condition.cpp
 )
 
 if (WIN32)
@@ -57,73 +58,73 @@ if (WIN32)
 endif ()
 
 target_include_directories(
-        asyncio
-        PUBLIC
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    asyncio
+    PUBLIC
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
 target_link_libraries(
-        asyncio
-        PRIVATE
-        $<$<PLATFORM_ID:Windows>:Crypt32>
-        PUBLIC
-        zero::zero
-        ZLIB::ZLIB
-        OpenSSL::SSL
-        OpenSSL::Crypto
-        CURL::libcurl
-        nlohmann_json::nlohmann_json
-        $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
+    asyncio
+    PRIVATE
+    $<$<PLATFORM_ID:Windows>:Crypt32>
+    PUBLIC
+    zero::zero
+    ZLIB::ZLIB
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
+    $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
 )
 
 add_library(asyncio-main STATIC src/main.cpp)
 target_link_libraries(asyncio-main PUBLIC asyncio)
 
 install(
-        DIRECTORY
-        include/
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        ${EXCLUDE_HEADERS}
+    DIRECTORY
+    include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    ${EXCLUDE_HEADERS}
 )
 
 install(
-        TARGETS asyncio
-        EXPORT ${PROJECT_NAME}Targets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    TARGETS asyncio
+    EXPORT ${PROJECT_NAME}Targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 install(
-        TARGETS asyncio-main
-        EXPORT ${PROJECT_NAME}Targets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    TARGETS asyncio-main
+    EXPORT ${PROJECT_NAME}Targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 install(
-        EXPORT ${PROJECT_NAME}Targets
-        NAMESPACE ${PROJECT_NAME}::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+    EXPORT ${PROJECT_NAME}Targets
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
 configure_package_config_file(
-        cmake/${PROJECT_NAME}-config.cmake.in
-        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
-        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+    cmake/${PROJECT_NAME}-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
 write_basic_package_version_file(
-        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
-        VERSION ${ASYNCIO_VERSION}
-        COMPATIBILITY SameMajorVersion
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+    VERSION ${ASYNCIO_VERSION}
+    COMPATIBILITY SameMajorVersion
 )
 
 install(
-        FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
-        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+    FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
 if (BUILD_SAMPLES)
@@ -132,4 +133,8 @@ endif ()
 
 if (BUILD_TESTING)
     add_subdirectory(test)
+endif ()
+
+if (BUILD_MODULES)
+    add_subdirectory(modules)
 endif ()

@@ -88,6 +88,7 @@ Based on the `libuv` event loop, use C++20 stackless `coroutines` to implement n
 - Lessons learned from `JavaScript`'s `Promise.all`, `Promise.any`, `Promise.race`, etc., subtask management methods.
 - Lessons learned from `Golang`'s `WaitGroup` dynamic task management groups.
 - Built-in call stack tracing allows for better debugging and analysis.
+- Support for C++20 modules.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
