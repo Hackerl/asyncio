@@ -73,7 +73,7 @@ namespace asyncio {
 
         auto result = co_await task::CancellableFuture{
             promise.getFuture(),
-            [&]() -> std::expected<void, std::error_code> {
+            [&] {
                 return cancel(thread.native_handle());
             }
         };
@@ -203,7 +203,7 @@ namespace asyncio {
 
             if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                [&] {
                     return uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }).transform([](const auto &) {
@@ -243,7 +243,7 @@ namespace asyncio {
 
             if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                [&] {
                     return uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }).transform([](const auto &) {
