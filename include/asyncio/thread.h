@@ -11,22 +11,35 @@ namespace asyncio {
     toThread(F f) {
         using T = std::invoke_result_t<F>;
 
-        Promise<T> promise;
+        Promise<T, std::exception_ptr> promise;
 
         std::thread thread{
             [&] {
-                if constexpr (std::is_void_v<T>) {
-                    f();
-                    promise.resolve();
+                try {
+                    if constexpr (std::is_void_v<T>) {
+                        f();
+                        promise.resolve();
+                    }
+                    else {
+                        promise.resolve(f());
+                    }
                 }
-                else {
-                    promise.resolve(f());
+                catch (const std::exception &) {
+                    promise.reject(std::current_exception());
                 }
             }
         };
         Z_DEFER(thread.join());
 
-        co_return *co_await promise.getFuture();
+        auto result = co_await promise.getFuture();
+
+        if (!result)
+            std::rethrow_exception(result.error());
+
+        if constexpr (std::is_void_v<T>)
+            co_return;
+        else
+            co_return *std::move(result);
     }
 
     template<typename F, typename C>
@@ -38,27 +51,40 @@ namespace asyncio {
     toThread(F f, C cancel) {
         using T = std::invoke_result_t<F>;
 
-        Promise<T> promise;
+        Promise<T, std::exception_ptr> promise;
 
         std::thread thread{
             [&] {
-                if constexpr (std::is_void_v<T>) {
-                    f();
-                    promise.resolve();
+                try {
+                    if constexpr (std::is_void_v<T>) {
+                        f();
+                        promise.resolve();
+                    }
+                    else {
+                        promise.resolve(f());
+                    }
                 }
-                else {
-                    promise.resolve(f());
+                catch (const std::exception &) {
+                    promise.reject(std::current_exception());
                 }
             }
         };
         Z_DEFER(thread.join());
 
-        co_return *co_await task::CancellableFuture{
+        auto result = co_await task::CancellableFuture{
             promise.getFuture(),
             [&]() -> std::expected<void, std::error_code> {
                 return cancel(thread.native_handle());
             }
         };
+
+        if (!result)
+            std::rethrow_exception(result.error());
+
+        if constexpr (std::is_void_v<T>)
+            co_return;
+        else
+            co_return *std::move(result);
     }
 
     Z_DEFINE_ERROR_CODE_EX(

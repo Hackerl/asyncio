@@ -209,17 +209,15 @@ namespace {
 
             // `WaitForSingleObject` cannot be integrated into EventLoop, so we use a separate thread to call it,
             // and a custom cancellation function allows it to be seamlessly integrated into coroutine management.
-            zero::error::guard(co_await asyncio::toThread(
-                [&, &cancelled = std::as_const(cancelled)]() -> std::expected<void, std::error_code> {
+            co_await asyncio::toThread(
+                [&, &cancelled = std::as_const(cancelled)] {
                     if (WaitForSingleObject(*event, INFINITE) != WAIT_OBJECT_0)
-                        return std::unexpected{
-                            std::error_code{static_cast<int>(GetLastError()), std::system_category()}
-                        };
+                        throw zero::error::SystemError{static_cast<int>(GetLastError()), std::system_category()};
 
                     if (cancelled)
-                        return std::unexpected{asyncio::task::Error::CANCELLED};
+                        throw zero::error::SystemError{asyncio::task::Error::CANCELLED};
 
-                    return {};
+                    return;
                 },
                 [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
                     cancelled = true;
@@ -227,7 +225,7 @@ namespace {
                         return SetEvent(*event);
                     });
                 }
-            ));
+            );
 
             // Print the task's formatted call stack
             fmt::print(stderr, "{}\n", task.trace());
