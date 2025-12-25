@@ -31,7 +31,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
 
         message.resize(n);
 
-        fmt::print("Receive message: {}\n", message);
+        fmt::print("Received message: {}\n", message);
         zero::error::guard(co_await asyncio::sleep(1s));
     }
 }

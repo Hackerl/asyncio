@@ -5,8 +5,7 @@
 #include <zero/formatter.h>
 
 asyncio::task::Task<void> handle(asyncio::net::TCPStream stream, asyncio::net::tls::Context context) {
-    const auto address = zero::error::guard(stream.remoteAddress());
-    fmt::print("Connection: {}\n", address);
+    fmt::print("Connection: {}\n", zero::error::guard(stream.remoteAddress()));
 
     auto tls = zero::error::guard(co_await asyncio::net::tls::accept(std::move(stream), std::move(context)));
 
@@ -21,7 +20,7 @@ asyncio::task::Task<void> handle(asyncio::net::TCPStream stream, asyncio::net::t
 
         message.resize(n);
 
-        fmt::print("Receive message: {}\n", message);
+        fmt::print("Received message: {}\n", message);
         zero::error::guard(co_await tls.writeAll(std::as_bytes(std::span{message})));
     }
 }
