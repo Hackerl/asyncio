@@ -84,10 +84,10 @@ std::expected<std::optional<asyncio::process::ExitStatus>, std::error_code> asyn
     const auto &impl = this->impl();
 
     if (const auto result = impl.wait(0ms); !result) {
-        if (result.error() == std::errc::timed_out)
-            return std::nullopt;
+        if (result.error() != std::errc::timed_out)
+            return std::unexpected{result.error()};
 
-        return std::unexpected{result.error()};
+        return std::nullopt;
     }
 
     return impl.exitCode().transform([](const auto &code) {
