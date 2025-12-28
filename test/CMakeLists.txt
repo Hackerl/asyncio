@@ -11,7 +11,6 @@ add_executable(
         binary.cpp
         promise.cpp
         channel.cpp
-        process.cpp
         event_loop.cpp
         task/error.cpp
         task/exception.cpp
@@ -27,6 +26,7 @@ add_executable(
         sync/event.cpp
         sync/condition.cpp
         $<$<NOT:$<PLATFORM_ID:Windows>>:signal.cpp>
+        $<$<PLATFORM_ID:Windows,Darwin,Linux,Android>:process.cpp>
 )
 
 target_include_directories(asyncio_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

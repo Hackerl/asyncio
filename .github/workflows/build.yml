@@ -139,10 +139,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Install LLVM
-        run: |
-          brew install llvm@19
-          echo "LLVM_HOME=$(brew --prefix llvm@19)" >> $GITHUB_ENV
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         env:
@@ -162,10 +158,32 @@ jobs:
           buildPreset: debug-asan
           testPreset: debug-asan
         env:
-          CC: ${{ env.LLVM_HOME }}/bin/clang
-          CXX: ${{ env.LLVM_HOME }}/bin/clang++
-          LDFLAGS: -L${{ env.LLVM_HOME }}/lib/c++ -L${{ env.LLVM_HOME }}/lib -L${{ env.LLVM_HOME }}/lib/unwind -lunwind -Wl,-rpath,${{ env.LLVM_HOME }}/lib/c++ -Wl,-rpath,${{ env.LLVM_HOME }}/lib -Wl,-rpath,${{ env.LLVM_HOME }}/lib/unwind
           SDKROOT: macosx
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-binary-cache-
+      - name: Build
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug-asan
+          configurePresetAdditionalArgs: "['-DCMAKE_SYSTEM_NAME=iOS', '-DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST']"
+          buildPreset: debug-asan
+        env:
+          SDKROOT: iphoneos
 
   android:
     runs-on: ubuntu-latest

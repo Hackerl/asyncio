@@ -36,7 +36,6 @@ add_library(
         src/stream.cpp
         src/buffer.cpp
         src/channel.cpp
-        src/process.cpp
         src/task.cpp
         src/event_loop.cpp
         src/net/net.cpp
@@ -50,6 +49,7 @@ add_library(
         src/sync/mutex.cpp
         src/sync/event.cpp
         src/sync/condition.cpp
+        $<$<PLATFORM_ID:Windows,Darwin,Linux,Android>:src/process.cpp>
 )
 
 if (WIN32)
