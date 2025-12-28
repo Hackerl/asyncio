@@ -20,9 +20,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Build and test
         uses: lukka/run-cmake@v10
         with:
@@ -51,9 +51,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Build
         uses: lukka/run-cmake@v10
         with:
@@ -77,9 +77,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Create custom triplet
         # https://github.com/microsoft/vcpkg/issues/29132
         run: |
@@ -111,9 +111,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Create custom triplet
         # https://github.com/microsoft/vcpkg/issues/29132
         run: |
@@ -147,9 +147,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Build and test
         uses: lukka/run-cmake@v10
         with:
@@ -173,9 +173,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Build
         uses: lukka/run-cmake@v10
         with:
@@ -211,9 +211,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-${{ matrix.api }}-${{ matrix.platform.abi }}-${{ matrix.platform.triplet }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-${{ matrix.api }}-${{ matrix.platform.abi }}-${{ matrix.platform.triplet }}-vcpkg-binary-cache-
       - name: Create custom triplet
         run: |
           cp "${VCPKG_ROOT}/triplets/${{ matrix.platform.triplet }}.cmake" android-${{ matrix.api }}.cmake
