@@ -269,8 +269,13 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
         });
 
         if (!fd) {
-            std::ignore = child->kill();
-            std::ignore = child->wait();
+            zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
+                if (ec != std::errc::no_such_process)
+                    return std::unexpected{ec};
+
+                return {};
+            }));
+            zero::error::guard(child->wait());
             return std::unexpected{fd.error()};
         }
 
@@ -279,8 +284,13 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
         auto pipe = Pipe::from(*fd);
 
         if (!pipe) {
-            std::ignore = child->kill();
-            std::ignore = child->wait();
+            zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
+                if (ec != std::errc::no_such_process)
+                    return std::unexpected{ec};
+
+                return {};
+            }));
+            zero::error::guard(child->wait());
 
             uv_fs_t request{};
 
@@ -338,7 +348,7 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     Z_CO_EXPECT(child);
 
     if (auto input = std::exchange(child->stdInput(), std::nullopt))
-        std::ignore = co_await input->close();
+        zero::error::guard(co_await input->close());
 
     auto result = co_await all(
         task::spawn([&]() -> task::Task<std::vector<std::byte>, std::error_code> {
@@ -360,8 +370,13 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     );
 
     if (!result) {
-        std::ignore = child->kill();
-        std::ignore = co_await child->wait();
+        zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
+            if (ec != std::errc::no_such_process)
+                return std::unexpected{ec};
+
+            return {};
+        }));
+        zero::error::guard(co_await child->wait());
         co_return std::unexpected{result.error()};
     }
 
