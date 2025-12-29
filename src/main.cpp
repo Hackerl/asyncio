@@ -6,7 +6,8 @@ asyncio::task::Task<void> asyncMain(int argc, char *argv[]);
 
 int main(const int argc, char *argv[]) {
 #if defined(__unix__) || defined(__APPLE__)
-    signal(SIGPIPE, SIG_IGN);
+    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
+        throw zero::error::SystemError{errno, std::generic_category()};
 #endif
 
     const auto result = asyncio::run([=] {
