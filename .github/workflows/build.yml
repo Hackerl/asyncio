@@ -226,3 +226,37 @@ jobs:
           buildPreset: debug-asan
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+  ohos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install OHOS toolchains
+        run: curl -fsSL https://github.com/Hackerl/ohos-ndk-llvm19/releases/download/v6.0.1.260/ohos-ndk-llvm19.tar.gz | tar -xz -C /opt
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ github.job }}-vcpkg-binary-cache-
+      - name: Create custom triplet
+        run: |
+          cat <<EOF > arm64-ohos.cmake
+          set(VCPKG_TARGET_ARCHITECTURE arm64)
+          set(VCPKG_CRT_LINKAGE dynamic)
+          set(VCPKG_LIBRARY_LINKAGE static)
+          set(VCPKG_CMAKE_SYSTEM_NAME Linux)
+          set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE /opt/ohos-ndk-llvm19/build/cmake/ohos.toolchain.cmake)
+          EOF
+      - name: Build
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug-asan
+          configurePresetAdditionalArgs: "['-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=/opt/ohos-ndk-llvm19/build/cmake/ohos.toolchain.cmake', String.raw`-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}`, '-DVCPKG_TARGET_TRIPLET=arm64-ohos', '-DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST']"
+          buildPreset: debug-asan
