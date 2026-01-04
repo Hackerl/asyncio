@@ -370,6 +370,9 @@ namespace asyncio::task {
         template<typename T>
             requires zero::detail::is_specialization_v<std::remove_cvref_t<T>, Task>
         void add(T &&task) {
+            if (task.mFrame->finished)
+                return;
+
             if (mCancelled)
                 std::ignore = task.cancel();
 
@@ -828,7 +831,7 @@ namespace asyncio::task {
 
         co_await group;
 
-        auto &result = future.result();
+        auto result = co_await std::move(future);
 
         if constexpr (std::is_same_v<E, std::exception_ptr>) {
             if (!result)
@@ -881,7 +884,7 @@ namespace asyncio::task {
 
         co_await group;
 
-        auto &result = future.result();
+        auto result = co_await std::move(future);
 
         if constexpr (std::is_same_v<E, std::exception_ptr>) {
             if (!result)
@@ -1080,7 +1083,7 @@ namespace asyncio::task {
 
         co_await group;
 
-        auto &result = future.result();
+        auto result = co_await std::move(future);
 
         if constexpr (std::is_same_v<E, std::exception_ptr>) {
             if (!result)
@@ -1133,7 +1136,7 @@ namespace asyncio::task {
 
         co_await group;
 
-        auto &result = future.result();
+        auto result = co_await std::move(future);
 
         if constexpr (std::is_same_v<E, std::exception_ptr>) {
             if (!result)
