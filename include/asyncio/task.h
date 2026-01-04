@@ -741,7 +741,12 @@ namespace asyncio::task {
 
         Awaitable<void, std::exception_ptr>
         await_transform(TaskGroup &group, const std::source_location location = std::source_location::current()) {
-            if (group.mFrames.empty())
+            if (group.mFrames.empty() || std::ranges::all_of(
+                group.mFrames,
+                [](const auto &frame) {
+                    return frame->finished;
+                }
+            ))
                 return {zero::async::promise::resolve<void, std::exception_ptr>()};
 
             const auto promise = std::make_shared<asyncio::Promise<void, std::exception_ptr>>();
