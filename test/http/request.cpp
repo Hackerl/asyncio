@@ -36,10 +36,10 @@ namespace {
             const auto length = zero::strings::toNumber<std::size_t>(match.str(1));
             Z_CO_EXPECT(length);
 
-            std::vector<std::byte> remain(*length - (rawRequest.size() - rawRequest.find("\r\n\r\n") - 4));
-            Z_CO_EXPECT(co_await stream->readExactly(remain));
+            std::vector<std::byte> remaining(*length - (rawRequest.size() - rawRequest.find("\r\n\r\n") - 4));
+            Z_CO_EXPECT(co_await stream->readExactly(remaining));
 
-            rawRequest.append(reinterpret_cast<const char *>(remain.data()), remain.size());
+            rawRequest.append(reinterpret_cast<const char *>(remaining.data()), remaining.size());
         }
 
         Z_CO_EXPECT(co_await stream->writeAll(

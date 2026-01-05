@@ -216,8 +216,6 @@ namespace {
 
                     if (cancelled)
                         throw zero::error::SystemError{asyncio::task::Error::CANCELLED};
-
-                    return;
                 },
                 [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
                     cancelled = true;
