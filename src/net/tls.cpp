@@ -5,6 +5,11 @@
 #include <zero/os/windows/error.h>
 #endif
 
+#ifdef ASYNCIO_EMBED_CA_CERT
+#include <ca_cert.h>
+#include <openssl/x509.h>
+#endif
+
 #ifdef __linux__
 constexpr auto SYSTEM_CA_BUNDLE_PATHS = {
     "/etc/ssl/certs/ca-certificates.crt",
@@ -87,6 +92,43 @@ asyncio::task::Task<asyncio::net::tls::PrivateKey, std::error_code>
 asyncio::net::tls::PrivateKey::loadFile(const std::filesystem::path &path) {
     co_return co_await fs::readString(path).andThen(load);
 }
+
+#ifdef ASYNCIO_EMBED_CA_CERT
+std::expected<void, std::error_code> asyncio::net::tls::Config::loadEmbeddedCA(X509_STORE *store) {
+    const std::unique_ptr<BIO, decltype(&BIO_free)> bio{
+        BIO_new_mem_buf(CA_CERT.data(), CA_CERT.size()),
+        BIO_free
+    };
+
+    if (!bio)
+        return std::unexpected{openSSLError()};
+
+    const auto info = PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr);
+
+    if (!info)
+        return std::unexpected{openSSLError()};
+
+    Z_DEFER(sk_X509_INFO_pop_free(info, X509_INFO_free));
+
+    for (int i{0}; i < sk_X509_INFO_num(info); ++i) {
+        const auto *item = sk_X509_INFO_value(info, i);
+
+        if (item->x509) {
+            Z_EXPECT(asyncio::net::tls::expected([&] {
+                return X509_STORE_add_cert(store, item->x509);
+            }));
+        }
+
+        if (item->crl) {
+            Z_EXPECT(asyncio::net::tls::expected([&] {
+                return X509_STORE_add_crl(store, item->crl);
+            }));
+        }
+    }
+
+    return {};
+}
+#endif
 
 #ifdef _WIN32
 std::expected<void, std::error_code>

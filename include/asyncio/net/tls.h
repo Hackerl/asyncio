@@ -70,6 +70,10 @@ namespace asyncio::net::tls {
     class ServerConfig;
 
     class Config {
+#ifdef ASYNCIO_EMBED_CA_CERT
+        static std::expected<void, std::error_code> loadEmbeddedCA(X509_STORE *store);
+#endif
+
 #ifdef _WIN32
         static std::expected<void, std::error_code> loadSystemCerts(X509_STORE *store, const std::string &name);
 #endif
@@ -119,6 +123,14 @@ namespace asyncio::net::tls {
             }));
 
             if (self.mRootCAs.empty()) {
+#ifdef ASYNCIO_EMBED_CA_CERT
+                const auto store = SSL_CTX_get_cert_store(context.get());
+
+                if (!store)
+                    return std::unexpected{openSSLError()};
+
+                Z_EXPECT(loadEmbeddedCA(store));
+#else
 #ifdef _WIN32
                 const auto store = SSL_CTX_get_cert_store(context.get());
 
@@ -138,6 +150,7 @@ namespace asyncio::net::tls {
                         return SSL_CTX_load_verify_locations(context.get(), bundle->c_str(), nullptr);
                     }));
                 }
+#endif
 #endif
 #endif
             } else {

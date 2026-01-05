@@ -478,7 +478,7 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
         auto decompressed = co_await decompressor.decompress(frame->data);
         Z_CO_EXPECT(decompressed);
 
-        frame->data = std::move(*decompressed);
+        frame->data = *std::move(decompressed);
 
         if (config.serverNoContextTakeover) {
             Z_CO_EXPECT(decompressor.reset());
@@ -510,7 +510,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
         assert(compressed->size() > 4);
         compressed->resize(compressed->size() - 4);
 
-        message.data = std::move(*compressed);
+        message.data = *std::move(compressed);
         header.rsv1(true);
     }
 

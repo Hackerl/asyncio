@@ -3,7 +3,9 @@
 #include <zero/defer.h>
 #include <fmt/ranges.h>
 
-#ifdef __linux__
+#ifdef ASYNCIO_EMBED_CA_CERT
+#include <ca_cert.h>
+#elif defined(__linux__)
 #include <asyncio/net/tls.h>
 #endif
 
@@ -603,18 +605,29 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         return curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L);
     }));
 
-#ifdef __linux__
-    if (const auto bundle = net::tls::systemCABundle()) {
-        zero::error::guard(expected([&] {
-            return curl_easy_setopt(easy, CURLOPT_CAINFO, bundle->c_str());
-        }));
-    }
-#endif
-
     if (ca) {
         zero::error::guard(expected([&] {
             return curl_easy_setopt(easy, CURLOPT_CAINFO, ca->c_str());
         }));
+    }
+    else {
+#ifdef ASYNCIO_EMBED_CA_CERT
+        constexpr curl_blob blob{
+            .data = const_cast<char *>(CA_CERT.data()),
+            .len = CA_CERT.size(),
+            .flags = CURL_BLOB_COPY
+        };
+
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(easy, CURLOPT_CAINFO_BLOB, &blob);
+        }));
+#elif defined(__linux__)
+        if (const auto bundle = net::tls::systemCABundle()) {
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(easy, CURLOPT_CAINFO, bundle->c_str());
+            }));
+        }
+#endif
     }
 
     if (cert) {

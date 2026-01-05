@@ -7,6 +7,7 @@ set(ASYNCIO_VERSION 1.0.6)
 
 option(BUILD_SAMPLES "Build asyncio samples" ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
+option(ASYNCIO_EMBED_CA_CERT "Use built-in CA certificates instead of system certificates" OFF)
 
 if (BUILD_SHARED_LIBS AND MSVC)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -51,6 +52,23 @@ add_library(
         src/sync/condition.cpp
         $<$<PLATFORM_ID:Windows,Darwin,Linux,Android>:src/process.cpp>
 )
+
+if (ASYNCIO_EMBED_CA_CERT)
+    set(ca_cert_file ${CMAKE_CURRENT_BINARY_DIR}/cacert.pem)
+    set(ca_cert_header ${CMAKE_CURRENT_SOURCE_DIR}/include/ca_cert.h)
+
+    if (NOT EXISTS ${ca_cert_file})
+        file(DOWNLOAD "https://curl.se/ca/cacert.pem" ${ca_cert_file})
+    endif ()
+
+    if (NOT EXISTS ${ca_cert_header})
+        file(READ ${ca_cert_file} content)
+        file(WRITE ${ca_cert_header} "constexpr std::string_view CA_CERT = R\"(${content})\";")
+    endif ()
+
+    set(EXCLUDE_HEADERS ${EXCLUDE_HEADERS} PATTERN "ca_cert.h" EXCLUDE)
+    target_compile_definitions(asyncio PUBLIC ASYNCIO_EMBED_CA_CERT)
+endif ()
 
 if (WIN32)
     target_compile_definitions(asyncio PUBLIC NOMINMAX)
