@@ -84,7 +84,7 @@ target_include_directories(
 target_link_libraries(
         asyncio
         PRIVATE
-        $<$<PLATFORM_ID:Windows>:Crypt32>
+        $<$<PLATFORM_ID:Windows>:crypt32>
         PUBLIC
         zero::zero
         ZLIB::ZLIB
