@@ -55,8 +55,7 @@ namespace asyncio {
         typename std::invoke_result_t<F>::value_type,
         typename std::invoke_result_t<F>::error_type
     >
-    run(F &&f) {
-        const auto eventLoop = std::make_shared<EventLoop>(EventLoop::make());
+    run(const std::shared_ptr<EventLoop> &eventLoop, F &&f) {
         setEventLoop(eventLoop);
 
         auto task = f().addCallback([&] {
@@ -66,6 +65,12 @@ namespace asyncio {
         eventLoop->run();
         assert(task.done());
         return {task.future().result()};
+    }
+
+    template<typename F>
+        requires zero::detail::is_specialization_v<std::invoke_result_t<F>, task::Task>
+    auto run(F &&f) {
+        return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
     }
 
     task::Task<void, std::error_code> reschedule();
