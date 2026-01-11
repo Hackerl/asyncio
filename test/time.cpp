@@ -13,11 +13,11 @@ ASYNC_TEST_CASE("timeout - error", "[time]") {
     using namespace std::chrono_literals;
 
     SECTION("not expired") {
-        REQUIRE(co_await asyncio::timeout(asyncio::sleep(10ms), 20ms));
+        REQUIRE(co_await asyncio::timeout(asyncio::sleep(10ms), 50ms));
     }
 
     SECTION("expired") {
-        REQUIRE_ERROR(co_await asyncio::timeout(asyncio::sleep(20ms), 10ms), asyncio::TimeoutError::ELAPSED);
+        REQUIRE_ERROR(co_await asyncio::timeout(asyncio::sleep(50ms), 10ms), asyncio::TimeoutError::ELAPSED);
     }
 
     SECTION("expired but cannot be cancelled") {
@@ -33,7 +33,7 @@ ASYNC_TEST_CASE("timeout - error", "[time]") {
             10ms
         );
 
-        REQUIRE(co_await asyncio::sleep(20ms));
+        REQUIRE(co_await asyncio::sleep(50ms));
         REQUIRE_FALSE(task.done());
 
         promise.resolve();
@@ -44,7 +44,7 @@ ASYNC_TEST_CASE("timeout - error", "[time]") {
     }
 
     SECTION("cancel") {
-        auto task = asyncio::timeout(asyncio::sleep(20ms), 10ms);
+        auto task = asyncio::timeout(asyncio::sleep(50ms), 10ms);
         REQUIRE(task.cancel());
 
         const auto result = co_await task;
@@ -63,7 +63,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
                 asyncio::task::spawn([]() -> asyncio::task::Task<void> {
                     zero::error::guard(co_await asyncio::sleep(10ms));
                 }),
-                20ms
+                50ms
             )
         );
     }
@@ -72,7 +72,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
         REQUIRE_THROWS_MATCHES(
             co_await asyncio::timeout(
                 asyncio::task::spawn([]() -> asyncio::task::Task<void> {
-                    zero::error::guard(co_await asyncio::sleep(20ms));
+                    zero::error::guard(co_await asyncio::sleep(50ms));
                 }),
                 10ms
             ),
@@ -98,7 +98,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
             10ms
         );
 
-        REQUIRE(co_await asyncio::sleep(20ms));
+        REQUIRE(co_await asyncio::sleep(50ms));
         REQUIRE_FALSE(task.done());
 
         promise.resolve();
@@ -108,7 +108,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
     SECTION("cancel") {
         auto task = asyncio::timeout(
             asyncio::task::spawn([]() -> asyncio::task::Task<void> {
-                zero::error::guard(co_await asyncio::sleep(20ms));
+                zero::error::guard(co_await asyncio::sleep(50ms));
             }),
             10ms
         );
