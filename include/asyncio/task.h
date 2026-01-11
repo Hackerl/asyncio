@@ -613,8 +613,8 @@ namespace asyncio::task {
     template<>
     class Promise<void, std::exception_ptr> {
     public:
-        Promise(): mFrame{std::make_shared<Frame>()},
-                   mPromise{std::make_shared<asyncio::Promise<void, std::exception_ptr>>()} {
+        Promise() : mFrame{std::make_shared<Frame>()},
+                    mPromise{std::make_shared<asyncio::Promise<void, std::exception_ptr>>()} {
         }
 
         // ReSharper disable once CppMemberFunctionMayBeStatic

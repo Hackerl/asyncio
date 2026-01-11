@@ -34,7 +34,7 @@ asyncio::http::URL::URL(const URL &rhs) : mURL{curl_url_dup(rhs.mURL.get()), cur
         throw zero::error::SystemError{errno, std::generic_category()};
 }
 
-asyncio::http::URL::URL(URL &&rhs) noexcept: mURL{std::move(rhs.mURL)} {
+asyncio::http::URL::URL(URL &&rhs) noexcept : mURL{std::move(rhs.mURL)} {
 }
 
 asyncio::http::URL &asyncio::http::URL::operator=(const URL &rhs) {

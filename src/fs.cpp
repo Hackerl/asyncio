@@ -9,7 +9,7 @@
 #include <zero/os/unix/error.h>
 #endif
 
-asyncio::fs::File::File(const uv_file file): mFile{file}, mEventLoop{getEventLoop()} {
+asyncio::fs::File::File(const uv_file file) : mFile{file}, mEventLoop{getEventLoop()} {
 }
 
 asyncio::fs::File::File(File &&rhs) noexcept

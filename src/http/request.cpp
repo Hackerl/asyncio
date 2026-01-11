@@ -300,15 +300,18 @@ asyncio::http::Requests::Requests(std::unique_ptr<Core> core) : mCore{std::move(
 asyncio::http::Requests asyncio::http::Requests::make(Options options) {
     static std::once_flag flag;
 
-    std::call_once(flag, [] {
-        zero::error::guard(expected([] {
-            return curl_global_init(CURL_GLOBAL_DEFAULT);
-        }));
+    std::call_once(
+        flag,
+        [] {
+            zero::error::guard(expected([] {
+                return curl_global_init(CURL_GLOBAL_DEFAULT);
+            }));
 
-        std::atexit([] {
-            curl_global_cleanup();
-        });
-    });
+            std::atexit([] {
+                curl_global_cleanup();
+            });
+        }
+    );
 
     std::unique_ptr<CURLM, decltype(&curl_multi_cleanup)> ptr{curl_multi_init(), curl_multi_cleanup};
 

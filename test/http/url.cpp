@@ -206,7 +206,12 @@ TEST_CASE("URL", "[http::url]") {
                 REQUIRE(url->rawQuery() == "name=%E6%B5%8B%E8%AF%95");
 
                 url->appendQuery("description", R"(special chars !@#$%^&*()_+-=[]{}|;':",./<>? and spaces)");
-                REQUIRE(url->query() == R"(name=测试&description=special chars !@#$%^&*()_+-=[]{}|;':",./<>? and spaces)");
+
+                REQUIRE(
+                    url->query() ==
+                    R"(name=测试&description=special chars !@#$%^&*()_+-=[]{}|;':",./<>? and spaces)"
+                );
+
                 REQUIRE(
                     url->rawQuery() ==
                     "name=%E6%B5%8B%E8%AF%95&description=special+chars+%21%40%23%24%25%5E%26%2A%28%29_"

@@ -160,6 +160,7 @@ namespace asyncio {
 }
 
 Z_DECLARE_ERROR_CONDITION(asyncio::IOError)
+
 Z_DECLARE_ERROR_CODE(asyncio::IReader::ReadExactlyError)
 
 #endif //ASYNCIO_IO_H

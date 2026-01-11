@@ -6,7 +6,7 @@ thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 asyncio::EventLoop::EventLoop(
     std::unique_ptr<uv_loop_t, void(*)(uv_loop_t *)> loop,
     std::unique_ptr<TaskQueue> taskQueue
-): mLoop{std::move(loop)}, mTaskQueue{std::move(taskQueue)} {
+) : mLoop{std::move(loop)}, mTaskQueue{std::move(taskQueue)} {
 }
 
 asyncio::EventLoop::~EventLoop() {

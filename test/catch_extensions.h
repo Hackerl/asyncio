@@ -136,8 +136,8 @@ public:
         const std::size_t maxLength,
         std::string charset,
         const unsigned int seed
-    ): mGenerator{seed}, mLengthDistribution{minLength, maxLength},
-       mIndexDistribution{0, charset.size() - 1}, mCharset{std::move(charset)} {
+    ) : mGenerator{seed}, mLengthDistribution{minLength, maxLength},
+        mIndexDistribution{0, charset.size() - 1}, mCharset{std::move(charset)} {
         next();
     }
 

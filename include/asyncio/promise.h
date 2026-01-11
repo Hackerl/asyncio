@@ -11,7 +11,7 @@ namespace asyncio {
         Promise() : mEventLoop{getEventLoop()} {
         }
 
-        explicit Promise(std::shared_ptr<EventLoop> eventLoop): mEventLoop{std::move(eventLoop)} {
+        explicit Promise(std::shared_ptr<EventLoop> eventLoop) : mEventLoop{std::move(eventLoop)} {
         }
 
         explicit Promise(zero::async::promise::Promise<T, E> &&rhs)

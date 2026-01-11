@@ -153,7 +153,8 @@ namespace asyncio::net::tls {
 #endif
 #endif
 #endif
-            } else {
+            }
+            else {
                 const auto store = SSL_CTX_get_cert_store(context.get());
 
                 if (!store)

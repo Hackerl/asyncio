@@ -1,7 +1,6 @@
 #include <asyncio/poll.h>
 
 asyncio::Poll::Poll(uv::Handle<uv_poll_t> poll) : mPoll{std::move(poll)} {
-
 }
 
 std::expected<asyncio::Poll, std::error_code> asyncio::Poll::make(const int fd) {

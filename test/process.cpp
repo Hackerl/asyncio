@@ -24,10 +24,10 @@ ASYNC_TEST_CASE("spawn child process and collect output", "[process]") {
     REQUIRE(output);
     REQUIRE(output->status.success());
 
-    REQUIRE(zero::strings::trim({
-        reinterpret_cast<const char *>(output->out.data()),
-        output->out.size()
-    }) == *hostname);
+    REQUIRE(
+        zero::strings::trim({reinterpret_cast<const char *>(output->out.data()), output->out.size()}) ==
+        *hostname
+    );
 }
 
 ASYNC_TEST_CASE("spawn child process with pseudo console", "[process]") {

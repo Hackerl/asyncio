@@ -55,9 +55,12 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
 
         int value{};
 
-        auto task = condition.wait(mutex, [&] {
-            return value == 1;
-        });
+        auto task = condition.wait(
+            mutex,
+            [&] {
+                return value == 1;
+            }
+        );
         REQUIRE_FALSE(mutex.locked());
 
         REQUIRE(co_await asyncio::sleep(20ms));
