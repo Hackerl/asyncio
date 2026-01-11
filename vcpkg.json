@@ -1,7 +1,7 @@
 {
   "name": "asyncio",
   "version": "1.0.6",
-  "builtin-baseline": "6b3172d1a7be062b3d0278369aac9a0258cefc65",
+  "builtin-baseline": "84bab45d415d22042bd0b9081aea57f362da3f35",
   "dependencies": [
     "curl",
     "libuv",
