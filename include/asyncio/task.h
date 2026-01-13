@@ -439,17 +439,24 @@ namespace asyncio::task {
 
         [[nodiscard]] Awaitable<std::vector<std::source_location>, std::exception_ptr>
         await_transform(const Backtrace, const std::source_location location = std::source_location::current()) const {
-            std::vector stacktrace{location};
+            auto promise = std::make_shared<asyncio::Promise<std::vector<std::source_location>, std::exception_ptr>>();
+            auto future = promise->getFuture();
 
-            auto frame = mFrame->parent.lock();
+            getEventLoop()->post([=, this, promise = std::move(promise)] {
+                std::vector stacktrace{location};
 
-            while (frame) {
-                assert(frame->location);
-                stacktrace.push_back(*frame->location);
-                frame = frame->parent.lock();
-            }
+                auto frame = mFrame->parent.lock();
 
-            return {zero::async::promise::resolve<std::vector<std::source_location>, std::exception_ptr>(stacktrace)};
+                while (frame) {
+                    assert(frame->location);
+                    stacktrace.push_back(*frame->location);
+                    frame = frame->parent.lock();
+                }
+
+                promise->resolve(std::move(stacktrace));
+            });
+
+            return {std::move(future)};
         }
 
         template<typename Result, typename Error>
@@ -653,17 +660,24 @@ namespace asyncio::task {
 
         [[nodiscard]] Awaitable<std::vector<std::source_location>, std::exception_ptr>
         await_transform(const Backtrace, const std::source_location location = std::source_location::current()) const {
-            std::vector stacktrace{location};
+            auto promise = std::make_shared<asyncio::Promise<std::vector<std::source_location>, std::exception_ptr>>();
+            auto future = promise->getFuture();
 
-            auto frame = mFrame->parent.lock();
+            getEventLoop()->post([=, this, promise = std::move(promise)] {
+                std::vector stacktrace{location};
 
-            while (frame) {
-                assert(frame->location);
-                stacktrace.push_back(*frame->location);
-                frame = frame->parent.lock();
-            }
+                auto frame = mFrame->parent.lock();
 
-            return {zero::async::promise::resolve<std::vector<std::source_location>, std::exception_ptr>(stacktrace)};
+                while (frame) {
+                    assert(frame->location);
+                    stacktrace.push_back(*frame->location);
+                    frame = frame->parent.lock();
+                }
+
+                promise->resolve(std::move(stacktrace));
+            });
+
+            return {std::move(future)};
         }
 
         template<typename Result, typename Error>
