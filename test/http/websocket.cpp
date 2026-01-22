@@ -8,7 +8,7 @@
 #include <openssl/sha.h>
 #include <regex>
 
-constexpr auto WebsocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+constexpr auto WebSocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 constexpr auto MaskingKeyLength = 4;
 
 constexpr auto TwoBytePayloadLength = 126;
@@ -22,7 +22,7 @@ namespace {
     public:
         Z_DEFINE_ERROR_CODE_INNER(
             Error,
-            "WebsocketServer",
+            "WebSocketServer",
             NoKeyHeader, "No websocket key header"
         )
 
@@ -49,7 +49,7 @@ namespace {
                 co_return std::unexpected{make_error_code(Error::NoKeyHeader)};
 
             std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
-            const auto data = match.str(1) + WebsocketMagic;
+            const auto data = match.str(1) + WebSocketMagic;
 
             SHA1(
                 reinterpret_cast<const unsigned char *>(data.data()),

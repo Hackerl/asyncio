@@ -30,11 +30,11 @@ constexpr auto FinalBit = std::byte{0x80};
 constexpr auto LengthMask = std::byte{0x7f};
 constexpr auto MaskBit = std::byte{0x80};
 
-constexpr auto WebsocketScheme = "http";
-constexpr auto WebsocketSecureScheme = "https";
-constexpr auto WebsocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+constexpr auto WebSocketScheme = "http";
+constexpr auto WebSocketSecureScheme = "https";
+constexpr auto WebSocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-constexpr auto WebsocketCompressionThreshold = 128;
+constexpr auto WebSocketCompressionThreshold = 128;
 
 Z_DEFINE_ERROR_TRANSFORMER(ZLIBError, "zlib", zError)
 Z_DECLARE_ERROR_CODE(ZLIBError)
@@ -43,14 +43,14 @@ Z_DEFINE_ERROR_CATEGORY_INSTANCE(ZLIBError)
 
 namespace {
     std::expected<void, std::error_code>
-    validateWebsocketAccept(const std::map<std::string, std::string> &headers, const std::string &key) {
+    validateWebSocketAccept(const std::map<std::string, std::string> &headers, const std::string &key) {
         const auto it = headers.find("Sec-WebSocket-Accept");
 
         if (it == headers.end())
             return std::unexpected{asyncio::http::ws::WebSocket::Error::NoAcceptHeader};
 
         std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
-        const auto data = key + WebsocketMagic;
+        const auto data = key + WebSocketMagic;
 
         SHA1(
             reinterpret_cast<const unsigned char *>(data.data()),
@@ -301,7 +301,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
     std::shared_ptr<IWriter> writer;
     std::shared_ptr<ICloseable> closeable;
 
-    if (scheme == WebsocketScheme) {
+    if (scheme == WebSocketScheme) {
         auto stream = co_await net::TCPStream::connect(*host, *port)
             .transform([](net::TCPStream &&value) {
                 return std::make_shared<net::TCPStream>(std::move(value));
@@ -311,7 +311,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
         writer = *stream;
         closeable = *std::move(stream);
     }
-    else if (scheme == WebsocketSecureScheme) {
+    else if (scheme == WebSocketSecureScheme) {
         auto stream = co_await net::TCPStream::connect(*host, *port);
         Z_CO_EXPECT(stream);
 
@@ -397,7 +397,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
         headers[tokens[0]] = zero::strings::trim(tokens[1]);
     }
 
-    Z_CO_EXPECT(validateWebsocketAccept(headers, key));
+    Z_CO_EXPECT(validateWebSocketAccept(headers, key));
 
     const auto config = parseExtensionConfig(headers);
     Z_CO_EXPECT(config);
@@ -503,7 +503,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     header.mask(true);
 
     if (mDeflateExtension && (message.opcode == Opcode::Text || message.opcode == Opcode::Binary)
-        && message.data.size() >= WebsocketCompressionThreshold) {
+        && message.data.size() >= WebSocketCompressionThreshold) {
         auto compressed = co_await mDeflateExtension->compressor.compress(message.data);
         Z_CO_EXPECT(compressed);
 
