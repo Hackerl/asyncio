@@ -76,14 +76,14 @@ void addCallback(std::function<void()> callback);
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
-        zero::detail::is_specialization_v<callback_result_t<F, T>, Task>
+        zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
     )
 Task<typename callback_result_t<F, T>::value_type, E> transform(F f) &&;
 
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
-        !zero::detail::is_specialization_v<callback_result_t<F, T>, Task>
+        !zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
     )
 Task<callback_result_t<F, T>, E> transform(F f) &&;
 ```
@@ -98,14 +98,14 @@ Task<callback_result_t<F, T>, E> transform(F f) &&;
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
-        zero::detail::is_specialization_v<callback_result_t<F, T>, Task>
+        zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
     )
 Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
 
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
-        zero::detail::is_specialization_v<callback_result_t<F, T>, std::expected>
+        zero::traits::is_specialization_v<callback_result_t<F, T>, std::expected>
     )
 Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
 ```
@@ -120,14 +120,14 @@ Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
-        zero::detail::is_specialization_v<callback_result_t<F, E>, Task>
+        zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
     )
 Task<T, typename callback_result_t<F, E>::value_type> transformError(F f) &&;
 
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
-        !zero::detail::is_specialization_v<callback_result_t<F, E>, Task>
+        !zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
     )
 Task<T, callback_result_t<F, E>> transformError(F f) &&;
 ```
@@ -142,14 +142,14 @@ Task<T, callback_result_t<F, E>> transformError(F f) &&;
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
-        zero::detail::is_specialization_v<callback_result_t<F, E>, Task>
+        zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
     )
 Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
-        zero::detail::is_specialization_v<callback_result_t<F, E>, std::expected>
+        zero::traits::is_specialization_v<callback_result_t<F, E>, std::expected>
     )
 Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 ```
@@ -433,7 +433,7 @@ std::expected<void, std::error_code> cancel();
 
 ```cpp
 template<typename T>
-    requires zero::detail::is_specialization_v<std::remove_cvref_t<T>, Task>
+    requires zero::traits::is_specialization_v<std::remove_cvref_t<T>, Task>
 void add(T &&task);
 ```
 
@@ -450,7 +450,7 @@ void add(T &&task);
 
 ```cpp
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::detail::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<
     all_ranges_value_t<I, S>,
     all_ranges_error_t<I, S>
@@ -458,7 +458,7 @@ Task<
 all(I first, S last);
 
 template<std::ranges::range R>
-    requires zero::detail::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
 auto all(R &&tasks) {
     return all(tasks.begin(), tasks.end());
 }
@@ -469,7 +469,7 @@ auto all(R &&tasks) {
 
 ```cpp
 template<typename... Ts>
-    requires (zero::detail::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
     all_variadic_value_t<Ts...>,
     all_variadic_error_t<Ts...>
@@ -487,12 +487,12 @@ all(Ts &&... tasks);
 
 ```cpp
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::detail::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<all_settled_ranges_value_t<I, S>>
 allSettled(I first, S last);
 
 template<std::ranges::range R>
-    requires zero::detail::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
 auto allSettled(R &&tasks) {
     return allSettled(tasks.begin(), tasks.end());
 }
@@ -502,7 +502,7 @@ auto allSettled(R &&tasks) {
 
 ```cpp
 template<typename... Ts>
-    requires (zero::detail::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<all_settled_variadic_value_t<Ts...>>
 allSettled(Ts &&... tasks);
 ```
@@ -515,7 +515,7 @@ allSettled(Ts &&... tasks);
 
 ```cpp
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::detail::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<
     any_ranges_value_t<I, S>,
     any_ranges_error_t<I, S>
@@ -523,7 +523,7 @@ Task<
 any(I first, S last);
 
 template<std::ranges::range R>
-    requires zero::detail::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
 auto any(R &&tasks) {
     return any(tasks.begin(), tasks.end());
 }
@@ -533,7 +533,7 @@ auto any(R &&tasks) {
 
 ```cpp
 template<typename... Ts>
-    requires (zero::detail::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
     any_variadic_value_t<Ts...>,
     any_variadic_error_t<Ts...>
@@ -550,7 +550,7 @@ any(Ts &&... tasks);
 
 ```cpp
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::detail::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<
     race_ranges_value_t<I, S>,
     race_ranges_error_t<I, S>
@@ -558,7 +558,7 @@ Task<
 race(I first, S last);
 
 template<std::ranges::range R>
-    requires zero::detail::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
 auto race(R &&tasks) {
     return race(tasks.begin(), tasks.end());
 }
@@ -568,7 +568,7 @@ auto race(R &&tasks) {
 
 ```cpp
 template<typename... Ts>
-    requires (zero::detail::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
     race_variadic_value_t<Ts...>,
     race_variadic_error_t<Ts...>
@@ -612,7 +612,7 @@ const auto status = zero::flattenWith<std::error_code>(
 
 ```cpp
 template<typename F>
-    requires zero::detail::is_specialization_v<std::invoke_result_t<F>, Task>
+    requires zero::traits::is_specialization_v<std::invoke_result_t<F>, Task>
 std::invoke_result_t<F> spawn(F f) {
     co_return co_await f();
 }

@@ -56,7 +56,7 @@ You might be wondering what the internal workings of the `sleep` task are. How d
 ```c++
 namespace asyncio {
     template<typename F>
-        requires zero::detail::is_specialization_v<std::invoke_result_t<F>, task::Task>
+        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
     std::expected<
         std::expected<
             typename std::invoke_result_t<F>::value_type,

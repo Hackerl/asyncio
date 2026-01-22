@@ -10,7 +10,7 @@
 
 ASYNC_TEST_CASE("spawn child process and collect status", "[process]") {
     const auto status = co_await asyncio::process::Command{"hostname"}
-                                 .stdOutput(zero::os::process::Command::StdioType::NUL)
+                                 .stdOutput(zero::os::process::Command::StdioType::Null)
                                  .status();
     REQUIRE(status);
     REQUIRE(status->success());

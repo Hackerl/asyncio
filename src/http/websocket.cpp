@@ -15,26 +15,26 @@
 #include <endian.h>
 #endif
 
-constexpr auto SWITCHING_PROTOCOLS_STATUS = 101;
-constexpr auto MASKING_KEY_LENGTH = 4;
+constexpr auto SwitchingProtocolsStatus = 101;
+constexpr auto MaskingKeyLength = 4;
 
-constexpr auto TWO_BYTE_PAYLOAD_LENGTH = 126;
-constexpr auto EIGHT_BYTE_PAYLOAD_LENGTH = 127;
+constexpr auto TwoBytePayloadLength = 126;
+constexpr auto EightBytePayloadLength = 127;
 
-constexpr auto MAX_SINGLE_BYTE_PAYLOAD_LENGTH = 125;
-constexpr auto MAX_TWO_BYTE_PAYLOAD_LENGTH = (std::numeric_limits<std::uint16_t>::max)();
+constexpr auto MaxSingleBytePayloadLength = 125;
+constexpr auto MaxTwoBytePayloadLength = (std::numeric_limits<std::uint16_t>::max)();
 
-constexpr auto OPCODE_MASK = std::byte{0x0f};
-constexpr auto RSV1_BIT = std::byte{0x40};
-constexpr auto FINAL_BIT = std::byte{0x80};
-constexpr auto LENGTH_MASK = std::byte{0x7f};
-constexpr auto MASK_BIT = std::byte{0x80};
+constexpr auto OpcodeMask = std::byte{0x0f};
+constexpr auto RSV1Bit = std::byte{0x40};
+constexpr auto FinalBit = std::byte{0x80};
+constexpr auto LengthMask = std::byte{0x7f};
+constexpr auto MaskBit = std::byte{0x80};
 
-constexpr auto WS_SCHEME = "http";
-constexpr auto WS_SECURE_SCHEME = "https";
-constexpr auto WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+constexpr auto WebsocketScheme = "http";
+constexpr auto WebsocketSecureScheme = "https";
+constexpr auto WebsocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-constexpr auto WEBSOCKET_COMPRESSION_THRESHOLD = 128;
+constexpr auto WebsocketCompressionThreshold = 128;
 
 Z_DEFINE_ERROR_TRANSFORMER(ZLIBError, "zlib", zError)
 Z_DECLARE_ERROR_CODE(ZLIBError)
@@ -47,10 +47,10 @@ namespace {
         const auto it = headers.find("Sec-WebSocket-Accept");
 
         if (it == headers.end())
-            return std::unexpected{asyncio::http::ws::WebSocket::Error::NO_ACCEPT_HEADER};
+            return std::unexpected{asyncio::http::ws::WebSocket::Error::NoAcceptHeader};
 
         std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
-        const auto data = key + WS_MAGIC;
+        const auto data = key + WebsocketMagic;
 
         SHA1(
             reinterpret_cast<const unsigned char *>(data.data()),
@@ -59,7 +59,7 @@ namespace {
         );
 
         if (it->second != zero::encoding::base64::encode(digest))
-            return std::unexpected{asyncio::http::ws::WebSocket::Error::HASH_MISMATCH};
+            return std::unexpected{asyncio::http::ws::WebSocket::Error::HashMismatch};
 
         return {};
     }
@@ -96,60 +96,60 @@ namespace {
 }
 
 asyncio::http::ws::Opcode asyncio::http::ws::Header::opcode() const {
-    return static_cast<Opcode>(mBytes[0] & OPCODE_MASK);
+    return static_cast<Opcode>(mBytes[0] & OpcodeMask);
 }
 
 bool asyncio::http::ws::Header::rsv1() const {
-    return std::to_integer<int>(mBytes[0] & RSV1_BIT);
+    return std::to_integer<int>(mBytes[0] & RSV1Bit);
 }
 
 bool asyncio::http::ws::Header::final() const {
-    return std::to_integer<int>(mBytes[0] & FINAL_BIT);
+    return std::to_integer<int>(mBytes[0] & FinalBit);
 }
 
 std::size_t asyncio::http::ws::Header::length() const {
-    return std::to_integer<int>(mBytes[1] & LENGTH_MASK);
+    return std::to_integer<int>(mBytes[1] & LengthMask);
 }
 
 bool asyncio::http::ws::Header::mask() const {
-    return std::to_integer<int>(mBytes[1] & MASK_BIT);
+    return std::to_integer<int>(mBytes[1] & MaskBit);
 }
 
 void asyncio::http::ws::Header::opcode(const Opcode opcode) {
-    mBytes[0] &= ~OPCODE_MASK;
-    mBytes[0] |= static_cast<std::byte>(opcode) & OPCODE_MASK;
+    mBytes[0] &= ~OpcodeMask;
+    mBytes[0] |= static_cast<std::byte>(opcode) & OpcodeMask;
 }
 
 void asyncio::http::ws::Header::rsv1(const bool rsv1) {
     if (!rsv1) {
-        mBytes[0] &= ~RSV1_BIT;
+        mBytes[0] &= ~RSV1Bit;
         return;
     }
 
-    mBytes[0] |= RSV1_BIT;
+    mBytes[0] |= RSV1Bit;
 }
 
 void asyncio::http::ws::Header::final(const bool final) {
     if (!final) {
-        mBytes[0] &= ~FINAL_BIT;
+        mBytes[0] &= ~FinalBit;
         return;
     }
 
-    mBytes[0] |= FINAL_BIT;
+    mBytes[0] |= FinalBit;
 }
 
 void asyncio::http::ws::Header::length(const std::size_t length) {
-    mBytes[1] &= ~LENGTH_MASK;
-    mBytes[1] |= static_cast<std::byte>(length) & LENGTH_MASK;
+    mBytes[1] &= ~LengthMask;
+    mBytes[1] |= static_cast<std::byte>(length) & LengthMask;
 }
 
 void asyncio::http::ws::Header::mask(const bool mask) {
     if (!mask) {
-        mBytes[1] &= ~MASK_BIT;
+        mBytes[1] &= ~MaskBit;
         return;
     }
 
-    mBytes[1] |= MASK_BIT;
+    mBytes[1] |= MaskBit;
 }
 
 asyncio::http::ws::Compressor::Compressor(std::unique_ptr<z_stream, void(*)(z_stream *)> stream)
@@ -283,7 +283,7 @@ asyncio::http::ws::WebSocket::WebSocket(
     std::shared_ptr<IWriter> writer,
     std::shared_ptr<ICloseable> closeable,
     std::optional<DeflateExtension> deflateExtension
-) : mState{State::CONNECTED}, mMutex{std::make_unique<sync::Mutex>()},
+) : mState{State::Connected}, mMutex{std::make_unique<sync::Mutex>()},
     mReader{std::move(reader)}, mWriter{std::move(writer)}, mCloseable{std::move(closeable)},
     mDeflateExtension{std::move(deflateExtension)} {
 }
@@ -295,13 +295,13 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
     const auto port = url.port();
 
     if (!host || !port)
-        co_return std::unexpected{Error::INVALID_URL};
+        co_return std::unexpected{Error::InvalidURL};
 
     std::shared_ptr<IReader> reader;
     std::shared_ptr<IWriter> writer;
     std::shared_ptr<ICloseable> closeable;
 
-    if (scheme == WS_SCHEME) {
+    if (scheme == WebsocketScheme) {
         auto stream = co_await net::TCPStream::connect(*host, *port)
             .transform([](net::TCPStream &&value) {
                 return std::make_shared<net::TCPStream>(std::move(value));
@@ -311,7 +311,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
         writer = *stream;
         closeable = *std::move(stream);
     }
-    else if (scheme == WS_SECURE_SCHEME) {
+    else if (scheme == WebsocketSecureScheme) {
         auto stream = co_await net::TCPStream::connect(*host, *port);
         Z_CO_EXPECT(stream);
 
@@ -331,7 +331,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
         closeable = *std::move(tls);
     }
     else {
-        co_return std::unexpected{Error::UNSUPPORTED_SCHEME};
+        co_return std::unexpected{Error::UnsupportedScheme};
     }
 
     BufReader bufReader{reader};
@@ -371,13 +371,13 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
         const auto tokens = zero::strings::split(*line);
 
         if (tokens.size() < 2)
-            co_return std::unexpected{Error::INVALID_RESPONSE};
+            co_return std::unexpected{Error::InvalidResponse};
 
         const auto code = zero::strings::toNumber<int>(tokens[1]);
         Z_CO_EXPECT(code);
 
-        if (code != SWITCHING_PROTOCOLS_STATUS)
-            co_return std::unexpected{Error::UNEXPECTED_STATUS_CODE};
+        if (code != SwitchingProtocolsStatus)
+            co_return std::unexpected{Error::UnexpectedStatusCode};
     }
 
     std::map<std::string, std::string> headers;
@@ -392,7 +392,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
         const auto tokens = zero::strings::split(*line, ":", 1);
 
         if (tokens.size() != 2)
-            co_return std::unexpected{Error::INVALID_HTTP_HEADER};
+            co_return std::unexpected{Error::InvalidHTTPHeader};
 
         headers[tokens[0]] = zero::strings::trim(tokens[1]);
     }
@@ -429,16 +429,16 @@ asyncio::http::ws::WebSocket::readFrame() {
     Z_CO_EXPECT(co_await mReader->readExactly({reinterpret_cast<std::byte *>(&header), sizeof(Header)}));
 
     if (header.mask())
-        co_return std::unexpected{Error::UNSUPPORTED_MASKED_FRAME};
+        co_return std::unexpected{Error::UnsupportedMaskedFrame};
 
     std::vector<std::byte> data;
 
-    if (const auto length = header.length(); length == EIGHT_BYTE_PAYLOAD_LENGTH) {
+    if (const auto length = header.length(); length == EightBytePayloadLength) {
         const auto n = co_await binary::readBE<std::uint64_t>(mReader);
         Z_CO_EXPECT(n);
         data.resize(*n);
     }
-    else if (length == TWO_BYTE_PAYLOAD_LENGTH) {
+    else if (length == TwoBytePayloadLength) {
         const auto n = co_await binary::readBE<std::uint16_t>(mReader);
         Z_CO_EXPECT(n);
         data.resize(*n);
@@ -453,7 +453,7 @@ asyncio::http::ws::WebSocket::readFrame() {
 
 asyncio::task::Task<asyncio::http::ws::InternalMessage, std::error_code>
 asyncio::http::ws::WebSocket::readInternalMessage() {
-    assert(mState != State::CLOSED);
+    assert(mState != State::Closed);
 
     auto frame = co_await readFrame();
     Z_CO_EXPECT(frame);
@@ -470,7 +470,7 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
 
     if (frame->header.rsv1()) {
         if (!mDeflateExtension)
-            co_return std::unexpected{Error::UNEXPECTED_COMPRESSED_MESSAGE};
+            co_return std::unexpected{Error::UnexpectedCompressedMessage};
 
         frame->data.append_range(std::array{std::byte{0x00}, std::byte{0x00}, std::byte{0xff}, std::byte{0xff}});
 
@@ -493,8 +493,8 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     Z_CO_EXPECT(co_await mMutex->lock());
     Z_DEFER(mMutex->unlock());
 
-    if (mState == State::CLOSED || (mState == State::CLOSING && message.opcode != Opcode::CLOSE))
-        co_return std::unexpected{Error::CONNECTION_CLOSED};
+    if (mState == State::Closed || (mState == State::Closing && message.opcode != Opcode::Close))
+        co_return std::unexpected{Error::ConnectionClosed};
 
     Header header;
 
@@ -502,8 +502,8 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     header.final(true);
     header.mask(true);
 
-    if (mDeflateExtension && (message.opcode == Opcode::TEXT || message.opcode == Opcode::BINARY)
-        && message.data.size() >= WEBSOCKET_COMPRESSION_THRESHOLD) {
+    if (mDeflateExtension && (message.opcode == Opcode::Text || message.opcode == Opcode::Binary)
+        && message.data.size() >= WebsocketCompressionThreshold) {
         auto compressed = co_await mDeflateExtension->compressor.compress(message.data);
         Z_CO_EXPECT(compressed);
 
@@ -517,13 +517,13 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     std::size_t extendedBytes{};
     const auto length = message.data.size();
 
-    if (length > MAX_TWO_BYTE_PAYLOAD_LENGTH) {
+    if (length > MaxTwoBytePayloadLength) {
         extendedBytes = 8;
-        header.length(EIGHT_BYTE_PAYLOAD_LENGTH);
+        header.length(EightBytePayloadLength);
     }
-    else if (length > MAX_SINGLE_BYTE_PAYLOAD_LENGTH) {
+    else if (length > MaxSingleBytePayloadLength) {
         extendedBytes = 2;
-        header.length(TWO_BYTE_PAYLOAD_LENGTH);
+        header.length(TwoBytePayloadLength);
     }
     else {
         header.length(length);
@@ -542,7 +542,7 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     std::mt19937 gen{rd()};
     std::uniform_int_distribution dist{0, 255};
 
-    std::array<std::byte, MASKING_KEY_LENGTH> key{};
+    std::array<std::byte, MaskingKeyLength> key{};
     std::ranges::generate(key, [&] { return static_cast<std::byte>(dist(gen)); });
 
     Z_CO_EXPECT(co_await mWriter->writeAll(key));
@@ -555,46 +555,46 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
 
 asyncio::task::Task<asyncio::http::ws::Message, std::error_code>
 asyncio::http::ws::WebSocket::readMessage() {
-    assert(mState == State::CONNECTED);
+    assert(mState == State::Connected);
 
     while (true) {
         auto message = co_await readInternalMessage();
         Z_CO_EXPECT(message);
 
-        if (const auto opcode = message->opcode; opcode == Opcode::TEXT) {
+        if (const auto opcode = message->opcode; opcode == Opcode::Text) {
             co_return Message{
                 message->opcode,
                 std::string{reinterpret_cast<const char *>(message->data.data()), message->data.size()}
             };
         }
-        else if (opcode == Opcode::BINARY) {
+        else if (opcode == Opcode::Binary) {
             co_return Message{message->opcode, std::move(message->data)};
         }
-        else if (opcode == Opcode::PING) {
-            Z_CO_EXPECT(co_await writeInternalMessage({Opcode::PONG, std::move(message->data)}));
+        else if (opcode == Opcode::Ping) {
+            Z_CO_EXPECT(co_await writeInternalMessage({Opcode::Pong, std::move(message->data)}));
         }
-        else if (opcode == Opcode::CLOSE) {
-            mState = State::CLOSING;
-            Z_CO_EXPECT(co_await writeInternalMessage({Opcode::CLOSE, message->data}));
-            mState = State::CLOSED;
+        else if (opcode == Opcode::Close) {
+            mState = State::Closing;
+            Z_CO_EXPECT(co_await writeInternalMessage({Opcode::Close, message->data}));
+            mState = State::Closed;
 
             if (message->data.size() < 2)
-                co_return std::unexpected{CloseCode::NORMAL_CLOSURE};
+                co_return std::unexpected{CloseCode::NormalClosure};
 
             co_return std::unexpected{
                 static_cast<CloseCode>(ntohs(*reinterpret_cast<const std::uint16_t *>(message->data.data())))
             };
         }
         else {
-            co_return std::unexpected{Error::UNSUPPORTED_OPCODE};
+            co_return std::unexpected{Error::UnsupportedOpcode};
         }
     }
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMessage(Message message) {
-    assert(message.opcode == Opcode::TEXT || message.opcode == Opcode::BINARY);
+    assert(message.opcode == Opcode::Text || message.opcode == Opcode::Binary);
 
-    if (message.opcode == Opcode::TEXT) {
+    if (message.opcode == Opcode::Text) {
         const auto &text = std::get<std::string>(message.data);
         co_return co_await writeInternalMessage({
                 message.opcode,
@@ -613,22 +613,22 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMe
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::sendText(std::string text) {
-    return writeMessage({Opcode::TEXT, std::move(text)});
+    return writeMessage({Opcode::Text, std::move(text)});
 }
 
 asyncio::task::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::sendBinary(const std::span<const std::byte> data) {
-    return writeMessage({Opcode::BINARY, std::vector<std::byte>{data.begin(), data.end()}});
+    return writeMessage({Opcode::Binary, std::vector<std::byte>{data.begin(), data.end()}});
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
-    assert(mState == State::CONNECTED);
+    assert(mState == State::Connected);
 
-    mState = State::CLOSING;
+    mState = State::Closing;
     const auto c = htons(static_cast<std::uint16_t>(code));
 
     Z_CO_EXPECT(co_await writeInternalMessage({
-        Opcode::CLOSE,
+        Opcode::Close,
         {reinterpret_cast<const std::byte *>(&c), reinterpret_cast<const std::byte *>(&c) + sizeof(c)}}
     ));
 
@@ -636,8 +636,8 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(c
         const auto message = co_await readInternalMessage();
         Z_CO_EXPECT(message);
 
-        if (message->opcode == Opcode::CLOSE) {
-            mState = State::CLOSED;
+        if (message->opcode == Opcode::Close) {
+            mState = State::Closed;
             break;
         }
     }

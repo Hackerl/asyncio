@@ -261,7 +261,7 @@ Writes all data in the buffer to the underlying `IO`.
 ## Function `copy`
 
 ```cpp
-task::Task<std::size_t, std::error_code> copy(zero::detail::Trait<IReader> auto &reader, zero::detail::Trait<IWriter> auto &writer);
+task::Task<std::size_t, std::error_code> copy(zero::traits::Trait<IReader> auto &reader, zero::traits::Trait<IWriter> auto &writer);
 ```
 
 Reads data from `reader` and writes it to `writer` until `read` returns `0` or `write` encounters an error. Returns the actual number of bytes copied.

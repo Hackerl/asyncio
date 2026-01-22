@@ -4,83 +4,83 @@
 #include <asyncio/time.h>
 
 TEST_CASE("channel error condition", "[channel]") {
-    const std::error_condition condition{asyncio::ChannelError::DISCONNECTED};
-    REQUIRE(condition == asyncio::TrySendError::DISCONNECTED);
-    REQUIRE(condition == asyncio::SendSyncError::DISCONNECTED);
-    REQUIRE(condition == asyncio::SendError::DISCONNECTED);
-    REQUIRE(condition == asyncio::TryReceiveError::DISCONNECTED);
-    REQUIRE(condition == asyncio::ReceiveSyncError::DISCONNECTED);
-    REQUIRE(condition == asyncio::ReceiveError::DISCONNECTED);
+    const std::error_condition condition{asyncio::ChannelError::Disconnected};
+    REQUIRE(condition == asyncio::TrySendError::Disconnected);
+    REQUIRE(condition == asyncio::SendSyncError::Disconnected);
+    REQUIRE(condition == asyncio::SendError::Disconnected);
+    REQUIRE(condition == asyncio::TryReceiveError::Disconnected);
+    REQUIRE(condition == asyncio::ReceiveSyncError::Disconnected);
+    REQUIRE(condition == asyncio::ReceiveError::Disconnected);
 }
 
 TEST_CASE("channel try send error", "[channel]") {
     SECTION("disconnected") {
-        const std::error_code ec{asyncio::TrySendError::DISCONNECTED};
-        REQUIRE(ec == asyncio::ChannelError::DISCONNECTED);
+        const std::error_code ec{asyncio::TrySendError::Disconnected};
+        REQUIRE(ec == asyncio::ChannelError::Disconnected);
     }
 
     SECTION("full") {
-        const std::error_code ec{asyncio::TrySendError::FULL};
+        const std::error_code ec{asyncio::TrySendError::Full};
         REQUIRE(ec == std::errc::operation_would_block);
     }
 }
 
 TEST_CASE("channel send sync error", "[channel]") {
     SECTION("disconnected") {
-        const std::error_code ec{asyncio::SendSyncError::DISCONNECTED};
-        REQUIRE(ec == asyncio::ChannelError::DISCONNECTED);
+        const std::error_code ec{asyncio::SendSyncError::Disconnected};
+        REQUIRE(ec == asyncio::ChannelError::Disconnected);
     }
 
     SECTION("timeout") {
-        const std::error_code ec{asyncio::SendSyncError::TIMEOUT};
+        const std::error_code ec{asyncio::SendSyncError::Timeout};
         REQUIRE(ec == std::errc::timed_out);
     }
 }
 
 TEST_CASE("channel send error", "[channel]") {
     SECTION("disconnected") {
-        const std::error_code ec{asyncio::SendError::DISCONNECTED};
-        REQUIRE(ec == asyncio::ChannelError::DISCONNECTED);
+        const std::error_code ec{asyncio::SendError::Disconnected};
+        REQUIRE(ec == asyncio::ChannelError::Disconnected);
     }
 
     SECTION("cancelled") {
-        const std::error_code ec{asyncio::SendError::CANCELLED};
+        const std::error_code ec{asyncio::SendError::Cancelled};
         REQUIRE(ec == std::errc::operation_canceled);
     }
 }
 
 TEST_CASE("channel try receive error", "[channel]") {
     SECTION("disconnected") {
-        const std::error_code ec{asyncio::TryReceiveError::DISCONNECTED};
-        REQUIRE(ec == asyncio::ChannelError::DISCONNECTED);
+        const std::error_code ec{asyncio::TryReceiveError::Disconnected};
+        REQUIRE(ec == asyncio::ChannelError::Disconnected);
     }
 
     SECTION("empty") {
-        const std::error_code ec{asyncio::TryReceiveError::EMPTY};
+        const std::error_code ec{asyncio::TryReceiveError::Empty};
         REQUIRE(ec == std::errc::operation_would_block);
     }
 }
 
 TEST_CASE("channel receive sync error", "[channel]") {
     SECTION("disconnected") {
-        const std::error_code ec{asyncio::ReceiveSyncError::DISCONNECTED};
-        REQUIRE(ec == asyncio::ChannelError::DISCONNECTED);
+        const std::error_code ec{asyncio::ReceiveSyncError::Disconnected};
+        REQUIRE(ec == asyncio::ChannelError::Disconnected);
     }
 
     SECTION("timeout") {
-        const std::error_code ec{asyncio::ReceiveSyncError::TIMEOUT};
+        const std::error_code ec{asyncio::ReceiveSyncError::Timeout};
         REQUIRE(ec == std::errc::timed_out);
     }
 }
 
 TEST_CASE("channel receive error", "[channel]") {
     SECTION("disconnected") {
-        const std::error_code ec{asyncio::ReceiveError::DISCONNECTED};
-        REQUIRE(ec == asyncio::ChannelError::DISCONNECTED);
+        const std::error_code ec{asyncio::ReceiveError::Disconnected};
+        REQUIRE(ec == asyncio::ChannelError::Disconnected);
     }
 
     SECTION("cancelled") {
-        const std::error_code ec{asyncio::ReceiveError::CANCELLED};
+        const std::error_code ec{asyncio::ReceiveError::Cancelled};
         REQUIRE(ec == std::errc::operation_canceled);
     }
 }
@@ -98,7 +98,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
 
         SECTION("disconnected") {
             sender.close();
-            REQUIRE_ERROR(sender.trySend(element), asyncio::TrySendError::DISCONNECTED);
+            REQUIRE_ERROR(sender.trySend(element), asyncio::TrySendError::Disconnected);
         }
 
         SECTION("full") {
@@ -106,7 +106,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
                 REQUIRE(sender.trySend(element));
             }
 
-            REQUIRE_ERROR(sender.trySend(element), asyncio::TrySendError::FULL);
+            REQUIRE_ERROR(sender.trySend(element), asyncio::TrySendError::Full);
         }
     }
 
@@ -121,7 +121,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             const auto result = sender.trySendEx(std::string{element});
             REQUIRE_FALSE(result);
             REQUIRE(std::get<0>(result.error()) == element);
-            REQUIRE(std::get<1>(result.error()) == asyncio::TrySendError::DISCONNECTED);
+            REQUIRE(std::get<1>(result.error()) == asyncio::TrySendError::Disconnected);
         }
 
         SECTION("full") {
@@ -132,7 +132,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             const auto result = sender.trySendEx(std::string{element});
             REQUIRE_FALSE(result);
             REQUIRE(std::get<0>(result.error()) == element);
-            REQUIRE(std::get<1>(result.error()) == asyncio::TrySendError::FULL);
+            REQUIRE(std::get<1>(result.error()) == asyncio::TrySendError::Full);
         }
     }
 
@@ -173,7 +173,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
 
         SECTION("disconnected") {
             sender.close();
-            REQUIRE_ERROR(sender.sendSync(element), asyncio::SendSyncError::DISCONNECTED);
+            REQUIRE_ERROR(sender.sendSync(element), asyncio::SendSyncError::Disconnected);
         }
 
         SECTION("timeout") {
@@ -183,7 +183,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
                 REQUIRE(sender.trySend(element));
             }
 
-            REQUIRE_ERROR(sender.sendSync(element, 10ms), asyncio::SendSyncError::TIMEOUT);
+            REQUIRE_ERROR(sender.sendSync(element, 10ms), asyncio::SendSyncError::Timeout);
         }
     }
 
@@ -228,7 +228,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             const auto result = sender.sendSyncEx(std::string{element});
             REQUIRE_FALSE(result);
             REQUIRE(std::get<0>(result.error()) == element);
-            REQUIRE(std::get<1>(result.error()) == asyncio::SendSyncError::DISCONNECTED);
+            REQUIRE(std::get<1>(result.error()) == asyncio::SendSyncError::Disconnected);
         }
 
         SECTION("timeout") {
@@ -241,7 +241,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             const auto result = sender.sendSyncEx(std::string{element}, 10ms);
             REQUIRE_FALSE(result);
             REQUIRE(std::get<0>(result.error()) == element);
-            REQUIRE(std::get<1>(result.error()) == asyncio::SendSyncError::TIMEOUT);
+            REQUIRE(std::get<1>(result.error()) == asyncio::SendSyncError::Timeout);
         }
     }
 
@@ -264,7 +264,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
 
         SECTION("disconnected") {
             sender.close();
-            REQUIRE_ERROR(co_await sender.send(element), asyncio::SendError::DISCONNECTED);
+            REQUIRE_ERROR(co_await sender.send(element), asyncio::SendError::Disconnected);
         }
 
         SECTION("cancelled") {
@@ -276,7 +276,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
 
             auto task = sender.send(element);
             REQUIRE(task.cancel());
-            REQUIRE_ERROR(co_await task, asyncio::SendError::CANCELLED);
+            REQUIRE_ERROR(co_await task, asyncio::SendError::Cancelled);
         }
     }
 
@@ -303,7 +303,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             const auto result = sender.sendSyncEx(std::string{element});
             REQUIRE_FALSE(result);
             REQUIRE(std::get<0>(result.error()) == element);
-            REQUIRE(std::get<1>(result.error()) == asyncio::SendSyncError::DISCONNECTED);
+            REQUIRE(std::get<1>(result.error()) == asyncio::SendSyncError::Disconnected);
         }
 
         SECTION("cancelled") {
@@ -319,7 +319,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             const auto result = co_await task;
             REQUIRE_FALSE(result);
             REQUIRE(std::get<0>(result.error()) == element);
-            REQUIRE(std::get<1>(result.error()) == asyncio::SendError::CANCELLED);
+            REQUIRE(std::get<1>(result.error()) == asyncio::SendError::Cancelled);
         }
     }
 
@@ -398,11 +398,11 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
 
         SECTION("disconnected") {
             sender.close();
-            REQUIRE_ERROR(receiver.tryReceive(), asyncio::TryReceiveError::DISCONNECTED);
+            REQUIRE_ERROR(receiver.tryReceive(), asyncio::TryReceiveError::Disconnected);
         }
 
         SECTION("empty") {
-            REQUIRE_ERROR(receiver.tryReceive(), asyncio::TryReceiveError::EMPTY);
+            REQUIRE_ERROR(receiver.tryReceive(), asyncio::TryReceiveError::Empty);
         }
     }
 
@@ -452,7 +452,7 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
         SECTION("disconnected") {
             SECTION("after close") {
                 sender.close();
-                REQUIRE_ERROR(receiver.receiveSync(), asyncio::ReceiveSyncError::DISCONNECTED);
+                REQUIRE_ERROR(receiver.receiveSync(), asyncio::ReceiveSyncError::Disconnected);
             }
 
             SECTION("before close") {
@@ -460,13 +460,13 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
                     return receiver.receiveSync();
                 });
                 sender.close();
-                REQUIRE_ERROR(co_await task, asyncio::ReceiveSyncError::DISCONNECTED);
+                REQUIRE_ERROR(co_await task, asyncio::ReceiveSyncError::Disconnected);
             }
         }
 
         SECTION("timeout") {
             using namespace std::chrono_literals;
-            REQUIRE_ERROR(receiver.receiveSync(10ms), asyncio::ReceiveSyncError::TIMEOUT);
+            REQUIRE_ERROR(receiver.receiveSync(10ms), asyncio::ReceiveSyncError::Timeout);
         }
     }
 
@@ -497,13 +497,13 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
         SECTION("disconnected") {
             SECTION("after close") {
                 sender.close();
-                REQUIRE_ERROR(co_await receiver.receive(), asyncio::ReceiveError::DISCONNECTED);
+                REQUIRE_ERROR(co_await receiver.receive(), asyncio::ReceiveError::Disconnected);
             }
 
             SECTION("before close") {
                 auto task = receiver.receive();
                 sender.close();
-                REQUIRE_ERROR(co_await task, asyncio::ReceiveError::DISCONNECTED);
+                REQUIRE_ERROR(co_await task, asyncio::ReceiveError::Disconnected);
             }
         }
 
@@ -511,7 +511,7 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
             using namespace std::chrono_literals;
             auto task = receiver.receive();
             REQUIRE(task.cancel());
-            REQUIRE_ERROR(co_await task, asyncio::ReceiveError::CANCELLED);
+            REQUIRE_ERROR(co_await task, asyncio::ReceiveError::Cancelled);
         }
     }
 
@@ -630,7 +630,7 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
             const auto result = co_await receiver.receive();
 
             if (!result) {
-                if (result.error() != asyncio::ReceiveError::DISCONNECTED)
+                if (result.error() != asyncio::ReceiveError::Disconnected)
                     co_return std::unexpected{result.error()};
 
                 co_return {};
@@ -648,7 +648,7 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
             const auto result = receiver.receiveSync();
 
             if (!result) {
-                if (result.error() != asyncio::ReceiveSyncError::DISCONNECTED)
+                if (result.error() != asyncio::ReceiveSyncError::Disconnected)
                     return std::unexpected{result.error()};
 
                 return {};

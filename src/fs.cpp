@@ -146,7 +146,7 @@ asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
                     uv_get_osfhandle(mFile),
                     LARGE_INTEGER{.QuadPart = offset},
                     &pos,
-                    whence == Whence::BEGIN ? FILE_BEGIN : whence == Whence::CURRENT ? FILE_CURRENT : FILE_END
+                    whence == Whence::Begin ? FILE_BEGIN : whence == Whence::Current ? FILE_CURRENT : FILE_END
                 );
             }));
 
@@ -160,7 +160,7 @@ asyncio::fs::File::seek(const std::int64_t offset, const Whence whence) {
 #endif
                     mFile,
                     offset,
-                    whence == Whence::BEGIN ? SEEK_SET : whence == Whence::CURRENT ? SEEK_CUR : SEEK_END
+                    whence == Whence::Begin ? SEEK_SET : whence == Whence::Current ? SEEK_CUR : SEEK_END
                 );
             });
             Z_EXPECT(pos);

@@ -7,8 +7,8 @@ namespace asyncio::net {
     class UDPSocket final : public ISocket {
     public:
         enum class Membership {
-            JOIN_GROUP = UV_JOIN_GROUP,
-            LEAVE_GROUP = UV_LEAVE_GROUP
+            JoinGroup = UV_JOIN_GROUP,
+            LeaveGroup = UV_LEAVE_GROUP
         };
 
         explicit UDPSocket(uv::Handle<uv_udp_t> udp);

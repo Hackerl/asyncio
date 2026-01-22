@@ -11,8 +11,8 @@
 
 using namespace std::chrono_literals;
 
-constexpr auto DEFAULT_CONNECT_TIMEOUT = 30s;
-constexpr auto DEFAULT_TRANSFER_TIMEOUT = 1h;
+constexpr auto DefaultConnectTimeout = 30s;
+constexpr auto DefaultTransferTimeout = 1h;
 
 asyncio::http::Response::Response(Requests *requests, std::shared_ptr<Connection> connection)
     : mRequests{requests}, mConnection{std::move(connection)} {
@@ -131,13 +131,13 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
             auto &promise = mConnection->downstream.promise;
 
             if (!promise)
-                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
             Z_EXPECT(expected([&] {
                 return curl_easy_pause(mConnection->easy.get(), CURLPAUSE_RECV);
             }));
 
-            std::exchange(promise, std::nullopt)->reject(task::Error::CANCELLED);
+            std::exchange(promise, std::nullopt)->reject(task::Error::Cancelled);
             return {};
         }
     };
@@ -545,7 +545,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         return curl_easy_setopt(
             easy,
             CURLOPT_CONNECTTIMEOUT,
-            static_cast<long>(connectTimeout.value_or(DEFAULT_CONNECT_TIMEOUT).count())
+            static_cast<long>(connectTimeout.value_or(DefaultConnectTimeout).count())
         );
     }));
 
@@ -553,7 +553,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         return curl_easy_setopt(
             easy,
             CURLOPT_TIMEOUT,
-            static_cast<long>(timeout.value_or(DEFAULT_TRANSFER_TIMEOUT).count())
+            static_cast<long>(timeout.value_or(DefaultTransferTimeout).count())
         );
     }));
 
@@ -616,8 +616,8 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     else {
 #ifdef ASYNCIO_EMBED_CA_CERT
         constexpr curl_blob blob{
-            .data = const_cast<char *>(CA_CERT.data()),
-            .len = CA_CERT.size(),
+            .data = const_cast<char *>(CACert.data()),
+            .len = CACert.size(),
             .flags = CURL_BLOB_COPY
         };
 
@@ -679,9 +679,9 @@ asyncio::http::Requests::perform(std::shared_ptr<Connection> connection) {
         connection->promise.getFuture(),
         [&promise = connection->promise]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
-            promise.reject(task::Error::CANCELLED);
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     });

@@ -17,7 +17,7 @@ ASYNC_TEST_CASE("timeout - error", "[time]") {
     }
 
     SECTION("expired") {
-        REQUIRE_ERROR(co_await asyncio::timeout(asyncio::sleep(50ms), 10ms), asyncio::TimeoutError::ELAPSED);
+        REQUIRE_ERROR(co_await asyncio::timeout(asyncio::sleep(50ms), 10ms), asyncio::TimeoutError::Elapsed);
     }
 
     SECTION("expired but cannot be cancelled") {
@@ -27,7 +27,7 @@ ASYNC_TEST_CASE("timeout - error", "[time]") {
             from(asyncio::task::CancellableFuture{
                 promise.getFuture(),
                 []() -> std::expected<void, std::error_code> {
-                    return std::unexpected{asyncio::task::Error::CANCELLATION_TOO_LATE};
+                    return std::unexpected{asyncio::task::Error::CancellationTooLate};
                 }
             }),
             10ms
@@ -78,7 +78,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
             ),
             std::system_error,
             Catch::Matchers::Predicate<std::system_error>([](const auto &error) {
-                return error.code() == asyncio::TimeoutError::ELAPSED;
+                return error.code() == asyncio::TimeoutError::Elapsed;
             })
         );
     }
@@ -91,7 +91,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
                 zero::error::guard(co_await from(asyncio::task::CancellableFuture{
                     promise.getFuture(),
                     []() -> std::expected<void, std::error_code> {
-                        return std::unexpected{asyncio::task::Error::CANCELLATION_TOO_LATE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
                     }
                 }));
             }),

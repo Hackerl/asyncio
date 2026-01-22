@@ -90,7 +90,7 @@ namespace asyncio {
     Z_DEFINE_ERROR_CODE_EX(
         ToThreadPoolError,
         "asyncio::toThreadPool",
-        CANCELLED, "Request was cancelled", std::errc::operation_canceled
+        Cancelled, "Request was cancelled", std::errc::operation_canceled
     )
 
     template<typename F>
@@ -129,7 +129,7 @@ namespace asyncio {
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+                co_return std::unexpected{ToThreadPoolError::Cancelled};
             }
 
             co_return {};
@@ -167,7 +167,7 @@ namespace asyncio {
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+                co_return std::unexpected{ToThreadPoolError::Cancelled};
             }
 
             co_return std::move(*context.result);
@@ -213,7 +213,7 @@ namespace asyncio {
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+                co_return std::unexpected{ToThreadPoolError::Cancelled};
             }
 
             co_return {};
@@ -253,7 +253,7 @@ namespace asyncio {
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+                co_return std::unexpected{ToThreadPoolError::Cancelled};
             }
 
             co_return std::move(*context.result);

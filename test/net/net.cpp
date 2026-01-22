@@ -21,7 +21,7 @@ TEST_CASE("IPv4 address", "[net]") {
         SECTION("valid") {
             REQUIRE(
                 asyncio::net::IPv4Address::from("127.0.0.1", 80) ==
-                asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80}
+                asyncio::net::IPv4Address{asyncio::net::LocalhostIPv4, 80}
             );
         }
 
@@ -31,7 +31,7 @@ TEST_CASE("IPv4 address", "[net]") {
     }
 
     SECTION("stringify") {
-        REQUIRE(fmt::to_string(asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80}) == "127.0.0.1:80");
+        REQUIRE(fmt::to_string(asyncio::net::IPv4Address{asyncio::net::LocalhostIPv4, 80}) == "127.0.0.1:80");
     }
 }
 
@@ -41,14 +41,14 @@ TEST_CASE("IPv6 address", "[net]") {
             SECTION("with zone") {
                 REQUIRE(
                     asyncio::net::IPv6Address::from("::1%eth0", 80) ==
-                    asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80, "eth0"}
+                    asyncio::net::IPv6Address{asyncio::net::LocalhostIPv6, 80, "eth0"}
                 );
             }
 
             SECTION("without zone") {
                 REQUIRE(
                     asyncio::net::IPv6Address::from("::1", 80) ==
-                    asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80}
+                    asyncio::net::IPv6Address{asyncio::net::LocalhostIPv6, 80}
                 );
             }
         }
@@ -60,7 +60,7 @@ TEST_CASE("IPv6 address", "[net]") {
 
     SECTION("mapped") {
         REQUIRE(
-            asyncio::net::IPv6Address::from(asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80}) ==
+            asyncio::net::IPv6Address::from(asyncio::net::IPv4Address{asyncio::net::LocalhostIPv4, 80}) ==
             asyncio::net::IPv6Address{
                 {
                     std::byte{0}, std::byte{0}, std::byte{0}, std::byte{0},
@@ -76,12 +76,12 @@ TEST_CASE("IPv6 address", "[net]") {
     SECTION("stringify") {
         SECTION("with zone") {
             REQUIRE(
-                fmt::to_string(asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80, "eth0"}) == "[::1%eth0]:80"
+                fmt::to_string(asyncio::net::IPv6Address{asyncio::net::LocalhostIPv6, 80, "eth0"}) == "[::1%eth0]:80"
             );
         }
 
         SECTION("without zone") {
-            REQUIRE(fmt::to_string(asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80}) == "[::1]:80");
+            REQUIRE(fmt::to_string(asyncio::net::IPv6Address{asyncio::net::LocalhostIPv6, 80}) == "[::1]:80");
         }
     }
 }
@@ -98,7 +98,7 @@ TEST_CASE("unix address", "[net]") {
 
 TEST_CASE("convert network address to socket address", "[net]") {
     SECTION("IPv4") {
-        const auto address = socketAddressFrom(asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80});
+        const auto address = socketAddressFrom(asyncio::net::IPv4Address{asyncio::net::LocalhostIPv4, 80});
         REQUIRE(address);
 
         const auto ptr = reinterpret_cast<const sockaddr_in *>(address->first.get());
@@ -116,7 +116,7 @@ TEST_CASE("convert network address to socket address", "[net]") {
         const auto index = if_nametoindex(zone.c_str());
         REQUIRE(index != 0);
 
-        const auto address = socketAddressFrom(asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80, zone});
+        const auto address = socketAddressFrom(asyncio::net::IPv6Address{asyncio::net::LocalhostIPv6, 80, zone});
         REQUIRE(address);
 
         const auto ptr = reinterpret_cast<const sockaddr_in6 *>(address->first.get());
@@ -172,7 +172,7 @@ TEST_CASE("convert socket address to network address", "[net]") {
 
         REQUIRE(
             asyncio::net::addressFrom(reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) ==
-            asyncio::net::IPv4Address{asyncio::net::LOCALHOST_IPV4, 80}
+            asyncio::net::IPv4Address{asyncio::net::LocalhostIPv4, 80}
         );
     }
 
@@ -185,7 +185,7 @@ TEST_CASE("convert socket address to network address", "[net]") {
 
         REQUIRE(
             asyncio::net::addressFrom(reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) ==
-            asyncio::net::IPv6Address{asyncio::net::LOCALHOST_IPV6, 80}
+            asyncio::net::IPv6Address{asyncio::net::LocalhostIPv6, 80}
         );
     }
 

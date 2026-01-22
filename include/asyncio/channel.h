@@ -74,22 +74,22 @@ namespace asyncio {
     Z_DEFINE_ERROR_CODE_EX(
         TrySendError,
         "asyncio::Sender::trySend",
-        DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-        FULL, "Sending on a full channel", std::errc::operation_would_block
+        Disconnected, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+        Full, "Sending on a full channel", std::errc::operation_would_block
     )
 
     Z_DEFINE_ERROR_CODE_EX(
         SendSyncError,
         "asyncio::Sender::sendSync",
-        DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-        TIMEOUT, "Send operation timed out", std::errc::timed_out
+        Disconnected, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+        Timeout, "Send operation timed out", std::errc::timed_out
     )
 
     Z_DEFINE_ERROR_CODE_EX(
         SendError,
         "asyncio::Sender::send",
-        DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-        CANCELLED, "Send operation was cancelled", std::errc::operation_canceled
+        Disconnected, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+        Cancelled, "Send operation was cancelled", std::errc::operation_canceled
     )
 
     template<typename T>
@@ -126,12 +126,12 @@ namespace asyncio {
         template<typename U = T>
         std::expected<void, TrySendError> trySend(U &&element) {
             if (mCore->closed)
-                return std::unexpected{TrySendError::DISCONNECTED};
+                return std::unexpected{TrySendError::Disconnected};
 
             const auto index = mCore->buffer.reserve();
 
             if (!index)
-                return std::unexpected{TrySendError::FULL};
+                return std::unexpected{TrySendError::Full};
 
             mCore->buffer[*index] = std::forward<U>(element);
             mCore->buffer.commit(*index);
@@ -142,12 +142,12 @@ namespace asyncio {
 
         std::expected<void, std::pair<T, TrySendError>> trySendEx(T &&element) {
             if (mCore->closed)
-                return std::unexpected{std::pair{std::move(element), TrySendError::DISCONNECTED}};
+                return std::unexpected{std::pair{std::move(element), TrySendError::Disconnected}};
 
             const auto index = mCore->buffer.reserve();
 
             if (!index)
-                return std::unexpected{std::pair{std::move(element), TrySendError::FULL}};
+                return std::unexpected{std::pair{std::move(element), TrySendError::Full}};
 
             mCore->buffer[*index] = std::move(element);
             mCore->buffer.commit(*index);
@@ -160,7 +160,7 @@ namespace asyncio {
         std::expected<void, SendSyncError>
         sendSync(U &&element, const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
             if (mCore->closed)
-                return std::unexpected{SendSyncError::DISCONNECTED};
+                return std::unexpected{SendSyncError::Disconnected};
 
             while (true) {
                 const auto index = mCore->buffer.reserve();
@@ -176,7 +176,7 @@ namespace asyncio {
 
                 if (mCore->closed) {
                     mCore->mutex.unlock();
-                    return std::unexpected{SendSyncError::DISCONNECTED};
+                    return std::unexpected{SendSyncError::Disconnected};
                 }
 
                 if (!mCore->buffer.full()) {
@@ -194,7 +194,7 @@ namespace asyncio {
                     assert(result.error() == std::errc::timed_out);
                     const std::lock_guard guard{mCore->mutex};
                     mCore->sender.pending.remove(promise);
-                    return std::unexpected{SendSyncError::TIMEOUT};
+                    return std::unexpected{SendSyncError::Timeout};
                 }
             }
         }
@@ -202,7 +202,7 @@ namespace asyncio {
         std::expected<void, std::pair<T, SendSyncError>>
         sendSyncEx(T &&element, const std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
             if (mCore->closed)
-                return std::unexpected{std::pair{std::move(element), SendSyncError::DISCONNECTED}};
+                return std::unexpected{std::pair{std::move(element), SendSyncError::Disconnected}};
 
             while (true) {
                 const auto index = mCore->buffer.reserve();
@@ -218,7 +218,7 @@ namespace asyncio {
 
                 if (mCore->closed) {
                     mCore->mutex.unlock();
-                    return std::unexpected{std::pair{std::move(element), SendSyncError::DISCONNECTED}};
+                    return std::unexpected{std::pair{std::move(element), SendSyncError::Disconnected}};
                 }
 
                 if (!mCore->buffer.full()) {
@@ -236,14 +236,14 @@ namespace asyncio {
                     assert(result.error() == std::errc::timed_out);
                     const std::lock_guard guard{mCore->mutex};
                     mCore->sender.pending.remove(promise);
-                    return std::unexpected{std::pair{std::move(element), SendSyncError::TIMEOUT}};
+                    return std::unexpected{std::pair{std::move(element), SendSyncError::Timeout}};
                 }
             }
         }
 
         task::Task<void, SendError> send(T element) {
             if (mCore->closed)
-                co_return std::unexpected{SendError::DISCONNECTED};
+                co_return std::unexpected{SendError::Disconnected};
 
             while (true) {
                 const auto index = mCore->buffer.reserve();
@@ -259,7 +259,7 @@ namespace asyncio {
 
                 if (mCore->closed) {
                     mCore->mutex.unlock();
-                    co_return std::unexpected{SendError::DISCONNECTED};
+                    co_return std::unexpected{SendError::Disconnected};
                 }
 
                 if (!mCore->buffer.full()) {
@@ -276,23 +276,23 @@ namespace asyncio {
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())
-                            return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                            return std::unexpected{task::Error::CancellationTooLate};
 
-                        promise->reject(task::Error::CANCELLED);
+                        promise->reject(task::Error::Cancelled);
                         return {};
                     }
                 }; !result) {
                     assert(result.error() == std::errc::operation_canceled);
                     const std::lock_guard guard{mCore->mutex};
                     mCore->sender.pending.remove(promise);
-                    co_return std::unexpected{SendError::CANCELLED};
+                    co_return std::unexpected{SendError::Cancelled};
                 }
             }
         }
 
         task::Task<void, std::pair<T, SendError>> sendEx(T element) {
             if (mCore->closed)
-                co_return std::unexpected{std::pair{std::move(element), SendError::DISCONNECTED}};
+                co_return std::unexpected{std::pair{std::move(element), SendError::Disconnected}};
 
             while (true) {
                 const auto index = mCore->buffer.reserve();
@@ -308,7 +308,7 @@ namespace asyncio {
 
                 if (mCore->closed) {
                     mCore->mutex.unlock();
-                    co_return std::unexpected{std::pair{std::move(element), SendError::DISCONNECTED}};
+                    co_return std::unexpected{std::pair{std::move(element), SendError::Disconnected}};
                 }
 
                 if (!mCore->buffer.full()) {
@@ -325,16 +325,16 @@ namespace asyncio {
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())
-                            return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                            return std::unexpected{task::Error::CancellationTooLate};
 
-                        promise->reject(task::Error::CANCELLED);
+                        promise->reject(task::Error::Cancelled);
                         return {};
                     }
                 }; !result) {
                     assert(result.error() == std::errc::operation_canceled);
                     const std::lock_guard guard{mCore->mutex};
                     mCore->sender.pending.remove(promise);
-                    co_return std::unexpected{std::pair{std::move(element), SendError::CANCELLED}};
+                    co_return std::unexpected{std::pair{std::move(element), SendError::Cancelled}};
                 }
             }
         }
@@ -370,22 +370,22 @@ namespace asyncio {
     Z_DEFINE_ERROR_CODE_EX(
         TryReceiveError,
         "asyncio::Receiver::tryReceive",
-        DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-        EMPTY, "Receiving on an empty channel", std::errc::operation_would_block
+        Disconnected, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+        Empty, "Receiving on an empty channel", std::errc::operation_would_block
     )
 
     Z_DEFINE_ERROR_CODE_EX(
         ReceiveSyncError,
         "asyncio::Receiver::receiveSync",
-        DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-        TIMEOUT, "Receive operation timed out", std::errc::timed_out
+        Disconnected, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+        Timeout, "Receive operation timed out", std::errc::timed_out
     )
 
     Z_DEFINE_ERROR_CODE_EX(
         ReceiveError,
         "asyncio::Receiver::receive",
-        DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-        CANCELLED, "Receive operation was cancelled", std::errc::operation_canceled
+        Disconnected, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+        Cancelled, "Receive operation was cancelled", std::errc::operation_canceled
     )
 
     template<typename T>
@@ -423,7 +423,7 @@ namespace asyncio {
             const auto index = mCore->buffer.acquire();
 
             if (!index)
-                return std::unexpected{mCore->closed ? TryReceiveError::DISCONNECTED : TryReceiveError::EMPTY};
+                return std::unexpected{mCore->closed ? TryReceiveError::Disconnected : TryReceiveError::Empty};
 
             auto element = std::move(mCore->buffer[*index]);
 
@@ -454,7 +454,7 @@ namespace asyncio {
 
                 if (mCore->closed) {
                     mCore->mutex.unlock();
-                    return std::unexpected{ReceiveSyncError::DISCONNECTED};
+                    return std::unexpected{ReceiveSyncError::Disconnected};
                 }
 
                 const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
@@ -467,7 +467,7 @@ namespace asyncio {
                     assert(result.error() == std::errc::timed_out);
                     const std::lock_guard guard{mCore->mutex};
                     mCore->receiver.pending.remove(promise);
-                    return std::unexpected{ReceiveSyncError::TIMEOUT};
+                    return std::unexpected{ReceiveSyncError::Timeout};
                 }
             }
         }
@@ -492,7 +492,7 @@ namespace asyncio {
 
                 if (mCore->closed) {
                     mCore->mutex.unlock();
-                    co_return std::unexpected{ReceiveError::DISCONNECTED};
+                    co_return std::unexpected{ReceiveError::Disconnected};
                 }
 
                 const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
@@ -504,16 +504,16 @@ namespace asyncio {
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())
-                            return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                            return std::unexpected{task::Error::CancellationTooLate};
 
-                        promise->reject(task::Error::CANCELLED);
+                        promise->reject(task::Error::Cancelled);
                         return {};
                     }
                 }; !result) {
                     assert(result.error() == std::errc::operation_canceled);
                     const std::lock_guard guard{mCore->mutex};
                     mCore->receiver.pending.remove(promise);
-                    co_return std::unexpected{ReceiveError::CANCELLED};
+                    co_return std::unexpected{ReceiveError::Cancelled};
                 }
             }
         }
@@ -545,15 +545,15 @@ namespace asyncio {
     Z_DEFINE_ERROR_CONDITION_EX(
         ChannelError,
         "asyncio::channel",
-        DISCONNECTED,
+        Disconnected,
         "Channel disconnected",
         [](const std::error_code &ec) {
-            return ec == make_error_code(TrySendError::DISCONNECTED) ||
-                ec == make_error_code(SendSyncError::DISCONNECTED) ||
-                ec == make_error_code(SendError::DISCONNECTED) ||
-                ec == make_error_code(TryReceiveError::DISCONNECTED) ||
-                ec == make_error_code(ReceiveSyncError::DISCONNECTED) ||
-                ec == make_error_code(ReceiveError::DISCONNECTED);
+            return ec == make_error_code(TrySendError::Disconnected) ||
+                ec == make_error_code(SendSyncError::Disconnected) ||
+                ec == make_error_code(SendError::Disconnected) ||
+                ec == make_error_code(TryReceiveError::Disconnected) ||
+                ec == make_error_code(ReceiveSyncError::Disconnected) ||
+                ec == make_error_code(ReceiveError::Disconnected);
         }
     )
 

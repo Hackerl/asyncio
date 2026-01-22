@@ -33,19 +33,19 @@ ASYNC_TEST_CASE("poll events", "[poll]") {
     SECTION("readable") {
         REQUIRE(send(sockets[1], "hello world", 11, 0) == 11);
 
-        const auto events = co_await poll->on(asyncio::Poll::Event::READABLE);
+        const auto events = co_await poll->on(asyncio::Poll::Event::Readable);
         REQUIRE(events);
-        REQUIRE(*events & asyncio::Poll::Event::READABLE);
+        REQUIRE(*events & asyncio::Poll::Event::Readable);
     }
 
     SECTION("writable") {
-        const auto events = co_await poll->on(asyncio::Poll::Event::WRITABLE);
+        const auto events = co_await poll->on(asyncio::Poll::Event::Writable);
         REQUIRE(events);
-        REQUIRE(*events & asyncio::Poll::Event::WRITABLE);
+        REQUIRE(*events & asyncio::Poll::Event::Writable);
     }
 
     SECTION("cancel") {
-        auto task = poll->on(asyncio::Poll::Event::READABLE);
+        auto task = poll->on(asyncio::Poll::Event::Readable);
         REQUIRE(task.cancel());
         REQUIRE_ERROR(co_await task, std::errc::operation_canceled);
     }

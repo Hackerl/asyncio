@@ -38,11 +38,11 @@ namespace asyncio::net::tls {
     }
 
     enum class Version {
-        TLS_VERSION_1 = TLS1_VERSION,
-        TLS_VERSION_1_1 = TLS1_1_VERSION,
-        TLS_VERSION_1_2 = TLS1_2_VERSION,
-        TLS_VERSION_1_3 = TLS1_3_VERSION,
-        TLS_VERSION_3 = SSL3_VERSION
+        TLSVersion1 = TLS1_VERSION,
+        TLSVersion1_1 = TLS1_1_VERSION,
+        TLSVersion1_2 = TLS1_2_VERSION,
+        TLSVersion1_3 = TLS1_3_VERSION,
+        TLSVersion3 = SSL3_VERSION
     };
 
     struct Certificate {
@@ -191,8 +191,8 @@ namespace asyncio::net::tls {
         }
 
     protected:
-        Version mMinVersion{Version::TLS_VERSION_1_2};
-        Version mMaxVersion{Version::TLS_VERSION_1_3};
+        Version mMinVersion{Version::TLSVersion1_2};
+        Version mMaxVersion{Version::TLSVersion1_3};
         bool mInsecure{false};
         std::list<Certificate> mRootCAs;
         std::list<CertKeyPair> mCertKeyPairs;
@@ -223,14 +223,14 @@ namespace asyncio::net::tls {
     Z_DEFINE_ERROR_CODE_EX(
         TLSError,
         "asyncio::net::tls",
-        UNEXPECTED_EOF, "Unexpected end of file", IOError::UNEXPECTED_EOF
+        UnexpectedEOF, "Unexpected end of file", IOError::UnexpectedEOF
     )
 
     template<typename T>
         requires (
-            zero::detail::Trait<T, IReader> &&
-            zero::detail::Trait<T, IWriter> &&
-            zero::detail::Trait<T, ICloseable>
+            zero::traits::Trait<T, IReader> &&
+            zero::traits::Trait<T, IWriter> &&
+            zero::traits::Trait<T, ICloseable>
         )
     class TLS final : public IReader, public IWriter, public ICloseable, public IHalfCloseable {
     public:
@@ -254,7 +254,7 @@ namespace asyncio::net::tls {
             Z_CO_EXPECT(n);
 
             if (*n == 0)
-                co_return std::unexpected{make_error_code(TLSError::UNEXPECTED_EOF)};
+                co_return std::unexpected{make_error_code(TLSError::UnexpectedEOF)};
 
             const auto result = BIO_write(SSL_get_rbio(mSSL.get()), data.data(), static_cast<int>(*n));
             assert(result == *n);
@@ -428,9 +428,9 @@ namespace asyncio::net::tls {
 
     template<typename T>
         requires (
-            zero::detail::Trait<T, IReader> &&
-            zero::detail::Trait<T, IWriter> &&
-            zero::detail::Trait<T, ICloseable>
+            zero::traits::Trait<T, IReader> &&
+            zero::traits::Trait<T, IWriter> &&
+            zero::traits::Trait<T, ICloseable>
         )
     task::Task<TLS<T>, std::error_code> connect(
         T stream,
@@ -474,9 +474,9 @@ namespace asyncio::net::tls {
 
     template<typename T>
         requires (
-            zero::detail::Trait<T, IReader> &&
-            zero::detail::Trait<T, IWriter> &&
-            zero::detail::Trait<T, ICloseable>
+            zero::traits::Trait<T, IReader> &&
+            zero::traits::Trait<T, IWriter> &&
+            zero::traits::Trait<T, ICloseable>
         )
     task::Task<TLS<T>, std::error_code> accept(T stream, const Context context) {
         std::unique_ptr<SSL, decltype(&SSL_free)> ssl{SSL_new(context.get()), SSL_free};

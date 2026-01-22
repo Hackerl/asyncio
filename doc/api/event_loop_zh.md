@@ -49,7 +49,7 @@ void stop();
 
 ```cpp
 template<typename F>
-    requires zero::detail::is_specialization_v<std::invoke_result_t<F>, task::Task>
+    requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
 std::expected<
     typename std::invoke_result_t<F>::value_type,
     typename std::invoke_result_t<F>::error_type

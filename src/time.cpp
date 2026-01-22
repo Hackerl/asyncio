@@ -30,13 +30,13 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
             zero::error::guard(uv::expected([&] {
                 return uv_timer_stop(timer.raw());
             }));
 
-            promise.reject(task::Error::CANCELLED);
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     };

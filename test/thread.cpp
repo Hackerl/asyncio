@@ -49,7 +49,7 @@ ASYNC_TEST_CASE("post cancellable task to a new thread - error", "[thread]") {
         auto task = asyncio::toThread(
             [&]() -> std::expected<void, std::error_code> {
                 if (event.wait(50ms))
-                    return std::unexpected{asyncio::task::Error::CANCELLED};
+                    return std::unexpected{asyncio::task::Error::Cancelled};
 
                 return {};
             },
@@ -79,7 +79,7 @@ ASYNC_TEST_CASE("post cancellable task to a new thread - error", "[thread]") {
         auto task = asyncio::toThread(
             [&]() -> std::expected<int, std::error_code> {
                 if (event.wait(50ms))
-                    return std::unexpected{asyncio::task::Error::CANCELLED};
+                    return std::unexpected{asyncio::task::Error::Cancelled};
 
                 return 1024;
             },
@@ -113,7 +113,7 @@ ASYNC_TEST_CASE("post cancellable task to a new thread - exception", "[thread]")
         auto task = asyncio::toThread(
             [&] {
                 if (event.wait(50ms))
-                    throw std::system_error{asyncio::task::Error::CANCELLED};
+                    throw std::system_error{asyncio::task::Error::Cancelled};
             },
             [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
                 event.set();
@@ -147,7 +147,7 @@ ASYNC_TEST_CASE("post cancellable task to a new thread - exception", "[thread]")
         auto task = asyncio::toThread(
             [&] {
                 if (event.wait(50ms))
-                    throw std::system_error{asyncio::task::Error::CANCELLED};
+                    throw std::system_error{asyncio::task::Error::Cancelled};
 
                 return 1024;
             },
@@ -215,7 +215,7 @@ ASYNC_TEST_CASE("post task to thread pool", "[thread]") {
                 std::this_thread::sleep_for(50ms);
             });
             REQUIRE(task.cancel());
-            REQUIRE_ERROR(co_await task, asyncio::ToThreadPoolError::CANCELLED);
+            REQUIRE_ERROR(co_await task, asyncio::ToThreadPoolError::Cancelled);
             REQUIRE(std::chrono::system_clock::now() - tp < 50ms);
         }
 
@@ -225,7 +225,7 @@ ASYNC_TEST_CASE("post task to thread pool", "[thread]") {
                 return 1024;
             });
             REQUIRE(task.cancel());
-            REQUIRE_ERROR(co_await task, asyncio::ToThreadPoolError::CANCELLED);
+            REQUIRE_ERROR(co_await task, asyncio::ToThreadPoolError::Cancelled);
             REQUIRE(std::chrono::system_clock::now() - tp < 50ms);
         }
 
@@ -246,7 +246,7 @@ ASYNC_TEST_CASE("post cancellable task to thread pool", "[thread]") {
                 events[0].set();
 
                 if (events[1].wait(50ms))
-                    return std::unexpected{asyncio::task::Error::CANCELLED};
+                    return std::unexpected{asyncio::task::Error::Cancelled};
 
                 return {};
             },
@@ -283,7 +283,7 @@ ASYNC_TEST_CASE("post cancellable task to thread pool", "[thread]") {
                 events[0].set();
 
                 if (events[1].wait(50ms))
-                    return std::unexpected{asyncio::task::Error::CANCELLED};
+                    return std::unexpected{asyncio::task::Error::Cancelled};
 
                 return 1024;
             },

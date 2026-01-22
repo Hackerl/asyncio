@@ -19,9 +19,9 @@ ASYNC_TEST_CASE("get address info", "[net::dns]") {
             return std::visit(
                 []<typename T>(const T &arg) -> bool {
                     if constexpr (std::is_same_v<T, asyncio::net::IPv4Address>)
-                        return arg.ip == asyncio::net::LOCALHOST_IPV4 && arg.port == 80;
+                        return arg.ip == asyncio::net::LocalhostIPv4 && arg.port == 80;
                     else if constexpr (std::is_same_v<T, asyncio::net::IPv6Address>)
-                        return arg.ip == asyncio::net::LOCALHOST_IPV6 && arg.port == 80;
+                        return arg.ip == asyncio::net::LocalhostIPv6 && arg.port == 80;
                     else
                         std::abort();
                 },
@@ -41,9 +41,9 @@ ASYNC_TEST_CASE("lookup IP", "[net]") {
             return std::visit(
                 []<typename T>(const T &arg) -> bool {
                     if constexpr (std::is_same_v<T, asyncio::net::IPv4>)
-                        return arg == asyncio::net::LOCALHOST_IPV4;
+                        return arg == asyncio::net::LocalhostIPv4;
                     else if constexpr (std::is_same_v<T, asyncio::net::IPv6>)
-                        return arg == asyncio::net::LOCALHOST_IPV6;
+                        return arg == asyncio::net::LocalhostIPv6;
                     else
                         std::abort();
                 },
@@ -57,12 +57,12 @@ ASYNC_TEST_CASE("lookup IPv4", "[net]") {
     const auto result = co_await asyncio::net::dns::lookupIPv4("localhost");
     REQUIRE(result);
     REQUIRE_THAT(*result, Catch::Matchers::SizeIs(1));
-    REQUIRE(result->front() == asyncio::net::LOCALHOST_IPV4);
+    REQUIRE(result->front() == asyncio::net::LocalhostIPv4);
 }
 
 ASYNC_TEST_CASE("lookup IPv6", "[net]") {
     if (const auto result = co_await asyncio::net::dns::lookupIPv6("localhost"); result && !result->empty()) {
         REQUIRE_THAT(*result, Catch::Matchers::SizeIs(1));
-        REQUIRE(result->front() == asyncio::net::LOCALHOST_IPV6);
+        REQUIRE(result->front() == asyncio::net::LocalhostIPv6);
     }
 }

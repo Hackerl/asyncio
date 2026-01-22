@@ -9,7 +9,7 @@ namespace asyncio {
     Z_DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
-        UNEXPECTED_EOF, "Unexpected end of file"
+        UnexpectedEOF, "Unexpected end of file"
     )
 
     using FileDescriptor = uv_os_fd_t;
@@ -34,7 +34,7 @@ namespace asyncio {
         Z_DEFINE_ERROR_CODE_INNER_EX(
             ReadExactlyError,
             "asyncio::IReader",
-            UNEXPECTED_EOF, "Unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
+            UnexpectedEOF, "Unexpected end of file", make_error_condition(IOError::UnexpectedEOF)
         )
 
         virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
@@ -51,9 +51,9 @@ namespace asyncio {
     class ISeekable : public virtual zero::Interface {
     public:
         enum class Whence {
-            BEGIN,
-            CURRENT,
-            END
+            Begin,
+            Current,
+            End
         };
 
         virtual task::Task<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
@@ -77,12 +77,12 @@ namespace asyncio {
     };
 
     task::Task<std::size_t, std::error_code>
-    copy(zero::detail::Trait<IReader> auto &reader, zero::detail::Trait<IWriter> auto &writer) {
+    copy(zero::traits::Trait<IReader> auto &reader, zero::traits::Trait<IWriter> auto &writer) {
         std::size_t written{0};
 
         while (true) {
             if (co_await task::cancelled)
-                co_return std::unexpected{task::Error::CANCELLED};
+                co_return std::unexpected{task::Error::Cancelled};
 
             std::array<std::byte, 20480> data; // NOLINT(*-pro-type-member-init)
 

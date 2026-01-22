@@ -93,7 +93,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
 
         SECTION("unexpected eof") {
             asyncio::BufReader reader{asyncio::StringReader{inputString}, capacity};
-            REQUIRE_ERROR(co_await reader.readLine(), asyncio::IOError::UNEXPECTED_EOF);
+            REQUIRE_ERROR(co_await reader.readLine(), asyncio::IOError::UnexpectedEOF);
         }
     }
 
@@ -113,7 +113,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
 
         SECTION("unexpected eof") {
             asyncio::BufReader reader{asyncio::StringReader{inputString}, capacity};
-            REQUIRE_ERROR(co_await reader.readUntil(static_cast<std::byte>(c)), asyncio::IOError::UNEXPECTED_EOF);
+            REQUIRE_ERROR(co_await reader.readUntil(static_cast<std::byte>(c)), asyncio::IOError::UnexpectedEOF);
         }
     }
 }

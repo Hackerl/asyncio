@@ -8,7 +8,7 @@ asyncio::task::Task<void, std::error_code> asyncio::IReader::readExactly(const s
         Z_CO_EXPECT(n);
 
         if (*n == 0)
-            co_return std::unexpected{ReadExactlyError::UNEXPECTED_EOF};
+            co_return std::unexpected{ReadExactlyError::UnexpectedEOF};
 
         offset += *n;
     }
@@ -39,7 +39,7 @@ asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std:
 
     while (offset < data.size()) {
         if (co_await task::cancelled)
-            co_return std::unexpected{task::Error::CANCELLED};
+            co_return std::unexpected{task::Error::Cancelled};
 
         const auto n = co_await write(data.subspan(offset));
         Z_CO_EXPECT(n);
@@ -52,7 +52,7 @@ asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std:
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::ISeekable::rewind() {
-    Z_CO_EXPECT(co_await seek(0, Whence::BEGIN));
+    Z_CO_EXPECT(co_await seek(0, Whence::Begin));
     co_return {};
 }
 
@@ -60,15 +60,15 @@ asyncio::task::Task<std::uint64_t, std::error_code> asyncio::ISeekable::length()
     const auto pos = co_await position();
     Z_CO_EXPECT(pos);
 
-    const auto length = co_await seek(0, Whence::END);
+    const auto length = co_await seek(0, Whence::End);
     Z_CO_EXPECT(length);
 
-    Z_CO_EXPECT(co_await seek(*pos, Whence::BEGIN));
+    Z_CO_EXPECT(co_await seek(*pos, Whence::Begin));
     co_return *length;
 }
 
 asyncio::task::Task<std::uint64_t, std::error_code> asyncio::ISeekable::position() {
-    return seek(0, Whence::CURRENT);
+    return seek(0, Whence::Current);
 }
 
 asyncio::StringReader::StringReader(std::string string) : mString{std::move(string)} {

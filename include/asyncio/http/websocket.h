@@ -10,20 +10,20 @@
 
 namespace asyncio::http::ws {
     enum class CloseCode {
-        NORMAL_CLOSURE = 1000,
-        GOING_AWAY,
-        PROTOCOL_ERROR,
-        UNSUPPORTED_DATA,
-        NO_STATUS_RECEIVED = 1005,
-        ABNORMAL_CLOSURE,
-        INVALID_FRAME_PAYLOAD_DATA,
-        POLICY_VIOLATION,
-        MESSAGE_TOO_BIG,
-        MANDATORY_EXTENSION,
-        INTERNAL_ERROR,
-        SERVICE_RESTART,
-        TRY_AGAIN_LATER,
-        BAD_GATEWAY
+        NormalClosure = 1000,
+        GoingAway,
+        ProtocolError,
+        UnsupportedData,
+        NoStatusReceived = 1005,
+        AbnormalClosure,
+        InvalidFramePayloadData,
+        PolicyViolation,
+        MessageTooBig,
+        MandatoryExtension,
+        InternalError,
+        ServiceRestart,
+        TryAgainLater,
+        BadGateway
     };
 
     class CloseCodeCategory final : public std::error_category {
@@ -36,46 +36,46 @@ namespace asyncio::http::ws {
 
         [[nodiscard]] std::string message(const int value) const override {
             switch (static_cast<CloseCode>(value)) {
-            case CloseCode::NORMAL_CLOSURE:
+            case CloseCode::NormalClosure:
                 return "Normal closure";
 
-            case CloseCode::GOING_AWAY:
+            case CloseCode::GoingAway:
                 return "Going away";
 
-            case CloseCode::PROTOCOL_ERROR:
+            case CloseCode::ProtocolError:
                 return "Protocol error";
 
-            case CloseCode::UNSUPPORTED_DATA:
+            case CloseCode::UnsupportedData:
                 return "Unsupported data";
 
-            case CloseCode::NO_STATUS_RECEIVED:
+            case CloseCode::NoStatusReceived:
                 return "No status received";
 
-            case CloseCode::ABNORMAL_CLOSURE:
+            case CloseCode::AbnormalClosure:
                 return "Abnormal closure";
 
-            case CloseCode::INVALID_FRAME_PAYLOAD_DATA:
+            case CloseCode::InvalidFramePayloadData:
                 return "Invalid frame payload data";
 
-            case CloseCode::POLICY_VIOLATION:
+            case CloseCode::PolicyViolation:
                 return "Policy violation";
 
-            case CloseCode::MESSAGE_TOO_BIG:
+            case CloseCode::MessageTooBig:
                 return "Message too big";
 
-            case CloseCode::MANDATORY_EXTENSION:
+            case CloseCode::MandatoryExtension:
                 return "Mandatory extension";
 
-            case CloseCode::INTERNAL_ERROR:
+            case CloseCode::InternalError:
                 return "Internal error";
 
-            case CloseCode::SERVICE_RESTART:
+            case CloseCode::ServiceRestart:
                 return "Service restart";
 
-            case CloseCode::TRY_AGAIN_LATER:
+            case CloseCode::TryAgainLater:
                 return "Try again later";
 
-            case CloseCode::BAD_GATEWAY:
+            case CloseCode::BadGateway:
                 return "Bad gateway";
 
             default:
@@ -89,12 +89,12 @@ namespace asyncio::http::ws {
     }
 
     enum class Opcode {
-        CONTINUATION = 0,
-        TEXT = 1,
-        BINARY = 2,
-        CLOSE = 8,
-        PING = 9,
-        PONG = 10
+        Continuation = 0,
+        Text = 1,
+        Binary = 2,
+        Close = 8,
+        Ping = 9,
+        Pong = 10
     };
 
     struct InternalMessage {
@@ -171,26 +171,26 @@ namespace asyncio::http::ws {
 
     class WebSocket {
         enum class State {
-            CONNECTED,
-            CLOSING,
-            CLOSED
+            Connected,
+            Closing,
+            Closed
         };
 
     public:
         Z_DEFINE_ERROR_CODE_INNER(
             Error,
             "asyncio::http::ws::WebSocket",
-            INVALID_URL, "Invalid URL",
-            UNSUPPORTED_SCHEME, "Unsupported WebSocket scheme",
-            INVALID_RESPONSE, "Invalid HTTP response",
-            UNEXPECTED_STATUS_CODE, "Unexpected HTTP response status code",
-            INVALID_HTTP_HEADER, "Invalid HTTP header",
-            NO_ACCEPT_HEADER, "No WebSocket accept header",
-            HASH_MISMATCH, "Hash mismatch",
-            UNSUPPORTED_MASKED_FRAME, "Unsupported masked frame",
-            UNSUPPORTED_OPCODE, "Unsupported opcode",
-            CONNECTION_CLOSED, "Connection closed",
-            UNEXPECTED_COMPRESSED_MESSAGE, "Unexpected compressed message"
+            InvalidURL, "Invalid URL",
+            UnsupportedScheme, "Unsupported WebSocket scheme",
+            InvalidResponse, "Invalid HTTP response",
+            UnexpectedStatusCode, "Unexpected HTTP response status code",
+            InvalidHTTPHeader, "Invalid HTTP header",
+            NoAcceptHeader, "No WebSocket accept header",
+            HashMismatch, "Hash mismatch",
+            UnsupportedMaskedFrame, "Unsupported masked frame",
+            UnsupportedOpcode, "Unsupported opcode",
+            ConnectionClosed, "Connection closed",
+            UnexpectedCompressedMessage, "Unexpected compressed message"
         )
 
         WebSocket(

@@ -5,7 +5,7 @@
 #include <mutex>
 #include <queue>
 #include <cassert>
-#include <zero/detail/type_traits.h>
+#include <zero/traits/type_traits.h>
 
 namespace asyncio {
     class EventLoop {
@@ -50,7 +50,7 @@ namespace asyncio {
     }
 
     template<typename F>
-        requires zero::detail::is_specialization_v<std::invoke_result_t<F>, task::Task>
+        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
     std::expected<
         typename std::invoke_result_t<F>::value_type,
         typename std::invoke_result_t<F>::error_type
@@ -68,7 +68,7 @@ namespace asyncio {
     }
 
     template<typename F>
-        requires zero::detail::is_specialization_v<std::invoke_result_t<F>, task::Task>
+        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
     auto run(F &&f) {
         return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
     }

@@ -182,13 +182,13 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
         context.promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())
-                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
             zero::error::guard(uv::expected([&] {
                 return uv_read_stop(mStream.raw());
             }));
 
-            context.promise.reject(task::Error::CANCELLED);
+            context.promise.reject(task::Error::Cancelled);
             return {};
         }
     };

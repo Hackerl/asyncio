@@ -17,7 +17,7 @@ ASYNC_TEST_CASE("UDP socket", "[net::dgram]") {
     SECTION("local address") {
         const auto address = socket->localAddress();
         REQUIRE(address);
-        REQUIRE(std::get<asyncio::net::IPv4Address>(*address).ip == asyncio::net::LOCALHOST_IPV4);
+        REQUIRE(std::get<asyncio::net::IPv4Address>(*address).ip == asyncio::net::LocalhostIPv4);
     }
 
     SECTION("remote address") {

@@ -53,7 +53,7 @@ ASYNC_TEST_CASE("mutex", "[sync::mutex]") {
         REQUIRE_FALSE(task1.done());
 
         mutex.unlock();
-        REQUIRE_ERROR(task1.cancel(), asyncio::task::Error::CANCELLATION_TOO_LATE);
+        REQUIRE_ERROR(task1.cancel(), asyncio::task::Error::CancellationTooLate);
 
         auto task2 = mutex.lock();
         REQUIRE_FALSE(task2.done());

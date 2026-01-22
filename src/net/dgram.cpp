@@ -306,13 +306,13 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
         context.promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())
-                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
             zero::error::guard(uv::expected([&] {
                 return uv_udp_recv_stop(mUDP.raw());
             }));
 
-            context.promise.reject(task::Error::CANCELLED);
+            context.promise.reject(task::Error::Cancelled);
             return {};
         }
     };

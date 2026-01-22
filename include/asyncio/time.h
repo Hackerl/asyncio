@@ -9,7 +9,7 @@ namespace asyncio {
     Z_DEFINE_ERROR_CODE_EX(
         TimeoutError,
         "asyncio::timeout",
-        ELAPSED, "Deadline has elapsed", std::errc::timed_out
+        Elapsed, "Deadline has elapsed", std::errc::timed_out
     )
 
     template<typename T, typename E>
@@ -30,7 +30,7 @@ namespace asyncio {
             if (!timer.future().result())
                 co_return std::expected<std::expected<T, E>, TimeoutError>{std::move(result)};
 
-            co_return std::unexpected{TimeoutError::ELAPSED};
+            co_return std::unexpected{TimeoutError::Elapsed};
         }
 
         std::ignore = timer.cancel();
@@ -76,7 +76,7 @@ namespace asyncio {
                     co_return *std::move(*result);
             }
 
-            throw zero::error::SystemError{make_error_code(TimeoutError::ELAPSED)};
+            throw zero::error::SystemError{make_error_code(TimeoutError::Elapsed)};
         }
 
         std::ignore = timer.cancel();

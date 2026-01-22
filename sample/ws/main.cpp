@@ -16,18 +16,18 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
         auto message = co_await ws.readMessage();
 
         if (!message) {
-            if (message.error() != asyncio::http::ws::CloseCode::NORMAL_CLOSURE)
+            if (message.error() != asyncio::http::ws::CloseCode::NormalClosure)
                 throw zero::error::SystemError{message.error()};
 
             break;
         }
 
         switch (message->opcode) {
-        case asyncio::http::ws::Opcode::TEXT:
+        case asyncio::http::ws::Opcode::Text:
             fmt::print("Received text message: {}\n", std::get<std::string>(message->data));
             break;
 
-        case asyncio::http::ws::Opcode::BINARY:
+        case asyncio::http::ws::Opcode::Binary:
             fmt::print(
                 "Received binary message: {}\n",
                 zero::encoding::hex::encode(std::get<std::vector<std::byte>>(message->data))

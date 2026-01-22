@@ -36,7 +36,7 @@ ASYNC_TEST_CASE("read exactly", "[io]") {
         std::vector<std::byte> data;
         data.resize(input.size());
 
-        REQUIRE_ERROR(co_await reader.readExactly(data), asyncio::IOError::UNEXPECTED_EOF);
+        REQUIRE_ERROR(co_await reader.readExactly(data), asyncio::IOError::UnexpectedEOF);
     }
 }
 

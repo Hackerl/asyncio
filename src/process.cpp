@@ -334,7 +334,7 @@ const std::vector<zero::os::Resource::Native> &asyncio::process::Command::inheri
 }
 
 std::expected<asyncio::process::ChildProcess, std::error_code> asyncio::process::Command::spawn() const {
-    return spawn({StdioType::INHERIT, StdioType::INHERIT, StdioType::INHERIT});
+    return spawn({StdioType::Inherit, StdioType::Inherit, StdioType::Inherit});
 }
 
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::Command::status() const {
@@ -344,7 +344,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
 }
 
 asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process::Command::output() const {
-    auto child = spawn({StdioType::NUL, StdioType::PIPED, StdioType::PIPED});
+    auto child = spawn({StdioType::Null, StdioType::Piped, StdioType::Piped});
     Z_CO_EXPECT(child);
 
     if (auto input = std::exchange(child->stdInput(), std::nullopt))

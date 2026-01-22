@@ -33,14 +33,14 @@ std::expected<void, std::error_code> asyncio::task::Frame::cancelAll() {
 
         while (true) {
             if (frame->finished) {
-                errors.emplace_back(Error::ALREADY_COMPLETED);
+                errors.emplace_back(Error::AlreadyCompleted);
                 break;
             }
 
             frame->cancelled = true;
 
             if (frame->locked) {
-                errors.emplace_back(Error::LOCKED);
+                errors.emplace_back(Error::Locked);
                 break;
             }
 
@@ -52,7 +52,7 @@ std::expected<void, std::error_code> asyncio::task::Frame::cancelAll() {
             }
 
             if (frame->children.empty()) {
-                errors.emplace_back(Error::CANCELLATION_NOT_SUPPORTED);
+                errors.emplace_back(Error::CancellationNotSupported);
                 break;
             }
 

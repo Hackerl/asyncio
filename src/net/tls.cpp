@@ -11,7 +11,7 @@
 #endif
 
 #ifdef __linux__
-constexpr auto SYSTEM_CA_BUNDLE_PATHS = {
+constexpr auto SystemCABundlePaths = {
     "/etc/ssl/certs/ca-certificates.crt",
     "/etc/pki/tls/certs/ca-bundle.crt",
     "/etc/ssl/ca-bundle.pem",
@@ -28,13 +28,13 @@ std::error_code asyncio::net::tls::openSSLError() {
 #ifdef __linux__
 std::optional<std::filesystem::path> asyncio::net::tls::systemCABundle() {
     const auto it = std::ranges::find_if(
-        SYSTEM_CA_BUNDLE_PATHS,
+        SystemCABundlePaths,
         [](const auto &path) {
             return zero::filesystem::exists(path).value_or(false);
         }
     );
 
-    if (it == SYSTEM_CA_BUNDLE_PATHS.end())
+    if (it == SystemCABundlePaths.end())
         return std::nullopt;
 
     return *it;
@@ -96,7 +96,7 @@ asyncio::net::tls::PrivateKey::loadFile(const std::filesystem::path &path) {
 #ifdef ASYNCIO_EMBED_CA_CERT
 std::expected<void, std::error_code> asyncio::net::tls::Config::loadEmbeddedCA(X509_STORE *store) {
     const std::unique_ptr<BIO, decltype(&BIO_free)> bio{
-        BIO_new_mem_buf(CA_CERT.data(), CA_CERT.size()),
+        BIO_new_mem_buf(CACert.data(), CACert.size()),
         BIO_free
     };
 

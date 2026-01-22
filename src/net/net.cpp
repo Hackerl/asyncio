@@ -65,7 +65,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
     switch (addr->sa_family) {
     case AF_INET: {
         if (length != 0 && length != sizeof(sockaddr_in))
-            return std::unexpected{ParseAddressError::INVALID_ARGUMENT};
+            return std::unexpected{ParseAddressError::InvalidArgument};
 
         const auto address = reinterpret_cast<const sockaddr_in *>(addr);
 
@@ -79,7 +79,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 
     case AF_INET6: {
         if (length != 0 && length != sizeof(sockaddr_in6))
-            return std::unexpected{ParseAddressError::INVALID_ARGUMENT};
+            return std::unexpected{ParseAddressError::InvalidArgument};
 
         const auto address = reinterpret_cast<const sockaddr_in6 *>(addr);
 
@@ -103,7 +103,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 #if defined(__unix__) || defined(__APPLE__)
     case AF_UNIX: {
         if (length < sizeof(sa_family_t))
-            return std::unexpected{ParseAddressError::INVALID_ARGUMENT};
+            return std::unexpected{ParseAddressError::InvalidArgument};
 
         if (length == sizeof(sa_family_t))
             return UnixAddress{};
@@ -120,7 +120,7 @@ asyncio::net::addressFrom(const sockaddr *addr, const socklen_t length) {
 #endif
 
     default:
-        return std::unexpected{ParseAddressError::ADDRESS_FAMILY_NOT_SUPPORTED};
+        return std::unexpected{ParseAddressError::AddressFamilyNotSupported};
     }
 }
 
@@ -171,7 +171,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
                 const auto &path = arg.path;
 
                 if (path.empty() || path.length() - (path.front() == '@' ? 1 : 0) >= sizeof(sockaddr_un::sun_path))
-                    return std::unexpected{ConvertToSocketAddressError::INVALID_ARGUMENT};
+                    return std::unexpected{ConvertToSocketAddressError::InvalidArgument};
 
                 ptr->sun_family = AF_UNIX;
                 std::memcpy(ptr->sun_path, path.c_str(), path.length());
@@ -187,7 +187,7 @@ asyncio::net::socketAddressFrom(const Address &address) {
             }
 #endif
             else {
-                return std::unexpected{ConvertToSocketAddressError::ADDRESS_FAMILY_NOT_SUPPORTED};
+                return std::unexpected{ConvertToSocketAddressError::AddressFamilyNotSupported};
             }
         },
         address
