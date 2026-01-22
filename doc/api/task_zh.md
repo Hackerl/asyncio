@@ -457,7 +457,7 @@ Task<
 >
 all(I first, S last);
 
-template<std::ranges::range R>
+template<std::ranges::input_range R>
     requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
 auto all(R &&tasks) {
     return all(tasks.begin(), tasks.end());
@@ -491,7 +491,7 @@ template<std::input_iterator I, std::sentinel_for<I> S>
 Task<all_settled_ranges_value_t<I, S>>
 allSettled(I first, S last);
 
-template<std::ranges::range R>
+template<std::ranges::input_range R>
     requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
 auto allSettled(R &&tasks) {
     return allSettled(tasks.begin(), tasks.end());
@@ -522,7 +522,7 @@ Task<
 >
 any(I first, S last);
 
-template<std::ranges::range R>
+template<std::ranges::input_range R>
     requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
 auto any(R &&tasks) {
     return any(tasks.begin(), tasks.end());
@@ -557,7 +557,7 @@ Task<
 >
 race(I first, S last);
 
-template<std::ranges::range R>
+template<std::ranges::input_range R>
     requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
 auto race(R &&tasks) {
     return race(tasks.begin(), tasks.end());

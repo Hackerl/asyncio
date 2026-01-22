@@ -859,7 +859,7 @@ namespace asyncio::task {
         }
     }
 
-    template<std::ranges::range R>
+    template<std::ranges::input_range R>
         requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
     auto all(R &&tasks) {
         return all(tasks.begin(), tasks.end());
@@ -946,7 +946,7 @@ namespace asyncio::task {
         co_return *std::move(future).result();
     }
 
-    template<std::ranges::range R>
+    template<std::ranges::input_range R>
         requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
     auto allSettled(R &&tasks) {
         return allSettled(tasks.begin(), tasks.end());
@@ -1018,7 +1018,7 @@ namespace asyncio::task {
         co_return std::move(future).result();
     }
 
-    template<std::ranges::range R>
+    template<std::ranges::input_range R>
         requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
     auto any(R &&tasks) {
         return any(tasks.begin(), tasks.end());
@@ -1111,7 +1111,7 @@ namespace asyncio::task {
         }
     }
 
-    template<std::ranges::range R>
+    template<std::ranges::input_range R>
         requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
     auto race(R &&tasks) {
         return race(tasks.begin(), tasks.end());
