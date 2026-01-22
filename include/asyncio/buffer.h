@@ -77,7 +77,7 @@ namespace asyncio {
                 if (const auto it = std::find(first, last, byte); it != last) {
                     data.append_range(std::ranges::subrange{first, it});
                     mHead += std::distance(first, it) + 1;
-                    co_return data;
+                    break;
                 }
 
                 data.append_range(std::ranges::subrange{first, last});
@@ -93,6 +93,8 @@ namespace asyncio {
 
                 mTail = *n;
             }
+
+            co_return data;
         }
 
         task::Task<void, std::error_code> peek(const std::span<std::byte> data) override {

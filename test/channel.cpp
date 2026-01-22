@@ -633,7 +633,7 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
                 if (const auto &error = result.error(); error != asyncio::ReceiveError::Disconnected)
                     co_return std::unexpected{error};
 
-                co_return {};
+                break;
             }
 
             if (*result != element)
@@ -641,6 +641,8 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
 
             ++counter;
         }
+
+        co_return {};
     };
 
     const auto consumeSync = [&]() -> std::expected<void, std::error_code> {
@@ -651,7 +653,7 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
                 if (const auto &error = result.error(); error != asyncio::ReceiveSyncError::Disconnected)
                     return std::unexpected{error};
 
-                return {};
+                break;
             }
 
             if (*result != element)
@@ -659,6 +661,8 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
 
             ++counter;
         }
+
+        return {};
     };
 
     std::array producers{asyncio::task::spawn(produce), asyncio::task::spawn(produce)};
