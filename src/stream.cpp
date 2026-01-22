@@ -315,8 +315,8 @@ asyncio::task::Task<void, std::error_code> asyncio::Listener::accept(uv_stream_t
         if (result)
             co_return {};
 
-        if (result.error() != std::errc::resource_unavailable_try_again)
-            co_return std::unexpected{result.error()};
+        if (const auto &error = result.error(); error != std::errc::resource_unavailable_try_again)
+            co_return std::unexpected{error};
 
         mCore->event.reset();
         Z_CO_EXPECT(co_await mCore->event.wait());

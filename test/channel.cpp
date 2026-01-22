@@ -630,8 +630,8 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
             const auto result = co_await receiver.receive();
 
             if (!result) {
-                if (result.error() != asyncio::ReceiveError::Disconnected)
-                    co_return std::unexpected{result.error()};
+                if (const auto &error = result.error(); error != asyncio::ReceiveError::Disconnected)
+                    co_return std::unexpected{error};
 
                 co_return {};
             }
@@ -648,8 +648,8 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
             const auto result = receiver.receiveSync();
 
             if (!result) {
-                if (result.error() != asyncio::ReceiveSyncError::Disconnected)
-                    return std::unexpected{result.error()};
+                if (const auto &error = result.error(); error != asyncio::ReceiveSyncError::Disconnected)
+                    return std::unexpected{error};
 
                 return {};
             }

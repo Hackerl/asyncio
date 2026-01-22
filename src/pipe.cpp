@@ -52,8 +52,8 @@ std::expected<std::string, std::error_code> asyncio::Pipe::localAddress() const 
         return address;
     }
 
-    if (result.error() != std::errc::no_buffer_space)
-        return std::unexpected{result.error()};
+    if (const auto &error = result.error(); error != std::errc::no_buffer_space)
+        return std::unexpected{error};
 
     address.resize(size);
 
@@ -80,8 +80,8 @@ std::expected<std::string, std::error_code> asyncio::Pipe::remoteAddress() const
         return address;
     }
 
-    if (result.error() != std::errc::no_buffer_space)
-        return std::unexpected{result.error()};
+    if (const auto &error = result.error(); error != std::errc::no_buffer_space)
+        return std::unexpected{error};
 
     address.resize(size);
 
@@ -150,8 +150,8 @@ std::expected<std::string, std::error_code> asyncio::PipeListener::address() con
         return address;
     }
 
-    if (result.error() != std::errc::no_buffer_space)
-        return std::unexpected{result.error()};
+    if (const auto &error = result.error(); error != std::errc::no_buffer_space)
+        return std::unexpected{error};
 
     address.resize(size);
 
