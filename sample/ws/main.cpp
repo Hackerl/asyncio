@@ -1,4 +1,5 @@
 #include <asyncio/http/websocket.h>
+#include <asyncio/error.h>
 #include <zero/cmdline.h>
 #include <zero/encoding/hex.h>
 
@@ -10,14 +11,14 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
 
     const auto url = cmdline.get<asyncio::http::URL>("url");
 
-    auto ws = zero::error::guard(co_await asyncio::http::ws::WebSocket::connect(url));
+    auto ws = co_await asyncio::error::guard(asyncio::http::ws::WebSocket::connect(url));
 
     while (true) {
         auto message = co_await ws.readMessage();
 
         if (!message) {
             if (const auto &error = message.error(); error != asyncio::http::ws::CloseCode::NormalClosure)
-                throw zero::error::SystemError{error};
+                throw co_await asyncio::error::SystemError::make(error);
 
             break;
         }
@@ -38,6 +39,6 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
             std::abort();
         }
 
-        zero::error::guard(co_await ws.writeMessage(*std::move(message)));
+        co_await asyncio::error::guard(ws.writeMessage(*std::move(message)));
     }
 }

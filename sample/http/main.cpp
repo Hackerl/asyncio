@@ -1,4 +1,5 @@
 #include <asyncio/http/request.h>
+#include <asyncio/error.h>
 #include <zero/cmdline.h>
 
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
@@ -44,11 +45,11 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
 
     auto response = co_await asyncio::task::spawn([&]() -> asyncio::task::Task<asyncio::http::Response> {
         if (!body)
-            co_return zero::error::guard(co_await requests.request(*method, url, options));
+            co_return co_await asyncio::error::guard(requests.request(*method, url, options));
 
         if (json)
-            co_return zero::error::guard(
-                co_await requests.request(*method, url, options, nlohmann::json::parse(*body))
+            co_return co_await asyncio::error::guard(
+                requests.request(*method, url, options, nlohmann::json::parse(*body))
             );
 
         if (form) {
@@ -66,16 +67,16 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
                     data[tokens[0]] = tokens[1];
             }
 
-            co_return zero::error::guard(co_await requests.request(*method, url, options, data));
+            co_return co_await asyncio::error::guard(requests.request(*method, url, options, data));
         }
 
-        co_return zero::error::guard(co_await requests.request(*method, url, options, *body));
+        co_return co_await asyncio::error::guard(requests.request(*method, url, options, *body));
     });
 
     if (output) {
-        zero::error::guard(co_await response.output(*output));
+        co_await asyncio::error::guard(response.output(*output));
         co_return;
     }
 
-    fmt::print("{}", zero::error::guard(co_await response.string()));
+    fmt::print("{}", co_await asyncio::error::guard(response.string()));
 }

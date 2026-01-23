@@ -1,19 +1,20 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/tls.h>
 #include <asyncio/signal.h>
+#include <asyncio/error.h>
 #include <zero/cmdline.h>
 #include <zero/formatter.h>
 
 asyncio::task::Task<void> handle(asyncio::net::TCPStream stream, asyncio::net::tls::Context context) {
-    fmt::print("Connection: {}\n", zero::error::guard(stream.remoteAddress()));
+    fmt::print("Connection: {}\n", co_await asyncio::error::guard(stream.remoteAddress()));
 
-    auto tls = zero::error::guard(co_await asyncio::net::tls::accept(std::move(stream), std::move(context)));
+    auto tls = co_await asyncio::error::guard(asyncio::net::tls::accept(std::move(stream), std::move(context)));
 
     while (true) {
         std::string message;
         message.resize(1024);
 
-        const auto n = zero::error::guard(co_await tls.read(std::as_writable_bytes(std::span{message})));
+        const auto n = co_await asyncio::error::guard(tls.read(std::as_writable_bytes(std::span{message})));
 
         if (n == 0)
             break;
@@ -21,7 +22,7 @@ asyncio::task::Task<void> handle(asyncio::net::TCPStream stream, asyncio::net::t
         message.resize(n);
 
         fmt::print("Received message: {}\n", message);
-        zero::error::guard(co_await tls.writeAll(std::as_bytes(std::span{message})));
+        co_await asyncio::error::guard(tls.writeAll(std::as_bytes(std::span{message})));
     }
 }
 
@@ -47,7 +48,7 @@ serve(asyncio::net::TCPListener listener, const asyncio::net::tls::Context conte
     }
 
     co_await group;
-    zero::error::guard(std::move(result));
+    co_await asyncio::error::guard(std::move(result));
 }
 
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
@@ -72,28 +73,28 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
 
     const auto verifyClient = cmdline.exist("verify");
 
-    auto cert = zero::error::guard(co_await asyncio::net::tls::Certificate::loadFile(certFile));
-    auto key = zero::error::guard(co_await asyncio::net::tls::PrivateKey::loadFile(keyFile));
+    auto cert = co_await asyncio::error::guard(asyncio::net::tls::Certificate::loadFile(certFile));
+    auto key = co_await asyncio::error::guard(asyncio::net::tls::PrivateKey::loadFile(keyFile));
 
     asyncio::net::tls::ServerConfig config;
 
     if (caFile)
-        config.rootCAs({zero::error::guard(co_await asyncio::net::tls::Certificate::loadFile(*caFile))});
+        config.rootCAs({co_await asyncio::error::guard(asyncio::net::tls::Certificate::loadFile(*caFile))});
 
-    auto context = zero::error::guard(
+    auto context = co_await asyncio::error::guard(
         config
         .verifyClient(verifyClient)
         .certKeyPairs({{std::move(cert), std::move(key)}})
         .build()
     );
 
-    auto listener = zero::error::guard(asyncio::net::TCPListener::listen(ip, port));
+    auto listener = co_await asyncio::error::guard(asyncio::net::TCPListener::listen(ip, port));
     auto signal = asyncio::Signal::make();
 
     co_await race(
         serve(std::move(listener), std::move(context)),
         asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
-            zero::error::guard(co_await signal.on(SIGINT));
+            co_await asyncio::error::guard(signal.on(SIGINT));
         })
     );
 }

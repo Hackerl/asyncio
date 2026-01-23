@@ -1,5 +1,6 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/time.h>
+#include <asyncio/error.h>
 #include <zero/cmdline.h>
 
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
@@ -16,15 +17,15 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     const auto host = cmdline.get<std::string>("host");
     const auto port = cmdline.get<std::uint16_t>("port");
 
-    auto stream = zero::error::guard(co_await asyncio::net::TCPStream::connect(host, port));
+    auto stream = co_await asyncio::error::guard(asyncio::net::TCPStream::connect(host, port));
 
     while (true) {
-        zero::error::guard(co_await stream.writeAll(std::as_bytes(std::span{"hello world"sv})));
+        co_await asyncio::error::guard(stream.writeAll(std::as_bytes(std::span{"hello world"sv})));
 
         std::string message;
         message.resize(1024);
 
-        const auto n = zero::error::guard(co_await stream.read(std::as_writable_bytes(std::span{message})));
+        const auto n = co_await asyncio::error::guard(stream.read(std::as_writable_bytes(std::span{message})));
 
         if (n == 0)
             break;
@@ -32,6 +33,6 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
         message.resize(n);
 
         fmt::print("Received message: {}\n", message);
-        zero::error::guard(co_await asyncio::sleep(1s));
+        co_await asyncio::error::guard(asyncio::sleep(1s));
     }
 }

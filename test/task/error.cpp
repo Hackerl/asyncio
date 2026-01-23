@@ -1,5 +1,6 @@
 #include <catch_extensions.h>
 #include <asyncio/task.h>
+#include <asyncio/error.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("cancellable task - error", "[task]") {
@@ -1106,7 +1107,7 @@ ASYNC_TEST_CASE("task transform - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .transform([](const auto &value) -> asyncio::task::Task<int> {
-                zero::error::guard(co_await asyncio::reschedule());
+                co_await asyncio::error::guard(asyncio::reschedule());
                 co_return value * 2;
             });
 
@@ -1145,7 +1146,7 @@ ASYNC_TEST_CASE("task transform error - error", "[task]") {
         asyncio::Promise<int, std::error_code> promise;
         auto task = asyncio::task::from(promise.getFuture())
             .transformError([](const auto &ec) -> asyncio::task::Task<int> {
-                zero::error::guard(co_await asyncio::reschedule());
+                co_await asyncio::error::guard(asyncio::reschedule());
                 co_return ec.value();
             });
 

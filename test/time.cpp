@@ -1,5 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/time.h>
+#include <asyncio/error.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("sleep", "[time]") {
@@ -61,7 +62,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
         REQUIRE_NOTHROW(
             co_await asyncio::timeout(
                 asyncio::task::spawn([]() -> asyncio::task::Task<void> {
-                    zero::error::guard(co_await asyncio::sleep(10ms));
+                    co_await asyncio::error::guard(asyncio::sleep(10ms));
                 }),
                 50ms
             )
@@ -72,7 +73,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
         REQUIRE_THROWS_MATCHES(
             co_await asyncio::timeout(
                 asyncio::task::spawn([]() -> asyncio::task::Task<void> {
-                    zero::error::guard(co_await asyncio::sleep(50ms));
+                    co_await asyncio::error::guard(asyncio::sleep(50ms));
                 }),
                 10ms
             ),
@@ -88,7 +89,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
 
         auto task = asyncio::timeout(
             asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
-                zero::error::guard(co_await from(asyncio::task::CancellableFuture{
+                co_await asyncio::error::guard(from(asyncio::task::CancellableFuture{
                     promise.getFuture(),
                     []() -> std::expected<void, std::error_code> {
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
@@ -108,7 +109,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
     SECTION("cancel") {
         auto task = asyncio::timeout(
             asyncio::task::spawn([]() -> asyncio::task::Task<void> {
-                zero::error::guard(co_await asyncio::sleep(50ms));
+                co_await asyncio::error::guard(asyncio::sleep(50ms));
             }),
             10ms
         );

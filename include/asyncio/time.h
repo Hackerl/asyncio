@@ -1,7 +1,7 @@
 #ifndef ASYNCIO_TIME_H
 #define ASYNCIO_TIME_H
 
-#include "task.h"
+#include "error.h"
 
 namespace asyncio {
     task::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
@@ -76,7 +76,7 @@ namespace asyncio {
                     co_return *std::move(*result);
             }
 
-            throw zero::error::SystemError{make_error_code(TimeoutError::Elapsed)};
+            throw co_await error::SystemError::make(TimeoutError::Elapsed);
         }
 
         std::ignore = timer.cancel();

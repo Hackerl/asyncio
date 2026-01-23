@@ -22,8 +22,8 @@ namespace asyncio {
             : zero::async::promise::Promise<T, E>{std::move(rhs)}, mEventLoop{std::move(eventLoop)} {
         }
 
-        template<typename... Ts>
-        void resolve(Ts &&... args) {
+        template<typename... Args>
+        void resolve(Args &&... args) {
             assert(this->mCore);
             assert(!this->mCore->result);
             assert(this->mCore->state != zero::async::promise::State::ONLY_RESULT);
@@ -32,7 +32,7 @@ namespace asyncio {
             if constexpr (std::is_void_v<T>)
                 this->mCore->result.emplace();
             else
-                this->mCore->result.emplace(std::in_place, std::forward<Ts>(args)...);
+                this->mCore->result.emplace(std::in_place, std::forward<Args>(args)...);
 
             auto state = this->mCore->state.load();
 
@@ -53,14 +53,14 @@ namespace asyncio {
             });
         }
 
-        template<typename... Ts>
-        void reject(Ts &&... args) {
+        template<typename... Args>
+        void reject(Args &&... args) {
             assert(this->mCore);
             assert(!this->mCore->result);
             assert(this->mCore->state != zero::async::promise::State::ONLY_RESULT);
             assert(this->mCore->state != zero::async::promise::State::DONE);
 
-            this->mCore->result.emplace(std::unexpected<E>(std::in_place, std::forward<Ts>(args)...));
+            this->mCore->result.emplace(std::unexpected<E>(std::in_place, std::forward<Args>(args)...));
             auto state = this->mCore->state.load();
 
             if (state == zero::async::promise::State::PENDING &&

@@ -1,7 +1,7 @@
 #ifndef ASYNCIO_PROCESS_H
 #define ASYNCIO_PROCESS_H
 
-#include <asyncio/pipe.h>
+#include "pipe.h"
 #include <zero/os/process.h>
 
 namespace asyncio::process {

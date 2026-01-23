@@ -1,6 +1,7 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/tls.h>
 #include <asyncio/time.h>
+#include <asyncio/error.h>
 #include <zero/cmdline.h>
 
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
@@ -31,31 +32,31 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     asyncio::net::tls::ClientConfig config;
 
     if (caFile)
-        config.rootCAs({zero::error::guard(co_await asyncio::net::tls::Certificate::loadFile(*caFile))});
+        config.rootCAs({co_await asyncio::error::guard(asyncio::net::tls::Certificate::loadFile(*caFile))});
 
     if (certFile && keyFile) {
-        auto cert = zero::error::guard(co_await asyncio::net::tls::Certificate::loadFile(*certFile));
-        auto key = zero::error::guard(co_await asyncio::net::tls::PrivateKey::loadFile(*keyFile));
+        auto cert = co_await asyncio::error::guard(asyncio::net::tls::Certificate::loadFile(*certFile));
+        auto key = co_await asyncio::error::guard(asyncio::net::tls::PrivateKey::loadFile(*keyFile));
         config.certKeyPairs({{std::move(cert), std::move(key)}});
     }
 
     config.insecure(insecure);
 
-    auto tls = zero::error::guard(
-        co_await asyncio::net::tls::connect(
-            zero::error::guard(co_await asyncio::net::TCPStream::connect(host, port)),
-            zero::error::guard(config.build()),
+    auto tls = co_await asyncio::error::guard(
+        asyncio::net::tls::connect(
+            co_await asyncio::error::guard(asyncio::net::TCPStream::connect(host, port)),
+            co_await asyncio::error::guard(config.build()),
             host
         )
     );
 
     while (true) {
-        zero::error::guard(co_await tls.writeAll(std::as_bytes(std::span{"hello world"sv})));
+        co_await asyncio::error::guard(tls.writeAll(std::as_bytes(std::span{"hello world"sv})));
 
         std::string message;
         message.resize(1024);
 
-        const auto n = zero::error::guard(co_await tls.read(std::as_writable_bytes(std::span{message})));
+        const auto n = co_await asyncio::error::guard(tls.read(std::as_writable_bytes(std::span{message})));
 
         if (n == 0)
             break;
@@ -63,6 +64,6 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
         message.resize(n);
 
         fmt::print("Received message: {}\n", message);
-        zero::error::guard(co_await asyncio::sleep(1s));
+        co_await asyncio::error::guard(asyncio::sleep(1s));
     }
 }
