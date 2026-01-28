@@ -6,7 +6,6 @@
 #include <curl/curl.h>
 #include <zero/cmdline.h>
 #include <zero/error.h>
-#include <fmt/std.h>
 
 namespace asyncio::http {
     std::string urlEscape(const std::string &str);

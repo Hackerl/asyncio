@@ -63,7 +63,8 @@ if (ASYNCIO_EMBED_CA_CERT)
 
     if (NOT EXISTS ${ca_cert_header})
         file(READ ${ca_cert_file} content)
-        file(WRITE ${ca_cert_header} "constexpr std::string_view CACert = R\"(${content})\";")
+        string(REPLACE "\n" "\\n\"\n\"" content "${content}")
+        file(WRITE ${ca_cert_header} "constexpr std::string_view CACert = \"${content}\";")
     endif ()
 
     set(EXCLUDE_HEADERS ${EXCLUDE_HEADERS} PATTERN "ca_cert.h" EXCLUDE)
