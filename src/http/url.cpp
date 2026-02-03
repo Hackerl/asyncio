@@ -7,7 +7,7 @@ std::string asyncio::http::urlEscape(const std::string &str) {
     };
 
     if (!ptr)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     return ptr.get();
 }
@@ -21,7 +21,7 @@ std::string asyncio::http::urlUnescape(const std::string &str) {
     };
 
     if (!ptr)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     return std::string{ptr.get(), static_cast<std::size_t>(length)};
 }
@@ -31,7 +31,7 @@ asyncio::http::URL::URL(std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url)
 
 asyncio::http::URL::URL(const URL &rhs) : mURL{curl_url_dup(rhs.mURL.get()), curl_url_cleanup} {
     if (!mURL)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 }
 
 asyncio::http::URL::URL(URL &&rhs) noexcept : mURL{std::move(rhs.mURL)} {
@@ -44,7 +44,7 @@ asyncio::http::URL &asyncio::http::URL::operator=(const URL &rhs) {
     mURL = {curl_url_dup(rhs.mURL.get()), curl_url_cleanup};
 
     if (!mURL)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     return *this;
 }
@@ -58,7 +58,7 @@ std::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(cons
     std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url{curl_url(), curl_url_cleanup};
 
     if (!url)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     Z_EXPECT(expected([&] {
         return curl_url_set(url.get(), CURLUPART_URL, str.c_str(), CURLU_NON_SUPPORT_SCHEME);
@@ -94,7 +94,7 @@ std::optional<std::string> asyncio::http::URL::user() const {
         return curl_url_get(mURL.get(), CURLUPART_USER, &user, CURLU_URLDECODE);
     }); !result) {
         if (const auto &error = result.error(); error != static_cast<Error>(CURLUE_NO_USER))
-            throw zero::error::SystemError{error};
+            throw zero::error::StacktraceError<std::system_error>{error};
 
         return std::nullopt;
     }
@@ -109,7 +109,7 @@ std::optional<std::string> asyncio::http::URL::password() const {
         return curl_url_get(mURL.get(), CURLUPART_PASSWORD, &password, CURLU_URLDECODE);
     }); !result) {
         if (const auto &error = result.error(); error != static_cast<Error>(CURLUE_NO_PASSWORD))
-            throw zero::error::SystemError{error};
+            throw zero::error::StacktraceError<std::system_error>{error};
 
         return std::nullopt;
     }
@@ -124,7 +124,7 @@ std::optional<std::string> asyncio::http::URL::host() const {
         return curl_url_get(mURL.get(), CURLUPART_HOST, &host, 0);
     }); !result) {
         if (const auto &error = result.error(); error != static_cast<Error>(CURLUE_NO_HOST))
-            throw zero::error::SystemError{error};
+            throw zero::error::StacktraceError<std::system_error>{error};
 
         return std::nullopt;
     }
@@ -159,7 +159,7 @@ std::optional<std::string> asyncio::http::URL::query() const {
         return curl_url_get(mURL.get(), CURLUPART_QUERY, &query, CURLU_URLDECODE);
     }); !result) {
         if (const auto &error = result.error(); error != static_cast<Error>(CURLUE_NO_QUERY))
-            throw zero::error::SystemError{error};
+            throw zero::error::StacktraceError<std::system_error>{error};
 
         return std::nullopt;
     }
@@ -174,7 +174,7 @@ std::optional<std::string> asyncio::http::URL::rawQuery() const {
         return curl_url_get(mURL.get(), CURLUPART_QUERY, &query, 0);
     }); !result) {
         if (const auto &error = result.error(); error != static_cast<Error>(CURLUE_NO_QUERY))
-            throw zero::error::SystemError{error};
+            throw zero::error::StacktraceError<std::system_error>{error};
 
         return std::nullopt;
     }
@@ -189,7 +189,7 @@ std::optional<std::string> asyncio::http::URL::fragment() const {
         return curl_url_get(mURL.get(), CURLUPART_FRAGMENT, &fragment, CURLU_URLDECODE);
     }); !result) {
         if (const auto &error = result.error(); error != static_cast<Error>(CURLUE_NO_FRAGMENT))
-            throw zero::error::SystemError{error};
+            throw zero::error::StacktraceError<std::system_error>{error};
 
         return std::nullopt;
     }
@@ -204,7 +204,7 @@ std::optional<std::uint16_t> asyncio::http::URL::port() const {
         return curl_url_get(mURL.get(), CURLUPART_PORT, &port, CURLU_DEFAULT_PORT);
     }); !result) {
         if (const auto &error = result.error(); error != static_cast<Error>(CURLUE_NO_PORT))
-            throw zero::error::SystemError{error};
+            throw zero::error::StacktraceError<std::system_error>{error};
 
         return std::nullopt;
     }

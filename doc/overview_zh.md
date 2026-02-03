@@ -8,7 +8,7 @@
 asyncio::task::Task<void> test1() {
     while (true) {
         if (co_await task::cancelled)
-            throw zero::error::SystemError{task::Error::CANCELLED};
+            throw zero::error::StacktraceError<std::system_error>{task::Error::CANCELLED};
 
         zero::error::guard(co_await asyncio::sleep(1s));
         fmt::print("Hello world\n");

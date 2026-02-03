@@ -76,7 +76,7 @@ namespace asyncio {
                     co_return *std::move(*result);
             }
 
-            throw co_await error::SystemError::make(TimeoutError::Elapsed);
+            throw co_await error::StacktraceError<std::system_error>::make(TimeoutError::Elapsed);
         }
 
         std::ignore = timer.cancel();

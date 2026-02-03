@@ -11,7 +11,7 @@ std::expected<asyncio::Pipe, std::error_code> asyncio::Pipe::from(const uv_file 
     };
 
     if (!pipe)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);

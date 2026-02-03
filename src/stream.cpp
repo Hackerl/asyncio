@@ -22,7 +22,7 @@ std::array<asyncio::Stream, 2> asyncio::Stream::pair() {
                 continue;
 
             if (closesocket(fd) != 0)
-                throw zero::error::SystemError{WSAGetLastError(), std::system_category()};
+                throw zero::error::StacktraceError<std::system_error>{WSAGetLastError(), std::system_category()};
         }
     );
 
@@ -32,7 +32,7 @@ std::array<asyncio::Stream, 2> asyncio::Stream::pair() {
     };
 
     if (!first)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), first.get());
@@ -56,7 +56,7 @@ std::array<asyncio::Stream, 2> asyncio::Stream::pair() {
     };
 
     if (!second)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), second.get());
@@ -93,7 +93,7 @@ std::array<asyncio::Stream, 2> asyncio::Stream::pair() {
     };
 
     if (!first)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), first.get(), 0);
@@ -117,7 +117,7 @@ std::array<asyncio::Stream, 2> asyncio::Stream::pair() {
     };
 
     if (!second)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), second.get(), 0);

@@ -316,7 +316,7 @@ asyncio::http::Requests asyncio::http::Requests::make(Options options) {
     std::unique_ptr<CURLM, decltype(&curl_multi_cleanup)> ptr{curl_multi_init(), curl_multi_cleanup};
 
     if (!ptr)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     auto timer = std::make_unique<uv_timer_t>();
 
@@ -466,7 +466,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
     std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> ptr{curl_easy_init(), curl_easy_cleanup};
 
     if (!ptr)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     const auto [
         proxy,
@@ -587,7 +587,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         const auto l = curl_slist_append(list, fmt::format("{}: {}", k, v).c_str());
 
         if (!l)
-            throw zero::error::SystemError{errno, std::generic_category()};
+            throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
         list = l;
     }
@@ -769,13 +769,13 @@ asyncio::http::Requests::request(
     };
 
     if (!form)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     for (const auto &[k, v]: payload) {
         const auto field = curl_mime_addpart(form.get());
 
         if (!field)
-            throw zero::error::SystemError{errno, std::generic_category()};
+            throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
         zero::error::guard(expected([&] {
             return curl_mime_name(field, k.c_str());

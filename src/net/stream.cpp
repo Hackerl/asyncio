@@ -21,7 +21,7 @@ asyncio::net::TCPStream asyncio::net::TCPStream::make() {
     };
 
     if (!tcp)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
@@ -246,7 +246,7 @@ asyncio::net::TCPListener::listen(const SocketAddress &address) {
     };
 
     if (!tcp)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
@@ -334,7 +334,7 @@ asyncio::net::TCPListener::accept() {
     };
 
     if (!tcp)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
@@ -373,7 +373,7 @@ asyncio::net::NamedPipeStream::connect(const std::string name) {
     };
 
     if (!pipe)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
@@ -464,7 +464,7 @@ asyncio::net::NamedPipeListener::listen(const std::string &name) {
     };
 
     if (!pipe)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
@@ -508,7 +508,7 @@ asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code> asyncio::net
     };
 
     if (!pipe)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
@@ -551,7 +551,7 @@ asyncio::net::UnixStream::connect(std::string path) {
     };
 
     if (!pipe)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
@@ -704,7 +704,7 @@ std::expected<asyncio::net::UnixListener, std::error_code> asyncio::net::UnixLis
     };
 
     if (!pipe)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
@@ -755,7 +755,7 @@ asyncio::task::Task<asyncio::net::UnixStream, std::error_code> asyncio::net::Uni
     };
 
     if (!pipe)
-        throw zero::error::SystemError{errno, std::generic_category()};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
     zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);

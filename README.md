@@ -198,7 +198,7 @@ namespace {
         const auto handle = CreateEventA(nullptr, false, false, "Global\\AsyncIOBacktraceEvent");
 
         if (!handle)
-            throw zero::error::SystemError{
+            throw zero::error::StacktraceError<std::system_error>{
                 std::error_code{static_cast<int>(GetLastError()), std::system_category()}
             };
 
@@ -212,10 +212,12 @@ namespace {
             co_await asyncio::toThread(
                 [&, &cancelled = std::as_const(cancelled)] {
                     if (WaitForSingleObject(*event, INFINITE) != WAIT_OBJECT_0)
-                        throw zero::error::SystemError{static_cast<int>(GetLastError()), std::system_category()};
+                        throw zero::error::StacktraceError<std::system_error>{
+                            static_cast<int>(GetLastError()), std::system_category()
+                        };
 
                     if (cancelled)
-                        throw zero::error::SystemError{asyncio::task::Error::CANCELLED};
+                        throw zero::error::StacktraceError<std::system_error>{asyncio::task::Error::CANCELLED};
                 },
                 [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
                     cancelled = true;

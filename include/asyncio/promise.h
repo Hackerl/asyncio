@@ -26,8 +26,8 @@ namespace asyncio {
         void resolve(Args &&... args) {
             assert(this->mCore);
             assert(!this->mCore->result);
-            assert(this->mCore->state != zero::async::promise::State::ONLY_RESULT);
-            assert(this->mCore->state != zero::async::promise::State::DONE);
+            assert(this->mCore->state != zero::async::promise::State::OnlyResult);
+            assert(this->mCore->state != zero::async::promise::State::Done);
 
             if constexpr (std::is_void_v<T>)
                 this->mCore->result.emplace();
@@ -36,15 +36,17 @@ namespace asyncio {
 
             auto state = this->mCore->state.load();
 
-            if (state == zero::async::promise::State::PENDING &&
-                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
+            if (state == zero::async::promise::State::Pending &&
+                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::OnlyResult)) {
                 this->mCore->event.set();
                 return;
             }
 
-            if (state != zero::async::promise::State::ONLY_CALLBACK ||
-                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
-                throw std::logic_error{fmt::format("Unexpected promise state: {}", std::to_underlying(state))};
+            if (state != zero::async::promise::State::OnlyCallback ||
+                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::Done))
+                throw zero::error::StacktraceError<std::logic_error>{
+                    fmt::format("Unexpected promise state: {}", std::to_underlying(state))
+                };
 
             this->mCore->event.set();
 
@@ -57,21 +59,23 @@ namespace asyncio {
         void reject(Args &&... args) {
             assert(this->mCore);
             assert(!this->mCore->result);
-            assert(this->mCore->state != zero::async::promise::State::ONLY_RESULT);
-            assert(this->mCore->state != zero::async::promise::State::DONE);
+            assert(this->mCore->state != zero::async::promise::State::OnlyResult);
+            assert(this->mCore->state != zero::async::promise::State::Done);
 
             this->mCore->result.emplace(std::unexpected<E>(std::in_place, std::forward<Args>(args)...));
             auto state = this->mCore->state.load();
 
-            if (state == zero::async::promise::State::PENDING &&
-                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
+            if (state == zero::async::promise::State::Pending &&
+                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::OnlyResult)) {
                 this->mCore->event.set();
                 return;
             }
 
-            if (state != zero::async::promise::State::ONLY_CALLBACK ||
-                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
-                throw std::logic_error{fmt::format("Unexpected promise state: {}", std::to_underlying(state))};
+            if (state != zero::async::promise::State::OnlyCallback ||
+                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::Done))
+                throw zero::error::StacktraceError<std::logic_error>{
+                    fmt::format("Unexpected promise state: {}", std::to_underlying(state))
+                };
 
             this->mCore->event.set();
 

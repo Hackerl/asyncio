@@ -18,7 +18,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
 
         if (!message) {
             if (const auto &error = message.error(); error != asyncio::http::ws::CloseCode::NormalClosure)
-                throw co_await asyncio::error::SystemError::make(error);
+                throw co_await asyncio::error::StacktraceError<std::system_error>::make(error);
 
             break;
         }

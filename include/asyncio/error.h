@@ -6,22 +6,19 @@
 #include <fmt/ranges.h>
 
 namespace asyncio::error {
-    class SystemError final : public std::system_error {
-        SystemError(const std::error_code ec, const std::vector<std::source_location> &stacktrace)
-            : std::system_error{ec},
-              mMessage{
-                  fmt::format(
-                      "{} {}",
-                      std::system_error::what(),
-                      to_string(fmt::join(stacktrace | std::views::drop(1), "\n"))
-                  )
-              } {
-        }
-
+    template<typename T>
+        requires std::derived_from<T, std::exception>
+    class StacktraceError final : public T {
     public:
         template<typename... Args>
-        static task::Task<SystemError> make(Args &&... args) {
-            co_return SystemError{{std::forward<Args>(args)...}, co_await task::backtrace};
+        explicit StacktraceError(const std::vector<std::source_location> &stacktrace, Args &&... args)
+            : T{std::forward<Args>(args)...},
+              mMessage{fmt::format("{} {}", T::what(), to_string(fmt::join(stacktrace | std::views::drop(1), "\n")))} {
+        }
+
+        template<typename... Args>
+        static task::Task<StacktraceError> make(Args &&... args) {
+            co_return StacktraceError{co_await task::backtrace, std::forward<Args>(args)...};
         }
 
         [[nodiscard]] const char *what() const noexcept override {
@@ -36,7 +33,7 @@ namespace asyncio::error {
         requires std::is_convertible_v<E, std::error_code>
     task::Task<T> guard(std::expected<T, E> expected) {
         if (!expected)
-            throw co_await SystemError::make(expected.error());
+            throw co_await StacktraceError<std::system_error>::make(expected.error());
 
         if constexpr (std::is_void_v<T>)
             co_return;
@@ -50,7 +47,7 @@ namespace asyncio::error {
         auto result = co_await task;
 
         if (!result)
-            throw co_await SystemError::make(result.error());
+            throw co_await StacktraceError<std::system_error>::make(result.error());
 
         if constexpr (std::is_void_v<T>)
             co_return;
