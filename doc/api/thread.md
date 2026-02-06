@@ -4,7 +4,7 @@ This module provides thread-related functionality for compatibility with synchro
 
 ## Function `toThread`
 
-```cpp
+```c++
 template<typename F>
 task::Task<std::invoke_result_t<F>>
 toThread(F f);
@@ -20,7 +20,7 @@ toThread(F f, C cancel);
 
 Runs synchronous blocking code in a new thread and returns the corresponding result upon completion:
 
-```cpp
+```c++
 const auto result = co_await asyncio::toThread([] {
     std::this_thread::sleep_for(50ms);
     return 1024;
@@ -30,7 +30,7 @@ REQUIRE(result == 1024);
 
 Cancellation is not supported by default, but a custom cancellation function can be provided:
 
-```cpp
+```c++
 bool exit{false};
 
 co_await asyncio::toThread(
@@ -48,11 +48,11 @@ co_await asyncio::toThread(
 
 ## Function `toThreadPool`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     ToThreadPoolError,
     "asyncio::toThreadPool",
-    CANCELLED, "Request was cancelled", std::errc::operation_canceled
+    Cancelled, "Request was cancelled", std::errc::operation_canceled
 )
 
 template<typename F>
@@ -62,7 +62,7 @@ toThreadPool(F f);
 
 Runs time-consuming code in a thread pool and returns the corresponding result upon completion:
 
-```cpp
+```c++
 const auto result = co_await asyncio::toThreadPool([] {
     std::this_thread::sleep_for(50ms);
     return 1024;
@@ -70,6 +70,6 @@ const auto result = co_await asyncio::toThreadPool([] {
 REQUIRE(result == 1024);
 ```
 
-`toThreadPool` uses `uv_queue_work` internally, managed and scheduled by `libuv`. The upper layer can call `task.cancel()`, and the lower layer will attempt to terminate execution using `uv_cancel`. If the task is still in the queue and hasn't started, cancellation will succeed and return a `ToThreadPoolError::CANCELLED` error.
+`toThreadPool` uses `uv_queue_work` internally, managed and scheduled by `libuv`. The upper layer can call `task.cancel()`, and the lower layer will attempt to terminate execution using `uv_cancel`. If the task is still in the queue and hasn't started, cancellation will succeed and return a `ToThreadPoolError::Cancelled` error.
 
 > Long-blocking code should not be placed in the thread pool, as the number of threads in the pool is limited, which would cause all worker threads to block.

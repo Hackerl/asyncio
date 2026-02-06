@@ -1,18 +1,18 @@
 # IO
 
-This module provides unified async `IO` interface definitions.
+This module provides a unified asynchronous `IO` interface definition.
 
 ## Error Condition `IOError`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CONDITION(
     IOError,
     "asyncio::io",
-    UNEXPECTED_EOF, "Unexpected end of file"
+    UnexpectedEOF, "Unexpected end of file"
 )
 ```
 
-Common `error condition` for `IO` interfaces, currently only has the `UNEXPECTED_EOF` error.
+Common `error condition` for `IO` interfaces, currently only has the `UnexpectedEOF` error.
 
 ## Type `FileDescriptor`
 
@@ -20,22 +20,22 @@ Common `error condition` for `IO` interfaces, currently only has the `UNEXPECTED
 using FileDescriptor = uv_os_fd_t;
 ```
 
-On `Unix` systems, `FileDescriptor` is of type `int`. On `Windows` systems, `FileDescriptor` is of type `HANDLE`.
+On `Unix` systems, `FileDescriptor` is of type `int`, on `Windows` systems, `FileDescriptor` is of type `HANDLE`.
 
 ## Interface `IFileDescriptor`
 
-```cpp
+```c++
 class IFileDescriptor : public virtual zero::Interface {
 public:
     [[nodiscard]] virtual FileDescriptor fd() const = 0;
 };
 ```
 
-Used to get the underlying file descriptor.
+Used to obtain the underlying file descriptor.
 
 ## Interface `ICloseable`
 
-```cpp
+```c++
 class ICloseable : public virtual zero::Interface {
 public:
     virtual task::Task<void, std::error_code> close() = 0;
@@ -46,22 +46,22 @@ Used to close the underlying resource.
 
 ### Interface `IHalfCloseable`
 
-```cpp
+```c++
 class IHalfCloseable : public virtual zero::Interface {
 public:
     virtual task::Task<void, std::error_code> shutdown() = 0;
 };
 ```
 
-Closes the write end of the `IO` while keeping the read end open. Only a few connection types support this operation.
+Closes the write end of `IO` while keeping the read end open. Only a few connection types support this operation.
 
-```cpp
+```c++
 class IReader : public virtual zero::Interface {
 public:
     Z_DEFINE_ERROR_CODE_INNER_EX(
         ReadExactlyError,
         "asyncio::IReader",
-        UNEXPECTED_EOF, "Unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
+        UnexpectedEOF, "Unexpected end of file", make_error_condition(IOError::UnexpectedEOF)
     )
 
     virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
@@ -74,23 +74,23 @@ All `IO` resources that support read operations implement the `IReader` interfac
 
 ### Method `read`
 
-```cpp
+```c++
 virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
 ```
 
-Reads data into `data`, returning the actual number of bytes read. The actual number of bytes read may be less than the length of `data`. Returns `0` if end of file is reached.
+Reads data into `data`, returns the actual number of bytes read. The actual number of bytes read may be less than the length of `data`; if the end of file is reached, returns `0`.
 
 ### Method `readExactly`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> readExactly(std::span<std::byte> data);
 ```
 
-Reads exactly enough data to fill `data`. If insufficient data is available, returns a `ReadExactlyError::UNEXPECTED_EOF` error.
+Reads exactly enough data to fill `data`. If insufficient data is available, returns a `ReadExactlyError::UnexpectedEOF` error.
 
 ### Method `readAll`
 
-```cpp
+```c++
 virtual task::Task<std::vector<std::byte>, std::error_code> readAll();
 ```
 
@@ -100,7 +100,7 @@ Reads all data and returns a `std::vector<std::byte>` object.
 
 ## Interface `IWriter`
 
-```cpp
+```c++
 class IWriter : public virtual zero::Interface {
 public:
     virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
@@ -112,33 +112,33 @@ All `IO` resources that support write operations implement the `IWriter` interfa
 
 ### Method `write`
 
-```cpp
+```c++
 virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
 ```
 
 Writes data and returns the actual number of bytes written. The actual number of bytes written may be less than the length of `data`.
 
-> If some data was successfully written but an error occurred, returns the amount of data that was written.
+> If some data was successfully written but an error occurred, returns the number of bytes already written.
 
 ### Method `writeAll`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
 ```
 
 Writes all data. If an error occurs, returns the error.
 
-> All application-layer write operations should use the `writeAll` method.
+> All application-level write operations should use the `writeAll` method.
 
 ## Interface `ISeekable`
 
-```cpp
+```c++
 class ISeekable : public virtual zero::Interface {
 public:
     enum class Whence {
-        BEGIN,
-        CURRENT,
-        END
+        Begin,
+        Current,
+        End
     };
 
     virtual task::Task<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
@@ -152,7 +152,7 @@ All `IO` resources that support random access implement the `ISeekable` interfac
 
 ### Method `seek`
 
-```cpp
+```c++
 virtual task::Task<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
 ```
 
@@ -160,7 +160,7 @@ Moves the file pointer and returns the new file pointer position.
 
 ### Method `rewind`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> rewind();
 ```
 
@@ -168,7 +168,7 @@ Moves the file pointer to the beginning of the file.
 
 ### Method `length`
 
-```cpp
+```c++
 virtual task::Task<std::uint64_t, std::error_code> length();
 ```
 
@@ -176,7 +176,7 @@ Gets the file length.
 
 ### Method `position`
 
-```cpp
+```c++
 virtual task::Task<std::uint64_t, std::error_code> position();
 ```
 
@@ -184,7 +184,7 @@ Gets the file pointer position.
 
 ## Interface `IBufReader`
 
-```cpp
+```c++
 class IBufReader : public virtual IReader {
 public:
     [[nodiscard]] virtual std::size_t available() const = 0;
@@ -198,7 +198,7 @@ All `IO` resources that support buffered read operations implement the `IBufRead
 
 ### Method `available`
 
-```cpp
+```c++
 [[nodiscard]] virtual std::size_t available() const = 0;
 ```
 
@@ -206,33 +206,33 @@ Returns the number of bytes available to read in the buffer.
 
 ### Method `readLine`
 
-```cpp
+```c++
 virtual task::Task<std::string, std::error_code> readLine() = 0;
 ```
 
-Reads a line of data and returns a `std::string` object. If no data is available before a newline character, returns an `UNEXPECTED_EOF` error.
+Reads a line of data and returns a `std::string` object. If no data is available before a newline character, returns an `UnexpectedEOF` error.
 
-> Supports both `\r\n` and `\n` line endings.
+> Supports both `\r\n` and `\n` newline characters.
 
 ### Method `readUntil`
 
-```cpp
+```c++
 virtual task::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) = 0;
 ```
 
-Reads data until encountering the `byte` and returns a `std::vector<std::byte>` object. If no data is available before the `byte`, returns an `UNEXPECTED_EOF` error.
+Reads data until encountering the `byte` and returns a `std::vector<std::byte>` object. If no data is available before the `byte`, returns an `UnexpectedEOF` error.
 
 ### Method `peek`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> peek(std::span<std::byte> data) = 0;
 ```
 
-Pre-reads data into `data`, with length not exceeding the buffer size. If insufficient data is available, returns an `UNEXPECTED_EOF` error.
+Pre-reads data into `data`, with length not exceeding the buffer size. If insufficient data is available, returns an `UnexpectedEOF` error.
 
 ## Interface `IBufWriter`
 
-```cpp
+```c++
 class IBufWriter : public virtual IWriter {
 public:
     [[nodiscard]] virtual std::size_t pending() const = 0;
@@ -244,15 +244,15 @@ All `IO` resources that support buffered write operations implement the `IBufWri
 
 ### Method `pending`
 
-```cpp
+```c++
 [[nodiscard]] virtual std::size_t pending() const = 0;
 ```
 
-Returns the number of bytes pending in the buffer.
+Returns the number of bytes pending write in the buffer.
 
 ### Method `flush`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> flush() = 0;
 ```
 
@@ -260,17 +260,17 @@ Writes all data in the buffer to the underlying `IO`.
 
 ## Function `copy`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> copy(zero::traits::Trait<IReader> auto &reader, zero::traits::Trait<IWriter> auto &writer);
 ```
 
-Reads data from `reader` and writes it to `writer` until `read` returns `0` or `write` encounters an error. Returns the actual number of bytes copied.
+Reads data from `reader` and writes it to `writer` until `read` returns `0` or `write` encounters an error, returning the actual number of bytes copied.
 
-> Uses a `20480` byte buffer by default for buffering data.
+> Uses a buffer of `20480` bytes by default for buffering data.
 
 ### Class `StringReader`
 
-```cpp
+```c++
 class StringReader final : public IReader {
 public:
     explicit StringReader(std::string string);
@@ -281,7 +281,7 @@ Wraps a `std::string` object as an `IReader` interface.
 
 ### Method `read`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
 ```
 
@@ -289,7 +289,7 @@ Reads data from the string into `data`.
 
 ### Class `StringWriter`
 
-```cpp
+```c++
 class StringWriter final : public IWriter {
 public:
     explicit StringWriter(std::string &string);
@@ -300,7 +300,7 @@ Wraps a `std::string` object as an `IWriter` interface.
 
 ### Method `write`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 ```
 
@@ -308,7 +308,7 @@ Writes data into the string.
 
 ### Method `data`
 
-```cpp
+```c++
 auto &&data(this Self &&self) {
     return self.mString;
 }
@@ -318,7 +318,7 @@ Accesses the underlying `std::string` member.
 
 ### Method `operator*`
 
-```cpp
+```c++
 auto &&operator*(this Self &&self) {
     return self.mString;
 }
@@ -328,7 +328,7 @@ Accesses the underlying `std::string` member.
 
 ### Class `BytesReader`
 
-```cpp
+```c++
 class BytesReader final : public IReader {
 public:
     explicit BytesReader(std::vector<std::byte> bytes);
@@ -339,7 +339,7 @@ Wraps a `std::vector<std::byte>` object as an `IReader` interface.
 
 ### Method `read`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
 ```
 
@@ -347,7 +347,7 @@ Reads data from the byte array into `data`.
 
 ### Class `BytesWriter`
 
-```cpp
+```c++
 class BytesWriter final : public IWriter {
 public:
     explicit BytesWriter(std::vector<std::byte> &bytes);
@@ -358,7 +358,7 @@ Wraps a `std::vector<std::byte>` object as an `IWriter` interface.
 
 ### Method `write`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 ```
 
@@ -366,7 +366,7 @@ Writes data into the byte array.
 
 ### Method `data`
 
-```cpp
+```c++
 auto &&data(this Self &&self) {
     return self.mBytes;
 }
@@ -376,7 +376,7 @@ Accesses the underlying `std::vector<std::byte>` member.
 
 ### Method `operator*`
 
-```cpp
+```c++
 auto &&operator*(this Self &&self) {
     return self.mBytes;
 }

@@ -4,15 +4,15 @@
 
 ## Error Condition `IOError`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CONDITION(
     IOError,
     "asyncio::io",
-    UNEXPECTED_EOF, "Unexpected end of file"
+    UnexpectedEOF, "Unexpected end of file"
 )
 ```
 
-`IO` 接口通用的 `error condition`，现在只有 `UNEXPECTED_EOF` 这一种错误。
+`IO` 接口通用的 `error condition`，现在只有 `UnexpectedEOF` 这一种错误。
 
 ## Type `FileDescriptor`
 
@@ -24,7 +24,7 @@ using FileDescriptor = uv_os_fd_t;
 
 ## Interface `IFileDescriptor`
 
-```cpp
+```c++
 class IFileDescriptor : public virtual zero::Interface {
 public:
     [[nodiscard]] virtual FileDescriptor fd() const = 0;
@@ -35,7 +35,7 @@ public:
 
 ## Interface `ICloseable`
 
-```cpp
+```c++
 class ICloseable : public virtual zero::Interface {
 public:
     virtual task::Task<void, std::error_code> close() = 0;
@@ -46,7 +46,7 @@ public:
 
 ### Interface `IHalfCloseable`
 
-```cpp
+```c++
 class IHalfCloseable : public virtual zero::Interface {
 public:
     virtual task::Task<void, std::error_code> shutdown() = 0;
@@ -55,13 +55,13 @@ public:
 
 关闭 `IO` 的写端，保留读端，只有少数几类连接支持此操作。
 
-```cpp
+```c++
 class IReader : public virtual zero::Interface {
 public:
     Z_DEFINE_ERROR_CODE_INNER_EX(
         ReadExactlyError,
         "asyncio::IReader",
-        UNEXPECTED_EOF, "Unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
+        UnexpectedEOF, "Unexpected end of file", make_error_condition(IOError::UnexpectedEOF)
     )
 
     virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
@@ -74,7 +74,7 @@ public:
 
 ### Method `read`
 
-```cpp
+```c++
 virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
 ```
 
@@ -82,15 +82,15 @@ virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data)
 
 ### Method `readExactly`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> readExactly(std::span<std::byte> data);
 ```
 
-读取精确数量的数据填满 `data`，如果数据不足，则返回 `ReadExactlyError::UNEXPECTED_EOF` 错误。
+读取精确数量的数据填满 `data`，如果数据不足，则返回 `ReadExactlyError::UnexpectedEOF` 错误。
 
 ### Method `readAll`
 
-```cpp
+```c++
 virtual task::Task<std::vector<std::byte>, std::error_code> readAll();
 ```
 
@@ -100,7 +100,7 @@ virtual task::Task<std::vector<std::byte>, std::error_code> readAll();
 
 ## Interface `IWriter`
 
-```cpp
+```c++
 class IWriter : public virtual zero::Interface {
 public:
     virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
@@ -112,7 +112,7 @@ public:
 
 ### Method `write`
 
-```cpp
+```c++
 virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
 ```
 
@@ -122,7 +122,7 @@ virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte
 
 ### Method `writeAll`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
 ```
 
@@ -132,13 +132,13 @@ virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> da
 
 ## Interface `ISeekable`
 
-```cpp
+```c++
 class ISeekable : public virtual zero::Interface {
 public:
     enum class Whence {
-        BEGIN,
-        CURRENT,
-        END
+        Begin,
+        Current,
+        End
     };
 
     virtual task::Task<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
@@ -152,7 +152,7 @@ public:
 
 ### Method `seek`
 
-```cpp
+```c++
 virtual task::Task<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
 ```
 
@@ -160,7 +160,7 @@ virtual task::Task<std::uint64_t, std::error_code> seek(std::int64_t offset, Whe
 
 ### Method `rewind`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> rewind();
 ```
 
@@ -168,7 +168,7 @@ virtual task::Task<void, std::error_code> rewind();
 
 ### Method `length`
 
-```cpp
+```c++
 virtual task::Task<std::uint64_t, std::error_code> length();
 ```
 
@@ -176,7 +176,7 @@ virtual task::Task<std::uint64_t, std::error_code> length();
 
 ### Method `position`
 
-```cpp
+```c++
 virtual task::Task<std::uint64_t, std::error_code> position();
 ```
 
@@ -184,7 +184,7 @@ virtual task::Task<std::uint64_t, std::error_code> position();
 
 ## Interface `IBufReader`
 
-```cpp
+```c++
 class IBufReader : public virtual IReader {
 public:
     [[nodiscard]] virtual std::size_t available() const = 0;
@@ -198,7 +198,7 @@ public:
 
 ### Method `available`
 
-```cpp
+```c++
 [[nodiscard]] virtual std::size_t available() const = 0;
 ```
 
@@ -206,33 +206,33 @@ public:
 
 ### Method `readLine`
 
-```cpp
+```c++
 virtual task::Task<std::string, std::error_code> readLine() = 0;
 ```
 
-读取一行数据，返回一个 `std::string` 对象。如果读取到换行符之前没有数据了，则返回 `UNEXPECTED_EOF` 错误。
+读取一行数据，返回一个 `std::string` 对象。如果读取到换行符之前没有数据了，则返回 `UnexpectedEOF` 错误。
 
 > 支持 `\r\n` 和 `\n` 两种换行符。
 
 ### Method `readUntil`
 
-```cpp
+```c++
 virtual task::Task<std::vector<std::byte>, std::error_code> readUntil(std::byte byte) = 0;
 ```
 
-读取数据直到遇到 `byte` 字节，返回一个 `std::vector<std::byte>` 对象。如果读取到 `byte` 字节之前没有数据了，则返回 `UNEXPECTED_EOF` 错误。
+读取数据直到遇到 `byte` 字节，返回一个 `std::vector<std::byte>` 对象。如果读取到 `byte` 字节之前没有数据了，则返回 `UnexpectedEOF` 错误。
 
 ### Method `peek`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> peek(std::span<std::byte> data) = 0;
 ```
 
-预读取数据到 `data` 中，长度不能超过缓冲区大小。如果数据不足，则返回 `UNEXPECTED_EOF` 错误。
+预读取数据到 `data` 中，长度不能超过缓冲区大小。如果数据不足，则返回 `UnexpectedEOF` 错误。
 
 ## Interface `IBufWriter`
 
-```cpp
+```c++
 class IBufWriter : public virtual IWriter {
 public:
     [[nodiscard]] virtual std::size_t pending() const = 0;
@@ -244,7 +244,7 @@ public:
 
 ### Method `pending`
 
-```cpp
+```c++
 [[nodiscard]] virtual std::size_t pending() const = 0;
 ```
 
@@ -252,7 +252,7 @@ public:
 
 ### Method `flush`
 
-```cpp
+```c++
 virtual task::Task<void, std::error_code> flush() = 0;
 ```
 
@@ -260,7 +260,7 @@ virtual task::Task<void, std::error_code> flush() = 0;
 
 ## Function `copy`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> copy(zero::traits::Trait<IReader> auto &reader, zero::traits::Trait<IWriter> auto &writer);
 ```
 
@@ -270,7 +270,7 @@ task::Task<std::size_t, std::error_code> copy(zero::traits::Trait<IReader> auto 
 
 ### Class `StringReader`
 
-```cpp
+```c++
 class StringReader final : public IReader {
 public:
     explicit StringReader(std::string string);
@@ -281,7 +281,7 @@ public:
 
 ### Method `read`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
 ```
 
@@ -289,7 +289,7 @@ task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) overrid
 
 ### Class `StringWriter`
 
-```cpp
+```c++
 class StringWriter final : public IWriter {
 public:
     explicit StringWriter(std::string &string);
@@ -300,7 +300,7 @@ public:
 
 ### Method `write`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 ```
 
@@ -308,7 +308,7 @@ task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) 
 
 ### Method `data`
 
-```cpp
+```c++
 auto &&data(this Self &&self) {
     return self.mString;
 }
@@ -318,7 +318,7 @@ auto &&data(this Self &&self) {
 
 ### Method `operator*`
 
-```cpp
+```c++
 auto &&operator*(this Self &&self) {
     return self.mString;
 }
@@ -328,7 +328,7 @@ auto &&operator*(this Self &&self) {
 
 ### Class `BytesReader`
 
-```cpp
+```c++
 class BytesReader final : public IReader {
 public:
     explicit BytesReader(std::vector<std::byte> bytes);
@@ -339,7 +339,7 @@ public:
 
 ### Method `read`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
 ```
 
@@ -347,7 +347,7 @@ task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) overrid
 
 ### Class `BytesWriter`
 
-```cpp
+```c++
 class BytesWriter final : public IWriter {
 public:
     explicit BytesWriter(std::vector<std::byte> &bytes);
@@ -358,7 +358,7 @@ public:
 
 ### Method `write`
 
-```cpp
+```c++
 task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
 ```
 
@@ -366,7 +366,7 @@ task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) 
 
 ### Method `data`
 
-```cpp
+```c++
 auto &&data(this Self &&self) {
     return self.mBytes;
 }
@@ -376,7 +376,7 @@ auto &&data(this Self &&self) {
 
 ### Method `operator*`
 
-```cpp
+```c++
 auto &&operator*(this Self &&self) {
     return self.mBytes;
 }

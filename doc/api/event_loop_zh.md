@@ -2,11 +2,12 @@
 该模块实现了 `Event Loop` 与相关功能。
 
 ## Class `EventLoop`
+
 基于 `uv_loop_t` 封装的 `Event Loop`，几乎所有功能都依赖它，但你通常不会直接使用到它。
 
 ### Static Method `make`
 
-```cpp
+```c++
 static EventLoop make();
 ```
 
@@ -14,7 +15,7 @@ static EventLoop make();
 
 ### Method `raw`
 
-```cpp
+```c++
 uv_loop_t *raw();
 [[nodiscard]] const uv_loop_t *raw() const;
 ```
@@ -23,15 +24,15 @@ uv_loop_t *raw();
 
 ### Method `post`
 
-```cpp
-std::expected<void, std::error_code> post(std::function<void()> function);
+```c++
+void post(std::function<void()> function);
 ```
 
-在下一次事件循环运行可调用对象。
+在下一次事件循环执行可调用对象。
 
 ### Method `run`
 
-```cpp
+```c++
 void run();
 ```
 
@@ -39,7 +40,7 @@ void run();
 
 ### Method `stop`
 
-```cpp
+```c++
 void stop();
 ```
 
@@ -47,22 +48,28 @@ void stop();
 
 ## Function `run`
 
-```cpp
+```c++
 template<typename F>
     requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
 std::expected<
     typename std::invoke_result_t<F>::value_type,
     typename std::invoke_result_t<F>::error_type
 >
-run(F &&f);
+run(const std::shared_ptr<EventLoop> &eventLoop, F &&f);
+
+template<typename F>
+    requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
+auto run(F &&f) {
+    return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
+}
 ```
 
-新建一个 `Event Loop`，并在其上运行异步任务，任务完成后返回结果。
+在指定的 `Event Loop` 上运行异步任务，等待任务完成并返回结果，不指定 `Event Loop` 则会创建一个新的 `Event Loop`。
 
 对于 `Task<T, std::error_code>`，返回 `std::expected<T, std::error_code>`：
 
-```cpp
-const auto result = asyncio::run([]() -> asyncio::task::Task<int, std::error_code> {
+```c++
+const std::expected<int, std::error_code> result = asyncio::run([]() -> asyncio::task::Task<int, std::error_code> {
     using namespace std::chrono_literals;
     Z_CO_EXPECT(co_await asyncio::sleep(10ms));
     co_return 1024;
@@ -73,8 +80,8 @@ REQUIRE(*result == 1024);
 
 对于 `Task<T>`（基于异常），返回 `std::expected<T, std::exception_ptr>`：
 
-```cpp
-const auto result = asyncio::run([]() -> asyncio::task::Task<int> {
+```c++
+const std::expected<int, std::exception_ptr> result = asyncio::run([]() -> asyncio::task::Task<int> {
     using namespace std::chrono_literals;
     zero::error::guard(co_await asyncio::sleep(10ms));
     co_return 1024;
@@ -91,6 +98,6 @@ REQUIRE(*result == 1024);
 target_link_libraries(demo PRIVATE asyncio::asyncio-main)
 ```
 
-```cpp
+```c++
 asyncio::task::Task<void> asyncMain(int argc, char *argv[]);
 ```

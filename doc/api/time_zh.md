@@ -4,23 +4,23 @@
 
 ## Function `sleep`
 
-```cpp
+```c++
 task::Task<void, std::error_code> sleep(std::chrono::milliseconds ms);
 ```
 
 休眠一段时间后恢复执行。
 
-```cpp
+```c++
 co_await asyncio::sleep(1s);
 ```
 
 ## Function `timeout`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     TimeoutError,
     "asyncio::timeout",
-    ELAPSED, "Deadline has elapsed", std::errc::timed_out
+    Elapsed, "Deadline has elapsed", std::errc::timed_out
 )
 
 template<typename T, typename E>
@@ -33,13 +33,13 @@ timeout(task::Task<T, E> task, const std::chrono::milliseconds ms);
 
 > `timeout` 保证在返回时子任务一定已完成，所以实际等待的时间可能会远远大于设定的期限，因为并不是所有任务在被取消后都会立刻结束。
 
-```cpp
+```c++
 REQUIRE(co_await asyncio::timeout(asyncio::sleep(10ms), 20ms));
-REQUIRE_ERROR(co_await asyncio::timeout(asyncio::sleep(20ms), 10ms), asyncio::TimeoutError::ELAPSED);
+REQUIRE_ERROR(co_await asyncio::timeout(asyncio::sleep(20ms), 10ms), asyncio::TimeoutError::Elapsed);
 ```
 
 需要注意的是 `timeout` 返回的结果为两层 `std::expected`，外层的 `std::expected` 指示子任务是否在规定期限内完成了，里层的 `std::expected` 即为子任务的结果。
 
-> `timeout` 是悲观的，这意味着即便超过了最后期限，但是在取消子任务时发生了错误，它依旧会返回子任务的结果，而不是 `TimeoutError::ELAPSED`。
+> `timeout` 是悲观的，这意味着即便超过了最后期限，但是在取消子任务时发生了错误，它依旧会返回子任务的结果，而不是 `TimeoutError::Elapsed`。
 
-`timeout` 只有在超过了期限，并且取消子任务成功时才会返回 `TimeoutError::ELAPSED`。
+`timeout` 只有在超过了期限，并且取消子任务成功时才会返回 `TimeoutError::Elapsed`。

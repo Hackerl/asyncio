@@ -4,40 +4,41 @@
 
 ## Error Code `Error`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
-    CANCELLED, "Task was cancelled", std::errc::operation_canceled,
-    CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
-    LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
-    CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+    Cancelled, "Task was cancelled", std::errc::operation_canceled,
+    CancellationNotSupported, "Task does not support cancellation", std::errc::operation_not_supported,
+    Locked, "Task is locked", std::errc::resource_unavailable_try_again,
+    CancellationTooLate, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION,
+    AlreadyCompleted, "Task is already completed", std::errc::operation_not_permitted
 )
 ```
 
 异步任务中通用的错误类型。
 
-> 对于这些常用的错误，在每个业务代码处都单独定义一个是麻烦且枯燥的，虽然它利于错误追溯。
+> 对于这些常用的错误，在每个业务代码处都单独定义一个是麻烦且枯燥的。
 
 ## Class `Task`
 每一个异步函数的返回值都必须是 `Task` 类型。
 
-```cpp
+```c++
 template<typename T, typename E = std::exception_ptr>
 class Task;
 ```
 
-> 当错误类型是 `std::exception_ptr` 时，`Task` 的错误处理将变为异常，通常用于那些不应该失败的 `API`。
+> 当错误类型是 `std::exception_ptr` 时，`Task` 的错误处理将变为异常，通常用于那些不应该失败的 `API`，以及上层业务代码。
 
 ### Method `cancel`
 
-```cpp
+```c++
 std::expected<void, std::error_code> cancel();
 ```
 
 取消任务，取消操作将会作用到任务树的每一个分支上；如果失败，仅返回最后一次失败的原因，所有任务依旧会被标记为取消状态，恢复运行后将在下一次挂起点再次尝试取消。
 
-```cpp
+```c++
 auto task = allSettled(task1, task2);
 REQUIRE(task.cancel());
 
@@ -48,7 +49,7 @@ REQUIRE_ERROR(result[1], std::errc::operation_canceled);
 
 ### Method `callTree`
 
-```cpp
+```c++
 tree<std::source_location> callTree() const;
 ```
 
@@ -56,7 +57,7 @@ tree<std::source_location> callTree() const;
 
 ### Method `trace`
 
-```cpp
+```c++
 [[nodiscard]] std::string trace() const
 ```
 
@@ -64,15 +65,17 @@ tree<std::source_location> callTree() const;
 
 ### Method `addCallback`
 
-```cpp
+```c++
 void addCallback(std::function<void()> callback);
 ```
 
 添加任务关联的 `callback`，将在任务完成时调用。
 
+> 暂时不提供删除 `callback` 的接口，因为它的使用场景非常有限。
+
 ### Method `transform`
 
-```cpp
+```c++
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
@@ -94,7 +97,7 @@ Task<callback_result_t<F, T>, E> transform(F f) &&;
 
 ### Method `andThen`
 
-```cpp
+```c++
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
@@ -116,7 +119,7 @@ Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
 
 ### Method `transformError`
 
-```cpp
+```c++
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
@@ -138,7 +141,7 @@ Task<T, callback_result_t<F, E>> transformError(F f) &&;
 
 ### Method `orElse`
 
-```cpp
+```c++
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
@@ -160,7 +163,7 @@ Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 
 ### Method `done`
 
-```cpp
+```c++
 [[nodiscard]] bool done() const;
 ```
 
@@ -168,7 +171,7 @@ Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 
 ### Method `cancelled`
 
-```cpp
+```c++
 [[nodiscard]] bool cancelled() const;
 ```
 
@@ -176,23 +179,23 @@ Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 
 ### Method `cancelled`
 
-```cpp
+```c++
 [[nodiscard]] bool lock() const;
 ```
 
 返回任务是否已被锁定。
 
-> 任务被锁定之后，所有子任务均无法被取消，取消时返回 `asyncio::task::Error::LOCKED`。
+> 任务被锁定之后，所有子任务均无法被取消，取消时返回 `asyncio::task::Error::Locked`。
 
 ### Method `future`
 
-```cpp
+```c++
 zero::async::promise::Future<T, E> future();
 ```
 
 获取任务关联的 `future`，之后任务不能再被 `co_await`。
 
-```cpp
+```c++
 auto task = asyncio::sleep(1s);
 
 task.future()
@@ -208,7 +211,7 @@ task.future()
 
 ## Struct `CancellableFuture`
 
-```cpp
+```c++
 template<typename T, typename E>
 struct CancellableFuture {
     zero::async::promise::Future<T, E> future;
@@ -218,7 +221,7 @@ struct CancellableFuture {
 
 `Task` 与底层接口打交道，必然要使用 `Promise` 和 `Future` 作为桥梁，然而 `Promise` 是不支持取消的，所以我们可以提供自定义的取消函数。
 
-```cpp
+```c++
 asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
     auto ptr = std::make_unique<uv_timer_t>();
 
@@ -247,10 +250,10 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
             uv_timer_stop(timer.raw());
-            promise.reject(task::Error::CANCELLED);
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     };
@@ -263,7 +266,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
 
 ## Struct `CancellableTask`
 
-```cpp
+```c++
 template<typename T, typename E>
 struct CancellableTask {
     Task<T, E> task;
@@ -273,7 +276,7 @@ struct CancellableTask {
 
 极少数的 `Task` 是无法被取消的，例如 `ChildProcess::wait`：
 
-```cpp
+```c++
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::ChildProcess::wait() {
     co_return co_await toThread(
         [this]() -> std::expected<ExitStatus, std::error_code> {
@@ -298,7 +301,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
 
 无论 `Task` 能否取消，我们都可以重载它的取消函数：
 
-```cpp
+```c++
 co_await asyncio::task::CancellableTask{
     child->wait(),
     [&] {
@@ -312,7 +315,7 @@ co_await asyncio::task::CancellableTask{
 
 ## Constant `cancelled`
 
-```cpp
+```c++
 struct Cancelled {
 };
 
@@ -321,13 +324,13 @@ inline constexpr Cancelled cancelled;
 
 在 `Task` 中，我们可以使用 `cancelled` 来获取当前任务的取消状态。
 
-```cpp
+```c++
 asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std::span<const std::byte> data) {
     std::size_t offset{0};
 
     while (offset < data.size()) {
         if (co_await task::cancelled)
-            co_return std::unexpected{task::Error::CANCELLED};
+            co_return std::unexpected{task::Error::Cancelled};
 
         const auto n = co_await write(data.subspan(offset));
         Z_CO_EXPECT(n);
@@ -345,7 +348,7 @@ asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std:
 
 ## Constant `lock`
 
-```cpp
+```c++
 struct Lock {
 };
 
@@ -354,17 +357,17 @@ inline constexpr Lock lock;
 
 如果我们正在执行一些原子操作，例如退出时，我们需要将至关重要的内容写入文件，我们想确保这些操作不会被中断，那么我们可以锁定当前 `Task`：
 
-```cpp
+```c++
 co_await asyncio::task::lock;
 // Write file.
 co_await asyncio::task::unlock;
 ```
 
-锁定之后，上层的取消操作将失败，并返回 `asyncio::task::Error::LOCKED`。
+锁定之后，上层的取消操作将失败，并返回 `asyncio::task::Error::Locked`。
 
 ## Constant `unlock`
 
-```cpp
+```c++
 struct Unlock {
 };
 
@@ -381,8 +384,8 @@ inline constexpr Unlock unlock;
 
 > 它和聚合函数的区别是，它可以用于动态创建、数量不定的任意任务，并且不关心任务的结果。
 
-```cpp
-asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
+```c++
+asyncio::task::Task<void> serve(asyncio::net::TCPListener listener) {
     std::expected<void, std::error_code> result;
     asyncio::task::TaskGroup group;
 
@@ -397,23 +400,24 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
         auto task = handle(*std::move(stream));
 
         group.add(task);
-        task.future().fail([](const auto &ec) {
-            fmt::print(stderr, "Unhandled error: {} ({})\n", ec.message(), ec);
+        task.future().fail([](const auto &e) {
+            fmt::print(stderr, "Unhandled exception: {}\n", e);
         });
     }
 
     co_await group;
-    co_return result;
+    co_await asyncio::error::guard(std::move(result));
 }
 ```
 
 没有比 `TCP Server` 更适合它的应用场景了，服务端不断地接收新的连接，每个连接都需要创建一个子任务进行处理。我们不能等待子任务，但又不能完全丢弃它，我们希望函数返回时所有子任务的生命周期也随之结束，所以我们使用 `TaskGroup` 来管理它们。
 
 > 当上层取消任务后，`co_await group` 将会自动取消组内所有子任务，并等待它们完成。
+> 往任务组中添加了任务之后，就必须要等待它。
 
 ### Method `cancelled`
 
-```cpp
+```c++
 [[nodiscard]] bool cancelled() const;
 ```
 
@@ -421,7 +425,7 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
 
 ### Method `cancel`
 
-```cpp
+```c++
 std::expected<void, std::error_code> cancel();
 ```
 
@@ -431,7 +435,7 @@ std::expected<void, std::error_code> cancel();
 
 ### Method `add`
 
-```cpp
+```c++
 template<typename T>
     requires zero::traits::is_specialization_v<std::remove_cvref_t<T>, Task>
 void add(T &&task);
@@ -448,7 +452,7 @@ void add(T &&task);
 > 每一个聚合函数都有三种重载，参数可以是 `iterator` 或 `range`，也可以是可变参数包（支持不同的任务类型），具体使用方式请参考此项目的单元测试。
 > 所有聚合函数都保证，函数返回时所有子任务都已完成。
 
-```cpp
+```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
     requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<
@@ -467,7 +471,7 @@ auto all(R &&tasks) {
 - 子任务类型是 `Task<void, E>` 时，返回值类型是 `Task<void, E>`。
 - 子任务类型是 `Task<T, E>` 时，返回值类型是 `Task<std::vector<T>, E>`。
 
-```cpp
+```c++
 template<typename... Ts>
     requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
@@ -485,7 +489,7 @@ all(Ts &&... tasks);
 
 等待所有任务完成，返回所有任务结果，永远不会失败。
 
-```cpp
+```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
     requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<all_settled_ranges_value_t<I, S>>
@@ -500,7 +504,7 @@ auto allSettled(R &&tasks) {
 
 返回值类型永远是 `std::vector<Task<T, E>>`。
 
-```cpp
+```c++
 template<typename... Ts>
     requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<all_settled_variadic_value_t<Ts...>>
@@ -513,7 +517,7 @@ allSettled(Ts &&... tasks);
 
 任何一个任务成功则成功，并取消剩余任务。
 
-```cpp
+```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
     requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<
@@ -531,7 +535,7 @@ auto any(R &&tasks) {
 
 返回值类型永远是 `Task<T, std::vector<E>>`。
 
-```cpp
+```c++
 template<typename... Ts>
     requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
@@ -548,7 +552,7 @@ any(Ts &&... tasks);
 
 使用最快完成的作为结果，并取消其它任务。
 
-```cpp
+```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
     requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<
@@ -566,7 +570,7 @@ auto race(R &&tasks) {
 
 返回值类型永远是 `Task<T, E>`。
 
-```cpp
+```c++
 template<typename... Ts>
     requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
@@ -581,7 +585,7 @@ race(Ts &&... tasks);
 
 ## Function `from`
 
-```cpp
+```c++
 template<typename T, typename E>
 Task<T, E> from(zero::async::promise::Future<T, E> future);
 
@@ -594,7 +598,7 @@ Task<T, E> from(zero::async::promise::CancellableTask<T, E> task);
 
 将 `Future`、`CancellableFuture`、`CancellableTask` 转换为 `Task`；`asyncio` 的 `API` 都是针对 `Task` 的，转换后我们才能调用。
 
-```cpp
+```c++
 const auto status = zero::flattenWith<std::error_code>(
     co_await asyncio::timeout(
         from(asyncio::task::CancellableTask{
@@ -610,7 +614,7 @@ const auto status = zero::flattenWith<std::error_code>(
 
 ## Function `spawn`
 
-```cpp
+```c++
 template<typename F>
     requires zero::traits::is_specialization_v<std::invoke_result_t<F>, Task>
 std::invoke_result_t<F> spawn(F f) {
@@ -620,7 +624,7 @@ std::invoke_result_t<F> spawn(F f) {
 
 从可调用对象创建任务。它好像什么也没做，只是简单地调用，那为什么我们不在外层直接调用呢？
 
-```cpp
+```c++
 asyncio::task::Task<void> func(std::string host) {
     auto task = [=]() -> asyncio::task::Task<void> {
         auto socket = co_await connect(host, 443);
@@ -636,7 +640,7 @@ asyncio::task::Task<void> func(std::string host) {
 
 虽然极其不优雅，但是如果想使用具有捕获的 `lambda` 创建协程只能显式地传参：
 
-```cpp
+```c++
 Task<void> func(std::string host) {
     auto task = [](auto host) -> Task<void> {
         auto socket = co_await connect(host, 443);
@@ -652,7 +656,7 @@ Task<void> func(std::string host) {
 
 我们还可以使用 `deducing this` 来解决这个问题，但是编译器的支持并不完善：
 
-```cpp
+```c++
 auto task = [host]<typename Self>(this Self self) -> asyncio::task::Task<void> {
     auto socket = co_await connect(self.host, 443);
     co_await socket->write(xxx);
@@ -662,7 +666,7 @@ auto task = [host]<typename Self>(this Self self) -> asyncio::task::Task<void> {
 
 所以我们使用 `spawn` 函数来创建任务，将临时的 `lambda` 保存在 `spawn` 的协程栈上以延长其生命周期：
 
-```cpp
+```c++
 asyncio::task::spawn([=]() -> asyncio::task::Task<void> {
     auto socket = co_await connect(host, 443);
     co_await socket->write(xxx);

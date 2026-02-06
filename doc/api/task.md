@@ -4,26 +4,27 @@ This module contains the core code for tasks.
 
 ## Error Code `Error`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
-    CANCELLED, "Task was cancelled", std::errc::operation_canceled,
-    CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
-    LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
-    CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+    Cancelled, "Task was cancelled", std::errc::operation_canceled,
+    CancellationNotSupported, "Task does not support cancellation", std::errc::operation_not_supported,
+    Locked, "Task is locked", std::errc::resource_unavailable_try_again,
+    CancellationTooLate, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION,
+    AlreadyCompleted, "Task is already completed", std::errc::operation_not_permitted
 )
 ```
 
 Common error types used in async tasks.
 
-> For these common errors, it would be tedious to define them separately in each business code, though that would aid in error tracing.
+> For these common errors, defining them separately in each business code would be tedious and monotonous.
 
 ## Class `Task`
 
 Every async function must return a `Task` type.
 
-```cpp
+```c++
 template<typename T, typename E = std::exception_ptr>
 class Task;
 ```
@@ -32,13 +33,13 @@ class Task;
 
 ### Method `cancel`
 
-```cpp
+```c++
 std::expected<void, std::error_code> cancel();
 ```
 
 Cancels the task. The cancellation operation applies to every branch of the task tree. If it fails, only the last failure reason is returned, but all tasks will still be marked as cancelled and will attempt to cancel again at the next suspension point when resumed.
 
-```cpp
+```c++
 auto task = allSettled(task1, task2);
 REQUIRE(task.cancel());
 
@@ -49,7 +50,7 @@ REQUIRE_ERROR(result[1], std::errc::operation_canceled);
 
 ### Method `callTree`
 
-```cpp
+```c++
 tree<std::source_location> callTree() const;
 ```
 
@@ -57,7 +58,7 @@ Traces the entire task tree, obtaining the call stack of each subtask.
 
 ### Method `trace`
 
-```cpp
+```c++
 [[nodiscard]] std::string trace() const
 ```
 
@@ -65,7 +66,7 @@ Traces the entire task tree, converting the `call tree` into a highly readable s
 
 ### Method `addCallback`
 
-```cpp
+```c++
 void addCallback(std::function<void()> callback);
 ```
 
@@ -73,7 +74,7 @@ Adds a `callback` associated with the task, which will be called when the task c
 
 ### Method `transform`
 
-```cpp
+```c++
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
@@ -95,7 +96,7 @@ Transforms the value type when the task succeeds, equivalent to `std::expected::
 
 ### Method `andThen`
 
-```cpp
+```c++
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
@@ -117,7 +118,7 @@ Performs the next operation using the value when the task succeeds, equivalent t
 
 ### Method `transformError`
 
-```cpp
+```c++
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
@@ -139,7 +140,7 @@ Transforms the error type when the task fails, equivalent to `std::expected::tra
 
 ### Method `orElse`
 
-```cpp
+```c++
 template<typename F>
     requires (
         !std::is_same_v<E, std::exception_ptr> &&
@@ -161,7 +162,7 @@ Performs the next operation using the error when the task fails, equivalent to `
 
 ### Method `done`
 
-```cpp
+```c++
 [[nodiscard]] bool done() const;
 ```
 
@@ -169,7 +170,7 @@ Returns whether the task is complete.
 
 ### Method `cancelled`
 
-```cpp
+```c++
 [[nodiscard]] bool cancelled() const;
 ```
 
@@ -177,23 +178,23 @@ Returns whether the task has been marked as cancelled.
 
 ### Method `lock`
 
-```cpp
+```c++
 [[nodiscard]] bool lock() const;
 ```
 
 Returns whether the task is locked.
 
-> After a task is locked, all subtasks cannot be cancelled. Cancellation will return `asyncio::task::Error::LOCKED`.
+> After a task is locked, all subtasks cannot be cancelled. Cancellation will return `asyncio::task::Error::Locked`.
 
 ### Method `future`
 
-```cpp
+```c++
 zero::async::promise::Future<T, E> future();
 ```
 
 Gets the `future` associated with the task, after which the task can no longer be `co_await`ed.
 
-```cpp
+```c++
 auto task = asyncio::sleep(1s);
 
 task.future()
@@ -209,7 +210,7 @@ task.future()
 
 ## Struct `CancellableFuture`
 
-```cpp
+```c++
 template<typename T, typename E>
 struct CancellableFuture {
     zero::async::promise::Future<T, E> future;
@@ -219,7 +220,7 @@ struct CancellableFuture {
 
 `Task` must interface with lower-level code and necessarily uses `Promise` and `Future` as bridges. However, `Promise` doesn't support cancellation, so we can provide a custom cancellation function.
 
-```cpp
+```c++
 asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
     auto ptr = std::make_unique<uv_timer_t>();
 
@@ -248,10 +249,10 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
             uv_timer_stop(timer.raw());
-            promise.reject(task::Error::CANCELLED);
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     };
@@ -264,7 +265,7 @@ When the deadline hasn't been reached and the callback hasn't occurred, cancella
 
 ## Struct `CancellableTask`
 
-```cpp
+```c++
 template<typename T, typename E>
 struct CancellableTask {
     Task<T, E> task;
@@ -274,7 +275,7 @@ struct CancellableTask {
 
 A very small number of `Task`s cannot be cancelled, such as `ChildProcess::wait`:
 
-```cpp
+```c++
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::ChildProcess::wait() {
     co_return co_await toThread(
         [this]() -> std::expected<ExitStatus, std::error_code> {
@@ -299,7 +300,7 @@ We create a new thread to blockingly execute `waitpid`, and we have no way to ca
 
 Regardless of whether a `Task` can be cancelled, we can override its cancellation function:
 
-```cpp
+```c++
 co_await asyncio::task::CancellableTask{
     child->wait(),
     [&] {
@@ -313,7 +314,7 @@ co_await asyncio::task::CancellableTask{
 
 ## Constant `cancelled`
 
-```cpp
+```c++
 struct Cancelled {
 };
 
@@ -322,13 +323,13 @@ inline constexpr Cancelled cancelled;
 
 In a `Task`, we can use `cancelled` to get the current task's cancellation status.
 
-```cpp
+```c++
 asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std::span<const std::byte> data) {
     std::size_t offset{0};
 
     while (offset < data.size()) {
         if (co_await task::cancelled)
-            co_return std::unexpected{task::Error::CANCELLED};
+            co_return std::unexpected{task::Error::Cancelled};
 
         const auto n = co_await write(data.subspan(offset));
         Z_CO_EXPECT(n);
@@ -346,7 +347,7 @@ asyncio::task::Task<void, std::error_code> asyncio::IWriter::writeAll(const std:
 
 ## Constant `lock`
 
-```cpp
+```c++
 struct Lock {
 };
 
@@ -355,17 +356,17 @@ inline constexpr Lock lock;
 
 If we're performing atomic operations, such as writing critical content to a file on exit, we want to ensure these operations aren't interrupted. We can lock the current `Task`:
 
-```cpp
+```c++
 co_await asyncio::task::lock;
 // Write file.
 co_await asyncio::task::unlock;
 ```
 
-After locking, upper-level cancellation operations will fail and return `asyncio::task::Error::LOCKED`.
+After locking, upper-level cancellation operations will fail and return `asyncio::task::Error::Locked`.
 
 ## Constant `unlock`
 
-```cpp
+```c++
 struct Unlock {
 };
 
@@ -382,8 +383,8 @@ Used to dynamically manage multiple tasks. It's like a combination of Golang's `
 
 > The difference from aggregation functions is that it can be used for dynamically created tasks of indeterminate number, and doesn't care about task results.
 
-```cpp
-asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
+```c++
+asyncio::task::Task<void> serve(asyncio::net::TCPListener listener) {
     std::expected<void, std::error_code> result;
     asyncio::task::TaskGroup group;
 
@@ -398,23 +399,24 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
         auto task = handle(*std::move(stream));
 
         group.add(task);
-        task.future().fail([](const auto &ec) {
-            fmt::print(stderr, "Unhandled error: {} ({})\n", ec.message(), ec);
+        task.future().fail([](const auto &e) {
+            fmt::print(stderr, "Unhandled exception: {}\n", e);
         });
     }
 
     co_await group;
-    co_return result;
+    co_await asyncio::error::guard(std::move(result));
 }
 ```
 
 There's no better use case than a `TCP Server`. The server continuously accepts new connections, each requiring a subtask for handling. We can't wait for subtasks, but we can't completely discard them either. We want all subtasks' lifecycles to end when the function returns, so we use `TaskGroup` to manage them.
 
 > When an upper-level cancels the task, `co_await group` will automatically cancel all subtasks in the group and wait for them to complete.
+> After adding tasks to the task group, you must wait for them.
 
 ### Method `cancelled`
 
-```cpp
+```c++
 [[nodiscard]] bool cancelled() const;
 ```
 
@@ -422,7 +424,7 @@ Returns whether the task group has been cancelled.
 
 ### Method `cancel`
 
-```cpp
+```c++
 std::expected<void, std::error_code> cancel();
 ```
 
@@ -432,7 +434,7 @@ Cancels the task group. The cancellation operation applies to all tasks in the g
 
 ### Method `add`
 
-```cpp
+```c++
 template<typename T>
     requires zero::traits::is_specialization_v<std::remove_cvref_t<T>, Task>
 void add(T &&task);
@@ -449,7 +451,7 @@ Waits for all tasks. Returns success if all tasks succeed. Returns failure and c
 > Each aggregation function has three overloads: parameters can be an `iterator` or `range`, or a variadic parameter pack (supporting different task types). See the unit tests in this project for specific usage.
 > All aggregation functions guarantee that when the function returns, all subtasks have completed.
 
-```cpp
+```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
     requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<
@@ -468,7 +470,7 @@ auto all(R &&tasks) {
 - When subtask type is `Task<void, E>`, return value type is `Task<void, E>`.
 - When subtask type is `Task<T, E>`, return value type is `Task<std::vector<T>, E>`.
 
-```cpp
+```c++
 template<typename... Ts>
     requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
@@ -486,7 +488,7 @@ all(Ts &&... tasks);
 
 Waits for all tasks to complete, returns all task results, never fails.
 
-```cpp
+```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
     requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<all_settled_ranges_value_t<I, S>>
@@ -501,7 +503,7 @@ auto allSettled(R &&tasks) {
 
 Return value type is always `std::vector<Task<T, E>>`.
 
-```cpp
+```c++
 template<typename... Ts>
     requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<all_settled_variadic_value_t<Ts...>>
@@ -514,7 +516,7 @@ Return value type is always `std::tuple<Task<T1, E>, Task<T2, E>, ...>`.
 
 Succeeds if any task succeeds, cancelling remaining tasks.
 
-```cpp
+```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
     requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<
@@ -532,7 +534,7 @@ auto any(R &&tasks) {
 
 Return value type is always `Task<T, std::vector<E>>`.
 
-```cpp
+```c++
 template<typename... Ts>
     requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
@@ -549,7 +551,7 @@ any(Ts &&... tasks);
 
 Uses the fastest-completing task as the result, cancelling other tasks.
 
-```cpp
+```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
     requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
 Task<
@@ -567,7 +569,7 @@ auto race(R &&tasks) {
 
 Return value type is always `Task<T, E>`.
 
-```cpp
+```c++
 template<typename... Ts>
     requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
@@ -582,7 +584,7 @@ race(Ts &&... tasks);
 
 ## Function `from`
 
-```cpp
+```c++
 template<typename T, typename E>
 Task<T, E> from(zero::async::promise::Future<T, E> future);
 
@@ -595,7 +597,7 @@ Task<T, E> from(zero::async::promise::CancellableTask<T, E> task);
 
 Converts `Future`, `CancellableFuture`, `CancellableTask` to `Task`. The `asyncio` APIs are designed for `Task`, so conversion is needed before calling.
 
-```cpp
+```c++
 const auto status = zero::flattenWith<std::error_code>(
     co_await asyncio::timeout(
         from(asyncio::task::CancellableTask{
@@ -611,7 +613,7 @@ const auto status = zero::flattenWith<std::error_code>(
 
 ## Function `spawn`
 
-```cpp
+```c++
 template<typename F>
     requires zero::traits::is_specialization_v<std::invoke_result_t<F>, Task>
 std::invoke_result_t<F> spawn(F f) {
@@ -621,7 +623,7 @@ std::invoke_result_t<F> spawn(F f) {
 
 Creates a task from a callable object. It seems to do nothing but simply call - why not call it directly in the outer layer?
 
-```cpp
+```c++
 asyncio::task::Task<void> func(std::string host) {
     auto task = [=]() -> asyncio::task::Task<void> {
         auto socket = co_await connect(host, 443);
@@ -637,7 +639,7 @@ Using a capturing lambda to create a coroutine, when executing `co_await task`, 
 
 Although extremely inelegant, if you want to use a capturing lambda to create a coroutine, you can only explicitly pass parameters:
 
-```cpp
+```c++
 Task<void> func(std::string host) {
     auto task = [](auto host) -> Task<void> {
         auto socket = co_await connect(host, 443);
@@ -653,7 +655,7 @@ Task<void> func(std::string host) {
 
 We can also use `deducing this` to solve this problem, but compiler support isn't complete:
 
-```cpp
+```c++
 auto task = [host]<typename Self>(this Self self) -> asyncio::task::Task<void> {
     auto socket = co_await connect(self.host, 443);
     co_await socket->write(xxx);
@@ -663,7 +665,7 @@ auto task = [host]<typename Self>(this Self self) -> asyncio::task::Task<void> {
 
 So we use the `spawn` function to create tasks, saving the temporary lambda on `spawn`'s coroutine stack to extend its lifetime:
 
-```cpp
+```c++
 asyncio::task::spawn([=]() -> asyncio::task::Task<void> {
     auto socket = co_await connect(host, 443);
     co_await socket->write(xxx);

@@ -4,22 +4,20 @@
 
 ## Function `channel`
 
-```cpp
+```c++
 template<typename T>
 using Channel = std::pair<Sender<T>, Receiver<T>>;
 
 template<typename T>
-Channel<T> channel(std::shared_ptr<EventLoop> eventLoop, const std::size_t capacity);
+Channel<T> channel(std::shared_ptr<EventLoop> eventLoop, const std::size_t capacity = 1);
 
 template<typename T>
-Channel<T> channel(const std::size_t capacity);
+Channel<T> channel(const std::size_t capacity = 1);
 ```
 
 创建固定容量的 `channel`，默认绑定到当前线程的 `Event Loop`，也可以手动指定。
 
-> `channel` 底层使用的是环形缓冲区，容量必须大于 1。
-
-```cpp
+```c++
 auto [sender, receiver] = asyncio::channel<std::string>(100);
 
 REQUIRE(co_await sender.send("hello world"));
@@ -32,30 +30,30 @@ REQUIRE(co_await receiver.receive() == "hello world");
 
 ### Method `trySend`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     TrySendError,
     "asyncio::Sender::trySend",
-    DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    FULL, "Sending on a full channel", std::errc::operation_would_block
+    Disconnected, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    Full, "Sending on a full channel", std::errc::operation_would_block
 )
 
 template<typename U = T>
 std::expected<void, TrySendError> trySend(U &&element);
 ```
 
-尝试发送数据，当 `channel` 已满时不等待，返回 `TrySendError::FULL` 错误，当 `channel` 已关闭时返回 `TrySendError::DISCONNECTED`。
+尝试发送数据，当 `channel` 已满时不等待，返回 `TrySendError::Full` 错误，当 `channel` 已关闭时返回 `TrySendError::Disconnected`。
 
 > 此函数可在任意线程中使用。
 
 ### Method `sendSync`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     SendSyncError,
     "asyncio::Sender::sendSync",
-    DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    TIMEOUT, "Send operation timed out", std::errc::timed_out
+    Disconnected, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    Timeout, "Send operation timed out", std::errc::timed_out
 )
 
 template<typename U = T>
@@ -67,7 +65,7 @@ sendSync(U &&element, const std::optional<std::chrono::milliseconds> timeout = s
 
 > 未设置 `timeout` 参数时，`sendSync` 将会永久阻塞直到发送成功或 `channel` 被关闭。
 
-```cpp
+```c++
 auto [sender, receiver] = asyncio::channel<std::string>(100);
 
 co_await asyncio::toThread([&] {
@@ -82,12 +80,12 @@ co_await asyncio::toThread([&] {
 
 ### Method `send`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     SendError,
     "asyncio::Sender::send",
-    DISCONNECTED, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    CANCELLED, "Send operation was cancelled", std::errc::operation_canceled
+    Disconnected, "Sending on a disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    Cancelled, "Send operation was cancelled", std::errc::operation_canceled
 )
 
 task::Task<void, SendError> send(T element);
@@ -97,7 +95,7 @@ task::Task<void, SendError> send(T element);
 
 > `send` 只能在 `Event Loop` 主线程内调用。
 
-```cpp
+```c++
 using namespace std::chrono_literals;
 
 auto [sender, receiver] = asyncio::channel<std::string>(100);
@@ -110,17 +108,17 @@ co_await timeout(sender.send("hello world"), 1s);
 
 ### Method `close`
 
-```cpp
+```c++
 void close();
 ```
 
-关闭 `channel`，这将唤醒所有发送端与接收端的等待者。`channel` 关闭后，发送操作将永远失败，返回 `DISCONNECTED` 错误。
+关闭 `channel`，这将唤醒所有发送端与接收端的等待者。`channel` 关闭后，发送操作将永远失败，返回 `Disconnected` 错误。
 
 > 重复关闭无任何影响。
 
 ### Method `size`
 
-```cpp
+```c++
 [[nodiscard]] std::size_t size() const;
 ```
 
@@ -128,7 +126,7 @@ void close();
 
 ### Method `capacity`
 
-```cpp
+```c++
 [[nodiscard]] std::size_t capacity() const;
 ```
 
@@ -138,7 +136,7 @@ void close();
 
 ### Method `empty`
 
-```cpp
+```c++
 [[nodiscard]] bool empty() const;
 ```
 
@@ -146,7 +144,7 @@ void close();
 
 ### Method `full`
 
-```cpp
+```c++
 [[nodiscard]] bool full() const;
 ```
 
@@ -154,7 +152,7 @@ void close();
 
 ### Method `closed`
 
-```cpp
+```c++
 [[nodiscard]] bool closed() const;
 ```
 
@@ -167,29 +165,29 @@ void close();
 ### Method `tryReceive`
 
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     TryReceiveError,
     "asyncio::Receiver::tryReceive",
-    DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    EMPTY, "Receiving on an empty channel", std::errc::operation_would_block
+    Disconnected, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    Empty, "Receiving on an empty channel", std::errc::operation_would_block
 )
 
 std::expected<T, TryReceiveError> tryReceive();
 ```
 
-尝试接收数据，当 `channel` 为空时不等待，返回 `TryReceiveError::EMPTY` 错误，当 `channel` 已关闭时返回 `TryReceiveError::DISCONNECTED`。
+尝试接收数据，当 `channel` 为空时不等待，返回 `TryReceiveError::Empty` 错误，当 `channel` 已关闭时返回 `TryReceiveError::Disconnected`。
 
 > 此函数可在任意线程中使用。
 
 ### Method `receiveSync`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     ReceiveSyncError,
     "asyncio::Receiver::receiveSync",
-    DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    TIMEOUT, "Receive operation timed out", std::errc::timed_out
+    Disconnected, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    Timeout, "Receive operation timed out", std::errc::timed_out
 )
 
 std::expected<T, ReceiveSyncError>
@@ -200,7 +198,7 @@ receiveSync(const std::optional<std::chrono::milliseconds> timeout = std::nullop
 
 > 未设置 `timeout` 参数时，`receiveSync` 将会永久阻塞直到接收成功或 `channel` 被关闭。
 
-```cpp
+```c++
 auto [sender, receiver] = asyncio::channel<std::string>(100);
 
 co_await asyncio::toThread([&] {
@@ -215,12 +213,12 @@ co_await asyncio::toThread([&] {
 
 ### Method `receive`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CODE_EX(
     ReceiveError,
     "asyncio::Receiver::receive",
-    DISCONNECTED, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
-    CANCELLED, "Receive operation was cancelled", std::errc::operation_canceled
+    Disconnected, "Receiving on an empty and disconnected channel", Z_DEFAULT_ERROR_CONDITION,
+    Cancelled, "Receive operation was cancelled", std::errc::operation_canceled
 )
 
 task::Task<T, ReceiveError> receive();
@@ -230,7 +228,7 @@ task::Task<T, ReceiveError> receive();
 
 > `receive` 只能在 `Event Loop` 主线程内调用。
 
-```cpp
+```c++
 using namespace std::chrono_literals;
 
 auto [sender, receiver] = asyncio::channel<std::string>(100);
@@ -243,17 +241,17 @@ co_await timeout(receiver.receive(), 1s);
 
 ### Method `close`
 
-```cpp
+```c++
 void close();
 ```
 
-关闭 `channel`，这将唤醒所有发送端与接收端的等待者。如果关闭后 `channel` 内还残留有数据，接收端依旧可以读取，在数据消费完后才会返回 `DISCONNECTED` 错误。
+关闭 `channel`，这将唤醒所有发送端与接收端的等待者。如果关闭后 `channel` 内还残留有数据，接收端依旧可以读取，在数据消费完后才会返回 `Disconnected` 错误。
 
 > 重复关闭无任何影响。
 
 ### Method `size`
 
-```cpp
+```c++
 [[nodiscard]] std::size_t size() const;
 ```
 
@@ -261,7 +259,7 @@ void close();
 
 ### Method `capacity`
 
-```cpp
+```c++
 [[nodiscard]] std::size_t capacity() const;
 ```
 
@@ -271,7 +269,7 @@ void close();
 
 ### Method `empty`
 
-```cpp
+```c++
 [[nodiscard]] bool empty() const;
 ```
 
@@ -279,7 +277,7 @@ void close();
 
 ### Method `full`
 
-```cpp
+```c++
 [[nodiscard]] bool full() const;
 ```
 
@@ -287,7 +285,7 @@ void close();
 
 ### Method `closed`
 
-```cpp
+```c++
 [[nodiscard]] bool closed() const;
 ```
 
@@ -295,30 +293,30 @@ void close();
 
 ## Error Condition `ChannelError`
 
-```cpp
+```c++
 Z_DEFINE_ERROR_CONDITION_EX(
     ChannelError,
     "asyncio::channel",
-    DISCONNECTED,
+    Disconnected,
     "Channel disconnected",
     [](const std::error_code &ec) {
-        return ec == make_error_code(TrySendError::DISCONNECTED) ||
-            ec == make_error_code(SendSyncError::DISCONNECTED) ||
-            ec == make_error_code(SendError::DISCONNECTED) ||
-            ec == make_error_code(TryReceiveError::DISCONNECTED) ||
-            ec == make_error_code(ReceiveSyncError::DISCONNECTED) ||
-            ec == make_error_code(ReceiveError::DISCONNECTED);
+        return ec == make_error_code(TrySendError::Disconnected) ||
+            ec == make_error_code(SendSyncError::Disconnected) ||
+            ec == make_error_code(SendError::Disconnected) ||
+            ec == make_error_code(TryReceiveError::Disconnected) ||
+            ec == make_error_code(ReceiveSyncError::Disconnected) ||
+            ec == make_error_code(ReceiveError::Disconnected);
     }
 )
 ```
 
-`channel` 相关的 `error condition`，`ChannelError::DISCONNECTED` 可用于判断出错误是否是 `channel` 关闭导致的。
+`channel` 相关的 `error condition`，`ChannelError::Disconnected` 可用于判断出错误是否是 `channel` 关闭导致的。
 
-```cpp
+```c++
 const auto result = co_await func();
 
 if (!result) {
-    if (result.error() == ChannelError::DISCONNECTED) {
+    if (result.error() == ChannelError::Disconnected) {
         // ...
     }
 }
