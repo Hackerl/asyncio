@@ -1,6 +1,6 @@
 # 错误处理
 
-`asyncio` 的绝大多数 `API` 都返回 [`std::expected`](https://en.cppreference.com/w/cpp/utility/expected)，它类似于 `Rust` 的 `Result`。
+`asyncio` 的绝大多数 `API` 都返回 [`std::expected`](https://en.cppreference.com/w/cpp/utility/expected)，它类似于 `Rust` 的 `Result`。但这并不意味着我反对异常，相反，在上层的业务代码中我大量使用了异常。错误码和异常并非水火不容，将它们完美结合才能造就一套优秀的错误处理体系。
 
 ## 错误码
 
@@ -40,23 +40,197 @@ fmt::print("{:s}", ec);
 
 关于这部分，感兴趣的可以自行查阅相关资料，此处不再赘述。
 
-## 自定义错误码
+## 什么时候使用错误码？
 
-标准库提供的错误种类当然远远不够，`asyncio` 中的众多 `API` 都需要返回自定义的错误，例如任务超时、任务被取消等等。
+假设你正在编写一系列底层的通用函数，作为库接口暴露给他人调用，例如 `readFile`、`httpGet`，你可能会发现它们有一些共通的特点：
 
-> 如果偷懒地使用 `ETIMEDOUT`，`ECANCELED` 来返回错误，那么上层接收到之后，错误的来源将无从得知，因为 `std::error_code` 的缺陷就是无法记录调用栈。
+- 它们有很大的可能会返回错误，例如文件不存在、连接失败等等。
+- 这些返回的错误，有时候希望被手动处理，例如文件不存在则执行额外的逻辑，而不是一味地向上传播错误。
+- 调用者可能希望从函数签名就能判断出该 `API` 是否可能返回错误。
+- 它们可能在业务代码的多个地方被调用，如果它们的错误码直接上抛到顶层时，错误来源将难以追溯。
 
-但如果我们自定义错误种类、错误消息，便能稍微缓解这一痛点。
+所以在编写这类 `API` 时，我选择 `std::expected<T, std::error_code>` 作为返回值。但就像上面说的，底层的错误码如果直接在业务代码层面传递，错误的源头将难以分析 —— “No such file or directory” 到底是哪一次调用产生的？
+
+## 异常
+异常总是为人所诟病，它那糟糕的性能，亦或是它出其不意的闪现。所以我绝不会将异常作为通用 `API` 的错误处理方式，但这并不意味着 `API` 内部不会抛出异常。
 
 ```c++
-fmt::print(stderr, "Error: {} ({})\n", ec.message(), ec);
+std::expected<asyncio::http::URL, std::error_code> asyncio::http::URL::from(const std::string &str) {
+    std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url{curl_url(), curl_url_cleanup};
+
+    if (!url)
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
+
+    Z_EXPECT(expected([&] {
+        return curl_url_set(url.get(), CURLUPART_URL, str.c_str(), CURLU_NON_SUPPORT_SCHEME);
+    }));
+
+    return URL{std::move(url)};
+}
 ```
 
-当上层打印出 `error code` 时，终端可能会显示：
+那些无法被处理的错误（例如内存不足），将会当作异常抛出。这也间接反映出了我对待异常的态度 —— 当异常产生时，说明程序遇到了无法恢复的错误，只能被迫退出。
 
-> Error: Task was cancelled (asyncio::task:1)
+因此我在上层业务代码中大量使用了异常，这些代码也有一些共通的特点：
 
-从其中我们可以得知，错误种类是 `asyncio::task`，错误号是 1，错误信息是 `task was cancelled`，错误产生的原因我们也应该心中有数了。
+- 它们组合调用多个底层 `API` 完成一系列逻辑操作，有时会手动处理 `API` 返回的错误，大多数时候则会直接将错误上抛。
+- 它们调用其它的业务代码时，默认它会抛出异常，大多数时候并不会捕获它，因为一个操作的失败导致整个调用链中断是预期内的行为。
+
+当一个异常抛出到顶层时，我们一定希望异常消息能够帮助我们追溯到错误源头。而 `C++23` 新增的 `stacktrace` 模块正好可以帮助我们获取调用栈，所以我封装了一个通用的异常类型 `StacktraceError`：
+
+```c++
+namespace zero::error {
+#if defined(__cpp_lib_stacktrace) && __cpp_lib_stacktrace >= 202011L
+    template<typename T>
+        requires std::derived_from<T, std::exception>
+    class StacktraceError final : public T {
+    public:
+        template<typename... Args>
+        explicit StacktraceError(Args &&... args)
+            : T{std::forward<Args>(args)...},
+              mMessage{fmt::format("{} {}", T::what(), std::to_string(std::stacktrace::current(1)))} {
+        }
+
+        [[nodiscard]] const char *what() const noexcept override {
+            return mMessage.c_str();
+        }
+
+    private:
+        std::string mMessage;
+    };
+#else
+    template<typename T>
+    using StacktraceError = T;
+#endif
+}
+```
+
+但是 `stacktrace` 获取的是同步的调用栈，而非协程的，并且它无法在去除了调试信息的情况下工作。幸运的是，在 `asyncio` 中我们可以轻松地完成调用栈回溯：
+
+```c++
+fmt::print("{}\n", fmt::join(co_await asyncio::task::backtrace, "\n"));
+```
+
+> 即使没有调试信息，`asyncio::task::backtrace` 也可以正常工作。
+
+所以我又为 `asyncio` 封装了一个 `StacktraceError`：
+
+```c++
+namespace asyncio::error {
+    template<typename T>
+        requires std::derived_from<T, std::exception>
+    class StacktraceError final : public T {
+    public:
+        template<typename... Args>
+        explicit StacktraceError(const std::vector<std::source_location> &stacktrace, Args &&... args)
+            : T{std::forward<Args>(args)...},
+              mMessage{fmt::format("{} {}", T::what(), to_string(fmt::join(stacktrace | std::views::drop(1), "\n")))} {
+        }
+
+        template<typename... Args>
+        static task::Task<StacktraceError> make(Args &&... args) {
+            co_return StacktraceError{co_await task::backtrace, std::forward<Args>(args)...};
+        }
+
+        [[nodiscard]] const char *what() const noexcept override {
+            return mMessage.c_str();
+        }
+
+    private:
+        std::string mMessage;
+    };
+}
+```
+
+它会获取当前协程的调用栈，并附加到异常信息中抛出。
+
+## 错误码转异常
+
+在业务代码中，调用某个 `API` 失败时，我们通常希望将错误直接上抛：
+
+```c++
+const std::expected<std::string, std::error_code> content = readFile(path);
+
+if (!content)
+    throw std::system_error{content.error()};
+```
+
+`std::error_code` 可以直接转为 `std::system_error` 异常，看起来很方便不是吗？然而问题随之而来，顶层捕获到异常后打印出一条消息 —— “No such file or directory”；你开始困惑，这到底是哪里抛出来的？你甚至都不确定这是调用哪个 `API` 触发的。冷静下来后，你仔细分析，猜测大概率是文件系统的操作引起的，于是你开始在代码库中搜索文件操作相关的调用；搜索结果却让你两眼一黑，足足有几十处调用了 `readFile`，到底是哪一处呢？
+
+为了更好地错误溯源，于是我们转而使用 `StacktraceError`：
+
+```c++
+const std::expected<std::string, std::error_code> content = readFile(path);
+
+if (!content)
+    throw zero::error::StacktraceError<std::system_error>{content.error()};
+```
+
+对于协程我们当然希望看到的是异步的调用栈：
+
+```c++
+const std::expected<std::string, std::error_code> content = co_await readFile(path);
+
+if (!content)
+    throw co_await asyncio::error::StacktraceError<std::system_error>::make(content.error());
+```
+
+我们频繁地判断错误并转为异常，为什么不能更优雅一些呢？所以我编写了一些辅助函数：
+
+```c++
+namespace zero::error {
+    template<typename T, typename E>
+        requires std::is_convertible_v<E, std::error_code>
+    T guard(std::expected<T, E> &&expected) {
+        if (!expected)
+            throw StacktraceError<std::system_error>{expected.error()};
+
+        if constexpr (std::is_void_v<T>)
+            return;
+        else
+            return *std::move(expected);
+    }
+}
+
+namespace asyncio::error {
+    template<typename T, typename E>
+        requires std::is_convertible_v<E, std::error_code>
+    task::Task<T> guard(std::expected<T, E> expected) {
+        if (!expected)
+            throw co_await StacktraceError<std::system_error>::make(expected.error());
+
+        if constexpr (std::is_void_v<T>)
+            co_return;
+        else
+            co_return *std::move(expected);
+    }
+
+    template<typename T, typename E>
+        requires std::is_convertible_v<E, std::error_code>
+    task::Task<T> guard(task::Task<T, E> task) {
+        auto result = co_await task;
+
+        if (!result)
+            throw co_await StacktraceError<std::system_error>::make(result.error());
+
+        if constexpr (std::is_void_v<T>)
+            co_return;
+        else
+            co_return *std::move(result);
+    }
+}
+```
+
+使用起来也很便利：
+
+```c++
+const std::string content = zero::error::guard(readFile(path));
+const std::string content = co_await asyncio::error::guard(readFile(path));
+```
+
+## 自定义错误码
+
+标准库提供的错误种类当然远远不够，`asyncio` 中的众多 `API` 都需要返回自定义的错误，例如任务被锁定、任务无法取消等等。
 
 不幸的是，自定义错误种类、错误码是一件极其繁琐的事情，我们需要定义自己的错误号枚举类型，还需要继承 [`std::error_category`](https://en.cppreference.com/w/cpp/error/error_category) 并重载部分虚函数。
 
@@ -70,10 +244,11 @@ namespace asyncio::task {
     Z_DEFINE_ERROR_CODE_EX(
         Error,
         "asyncio::task",
-        CANCELLED, "Task was cancelled", std::errc::operation_canceled,
-        CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
-        LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
-        CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+        Cancelled, "Task was cancelled", std::errc::operation_canceled,
+        CancellationNotSupported, "Task does not support cancellation", std::errc::operation_not_supported,
+        Locked, "Task is locked", std::errc::resource_unavailable_try_again,
+        CancellationTooLate, "Cancellation is too late", std::errc::operation_not_permitted,
+        AlreadyCompleted, "Task is already completed", std::errc::operation_not_permitted
     )
 }
 
@@ -85,31 +260,51 @@ Z_DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::task::Error)
 
 上面就是 `asyncio` 中真实存在的代码，使用三个宏我们轻松定义了一个新的错误种类，还有错误码及对应的错误信息。
 
-当某个任务被成功取消时，我们只需要 `return std::unexpected{task::Error::CANCELLED}`。
+当某个任务被成功取消时，我们只需要 `return std::unexpected{task::Error::Cancelled}`。
 
 ## 错误条件
 
 在 `C++` 的错误体系中，`std::error_code` 代表具体产生的错误，我们当然可以比较两个 `error code` 是否相等来判断具体的错误原因。
-但是如果我们只是想知道它是不是一个超时错误，或是任务被取消导致的，那应该怎么办呢？我们总不可能将它与所有可能出现的 `error code` 都比较一遍吧。
+但是如果我们只是想知道它是不是一个超时错误，或是文件不存在导致的，那应该怎么办呢？我们总不可能将它与所有可能出现的 `error code` 都比较一遍吧。
 细心的你可能已经注意到了，在上一节自定义错误码的代码中，使用到了 `std::errc`：
 
 ```c++
 Z_DEFINE_ERROR_CODE_EX(
     Error,
     "asyncio::task",
-    CANCELLED, "Task was cancelled", std::errc::operation_canceled,
-    CANCELLATION_NOT_SUPPORTED, "Task does not support cancellation", std::errc::operation_not_supported,
-    LOCKED, "Task is locked", std::errc::resource_unavailable_try_again,
-    CANCELLATION_TOO_LATE, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION
+    Cancelled, "Task was cancelled", std::errc::operation_canceled,
+    CancellationNotSupported, "Task does not support cancellation", std::errc::operation_not_supported,
+    Locked, "Task is locked", std::errc::resource_unavailable_try_again,
+    CancellationTooLate, "Cancellation is too late", std::errc::operation_not_permitted,
+    AlreadyCompleted, "Task is already completed", std::errc::operation_not_permitted
 )
 ```
 
-`std::error_condition` 代表一种错误条件，`std::errc` 就是标准库提供的与 `posix` 错误相对应的 `error condition`。
-我们在自定义错误时，可以指定错误对应的错误条件，那么将 `error code` 与对应的 `error condtion` 比较时就会相等：
+`std::error_condition` 代表一种错误条件，`std::errc` 就是标准库提供的与 `posix` 错误相对应的 `error condition`。我们在自定义错误时，可以指定错误对应的错误条件，那么将 `error code` 与对应的 `error condtion` 比较时就会相等：
 
 ```c++
-assert(std::error_code{asyncio::task::CANCELLED} == std::errc::operation_canceled);
+assert(std::error_code{asyncio::task::Cancelled} == std::errc::operation_canceled);
 ```
+
+如果我们希望在文件不存在时执行额外的 `fallback` 策略，那么可以这么写：
+
+```c++
+asyncio::task::Task<void> func() {
+    // ...
+    const auto content = co_await readFile(path);
+
+    if (!content) {
+        if (const auto &error = content.error(); error != std::errc::no_such_file_or_directory)
+            throw co_await asyncio::error::StacktraceError<std::system_error>::make(error);
+
+        // ...
+    }
+
+    // ...
+}
+```
+
+> 我们不在乎错误到底是 `ENOENT` 还是 `ERROR_FILE_NOT_FOUND`，我们只关心它的出现是否意味着文件不存在。
 
 当然，我们也可以自定义 `error condtion`：
 
@@ -118,12 +313,12 @@ namespace asyncio {
     Z_DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
-        UNEXPECTED_EOF, "Unexpected end of file"
+        UnexpectedEOF, "Unexpected end of file"
     )
 }
 ```
 
-在 `asyncio` 中，我定义了一个 `IOError` 的错误条件，其中 `UNEXPECTED_EOF` 用来表示遇到了预料之外的 `EOF`。
+在 `asyncio` 中，我定义了一个 `IOError` 的错误条件，其中 `UnexpectedEOF` 用来表示遇到了预料之外的 `EOF`。
 
 而具体的 `error code`，则在实现具体的接口时定义：
 
@@ -134,7 +329,7 @@ namespace asyncio {
         Z_DEFINE_ERROR_CODE_INNER_EX(
             ReadExactlyError,
             "asyncio::IReader",
-            UNEXPECTED_EOF, "Unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
+            UnexpectedEOF, "Unexpected end of file", make_error_condition(IOError::UnexpectedEOF)
         )
 
         virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
@@ -144,12 +339,12 @@ namespace asyncio {
 }
 ```
 
-`readExactly` 希望读取到准确数量的数据之后返回，如果读取到部分数据便遇到了 `EOF`，它便会返回 `asyncio::ReadExactlyError::UNEXPECTED_EOF` 错误。
+`readExactly` 希望读取到准确数量的数据之后返回，如果读取到部分数据便遇到了 `EOF`，它便会返回 `asyncio::ReadExactlyError::UnexpectedEOF` 错误。
 
 上层的调用者可能不关心，也记不住那么多具体的错误码，他们只关心错误是否属于某一种情况：
 
 ```c++
-assert(std::error_code{asyncio::ReadExactlyError::UNEXPECTED_EOF} == asyncio::IOError::UNEXPECTED_EOF);
+assert(std::error_code{asyncio::ReadExactlyError::UnexpectedEOF} == asyncio::IOError::UnexpectedEOF);
 ```
 
 ## 错误转换
@@ -217,31 +412,17 @@ namespace asyncio::uv {
 
 `asyncio` 基于 `libuv`，`libuv` 的错误大多都来自系统错误，所以我借助于 `ChatGPT` 的力量一一列出了映射关系。
 
-## 错误追溯
-
-错误追溯是一件让我头疼的事情，`error code` 无法携带任何动态数据用于溯源，它的错误描述通常也是一一映射的常量字符串。它也没有预留任何保留的字段，想要拓展它简直难如登天，而且我相信 `C++` 委员会也并不会去改变这一现状。
-在我多次尝试无果之后，这一部分便只能暂且搁置，如果真的到了不得已而为之的那一天，我会选择用自定义的 `error code` 类型替换掉 `std::error_code`：
-
-```c++
-class ErrorCode : publibc std::error_code {
-privete:
-#ifndef NDEBUG
-    std::stacktrace mStacktrace;
-#endif
-};
-```
-
-> 这并不是一件很难做的事情，只是我现在还没有立刻去做的理由。
-
 ## 错误传递
 
-每一个可能失败的接口，我们都应该检查调用的结果。大多数时候，当我们检查到错误后，都会选择直接抛出给上层：
+在编写通用 `API` 时，每一个可能失败的调用我们都应该检查返回值。大多数时候，当我们检查到错误后，都会选择直接抛出给上层：
 
 ```c++
-const auto result = func();
+std::expected<void, std::error_code> api() {
+    const auto result = func();
 
-if (!result)
-    return std::unexpected{result.error()};
+    if (!result)
+        return std::unexpected{result.error()};
+}
 ```
 
 但我不想在每个错误检查的地方都写上这么一长串代码，那样岂不是变成了 `Golang` 的模样？可是 `C++` 又没有 `Rust` 的问号语法糖，那该怎么办呢？
@@ -252,7 +433,7 @@ if (!result)
 // https://github.com/Hackerl/zero/blob/master/include/zero/expect.h
 
 #ifdef __GNUC__
-#define TRY(...)                                                    \
+#define Z_TRY(...)                                                  \
     ({                                                              \
         auto &&_result = __VA_ARGS__;                               \
                                                                     \
@@ -264,7 +445,7 @@ if (!result)
 #endif
 
 #ifdef __clang__
-#define CO_TRY(...)                                                 \
+#define Z_CO_TRY(...)                                               \
     ({                                                              \
         auto &&_result = __VA_ARGS__;                               \
                                                                     \
@@ -279,18 +460,18 @@ if (!result)
 我们借助 `statement expression` 可以模拟出 `Rust` 问号语法糖：
 
 ```c++
-const auto result1 = TRY(func());
-const auto result2 = CO_TRY(co_await func1());
+const auto result1 = Z_TRY(func());
+const auto result2 = Z_CO_TRY(co_await func1());
 ```
 
 可惜，`MSVC` 并不支持该拓展语法，`GCC` 的相关支持也差强人意，于是我便只能退而求其次：
 
 ```c++
-#define Z_EXPECT(...)                                                 \
+#define Z_EXPECT(...)                                               \
     if (auto &&_result = __VA_ARGS__; !_result)                     \
         return std::unexpected{std::move(_result).error()}
 
-#define Z_CO_EXPECT(...)                                              \
+#define Z_CO_EXPECT(...)                                            \
     if (auto &&_result = __VA_ARGS__; !_result)                     \
         co_return std::unexpected{std::move(_result).error()}
 ```
@@ -306,3 +487,237 @@ Z_CO_EXPECT(result2);
 ```
 
 > 我依旧保留了 `TRY` 的相关实现，如果你的项目确定只会使用 `Clang` 编译，使用它们也未尝不可。
+
+## 最佳实践
+### 业务代码
+
+业务代码中只使用异常进行错误传播。
+
+- 返回值为 `std::expected<T, std::error_code>` 的函数使用 `guard` 进行错误检查，出错时自动上抛。
+
+在同步函数中，使用 `zero::error::guard`：
+
+```c++
+void func() {
+    // ...
+    const auto content = zero::error::guard(readFile(path));
+    // ...
+}
+```
+
+在协程中，使用 `asyncio::error::guard`：
+
+```c++
+asyncio::task::Task<void> func() {
+    // ...
+    const auto content = co_await asyncio::error::guard(readFile(path));
+    // ...
+}
+```
+
+- 通用的系统 `API` 返回值转为 `std::expected` 后，再用 `guard` 处理。
+
+`Windows` 上返回值为 `BOOL` 的 `API` 即为通用的系统 `API` —— 返回 `TRUE` 表示成功，返回 `FALSE` 表示失败，失败时使用 `GetLastError` 获取错误码。
+
+```c++
+void func() {
+    // ...
+    zero::error::guard(zero::os::windows::expected([&] {
+        return CloseHandle(handle);
+    }));
+    // ...
+}
+
+asyncio::task::Task<void> func() {
+    // ...
+    co_await asyncio::error::guard(zero::os::windows::expected([&] {
+        return CloseHandle(handle);
+    }));
+    // ...
+}
+```
+
+`UNIX` 上返回值为整形或指针的 `API` 即为通用的系统 `API` —— 返回 0 表示成功，返回 -1 表示失败，失败时使用 `errno` 获取错误码。
+
+```c++
+void func() {
+    // ...
+    zero::error::guard(zero::os::unix::expected([&] {
+        return close(fd);
+    }));
+    // ...
+}
+
+asyncio::task::Task<void> func() {
+    // ...
+    co_await asyncio::error::guard(zero::os::unix::expected([&] {
+        return close(fd);
+    }));
+    // ...
+}
+```
+
+- 特殊的系统 `API`，手动判断错误并转为异常。
+
+```c++
+void func() {
+    // ...
+    const auto handle = CreateFileA(
+        R"(\\.\NUL)",
+        GENERIC_READ,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+
+    if (handle == INVALID_HANDLE_VALUE)
+        throw zero::error::StacktraceError<std::system_error>{static_cast<int>(GetLastError()), std::system_category()};
+    // ...
+}
+
+asyncio::task::Task<void> func() {
+    // ...
+    const auto handle = CreateFileA(
+        R"(\\.\NUL)",
+        GENERIC_READ,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+
+    if (handle == INVALID_HANDLE_VALUE)
+        throw co_await asyncio::error::StacktraceError<std::system_error>::make(static_cast<int>(GetLastError()), std::system_category());
+    // ...
+}
+```
+
+> 返回值为 `HANDLE` 的 `API`，有些失败时返回 `NULL`，有些失败时又返回 `INVALID_HANDLE_VALUE`，这也是 `zero::os::windows::expected` 不支持此类 `API` 的原因。
+
+- 内部错误直接抛异常。
+
+```c++
+void func() {
+    // ...
+    if (name.empty())
+        throw zero::error::StacktraceError<std::runtime_error>{"Empty name"};
+    // ...
+}
+
+asyncio::task::Task<void> func() {
+    // ...
+    if (name.empty())
+        throw co_await asyncio::error::StacktraceError<std::runtime_error>::make("Empty name");
+    // ...
+}
+```
+
+### 通用 `API` 代码
+如果你需要编写一些通用的函数，作为库接口暴露给别人调用，那么就需要使用 `std::expected` 作为返回值。
+
+- 返回值为 `std::expected<T, std::error_code>` 的函数使用 `EXPECT` 宏进行错误检查，出错时自动上抛。
+
+```c++
+std::expected<void, std::error_code> func() {
+    // ...
+    const auto content = readFile(path);
+    Z_EXPECT(content);
+    // ...
+}
+
+asyncio::task::Task<void, std::error_code> func() {
+    // ...
+    const auto content = co_await readFile(path);
+    Z_CO_EXPECT(content);
+    // ...
+}
+```
+
+- 通用的系统 `API` 返回值转为 `std::expected` 后，再用 `EXPECT` 处理。
+
+```c++
+std::expected<void, std::error_code> func() {
+    // ...
+    Z_EXPECT(zero::os::windows::expected([&] {
+        return CloseHandle(handle);
+    }));
+    // ...
+}
+
+asyncio::task::Task<void, std::error_code> func() {
+    // ...
+    Z_CO_EXPECT(co_await zero::os::windows::expected([&] {
+        return CloseHandle(handle);
+    }));
+    // ...
+}
+```
+
+- 特殊的系统 `API`，手动判断错误并转为 `std::error_code`。
+
+```c++
+std::expected<void, std::error_code> func() {
+    // ...
+    const auto handle = CreateFileA(
+        R"(\\.\NUL)",
+        GENERIC_READ,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+
+    if (handle == INVALID_HANDLE_VALUE)
+        return std::unexpected{static_cast<int>(GetLastError()), std::system_category()};
+    // ...
+}
+
+asyncio::task::Task<void, std::error_code> func() {
+    // ...
+    const auto handle = CreateFileA(
+        R"(\\.\NUL)",
+        GENERIC_READ,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+
+    if (handle == INVALID_HANDLE_VALUE)
+        co_return std::unexpected{static_cast<int>(GetLastError()), std::system_category()};
+    // ...
+}
+```
+
+- 内部错误返回自定义错误码。
+
+```c++
+Z_DEFINE_ERROR_CODE(
+    Error,
+    "Error",
+    EmptyName, "Empty name"
+)
+
+Z_DECLARE_ERROR_CODE(Error)
+
+Z_DEFINE_ERROR_CATEGORY_INSTANCE(Error)
+
+std::expected<void, std::error_code> func() {
+    // ...
+    if (name.empty())
+        return std::unexpected{Error::EmptyName};
+    // ...
+}
+
+asyncio::task::Task<void, std::error_code> func() {
+    // ...
+    if (name.empty())
+        co_return std::unexpected{Error::EmptyName};
+    // ...
+}
+```

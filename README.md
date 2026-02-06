@@ -83,11 +83,11 @@
 Based on the `libuv` event loop, use C++20 stackless `coroutines` to implement network components, and provide `channel` to send and receive data between tasks.
 
 `asyncio` might be better than existing coroutine network libraries in the following ways:
-- A unified error handling method based on `std::expected<T, std::error_code>`, but also supports exception handling.
-- A simple and direct cancellation method similar to `Python`'s `asyncio` - `task.cancel()`.
-- Lessons learned from `JavaScript`'s `Promise.all`, `Promise.any`, `Promise.race`, etc., subtask management methods.
-- Lessons learned from `Golang`'s `WaitGroup` dynamic task management groups.
-- Built-in call stack tracing allows for better debugging and analysis.
+- Combination of error codes and exceptions with a comprehensive error handling mechanism.
+- Simple and direct task cancellation similar to Python's `asyncio` — `task.cancel()`.
+- Multiple sub-task aggregation methods with structured concurrency model, inspired by JavaScript's `Promise`.
+- Flexible dynamic task management solution, similar to Golang's `WaitGroup`.
+- Built-in call stack tracing that can traverse the task tree top-down or complete backtracing bottom-up.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -198,9 +198,10 @@ namespace {
         const auto handle = CreateEventA(nullptr, false, false, "Global\\AsyncIOBacktraceEvent");
 
         if (!handle)
-            throw zero::error::StacktraceError<std::system_error>{
-                std::error_code{static_cast<int>(GetLastError()), std::system_category()}
-            };
+            throw co_await asyncio::error::StacktraceError<std::system_error>::make(
+                static_cast<int>(GetLastError()),
+                std::system_category()
+            );
 
         const zero::os::Resource event{handle};
 
@@ -217,7 +218,7 @@ namespace {
                         };
 
                     if (cancelled)
-                        throw zero::error::StacktraceError<std::system_error>{asyncio::task::Error::CANCELLED};
+                        throw zero::error::StacktraceError<std::system_error>{asyncio::task::Error::Cancelled};
                 },
                 [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
                     cancelled = true;

@@ -8,9 +8,9 @@
 asyncio::task::Task<void> test1() {
     while (true) {
         if (co_await task::cancelled)
-            throw zero::error::StacktraceError<std::system_error>{task::Error::CANCELLED};
+            throw zero::error::StacktraceError<std::system_error>{task::Error::Cancelled};
 
-        zero::error::guard(co_await asyncio::sleep(1s));
+        co_await asyncio::error::guard(asyncio::sleep(1s));
         fmt::print("Hello world\n");
     }
 }
@@ -18,7 +18,7 @@ asyncio::task::Task<void> test1() {
 asyncio::task::Task<void, std::error_code> test2() {
     while (true) {
         if (co_await task::cancelled)
-            co_return std::unexpected{task::Error::CANCELLED};
+            co_return std::unexpected{task::Error::Cancelled};
 
         Z_CO_EXPECT(co_await asyncio::sleep(1s));
         fmt::print("Hello world\n");
@@ -26,7 +26,7 @@ asyncio::task::Task<void, std::error_code> test2() {
 }
 ```
 
-> Tasks support two methods of error handling: exceptions and error codes. You can choose the one you prefer.
+> Tasks support two methods of error handling: exceptions and error codes. General-purpose API code is recommended to use error codes, while business code is recommended to use exceptions, which can carry call stack information for better debugging.
 
 The underlying implementation of a task is based on a state machine using stackless coroutines. Once a task is started, it does not complete immediately; it may need to suspend and resume multiple times. When it finally completes, its associated `promise` is immediately `resolved`. We can wait for one task in another; for example, `asyncio::sleep(1s)` is a task that completes after 1 second. When `co_await asyncio::sleep(1s)` is executed, the current task notices that the `sleep` task was created but has not yet completed, so it suspends itself and hands over control. After `sleep` completes, the result is fetched and the task resumes:
 
@@ -58,23 +58,25 @@ namespace asyncio {
     template<typename F>
         requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
     std::expected<
-        std::expected<
-            typename std::invoke_result_t<F>::value_type,
-            typename std::invoke_result_t<F>::error_type
-        >,
-        std::error_code
+        typename std::invoke_result_t<F>::value_type,
+        typename std::invoke_result_t<F>::error_type
     >
-    run(F &&f) {
-        const auto eventLoop = std::make_shared<EventLoop>(EventLoop::make());
+    run(const std::shared_ptr<EventLoop> &eventLoop, F &&f) {
         setEventLoop(eventLoop);
 
-        auto future = f().future().finally([&] {
+        auto task = f().addCallback([&] {
             eventLoop->stop();
         });
 
         eventLoop->run();
-        assert(future.isReady());
-        return {std::move(future).result()};
+        assert(task.done());
+        return {task.future().result()};
+    }
+
+    template<typename F>
+        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
+    auto run(F &&f) {
+        return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
     }
 }
 
@@ -118,20 +120,20 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
             zero::error::guard(uv::expected([&] {
                 return uv_timer_stop(timer.raw());
             }));
 
-            promise.reject(task::Error::CANCELLED);
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     };
 }
 ```
 
-`uv_timer_t` is a timer component from `libuv`. We create it and set the delay, then bind a callback function. Once the time is up, the callback is executed. `sleep` is, of course, a task, so it also needs to be suspended until the deadline is reached. After the deadline, it needs to be resumed. We use a manually constructed `promise` as a bridge for this, with `sleep` waiting for this `promise` to complete, and the callback function resolving the `promise`. Thus, during the 1-second duration, the `sleep` task is suspended while waiting for the `promise`. When the time expires and the `promise` is resolved, execution resumes. This resumption also means the task is completed, and the task that was waiting for it will wake up gradually.
+`uv_timer_t` is a timer component from `libuv`. We create it and set the delay, then bind a callback function. Once the time is up, the callback is executed. `sleep` is, of course, a task, so it also needs to be suspended until the deadline is reached. After the deadline, it needs to be resumed. We use a manually constructed `promise` as a bridge for this, with `sleep` waiting for this `promise` to complete, and the callback function resolving the `promise`. Thus, during the 1-second duration, the `sleep` task is suspended while waiting for the `promise`. When the time expires and the `promise` is resolved, execution resumes. This resumption also means the task is completed, and the task that was waiting for it will gradually wake up.
 
 ## Cancellation
 
@@ -169,25 +171,25 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::CANCELLATION_TOO_LATE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
             zero::error::guard(uv::expected([&] {
                 return uv_timer_stop(timer.raw());
             }));
 
-            promise.reject(task::Error::CANCELLED);
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     };
 }
 ```
 
-If you've read carefully, you'll have noticed the cancellation function registered in `sleep`. `uv_timer_stop` stops the timer, and `promise.reject(task::Error::CANCELLED)` makes the `promise` return a cancellation error.
+If you've read carefully, you'll have noticed the cancellation function registered in `sleep`. `uv_timer_stop` stops the timer, and `promise.reject(task::Error::Cancelled)` makes the `promise` return a cancellation error.
 
 > Why check `promise.isFulfilled()`? Because after a `promise` is fulfilled, the callback won't be triggered immediately; it waits for the next event loop, and during this time, cancellation can no longer occur.
 > This shows that cancellations don't always succeed. If an error occurs, `task.cancel()` will return a `std::error_code`.
 
-Once the cancellation is successful, the `CANCELLED` error is returned from `sleep`. The `Z_CO_EXPECT(sleep(1s))` statement at the higher level will propagate the error up, layer by layer, until it is handled.
+Once the cancellation is successful, the `Cancelled` error is returned from `sleep`. The `Z_CO_EXPECT(sleep(1s))` statement at the higher level will propagate the error up, layer by layer, until it is handled.
 
 Most coroutine libraries prefer `context` for finer-grained control over tasks because, in practice, tasks aren't usually simple chains. They're more like branching trees. When `context` is passed to numerous complex sub-tasks, cancellation initiated at the top can flow down to every branch. Does this mean `task.cancel()` can't provide fine-grained control? Can it only cancel a single task chain?
 
@@ -211,7 +213,7 @@ co_await asyncio::task::race(std::vector{test1(), test2()});
 
 - all: All tasks must succeed; if any one fails, the result fails, and remaining tasks are cancelled.
 - allSettled: Wait for all tasks to complete, never fails.
-- any: Any task succeeds; remaining tasks are cancelled.
+- any: Any task succeeds and remaining tasks are cancelled.
 - race: The result is based on the fastest task, and other tasks are cancelled.
 
 > When these functions return, all sub-tasks are guaranteed to have finished.
@@ -232,10 +234,9 @@ task
 │   ├── test3
 │   └── test4
 └── test2
-   
-
- ├── test5
+    ├── test5
     └── test6
+        └── test7
 ```
 
 The cancellation operation will be applied to each leaf node of the subtree (3, 4, 5, 7).
@@ -244,54 +245,51 @@ The cancellation operation will be applied to each leaf node of the subtree (3, 
 
 ## Task Group
 
-How are sub-tasks aggregated into one task? How are sub-tasks managed?  
+How are sub-tasks aggregated into one task? How are sub-tasks managed?
 Before answering this question, let's look at an example:
 
 ```c++
-asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
+asyncio::task::Task<void> handle(asyncio::net::TCPStream stream) {
     // ...
-    co_return {};
 }
 
-asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
+asyncio::task::Task<void> serve(asyncio::net::TCPListener listener) {
     while (true) {
-        auto stream = co_await listener.accept();
-        Z_CO_EXPECT(stream);
+        auto stream = co_await asyncio::error::guard(listener.accept());
 
-        handle(*std::move(stream)).future().fail([](const auto &ec) {
-            fmt::print(stderr, "Unhandled error: {} ({})\n", ec.message(), ec);
+        handle(std::move(stream)).future().fail([](const auto &e) {
+            fmt::print(stderr, "Unhandled exception: {}\n", e);
         });
     }
 }
 
-asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
-    auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 8000);
-    Z_CO_EXPECT(listener);
-
+asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
+    auto listener = co_await asyncio::error::guard(asyncio::net::TCPListener::listen("127.0.0.1", 8000));
     auto signal = asyncio::Signal::make();
 
-    co_return co_await race(
-        serve(*std::move(listener)),
-        signal.on(SIGINT).transform([](const int) {
+    co_await race(
+        serve(std::move(listener)),
+        asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+            co_await asyncio::error::guard(signal.on(SIGINT));
         })
     );
 }
 ```
 
-The above example demonstrates a simple `TCP` server. In the `serve` sub-task, it continuously calls `accept` to receive new connections, and then starts a `handle` task to process the connection.  
+The above example demonstrates a simple `TCP` server. In the `serve` sub-task, it continuously calls `accept` to receive new connections, and then starts a `handle` task to process the connection.
 After starting `handle`, we do not wait for it because we need to continuously call `accept` and cannot block on it. Therefore, we will not know if the `handle` task returns an error, so we bind a callback function to the task's `future` to print any errors.
 
-When the terminal presses `ctrl + c`, the sub-task listening for signals in `race` will complete, at which point `race` will return successfully and cancel the `serve` sub-task. The program will exit and return from the main function.  
-While it seems perfect, the downside is that when the main function exits, there may still be N `handle` tasks running. In most cases, this is not an issue, but if `handle` uses some resource that the program destroys during exit, it could lead to unexpected errors.  
+When the terminal presses `ctrl + c`, the sub-task listening for signals in `race` will complete, at which point `race` will return successfully and cancel the `serve` sub-task. The program will exit and return from the main function.
+While it seems perfect, the downside is that when the main function exits, there may still be N `handle` tasks running. In most cases, this is not an issue, but if `handle` uses some resource that the program destroys during exit, it could lead to unexpected errors.
 We certainly do not want this to happen. The most ideal exit might be to cancel all `handle` sub-tasks and wait for them to complete before `serve` finishes. However, the number of `handle` tasks is unknown; it may be few or many, and more importantly, it is dynamically changing and created in real-time. We cannot manage them using aggregation functions like `all`. So, what should we do?
 
-To achieve this goal, I introduced the concept of a `Task Group`, which is also the underlying component used by operations like `all`.  
+To achieve this goal, I introduced the concept of a `Task Group`, which is also the underlying component used by operations like `all`.
 We can dynamically add any number of tasks to a task group, and the tasks will be automatically removed from the group once completed. We cancel all tasks in the group by canceling the group itself, and we wait for all tasks in the group to complete by awaiting the group, but we cannot obtain the result of the tasks.
 
 > It sounds like a variant of `Golang`'s `WaitGroup`.
 
 ```c++
-asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
+asyncio::task::Task<void> serve(asyncio::net::TCPListener listener) {
     std::expected<void, std::error_code> result;
     asyncio::task::TaskGroup group;
 
@@ -306,13 +304,13 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
         auto task = handle(*std::move(stream));
 
         group.add(task);
-        task.future().fail([](const auto &ec) {
-            fmt::print(stderr, "Unhandled error: {} ({})\n", ec.message(), ec);
+        task.future().fail([](const auto &e) {
+            fmt::print(stderr, "Unhandled exception: {}\n", e);
         });
     }
 
     co_await group;
-    co_return result;
+    co_await asyncio::error::guard(std::move(result));
 }
 ```
 
