@@ -46,7 +46,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
                 return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
 
             if (result == WAIT_OBJECT_0 + 1)
-                return std::unexpected{make_error_code(std::errc::operation_canceled)};
+                return std::unexpected{task::Error::Cancelled};
 
             return impl.exitCode().transform([](const auto &code) {
                 return ExitStatus{code};
