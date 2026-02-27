@@ -338,7 +338,12 @@ std::expected<asyncio::process::ChildProcess, std::error_code> asyncio::process:
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::Command::status() const {
     auto child = spawn();
     Z_CO_EXPECT(child);
-    co_return co_await child->wait();
+    co_return co_await task::CancellableTask{
+        child->wait(),
+        [&] {
+            return child->kill();
+        }
+    };
 }
 
 asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process::Command::output() const {
@@ -368,6 +373,8 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     );
 
     if (!result) {
+        co_await task::lock;
+
         zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
             if (ec != std::errc::no_such_process)
                 return std::unexpected{ec};
@@ -375,10 +382,17 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
             return {};
         }));
         zero::error::guard(co_await child->wait());
+
+        co_await task::unlock;
         co_return std::unexpected{result.error()};
     }
 
-    const auto status = co_await child->wait();
+    const auto status = co_await task::CancellableTask{
+        child->wait(),
+        [&] {
+            return child->kill();
+        }
+    };
     Z_CO_EXPECT(status);
 
     co_return Output{
