@@ -344,8 +344,8 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
     std::ranges::generate(secret, [&] { return static_cast<std::byte>(dist(gen)); });
 
     const auto key = zero::encoding::base64::encode(secret);
-    const auto path = url.path();
-    const auto query = url.query();
+    const auto path = url.rawPath();
+    const auto query = url.rawQuery();
 
     const auto header = fmt::format(
         "GET {} HTTP/1.1\r\n"
