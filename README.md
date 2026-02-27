@@ -195,15 +195,13 @@ namespace {
     // For the top-level task, complex subtasks will branch out and form a tree.
     asyncio::task::Task<void> tracing(const auto &task) {
 #ifdef _WIN32
-        const auto handle = CreateEventA(nullptr, false, false, "Global\\AsyncIOBacktraceEvent");
+        const zero::os::Resource event{CreateEventA(nullptr, false, false, "Global\\AsyncIOBacktraceEvent")};
 
-        if (!handle)
+        if (!event)
             throw co_await asyncio::error::StacktraceError<std::system_error>::make(
                 static_cast<int>(GetLastError()),
                 std::system_category()
             );
-
-        const zero::os::Resource event{handle};
 
         while (true) {
             bool cancelled{false};

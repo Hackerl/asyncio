@@ -28,12 +28,10 @@ std::optional<asyncio::Pipe> &asyncio::process::ChildProcess::stdError() {
 // ReSharper disable once CppMemberFunctionMayBeConst
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::ChildProcess::wait() {
 #ifdef _WIN32
-    const auto handle = CreateEventA(nullptr, false, false, nullptr);
+    const zero::os::Resource event{CreateEventA(nullptr, false, false, nullptr)};
 
-    if (!handle)
+    if (!event)
         co_return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
-
-    const zero::os::Resource event{handle};
 
     co_return co_await toThread(
         [&]() -> std::expected<ExitStatus, std::error_code> {
