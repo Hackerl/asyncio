@@ -649,7 +649,7 @@ std::expected<void, std::error_code> func() {
 
 asyncio::task::Task<void, std::error_code> func() {
     // ...
-    Z_CO_EXPECT(co_await zero::os::windows::expected([&] {
+    Z_CO_EXPECT(zero::os::windows::expected([&] {
         return CloseHandle(handle);
     }));
     // ...
