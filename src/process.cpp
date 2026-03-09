@@ -267,12 +267,18 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
         });
 
         if (!fd) {
-            zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
-                if (ec != std::errc::no_such_process)
-                    return std::unexpected{ec};
+            zero::error::guard(
+                child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
+#ifdef _WIN32
+                    if (ec != std::errc::permission_denied)
+#else
+                    if (ec != std::errc::no_such_process)
+#endif
+                        return std::unexpected{ec};
 
-                return {};
-            }));
+                    return {};
+                })
+            );
             zero::error::guard(child->wait());
             return std::unexpected{fd.error()};
         }
@@ -282,12 +288,18 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
         auto pipe = Pipe::from(*fd);
 
         if (!pipe) {
-            zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
-                if (ec != std::errc::no_such_process)
-                    return std::unexpected{ec};
+            zero::error::guard(
+                child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
+#ifdef _WIN32
+                    if (ec != std::errc::permission_denied)
+#else
+                    if (ec != std::errc::no_such_process)
+#endif
+                        return std::unexpected{ec};
 
-                return {};
-            }));
+                    return {};
+                })
+            );
             zero::error::guard(child->wait());
 
             uv_fs_t request{};
@@ -375,12 +387,18 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     if (!result) {
         co_await task::lock;
 
-        zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
-            if (ec != std::errc::no_such_process)
-                return std::unexpected{ec};
+        zero::error::guard(
+            child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
+#ifdef _WIN32
+                if (ec != std::errc::permission_denied)
+#else
+                if (ec != std::errc::no_such_process)
+#endif
+                    return std::unexpected{ec};
 
-            return {};
-        }));
+                return {};
+            })
+        );
         zero::error::guard(co_await child->wait());
 
         co_await task::unlock;
