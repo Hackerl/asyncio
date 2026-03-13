@@ -855,7 +855,7 @@ namespace asyncio::task {
                 co_return *std::move(result);
         }
         else {
-            co_return std::move(result);
+            co_return result;
         }
     }
 
@@ -908,7 +908,7 @@ namespace asyncio::task {
                 co_return *std::move(result);
         }
         else {
-            co_return std::move(result);
+            co_return result;
         }
     }
 
@@ -1107,7 +1107,7 @@ namespace asyncio::task {
                 co_return *std::move(result);
         }
         else {
-            co_return std::move(result);
+            co_return result;
         }
     }
 
@@ -1160,7 +1160,7 @@ namespace asyncio::task {
                 co_return *std::move(result);
         }
         else {
-            co_return std::move(result);
+            co_return result;
         }
     }
 
@@ -1176,7 +1176,7 @@ namespace asyncio::task {
                 co_return *std::move(result);
         }
         else {
-            co_return std::move(result);
+            co_return result;
         }
     }
 
@@ -1192,7 +1192,7 @@ namespace asyncio::task {
                 co_return *std::move(result);
         }
         else {
-            co_return std::move(result);
+            co_return result;
         }
     }
 

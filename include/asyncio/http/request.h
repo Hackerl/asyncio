@@ -260,7 +260,7 @@ namespace asyncio::http {
                 std::ignore = co_await std::move(*future);
             }
 
-            co_return std::move(response);
+            co_return response;
         }
 
         task::Task<Response, std::error_code>
