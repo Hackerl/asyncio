@@ -233,7 +233,7 @@ namespace {
         auto signal = asyncio::Signal::make();
 
         while (true) {
-            zero::error::guard(co_await signal.on(SIGUSR1));
+            co_await asyncio::error::guard(signal.on(SIGUSR1));
             // Print the task's formatted call stack
             fmt::print(stderr, "{}\n", task.trace());
         }
@@ -244,20 +244,20 @@ namespace {
         using namespace std::chrono_literals;
 
         while (true) {
-            zero::error::guard(co_await asyncio::sleep(1s));
+            co_await asyncio::error::guard(asyncio::sleep(1s));
             // Trace back the coroutine call stack
             fmt::print("Do some thing: {}\n", fmt::join(co_await asyncio::task::backtrace, "\n"));
         }
     }
 
     asyncio::task::Task<void> handle(asyncio::net::TCPStream stream) {
-        fmt::print("Connection: {}\n", zero::error::guard(stream.remoteAddress()));
+        fmt::print("Connection: {}\n", co_await asyncio::error::guard(stream.remoteAddress()));
 
         while (true) {
             std::string message;
             message.resize(1024);
 
-            const auto n = zero::error::guard(co_await stream.read(std::as_writable_bytes(std::span{message})));
+            const auto n = co_await asyncio::error::guard(stream.read(std::as_writable_bytes(std::span{message})));
 
             if (n == 0)
                 break;
@@ -265,7 +265,7 @@ namespace {
             message.resize(n);
 
             fmt::print("Received message: {}\n", message);
-            zero::error::guard(co_await stream.writeAll(std::as_bytes(std::span{message})));
+            co_await asyncio::error::guard(stream.writeAll(std::as_bytes(std::span{message})));
         }
     }
 
@@ -299,7 +299,7 @@ namespace {
         // This function waits for all tasks in the `TaskGroup`.
         // When the parent task is canceled, all tasks in the group will be automatically canceled here and will wait for them to complete.
         co_await group;
-        zero::error::guard(std::move(result));
+        co_await asyncio::error::guard(std::move(result));
     }
 }
 
@@ -314,7 +314,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     const auto ip = cmdline.get<std::string>("ip");
     const auto port = cmdline.get<std::uint16_t>("port");
 
-    auto listener = zero::error::guard(asyncio::net::TCPListener::listen(ip, port));
+    auto listener = co_await asyncio::error::guard(asyncio::net::TCPListener::listen(ip, port));
     auto signal = asyncio::Signal::make();
 
     // This is the main task of our program.
@@ -329,7 +329,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
         // `race` will use the result of the task that completes fastest, so when the signal arrives,
         // the task is complete, `race` returns success and cancels the remaining subtasks.
         asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
-            zero::error::guard(co_await signal.on(SIGINT));
+            co_await asyncio::error::guard(signal.on(SIGINT));
         })
     );
 

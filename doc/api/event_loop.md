@@ -84,7 +84,7 @@ For `Task<T>` (exception-based), returns `std::expected<T, std::exception_ptr>`:
 ```c++
 const std::expected<int, std::exception_ptr> result = asyncio::run([]() -> asyncio::task::Task<int> {
     using namespace std::chrono_literals;
-    zero::error::guard(co_await asyncio::sleep(10ms));
+    co_await asyncio::error::guard(asyncio::sleep(10ms));
     co_return 1024;
 });
 REQUIRE(result);
