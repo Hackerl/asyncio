@@ -3,10 +3,10 @@
 asyncio::Signal::Signal(uv::Handle<uv_signal_t> signal) : mSignal{std::move(signal)} {
 }
 
-std::expected<asyncio::Signal, std::error_code> asyncio::Signal::make() {
+asyncio::Signal asyncio::Signal::make() {
     auto signal = std::make_unique<uv_signal_t>();
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_signal_init(getEventLoop()->raw(), signal.get());
     }));
 
@@ -17,7 +17,7 @@ asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
     Promise<int, std::error_code> promise;
     mSignal->data = &promise;
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_signal_start_oneshot(
             mSignal.raw(),
             [](auto *handle, const int s) {
@@ -31,10 +31,13 @@ asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
-            uv_signal_stop(mSignal.raw());
-            promise.reject(task::Error::CANCELLED);
+            zero::error::guard(uv::expected([&] {
+                return uv_signal_stop(mSignal.raw());
+            }));
+
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     };

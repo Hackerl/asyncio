@@ -182,17 +182,17 @@ ASYNC_TEST_CASE("seekable file", "[fs]") {
         const auto offset = GENERATE_REF(take(1, random<std::size_t>(0, content.size() - 1)));
 
         SECTION("begin") {
-            REQUIRE(co_await file->seek(offset, asyncio::ISeekable::Whence::BEGIN) == offset);
+            REQUIRE(co_await file->seek(offset, asyncio::ISeekable::Whence::Begin) == offset);
         }
 
         SECTION("current") {
-            REQUIRE(co_await file->seek(offset, asyncio::ISeekable::Whence::CURRENT) == offset);
+            REQUIRE(co_await file->seek(offset, asyncio::ISeekable::Whence::Current) == offset);
         }
 
         SECTION("end") {
             REQUIRE(co_await file->seek(
                 -(static_cast<std::int64_t>(content.size() - offset)),
-                asyncio::ISeekable::Whence::END
+                asyncio::ISeekable::Whence::End
             ) == offset);
         }
 

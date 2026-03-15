@@ -3,26 +3,27 @@
 
 #include <variant>
 #include <asyncio/io.h>
+#include <asyncio/net/tls.h>
 #include <asyncio/http/url.h>
 #include <asyncio/sync/mutex.h>
 #include <zlib.h>
 
 namespace asyncio::http::ws {
     enum class CloseCode {
-        NORMAL_CLOSURE = 1000,
-        GOING_AWAY,
-        PROTOCOL_ERROR,
-        UNSUPPORTED_DATA,
-        NO_STATUS_RECEIVED = 1005,
-        ABNORMAL_CLOSURE,
-        INVALID_FRAME_PAYLOAD_DATA,
-        POLICY_VIOLATION,
-        MESSAGE_TOO_BIG,
-        MANDATORY_EXTENSION,
-        INTERNAL_ERROR,
-        SERVICE_RESTART,
-        TRY_AGAIN_LATER,
-        BAD_GATEWAY
+        NormalClosure = 1000,
+        GoingAway,
+        ProtocolError,
+        UnsupportedData,
+        NoStatusReceived = 1005,
+        AbnormalClosure,
+        InvalidFramePayloadData,
+        PolicyViolation,
+        MessageTooBig,
+        MandatoryExtension,
+        InternalError,
+        ServiceRestart,
+        TryAgainLater,
+        BadGateway
     };
 
     class CloseCodeCategory final : public std::error_category {
@@ -35,65 +36,65 @@ namespace asyncio::http::ws {
 
         [[nodiscard]] std::string message(const int value) const override {
             switch (static_cast<CloseCode>(value)) {
-            case CloseCode::NORMAL_CLOSURE:
-                return "normal closure";
+            case CloseCode::NormalClosure:
+                return "Normal closure";
 
-            case CloseCode::GOING_AWAY:
-                return "going away";
+            case CloseCode::GoingAway:
+                return "Going away";
 
-            case CloseCode::PROTOCOL_ERROR:
-                return "protocol error";
+            case CloseCode::ProtocolError:
+                return "Protocol error";
 
-            case CloseCode::UNSUPPORTED_DATA:
-                return "unsupported data";
+            case CloseCode::UnsupportedData:
+                return "Unsupported data";
 
-            case CloseCode::NO_STATUS_RECEIVED:
-                return "no status received";
+            case CloseCode::NoStatusReceived:
+                return "No status received";
 
-            case CloseCode::ABNORMAL_CLOSURE:
-                return "abnormal closure";
+            case CloseCode::AbnormalClosure:
+                return "Abnormal closure";
 
-            case CloseCode::INVALID_FRAME_PAYLOAD_DATA:
-                return "invalid frame payload data";
+            case CloseCode::InvalidFramePayloadData:
+                return "Invalid frame payload data";
 
-            case CloseCode::POLICY_VIOLATION:
-                return "policy violation";
+            case CloseCode::PolicyViolation:
+                return "Policy violation";
 
-            case CloseCode::MESSAGE_TOO_BIG:
-                return "message too big";
+            case CloseCode::MessageTooBig:
+                return "Message too big";
 
-            case CloseCode::MANDATORY_EXTENSION:
-                return "mandatory extension";
+            case CloseCode::MandatoryExtension:
+                return "Mandatory extension";
 
-            case CloseCode::INTERNAL_ERROR:
-                return "internal error";
+            case CloseCode::InternalError:
+                return "Internal error";
 
-            case CloseCode::SERVICE_RESTART:
-                return "service restart";
+            case CloseCode::ServiceRestart:
+                return "Service restart";
 
-            case CloseCode::TRY_AGAIN_LATER:
-                return "try again later";
+            case CloseCode::TryAgainLater:
+                return "Try again later";
 
-            case CloseCode::BAD_GATEWAY:
-                return "bad gateway";
+            case CloseCode::BadGateway:
+                return "Bad gateway";
 
             default:
-                return "unknown";
+                return "Unknown";
             }
         }
     };
 
     inline std::error_code make_error_code(const CloseCode e) {
-        return {std::to_underlying(e), errorCategoryInstance<CloseCodeCategory>()};
+        return {std::to_underlying(e), zero::error::categoryInstance<CloseCodeCategory>()};
     }
 
     enum class Opcode {
-        CONTINUATION = 0,
-        TEXT = 1,
-        BINARY = 2,
-        CLOSE = 8,
-        PING = 9,
-        PONG = 10
+        Continuation = 0,
+        Text = 1,
+        Binary = 2,
+        Close = 8,
+        Ping = 9,
+        Pong = 10
     };
 
     struct InternalMessage {
@@ -170,26 +171,26 @@ namespace asyncio::http::ws {
 
     class WebSocket {
         enum class State {
-            CONNECTED,
-            CLOSING,
-            CLOSED
+            Connected,
+            Closing,
+            Closed
         };
 
     public:
-        DEFINE_ERROR_CODE_INNER(
+        Z_DEFINE_ERROR_CODE_INNER(
             Error,
             "asyncio::http::ws::WebSocket",
-            INVALID_URL, "invalid url",
-            UNSUPPORTED_SCHEME, "unsupported websocket scheme",
-            INVALID_RESPONSE, "invalid http response",
-            UNEXPECTED_STATUS_CODE, "unexpected http response status code",
-            INVALID_HTTP_HEADER, "invalid http header",
-            NO_ACCEPT_HEADER, "no websocket accept header",
-            HASH_MISMATCH, "hash mismatch",
-            UNSUPPORTED_MASKED_FRAME, "unsupported masked frame",
-            UNSUPPORTED_OPCODE, "unsupported opcode",
-            CONNECTION_CLOSED, "connection closed",
-            UNEXPECTED_COMPRESSED_MESSAGE, "unexpected compressed message"
+            InvalidURL, "Invalid URL",
+            UnsupportedScheme, "Unsupported WebSocket scheme",
+            InvalidResponse, "Invalid HTTP response",
+            UnexpectedStatusCode, "Unexpected HTTP response status code",
+            InvalidHTTPHeader, "Invalid HTTP header",
+            NoAcceptHeader, "No WebSocket accept header",
+            HashMismatch, "Hash mismatch",
+            UnsupportedMaskedFrame, "Unsupported masked frame",
+            UnsupportedOpcode, "Unsupported opcode",
+            ConnectionClosed, "Connection closed",
+            UnexpectedCompressedMessage, "Unexpected compressed message"
         )
 
         WebSocket(
@@ -199,7 +200,8 @@ namespace asyncio::http::ws {
             std::optional<DeflateExtension> deflateExtension
         );
 
-        static task::Task<WebSocket, std::error_code> connect(URL url);
+        static task::Task<WebSocket, std::error_code>
+        connect(URL url, std::optional<net::tls::Context> context = std::nullopt);
 
     private:
         [[nodiscard]] task::Task<Frame, std::error_code> readFrame();
@@ -225,6 +227,6 @@ namespace asyncio::http::ws {
     };
 }
 
-DECLARE_ERROR_CODES(asyncio::http::ws::CloseCode, asyncio::http::ws::WebSocket::Error)
+Z_DECLARE_ERROR_CODES(asyncio::http::ws::CloseCode, asyncio::http::ws::WebSocket::Error)
 
 #endif //ASYNCIO_WEBSOCKET_H

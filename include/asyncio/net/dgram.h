@@ -7,14 +7,14 @@ namespace asyncio::net {
     class UDPSocket final : public ISocket {
     public:
         enum class Membership {
-            JOIN_GROUP = UV_JOIN_GROUP,
-            LEAVE_GROUP = UV_LEAVE_GROUP
+            JoinGroup = UV_JOIN_GROUP,
+            LeaveGroup = UV_LEAVE_GROUP
         };
 
         explicit UDPSocket(uv::Handle<uv_udp_t> udp);
 
     private:
-        static std::expected<UDPSocket, std::error_code> make();
+        static UDPSocket make();
         static std::expected<UDPSocket, std::error_code> bind(const SocketAddress &address);
         static std::expected<UDPSocket, std::error_code> connect(const SocketAddress &address);
 

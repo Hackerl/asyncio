@@ -1,78 +1,70 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/signal.h>
+#include <asyncio/error.h>
 #include <zero/cmdline.h>
+#include <zero/formatter.h>
 
-namespace {
-    asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
-        const auto address = stream.remoteAddress();
-        CO_EXPECT(address);
+asyncio::task::Task<void> handle(asyncio::net::TCPStream stream) {
+    fmt::print("Connection: {}\n", co_await asyncio::error::guard(stream.remoteAddress()));
 
-        fmt::print("connection[{}]\n", *address);
+    while (true) {
+        std::string message;
+        message.resize(1024);
 
-        while (true) {
-            std::string message;
-            message.resize(1024);
+        const auto n = co_await asyncio::error::guard(stream.read(std::as_writable_bytes(std::span{message})));
 
-            const auto n = co_await stream.read(std::as_writable_bytes(std::span{message}));
-            CO_EXPECT(n);
+        if (n == 0)
+            break;
 
-            if (*n == 0)
-                break;
+        message.resize(n);
 
-            message.resize(*n);
-
-            fmt::print("receive message: {}\n", message);
-            CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{message})));
-        }
-
-        co_return {};
-    }
-
-    asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
-        std::expected<void, std::error_code> result;
-        asyncio::task::TaskGroup group;
-
-        while (true) {
-            auto stream = co_await listener.accept();
-
-            if (!stream) {
-                result = std::unexpected{stream.error()};
-                break;
-            }
-
-            auto task = handle(*std::move(stream));
-
-            group.add(task);
-            task.future().fail([](const auto &ec) {
-                fmt::print(stderr, "unhandled error: {:s} ({})\n", ec, ec);
-            });
-        }
-
-        co_await group;
-        co_return result;
+        fmt::print("Received message: {}\n", message);
+        co_await asyncio::error::guard(stream.writeAll(std::as_bytes(std::span{message})));
     }
 }
 
-asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
+asyncio::task::Task<void> serve(asyncio::net::TCPListener listener) {
+    std::expected<void, std::error_code> result;
+    asyncio::task::TaskGroup group;
+
+    while (true) {
+        auto stream = co_await listener.accept();
+
+        if (!stream) {
+            result = std::unexpected{stream.error()};
+            break;
+        }
+
+        auto task = handle(*std::move(stream));
+
+        group.add(task);
+        task.future().fail([](const auto &e) {
+            fmt::print(stderr, "Unhandled exception: {}\n", e);
+        });
+    }
+
+    co_await group;
+    co_await asyncio::error::guard(std::move(result));
+}
+
+asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
-    cmdline.add<std::string>("host", "remote host");
-    cmdline.add<std::uint16_t>("port", "remote port");
+    cmdline.add<std::string>("ip", "IP address to bind");
+    cmdline.add<std::uint16_t>("port", "Port number to listen on");
 
     cmdline.parse(argc, argv);
 
-    const auto host = cmdline.get<std::string>("host");
+    const auto ip = cmdline.get<std::string>("ip");
     const auto port = cmdline.get<std::uint16_t>("port");
 
-    auto listener = asyncio::net::TCPListener::listen(host, port);
-    CO_EXPECT(listener);
-
+    auto listener = co_await asyncio::error::guard(asyncio::net::TCPListener::listen(ip, port));
     auto signal = asyncio::Signal::make();
-    CO_EXPECT(signal);
 
-    co_return co_await race(
-        serve(*std::move(listener)),
-        signal->on(SIGINT).transform([](const int) {
+    co_await race(
+        serve(std::move(listener)),
+        asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+            co_await asyncio::error::guard(signal.on(SIGINT));
         })
     );
 }

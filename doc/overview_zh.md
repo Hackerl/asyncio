@@ -8,28 +8,25 @@
 asyncio::task::Task<void> test1() {
     while (true) {
         if (co_await task::cancelled)
-            throw std::system_error{task::Error::CANCELLED};
+            throw zero::error::StacktraceError<std::system_error>{task::Error::Cancelled};
 
-
-        if (const auto result = co_await asyncio::sleep(1s); !result)
-            throw std::system_error{result.error()};
-
-        fmt::print("hello world\n");
+        co_await asyncio::error::guard(asyncio::sleep(1s));
+        fmt::print("Hello world\n");
     }
 }
 
 asyncio::task::Task<void, std::error_code> test2() {
     while (true) {
         if (co_await task::cancelled)
-            co_return std::unexpected{task::Error::CANCELLED};
+            co_return std::unexpected{task::Error::Cancelled};
 
-        CO_EXPECT(co_await asyncio::sleep(1s));
-        fmt::print("hello world\n");
+        Z_CO_EXPECT(co_await asyncio::sleep(1s));
+        fmt::print("Hello world\n");
     }
 }
 ```
 
-> 任务支持异常和错误码两种处理方式，可以选择你更喜欢的那一种。
+> 任务支持异常和错误码两种处理方式，通用的 `API` 代码推荐使用错误码，业务代码推荐使用异常，可以携带调用栈信息更有利于调试。
 
 任务的底层是基于状态机的无栈协程，将它运行起来后它并不会立刻完成，它可能需要持续地挂起与恢复。等到它真正完成的那一刻，它所关联的 `promise` 便会立刻 `resolve`。
 我们可以在一个任务中等待另一个任务，`asyncio::sleep(1s)` 就是一个任务，这个任务会在 1 秒后完成。当 `co_await asyncio::sleep(1s)` 执行时，当前任务观察到 `sleep` 的任务创建后并没有立刻完成，它便要将自身挂起交出控制权，等到 `sleep` 完成后再获取它的结果并恢复执行：
@@ -46,7 +43,7 @@ if (!task.done) {
 
 // 任务已完成，继续执行。
 tag:
-    fmt::print("hello world\n");
+    fmt::print("Hello world\n");
 ```
 
 它的执行流程大概就是这样，它将自身挂起后将回调函数绑定到 `sleep` 的 `future` 上，`sleep` 任务完成后 `promise` 被解决时，`future` 上绑定的回调函数就会被执行。
@@ -61,29 +58,27 @@ tag:
 ```c++
 namespace asyncio {
     template<typename F>
-        requires zero::detail::is_specialization_v<std::invoke_result_t<F>, task::Task>
+        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
     std::expected<
-        std::expected<
-            typename std::invoke_result_t<F>::value_type,
-            typename std::invoke_result_t<F>::error_type
-        >,
-        std::error_code
+        typename std::invoke_result_t<F>::value_type,
+        typename std::invoke_result_t<F>::error_type
     >
-    run(F &&f) {
-        const auto eventLoop = EventLoop::make().transform([](EventLoop &&value) {
-            return std::make_shared<EventLoop>(std::move(value));
-        });
-        EXPECT(eventLoop);
+    run(const std::shared_ptr<EventLoop> &eventLoop, F &&f) {
+        setEventLoop(eventLoop);
 
-        setEventLoop(*eventLoop);
-
-        auto future = f().future().finally([&] {
-            eventLoop.value()->stop();
+        auto task = f().addCallback([&] {
+            eventLoop->stop();
         });
 
-        eventLoop.value()->run();
-        assert(future.isReady());
-        return {std::move(future).result()};
+        eventLoop->run();
+        assert(task.done());
+        return {task.future().result()};
+    }
+
+    template<typename F>
+        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
+    auto run(F &&f) {
+        return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
     }
 }
 
@@ -100,7 +95,7 @@ void asyncio::EventLoop::run() {
 asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::milliseconds ms) {
     auto ptr = std::make_unique<uv_timer_t>();
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_timer_init(getEventLoop()->raw(), ptr.get());
     }));
 
@@ -109,11 +104,13 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
     Promise<void, std::error_code> promise;
     timer->data = &promise;
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_timer_start(
             timer.raw(),
             [](auto *handle) {
-                uv_timer_stop(handle);
+                zero::error::guard(uv::expected([&] {
+                    return uv_timer_stop(handle);
+                }));
                 static_cast<Promise<void, std::error_code> *>(handle->data)->resolve();
             },
             ms.count(),
@@ -125,10 +122,13 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
-            uv_timer_stop(timer.raw());
-            promise.reject(task::Error::CANCELLED);
+            zero::error::guard(uv::expected([&] {
+                return uv_timer_stop(timer.raw());
+            }));
+
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     };
@@ -177,22 +177,25 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
-            uv_timer_stop(timer.raw());
-            promise.reject(task::Error::CANCELLED);
+            zero::error::guard(uv::expected([&] {
+                return uv_timer_stop(timer.raw());
+            }));
+
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     };
 }
 ```
 
-如果你阅读得足够仔细，那你一定已经看到了 `sleep` 中注册的取消函数了。`uv_timer_stop` 停止定时器，`promise.reject(task::Error::CANCELLED)` 让 `promise` 返回一个取消错误。
+如果你阅读得足够仔细，那你一定已经看到了 `sleep` 中注册的取消函数了。`uv_timer_stop` 停止定时器，`promise.reject(task::Error::Cancelled)` 让 `promise` 返回一个取消错误。
 
 > 为什么要判断 `promise.isFulfilled()` 呢？因为 `promise` 完成后并不会立刻回调，它需要等待下一个事件循环，而在这个时间段内已无法再取消。
 > 从这里也可以看出来，取消操作并不一定能成功，出错时 `task.cancel()` 将会返回 `std::error_code`。
 
-取消成功后，`CANCELLED` 错误从 `sleep` 中被返回时，上层的 `CO_EXPECT(sleep(1s))` 会接着将错误上抛，一层一层传递，直到最后被处理。
+取消成功后，`Cancelled` 错误从 `sleep` 中被返回时，上层的 `Z_CO_EXPECT(sleep(1s))` 会接着将错误上抛，一层一层传递，直到最后被处理。
 
 大多数协程库选择 `context` 的理由是为了更细粒度地控制任务，因为在实际应用中，任务的结构并不会是一条简简单单的链条，它通常都是一棵繁茂多枝的树。
 当 `context` 被传递到无数个错综复杂的子任务中后，在顶层执行取消操作，取消的通知便能顺流而下传递到每一个分支中。
@@ -255,32 +258,28 @@ task
 在回答这个问题之前，我们先看一个例子：
 
 ```c++
-asyncio::task::Task<void, std::error_code> handle(asyncio::net::TCPStream stream) {
+asyncio::task::Task<void> handle(asyncio::net::TCPStream stream) {
     // ...
-    co_return {};
 }
 
-asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
+asyncio::task::Task<void> serve(asyncio::net::TCPListener listener) {
     while (true) {
-        auto stream = co_await listener.accept();
-        CO_EXPECT(stream);
+        auto stream = co_await asyncio::error::guard(listener.accept());
 
-        handle(*std::move(stream)).future().fail([](const auto &ec) {
-            fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
+        handle(std::move(stream)).future().fail([](const auto &e) {
+            fmt::print(stderr, "Unhandled exception: {}\n", e);
         });
     }
 }
 
-asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
-    auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 8000);
-    CO_EXPECT(listener);
-
+asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
+    auto listener = co_await asyncio::error::guard(asyncio::net::TCPListener::listen("127.0.0.1", 8000));
     auto signal = asyncio::Signal::make();
-    CO_EXPECT(signal);
 
-    co_return co_await race(
-        serve(*std::move(listener)),
-        signal->on(SIGINT).transform([](const int) {
+    co_await race(
+        serve(std::move(listener)),
+        asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+            co_await asyncio::error::guard(signal.on(SIGINT));
         })
     );
 }
@@ -298,7 +297,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
 > 它听起来就像是 `Golang` 中 `WaitGroup` 的变异体。
 
 ```c++
-asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener listener) {
+asyncio::task::Task<void> serve(asyncio::net::TCPListener listener) {
     std::expected<void, std::error_code> result;
     asyncio::task::TaskGroup group;
 
@@ -313,13 +312,13 @@ asyncio::task::Task<void, std::error_code> serve(asyncio::net::TCPListener liste
         auto task = handle(*std::move(stream));
 
         group.add(task);
-        task.future().fail([](const auto &ec) {
-            fmt::print(stderr, "unhandled error: {} ({})\n", ec.message(), ec);
+        task.future().fail([](const auto &e) {
+            fmt::print(stderr, "Unhandled exception: {}\n", e);
         });
     }
 
     co_await group;
-    co_return result;
+    co_await asyncio::error::guard(std::move(result));
 }
 ```
 

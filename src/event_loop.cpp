@@ -6,7 +6,7 @@ thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
 asyncio::EventLoop::EventLoop(
     std::unique_ptr<uv_loop_t, void(*)(uv_loop_t *)> loop,
     std::unique_ptr<TaskQueue> taskQueue
-): mLoop{std::move(loop)}, mTaskQueue{std::move(taskQueue)} {
+) : mLoop{std::move(loop)}, mTaskQueue{std::move(taskQueue)} {
 }
 
 asyncio::EventLoop::~EventLoop() {
@@ -29,16 +29,16 @@ const uv_loop_t *asyncio::EventLoop::raw() const {
     return mLoop.get();
 }
 
-std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
+asyncio::EventLoop asyncio::EventLoop::make() {
     auto loop = std::make_unique<uv_loop_t>();
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_loop_init(loop.get());
     }));
 
     auto async = std::make_unique<uv_async_t>();
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_async_init(
             loop.get(),
             async.get(),
@@ -70,7 +70,9 @@ std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
         {
             loop.release(),
             [](uv_loop_t *ptr) {
-                uv_loop_close(ptr);
+                zero::error::guard(uv::expected([&] {
+                    return uv_loop_close(ptr);
+                }));
                 delete ptr;
             }
         },
@@ -79,15 +81,13 @@ std::expected<asyncio::EventLoop, std::error_code> asyncio::EventLoop::make() {
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-std::expected<void, std::error_code> asyncio::EventLoop::post(std::function<void()> function) {
+void asyncio::EventLoop::post(std::function<void()> function) {
     const std::lock_guard guard{mTaskQueue->mutex};
     mTaskQueue->queue.push(std::move(function));
 
-    EXPECT(uv::expected([this] {
+    zero::error::guard(uv::expected([this] {
         return uv_async_send(mTaskQueue->async.raw());
     }));
-
-    return {};
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
@@ -97,7 +97,9 @@ void asyncio::EventLoop::stop() {
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 void asyncio::EventLoop::run() {
-    uv_run(mLoop.get(), UV_RUN_DEFAULT);
+    zero::error::guard(uv::expected([this] {
+        return uv_run(mLoop.get(), UV_RUN_DEFAULT);
+    }));
 }
 
 std::shared_ptr<asyncio::EventLoop> asyncio::getEventLoop() {
@@ -114,7 +116,7 @@ void asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
 asyncio::task::Task<void, std::error_code> asyncio::reschedule() {
     auto ptr = std::make_unique<uv_idle_t>();
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_idle_init(getEventLoop()->raw(), ptr.get());
     }));
 
@@ -123,11 +125,13 @@ asyncio::task::Task<void, std::error_code> asyncio::reschedule() {
     Promise<void, std::error_code> promise;
     idle->data = &promise;
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_idle_start(
             idle.raw(),
             [](auto *handle) {
-                uv_idle_stop(handle);
+                zero::error::guard(uv::expected([&] {
+                    return uv_idle_stop(handle);
+                }));
                 static_cast<Promise<void, std::error_code> *>(handle->data)->resolve();
             }
         );
@@ -137,10 +141,13 @@ asyncio::task::Task<void, std::error_code> asyncio::reschedule() {
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
-            uv_idle_stop(idle.raw());
-            promise.reject(task::Error::CANCELLED);
+            zero::error::guard(uv::expected([&] {
+                return uv_idle_stop(idle.raw());
+            }));
+
+            promise.reject(task::Error::Cancelled);
             return {};
         }
     };

@@ -8,9 +8,9 @@ ASYNC_TEST_CASE("cancellable task - exception", "[task]") {
         asyncio::task::from(promise.getFuture()),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
-                return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-            promise.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+            promise.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
             return {};
         }
     });
@@ -19,7 +19,7 @@ ASYNC_TEST_CASE("cancellable task - exception", "[task]") {
         co_await task,
         std::system_error,
         Catch::Matchers::Predicate<std::system_error>([](const auto &error) {
-            return error.code() == asyncio::task::Error::CANCELLED;
+            return error.code() == asyncio::task::Error::Cancelled;
         })
     );
 }
@@ -31,9 +31,9 @@ ASYNC_TEST_CASE("cancel task - exception", "[task]") {
             promise.getFuture(),
             [&]() -> std::expected<void, std::error_code> {
                 if (promise.isFulfilled())
-                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                    return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                promise.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                promise.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                 return {};
             }
         });
@@ -44,7 +44,7 @@ ASYNC_TEST_CASE("cancel task - exception", "[task]") {
             co_await task,
             std::system_error,
             Catch::Matchers::Predicate<std::system_error>([](const auto &error) {
-                return error.code() == asyncio::task::Error::CANCELLED;
+                return error.code() == asyncio::task::Error::Cancelled;
             })
         );
     }
@@ -54,7 +54,7 @@ ASYNC_TEST_CASE("cancel task - exception", "[task]") {
         auto task = asyncio::task::from(promise.getFuture());
 
         REQUIRE_FALSE(task.cancelled());
-        REQUIRE_ERROR(task.cancel(), asyncio::task::Error::CANCELLATION_NOT_SUPPORTED);
+        REQUIRE_ERROR(task.cancel(), asyncio::task::Error::CancellationNotSupported);
         REQUIRE(task.cancelled());
 
         promise.resolve();
@@ -73,12 +73,12 @@ ASYNC_TEST_CASE("automatically cancel at next suspension point - exception", "[t
         co_await from(asyncio::task::CancellableFuture{
             promise2.getFuture(),
             [&]() -> std::expected<void, std::error_code> {
-                promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                 return {};
             }
         });
     });
-    REQUIRE_ERROR(task.cancel(), asyncio::task::Error::CANCELLATION_NOT_SUPPORTED);
+    REQUIRE_ERROR(task.cancel(), asyncio::task::Error::CancellationNotSupported);
 
     promise1.resolve();
 
@@ -86,7 +86,7 @@ ASYNC_TEST_CASE("automatically cancel at next suspension point - exception", "[t
         co_await task,
         std::system_error,
         Catch::Matchers::Predicate<std::system_error>([](const auto &error) {
-            return error.code() == asyncio::task::Error::CANCELLED;
+            return error.code() == asyncio::task::Error::Cancelled;
         })
     );
 }
@@ -100,7 +100,7 @@ ASYNC_TEST_CASE("check if the current task has been cancelled - exception", "[ta
         const auto result = co_await asyncio::task::CancellableFuture{
             promise.getFuture(),
             [&]() -> std::expected<void, std::error_code> {
-                promise.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                promise.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                 return {};
             }
         };
@@ -131,7 +131,7 @@ ASYNC_TEST_CASE("lock task - exception", "[task]") {
         const auto result = co_await asyncio::task::CancellableFuture{
             promise.getFuture(),
             [&]() -> std::expected<void, std::error_code> {
-                promise.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                promise.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                 return {};
             }
         };
@@ -142,7 +142,7 @@ ASYNC_TEST_CASE("lock task - exception", "[task]") {
         if (!result)
             std::rethrow_exception(result.error());
     });
-    REQUIRE_ERROR(task.cancel(), asyncio::task::Error::LOCKED);
+    REQUIRE_ERROR(task.cancel(), asyncio::task::Error::Locked);
 
     promise.resolve();
     REQUIRE_NOTHROW(co_await task);
@@ -185,9 +185,9 @@ ASYNC_TEST_CASE("task all - exception", "[task]") {
                 promise1.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
@@ -195,9 +195,9 @@ ASYNC_TEST_CASE("task all - exception", "[task]") {
                 promise2.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -243,9 +243,9 @@ ASYNC_TEST_CASE("task all - exception", "[task]") {
                 promise1.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
@@ -253,9 +253,9 @@ ASYNC_TEST_CASE("task all - exception", "[task]") {
                 promise2.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -307,9 +307,9 @@ ASYNC_TEST_CASE("task variadic all - exception", "[task]") {
                     promise1.getFuture(),
                     [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 }),
@@ -317,9 +317,9 @@ ASYNC_TEST_CASE("task variadic all - exception", "[task]") {
                     promise2.getFuture(),
                     [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 })
@@ -366,18 +366,18 @@ ASYNC_TEST_CASE("task variadic all - exception", "[task]") {
                 from(asyncio::task::CancellableFuture{
                     promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 }),
                 from(asyncio::task::CancellableFuture{
                     promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 })
@@ -429,27 +429,27 @@ ASYNC_TEST_CASE("task variadic all - exception", "[task]") {
             from(asyncio::task::CancellableFuture{
                 promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
             from(asyncio::task::CancellableFuture{
                 promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
             from(asyncio::task::CancellableFuture{
                 promise3.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise3.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise3.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise3.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -502,9 +502,9 @@ ASYNC_TEST_CASE("task allSettled - exception", "[task]") {
                 promise1.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
@@ -512,9 +512,9 @@ ASYNC_TEST_CASE("task allSettled - exception", "[task]") {
                 promise2.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -570,18 +570,18 @@ ASYNC_TEST_CASE("task allSettled - exception", "[task]") {
             from(asyncio::task::CancellableFuture{
                 promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
             from(asyncio::task::CancellableFuture{
                 promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -639,27 +639,27 @@ ASYNC_TEST_CASE("task variadic allSettled - exception", "[task]") {
         from(asyncio::task::CancellableFuture{
             promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                 if (promise1.isFulfilled())
-                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                    return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                 return {};
             }
         }),
         from(asyncio::task::CancellableFuture{
             promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                 if (promise2.isFulfilled())
-                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                    return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                 return {};
             }
         }),
         from(asyncio::task::CancellableFuture{
             promise3.getFuture(), [&]() -> std::expected<void, std::error_code> {
                 if (promise3.isFulfilled())
-                    return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                    return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                promise3.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                promise3.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                 return {};
             }
         })
@@ -728,9 +728,9 @@ ASYNC_TEST_CASE("task any - exception", "[task]") {
                 promise1.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
@@ -738,9 +738,9 @@ ASYNC_TEST_CASE("task any - exception", "[task]") {
                 promise2.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -808,18 +808,18 @@ ASYNC_TEST_CASE("task any - exception", "[task]") {
             from(asyncio::task::CancellableFuture{
                 promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
             from(asyncio::task::CancellableFuture{
                 promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -890,18 +890,18 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
                 from(asyncio::task::CancellableFuture{
                     promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 }),
                 from(asyncio::task::CancellableFuture{
                     promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 })
@@ -973,18 +973,18 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
                 from(asyncio::task::CancellableFuture{
                     promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 }),
                 from(asyncio::task::CancellableFuture{
                     promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 })
@@ -1060,9 +1060,9 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
                 promise1.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
@@ -1070,9 +1070,9 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
                 promise2.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
@@ -1080,9 +1080,9 @@ ASYNC_TEST_CASE("task variadic any - exception", "[task]") {
                 promise3.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     if (promise3.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise3.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise3.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -1196,18 +1196,18 @@ ASYNC_TEST_CASE("task race - exception", "[task]") {
             from(asyncio::task::CancellableFuture{
                 promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
             from(asyncio::task::CancellableFuture{
                 promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -1249,18 +1249,18 @@ ASYNC_TEST_CASE("task race - exception", "[task]") {
             from(asyncio::task::CancellableFuture{
                 promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
             from(asyncio::task::CancellableFuture{
                 promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })
@@ -1305,18 +1305,18 @@ ASYNC_TEST_CASE("task variadic race - exception", "[task]") {
                 from(asyncio::task::CancellableFuture{
                     promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 }),
                 from(asyncio::task::CancellableFuture{
                     promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 })
@@ -1361,18 +1361,18 @@ ASYNC_TEST_CASE("task variadic race - exception", "[task]") {
                 from(asyncio::task::CancellableFuture{
                     promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 }),
                 from(asyncio::task::CancellableFuture{
                     promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
-                            return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                            return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                        promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                         return {};
                     }
                 })
@@ -1420,27 +1420,27 @@ ASYNC_TEST_CASE("task variadic race - exception", "[task]") {
             from(asyncio::task::CancellableFuture{
                 promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise1.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
             from(asyncio::task::CancellableFuture{
                 promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise2.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             }),
             from(asyncio::task::CancellableFuture{
                 promise3.getFuture(), [&]() -> std::expected<void, std::error_code> {
                     if (promise3.isFulfilled())
-                        return std::unexpected{asyncio::task::Error::WILL_BE_DONE};
+                        return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
-                    promise3.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::CANCELLED}));
+                    promise3.reject(std::make_exception_ptr(std::system_error{asyncio::task::Error::Cancelled}));
                     return {};
                 }
             })

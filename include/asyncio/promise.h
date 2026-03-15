@@ -11,7 +11,7 @@ namespace asyncio {
         Promise() : mEventLoop{getEventLoop()} {
         }
 
-        explicit Promise(std::shared_ptr<EventLoop> eventLoop): mEventLoop{std::move(eventLoop)} {
+        explicit Promise(std::shared_ptr<EventLoop> eventLoop) : mEventLoop{std::move(eventLoop)} {
         }
 
         explicit Promise(zero::async::promise::Promise<T, E> &&rhs)
@@ -22,64 +22,66 @@ namespace asyncio {
             : zero::async::promise::Promise<T, E>{std::move(rhs)}, mEventLoop{std::move(eventLoop)} {
         }
 
-        template<typename... Ts>
-        void resolve(Ts &&... args) {
+        template<typename... Args>
+        void resolve(Args &&... args) {
             assert(this->mCore);
             assert(!this->mCore->result);
-            assert(this->mCore->state != zero::async::promise::State::ONLY_RESULT);
-            assert(this->mCore->state != zero::async::promise::State::DONE);
+            assert(this->mCore->state != zero::async::promise::State::OnlyResult);
+            assert(this->mCore->state != zero::async::promise::State::Done);
 
             if constexpr (std::is_void_v<T>)
                 this->mCore->result.emplace();
             else
-                this->mCore->result.emplace(std::in_place, std::forward<Ts>(args)...);
+                this->mCore->result.emplace(std::in_place, std::forward<Args>(args)...);
 
             auto state = this->mCore->state.load();
 
-            if (state == zero::async::promise::State::PENDING &&
-                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
+            if (state == zero::async::promise::State::Pending &&
+                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::OnlyResult)) {
                 this->mCore->event.set();
                 return;
             }
 
-            if (state != zero::async::promise::State::ONLY_CALLBACK ||
-                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
-                throw std::logic_error{fmt::format("unexpected state: {}", std::to_underlying(state))};
+            if (state != zero::async::promise::State::OnlyCallback ||
+                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::Done))
+                throw zero::error::StacktraceError<std::logic_error>{
+                    fmt::format("Unexpected promise state: {}", std::to_underlying(state))
+                };
 
             this->mCore->event.set();
 
-            if (const auto result = mEventLoop->post([core = this->mCore] {
+            mEventLoop->post([core = this->mCore] {
                 core->trigger();
-            }); !result)
-                throw std::system_error{result.error()};
+            });
         }
 
-        template<typename... Ts>
-        void reject(Ts &&... args) {
+        template<typename... Args>
+        void reject(Args &&... args) {
             assert(this->mCore);
             assert(!this->mCore->result);
-            assert(this->mCore->state != zero::async::promise::State::ONLY_RESULT);
-            assert(this->mCore->state != zero::async::promise::State::DONE);
+            assert(this->mCore->state != zero::async::promise::State::OnlyResult);
+            assert(this->mCore->state != zero::async::promise::State::Done);
 
-            this->mCore->result.emplace(std::unexpected<E>(std::in_place, std::forward<Ts>(args)...));
+            this->mCore->result.emplace(std::unexpected<E>(std::in_place, std::forward<Args>(args)...));
             auto state = this->mCore->state.load();
 
-            if (state == zero::async::promise::State::PENDING &&
-                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::ONLY_RESULT)) {
+            if (state == zero::async::promise::State::Pending &&
+                this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::OnlyResult)) {
                 this->mCore->event.set();
                 return;
             }
 
-            if (state != zero::async::promise::State::ONLY_CALLBACK ||
-                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::DONE))
-                throw std::logic_error{fmt::format("unexpected state: {}", std::to_underlying(state))};
+            if (state != zero::async::promise::State::OnlyCallback ||
+                !this->mCore->state.compare_exchange_strong(state, zero::async::promise::State::Done))
+                throw zero::error::StacktraceError<std::logic_error>{
+                    fmt::format("Unexpected promise state: {}", std::to_underlying(state))
+                };
 
             this->mCore->event.set();
 
-            if (const auto result = mEventLoop->post([core = this->mCore] {
+            mEventLoop->post([core = this->mCore] {
                 core->trigger();
-            }); !result)
-                throw std::system_error{result.error()};
+            });
         }
 
     private:

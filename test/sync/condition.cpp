@@ -55,9 +55,12 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
 
         int value{};
 
-        auto task = condition.wait(mutex, [&] {
-            return value == 1;
-        });
+        auto task = condition.wait(
+            mutex,
+            [&] {
+                return value == 1;
+            }
+        );
         REQUIRE_FALSE(mutex.locked());
 
         REQUIRE(co_await asyncio::sleep(20ms));
@@ -92,7 +95,7 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
         REQUIRE_FALSE(mutex.locked());
 
         condition.notify();
-        REQUIRE_ERROR(task.cancel(), asyncio::task::Error::WILL_BE_DONE);
+        REQUIRE_ERROR(task.cancel(), asyncio::task::Error::CancellationTooLate);
 
         REQUIRE(co_await task);
         REQUIRE(mutex.locked());

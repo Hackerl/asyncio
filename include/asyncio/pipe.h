@@ -18,8 +18,8 @@ namespace asyncio {
     class PipeListener final : public IFileDescriptor, public Listener {
     public:
         enum Mode {
-            READABLE = UV_READABLE,
-            WRITABLE = UV_WRITABLE,
+            Readable = UV_READABLE,
+            Writable = UV_WRITABLE,
         };
 
         explicit PipeListener(Listener listener);

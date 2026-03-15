@@ -3,24 +3,26 @@
 
 #ifndef _WIN32
 #include <unistd.h>
+#include <zero/os/unix/error.h>
 #endif
 
 asyncio::Stream::Stream(uv::Handle<uv_stream_t> stream) : mStream{std::move(stream)} {
 }
 
-std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::pair() {
+std::array<asyncio::Stream, 2> asyncio::Stream::pair() {
     std::array<uv_os_sock_t, 2> sockets{};
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_socketpair(SOCK_STREAM, 0, sockets.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE);
     }));
 #ifdef _WIN32
-    DEFER(
+    Z_DEFER(
         for (const auto &fd: sockets) {
             if (fd == -1)
                 continue;
 
-            closesocket(fd);
+            if (closesocket(fd) != 0)
+                throw zero::error::StacktraceError<std::system_error>{WSAGetLastError(), std::system_category()};
         }
     );
 
@@ -30,9 +32,9 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
     };
 
     if (!first)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), first.get());
     }));
 
@@ -43,7 +45,7 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     };
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(firstHandle.raw()), sockets[0]);
     }));
     sockets[0] = -1;
@@ -54,9 +56,9 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
     };
 
     if (!second)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), second.get());
     }));
 
@@ -67,19 +69,21 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     };
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(secondHandle.raw()), sockets[1]);
     }));
     sockets[1] = -1;
 
     return std::array{Stream{std::move(firstHandle)}, Stream{std::move(secondHandle)}};
 #else
-    DEFER(
+    Z_DEFER(
         for (const auto &fd: sockets) {
             if (fd == -1)
                 continue;
 
-            ::close(fd);
+            zero::error::guard(zero::os::unix::expected([&] {
+                return ::close(fd);
+            }));
         }
     );
 
@@ -89,9 +93,9 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
     };
 
     if (!first)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), first.get(), 0);
     }));
 
@@ -102,7 +106,7 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     };
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe_open(reinterpret_cast<uv_pipe_t *>(firstHandle.raw()), sockets[0]);
     }));
     sockets[0] = -1;
@@ -113,9 +117,9 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
     };
 
     if (!second)
-        return std::unexpected{std::error_code{errno, std::generic_category()}};
+        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), second.get(), 0);
     }));
 
@@ -126,7 +130,7 @@ std::expected<std::array<asyncio::Stream, 2>, std::error_code> asyncio::Stream::
         }
     };
 
-    EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe_open(reinterpret_cast<uv_pipe_t *>(secondHandle.raw()), sockets[1]);
     }));
     sockets[1] = -1;
@@ -144,7 +148,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
     Context context{data};
     mStream->data = &context;
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_read_start(
             mStream.raw(),
             [](auto *handle, const size_t, uv_buf_t *buf) {
@@ -153,7 +157,10 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
                 buf->len = static_cast<decltype(uv_buf_t::len)>(span.size());
             },
             [](auto *handle, const ssize_t n, const uv_buf_t *) {
-                uv_read_stop(handle);
+                zero::error::guard(uv::expected([&] {
+                    return uv_read_stop(handle);
+                }));
+
                 auto &promise = static_cast<Context *>(handle->data)->promise;
 
                 if (n < 0) {
@@ -175,10 +182,13 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
         context.promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
-            uv_read_stop(mStream.raw());
-            context.promise.reject(task::Error::CANCELLED);
+            zero::error::guard(uv::expected([&] {
+                return uv_read_stop(mStream.raw());
+            }));
+
+            context.promise.reject(task::Error::Cancelled);
             return {};
         }
     };
@@ -189,7 +199,7 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
     Promise<void, std::error_code> promise;
     uv_write_t request{.data = &promise};
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         uv_buf_t buffer;
 
         buffer.base = reinterpret_cast<char *>(const_cast<std::byte *>(data.data()));
@@ -213,9 +223,9 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
         );
     }));
 
-    // if an error occurs but some data has been written, the amount written should be returned,
+    // If an error occurs but some data has been written, the amount written should be returned,
     // but I have no way of knowing how much data has been written.
-    CO_EXPECT(co_await promise.getFuture());
+    Z_CO_EXPECT(co_await promise.getFuture());
     co_return data.size();
 }
 
@@ -239,7 +249,7 @@ asyncio::task::Task<void, std::error_code> asyncio::Stream::shutdown() {
     Promise<void, std::error_code> promise;
     uv_shutdown_t request{.data = &promise};
 
-    CO_EXPECT(uv::expected([&] {
+    Z_CO_EXPECT(uv::expected([&] {
         return uv_shutdown(
             &request,
             mStream.raw(),
@@ -273,13 +283,13 @@ std::expected<std::size_t, std::error_code> asyncio::Stream::tryWrite(const std:
 asyncio::Listener::Listener(std::unique_ptr<Core> core) : mCore{std::move(core)} {
 }
 
-std::expected<asyncio::Listener, std::error_code> asyncio::Listener::make(uv::Handle<uv_stream_t> stream) {
-    EXPECT(uv::expected([&] {
+asyncio::Listener asyncio::Listener::make(uv::Handle<uv_stream_t> stream) {
+    zero::error::guard(uv::expected([&] {
         return uv_listen(
             stream.raw(),
             256,
             [](auto *handle, const int status) {
-                auto &[stream, event, ec] = *static_cast<Core *>(handle->data);
+                auto &[h, event, ec] = *static_cast<Core *>(handle->data);
 
                 if (status < 0)
                     ec = static_cast<uv::Error>(status);
@@ -305,11 +315,11 @@ asyncio::task::Task<void, std::error_code> asyncio::Listener::accept(uv_stream_t
         if (result)
             co_return {};
 
-        if (result.error() != std::errc::resource_unavailable_try_again)
-            co_return std::unexpected{result.error()};
+        if (const auto &error = result.error(); error != std::errc::resource_unavailable_try_again)
+            co_return std::unexpected{error};
 
         mCore->event.reset();
-        CO_EXPECT(co_await mCore->event.wait());
+        Z_CO_EXPECT(co_await mCore->event.wait());
 
         if (mCore->ec)
             co_return std::unexpected{*mCore->ec};

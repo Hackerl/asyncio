@@ -20,9 +20,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Build and test
         uses: lukka/run-cmake@v10
         with:
@@ -51,9 +51,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Build
         uses: lukka/run-cmake@v10
         with:
@@ -77,9 +77,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Create custom triplet
         # https://github.com/microsoft/vcpkg/issues/29132
         run: |
@@ -111,9 +111,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Create custom triplet
         # https://github.com/microsoft/vcpkg/issues/29132
         run: |
@@ -135,14 +135,10 @@ jobs:
           VCPKG_DEFAULT_TRIPLET: x86-windows
 
   macos:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Install LLVM
-        run: |
-          brew install llvm@19
-          echo "LLVM_HOME=$(brew --prefix llvm@19)" >> $GITHUB_ENV
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         env:
@@ -151,21 +147,43 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-vcpkg-binary-cache-
       - name: Build and test
         uses: lukka/run-cmake@v10
         with:
           configurePreset: debug-asan
-          configurePresetAdditionalArgs: "['-DVCPKG_TARGET_TRIPLET=x64-osx-dynamic']"
+          configurePresetAdditionalArgs: "['-DVCPKG_TARGET_TRIPLET=arm64-osx-dynamic']"
           buildPreset: debug-asan
           testPreset: debug-asan
         env:
-          CC: ${{ env.LLVM_HOME }}/bin/clang
-          CXX: ${{ env.LLVM_HOME }}/bin/clang++
-          LDFLAGS: -L${{ env.LLVM_HOME }}/lib/c++ -L${{ env.LLVM_HOME }}/lib -L${{ env.LLVM_HOME }}/lib/unwind -lunwind -Wl,-rpath,${{ env.LLVM_HOME }}/lib/c++ -Wl,-rpath,${{ env.LLVM_HOME }}/lib -Wl,-rpath,${{ env.LLVM_HOME }}/lib/unwind
           SDKROOT: macosx
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ github.job }}-vcpkg-binary-cache-
+      - name: Build
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug-asan
+          configurePresetAdditionalArgs: "['-DCMAKE_SYSTEM_NAME=iOS', '-DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST']"
+          buildPreset: debug-asan
+        env:
+          SDKROOT: iphoneos
 
   android:
     runs-on: ubuntu-latest
@@ -193,9 +211,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-${{ matrix.api }}-${{ matrix.platform.abi }}-${{ matrix.platform.triplet }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+            ${{ github.job }}-${{ matrix.api }}-${{ matrix.platform.abi }}-${{ matrix.platform.triplet }}-vcpkg-binary-cache-
       - name: Create custom triplet
         run: |
           cp "${VCPKG_ROOT}/triplets/${{ matrix.platform.triplet }}.cmake" android-${{ matrix.api }}.cmake
@@ -208,3 +226,37 @@ jobs:
           buildPreset: debug-asan
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+  ohos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install OHOS toolchains
+        run: curl -fsSL https://github.com/Hackerl/ohos-ndk-llvm19/releases/download/v6.0.1.260/ohos-ndk-llvm19.tar.gz | tar -xz -C /opt
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+      - name: Setup vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ github.job }}-vcpkg-binary-cache-
+      - name: Create custom triplet
+        run: |
+          cat <<EOF > arm64-ohos.cmake
+          set(VCPKG_TARGET_ARCHITECTURE arm64)
+          set(VCPKG_CRT_LINKAGE dynamic)
+          set(VCPKG_LIBRARY_LINKAGE static)
+          set(VCPKG_CMAKE_SYSTEM_NAME Linux)
+          set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE /opt/ohos-ndk-llvm19/build/cmake/ohos.toolchain.cmake)
+          EOF
+      - name: Build
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: debug-asan
+          configurePresetAdditionalArgs: "['-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=/opt/ohos-ndk-llvm19/build/cmake/ohos.toolchain.cmake', String.raw`-DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}`, '-DVCPKG_TARGET_TRIPLET=arm64-ohos', '-DCMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST']"
+          buildPreset: debug-asan

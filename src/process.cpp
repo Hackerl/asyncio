@@ -28,12 +28,10 @@ std::optional<asyncio::Pipe> &asyncio::process::ChildProcess::stdError() {
 // ReSharper disable once CppMemberFunctionMayBeConst
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::ChildProcess::wait() {
 #ifdef _WIN32
-    const auto handle = CreateEventA(nullptr, false, false, nullptr);
+    const zero::os::Resource event{CreateEventA(nullptr, false, false, nullptr)};
 
-    if (!handle)
+    if (!event)
         co_return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
-
-    const zero::os::Resource event{handle};
 
     co_return co_await toThread(
         [&]() -> std::expected<ExitStatus, std::error_code> {
@@ -46,7 +44,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
                 return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
 
             if (result == WAIT_OBJECT_0 + 1)
-                return std::unexpected{make_error_code(std::errc::operation_canceled)};
+                return std::unexpected{task::Error::Cancelled};
 
             return impl.exitCode().transform([](const auto &code) {
                 return ExitStatus{code};
@@ -67,7 +65,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
             const auto id = zero::os::unix::ensure([&] {
                 return waitpid(pid, &s, 0);
             });
-            EXPECT(id);
+            Z_EXPECT(id);
             assert(*id == pid);
 
             return ExitStatus{s};
@@ -84,10 +82,10 @@ std::expected<std::optional<asyncio::process::ExitStatus>, std::error_code> asyn
     const auto &impl = this->impl();
 
     if (const auto result = impl.wait(0ms); !result) {
-        if (result.error() == std::errc::timed_out)
-            return std::nullopt;
+        if (const auto &error = result.error(); error != std::errc::timed_out)
+            return std::unexpected{error};
 
-        return std::unexpected{result.error()};
+        return std::nullopt;
     }
 
     return impl.exitCode().transform([](const auto &code) {
@@ -100,7 +98,7 @@ std::expected<std::optional<asyncio::process::ExitStatus>, std::error_code> asyn
     const auto id = zero::os::unix::expected([&] {
         return waitpid(pid, &s, WNOHANG);
     });
-    EXPECT(id);
+    Z_EXPECT(id);
 
     if (*id == 0)
         return std::nullopt;
@@ -125,7 +123,7 @@ asyncio::process::PseudoConsole::Pipe::write(const std::span<const std::byte> da
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::process::PseudoConsole::Pipe::close() {
-    CO_EXPECT(co_await mReader.close());
+    Z_CO_EXPECT(co_await mReader.close());
     co_return co_await mWriter.close();
 }
 #else
@@ -151,7 +149,7 @@ asyncio::process::PseudoConsole::PseudoConsole(zero::os::process::PseudoConsole 
 std::expected<asyncio::process::PseudoConsole, std::error_code>
 asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     auto pc = zero::os::process::PseudoConsole::make(rows, columns);
-    EXPECT(pc);
+    Z_EXPECT(pc);
 
 #ifdef _WIN32
     auto &[reader, writer] = pc->master();
@@ -159,14 +157,18 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     const auto firstFD = uv::expected([&] {
         return uv_open_osfhandle(reader.fd());
     });
-    EXPECT(firstFD);
+    Z_EXPECT(firstFD);
     std::ignore = reader.release();
 
     auto first = asyncio::Pipe::from(*firstFD);
 
     if (!first) {
         uv_fs_t request{};
-        uv_fs_close(nullptr, &request, *firstFD, nullptr);
+
+        zero::error::guard(uv::expected([&] {
+            return uv_fs_close(nullptr, &request, *firstFD, nullptr);
+        }));
+
         uv_fs_req_cleanup(&request);
         return std::unexpected{first.error()};
     }
@@ -174,14 +176,18 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     const auto secondFD = uv::expected([&] {
         return uv_open_osfhandle(writer.fd());
     });
-    EXPECT(secondFD);
+    Z_EXPECT(secondFD);
     std::ignore = writer.release();
 
     auto second = asyncio::Pipe::from(*secondFD);
 
     if (!second) {
         uv_fs_t request{};
-        uv_fs_close(nullptr, &request, *secondFD, nullptr);
+
+        zero::error::guard(uv::expected([&] {
+            return uv_fs_close(nullptr, &request, *secondFD, nullptr);
+        }));
+
         uv_fs_req_cleanup(&request);
         return std::unexpected{second.error()};
     }
@@ -193,14 +199,18 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     const auto fd = uv::expected([&] {
         return uv_open_osfhandle(resource.fd());
     });
-    EXPECT(fd);
+    Z_EXPECT(fd);
     std::ignore = resource.release();
 
     auto pipe = asyncio::Pipe::from(*fd);
 
     if (!pipe) {
         uv_fs_t request{};
-        uv_fs_close(nullptr, &request, *fd, nullptr);
+
+        zero::error::guard(uv::expected([&] {
+            return uv_fs_close(nullptr, &request, *fd, nullptr);
+        }));
+
         uv_fs_req_cleanup(&request);
         return std::unexpected{pipe.error()};
     }
@@ -236,7 +246,7 @@ asyncio::process::Command::Command(std::filesystem::path path) : mCommand{std::m
 std::expected<asyncio::process::ChildProcess, std::error_code>
 asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) const {
     auto child = mCommand.spawn(defaultTypes);
-    EXPECT(child);
+    Z_EXPECT(child);
 
     std::array<std::optional<Pipe>, 3> stdio;
 
@@ -257,8 +267,13 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
         });
 
         if (!fd) {
-            std::ignore = child->kill();
-            std::ignore = child->wait();
+            zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
+                if (ec != std::errc::no_such_process)
+                    return std::unexpected{ec};
+
+                return {};
+            }));
+            zero::error::guard(child->wait());
             return std::unexpected{fd.error()};
         }
 
@@ -267,11 +282,20 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
         auto pipe = Pipe::from(*fd);
 
         if (!pipe) {
-            std::ignore = child->kill();
-            std::ignore = child->wait();
+            zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
+                if (ec != std::errc::no_such_process)
+                    return std::unexpected{ec};
+
+                return {};
+            }));
+            zero::error::guard(child->wait());
 
             uv_fs_t request{};
-            uv_fs_close(nullptr, &request, *fd, nullptr);
+
+            zero::error::guard(uv::expected([&] {
+                return uv_fs_close(nullptr, &request, *fd, nullptr);
+            }));
+
             uv_fs_req_cleanup(&request);
 
             return std::unexpected{pipe.error()};
@@ -308,21 +332,26 @@ const std::vector<zero::os::Resource::Native> &asyncio::process::Command::inheri
 }
 
 std::expected<asyncio::process::ChildProcess, std::error_code> asyncio::process::Command::spawn() const {
-    return spawn({StdioType::INHERIT, StdioType::INHERIT, StdioType::INHERIT});
+    return spawn({StdioType::Inherit, StdioType::Inherit, StdioType::Inherit});
 }
 
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::Command::status() const {
     auto child = spawn();
-    CO_EXPECT(child);
-    co_return co_await child->wait();
+    Z_CO_EXPECT(child);
+    co_return co_await task::CancellableTask{
+        child->wait(),
+        [&] {
+            return child->kill();
+        }
+    };
 }
 
 asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process::Command::output() const {
-    auto child = spawn({StdioType::NUL, StdioType::PIPED, StdioType::PIPED});
-    CO_EXPECT(child);
+    auto child = spawn({StdioType::Null, StdioType::Piped, StdioType::Piped});
+    Z_CO_EXPECT(child);
 
     if (auto input = std::exchange(child->stdInput(), std::nullopt))
-        std::ignore = co_await input->close();
+        zero::error::guard(co_await input->close());
 
     auto result = co_await all(
         task::spawn([&]() -> task::Task<std::vector<std::byte>, std::error_code> {
@@ -344,13 +373,27 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     );
 
     if (!result) {
-        std::ignore = child->kill();
-        std::ignore = co_await child->wait();
+        co_await task::lock;
+
+        zero::error::guard(child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
+            if (ec != std::errc::no_such_process)
+                return std::unexpected{ec};
+
+            return {};
+        }));
+        zero::error::guard(co_await child->wait());
+
+        co_await task::unlock;
         co_return std::unexpected{result.error()};
     }
 
-    const auto status = co_await child->wait();
-    CO_EXPECT(status);
+    const auto status = co_await task::CancellableTask{
+        child->wait(),
+        [&] {
+            return child->kill();
+        }
+    };
+    Z_CO_EXPECT(status);
 
     co_return Output{
         *status,

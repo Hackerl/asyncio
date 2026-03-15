@@ -5,7 +5,7 @@
 #include <mutex>
 #include <queue>
 #include <cassert>
-#include <zero/detail/type_traits.h>
+#include <zero/traits/type_traits.h>
 
 namespace asyncio {
     class EventLoop {
@@ -26,12 +26,12 @@ namespace asyncio {
 
         ~EventLoop();
 
-        static std::expected<EventLoop, std::error_code> make();
+        static EventLoop make();
 
         uv_loop_t *raw();
         [[nodiscard]] const uv_loop_t *raw() const;
 
-        std::expected<void, std::error_code> post(std::function<void()> function);
+        void post(std::function<void()> function);
 
         void stop();
         void run();
@@ -50,29 +50,27 @@ namespace asyncio {
     }
 
     template<typename F>
-        requires zero::detail::is_specialization_v<std::invoke_result_t<F>, task::Task>
+        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
     std::expected<
-        std::expected<
-            typename std::invoke_result_t<F>::value_type,
-            typename std::invoke_result_t<F>::error_type
-        >,
-        std::error_code
+        typename std::invoke_result_t<F>::value_type,
+        typename std::invoke_result_t<F>::error_type
     >
-    run(F &&f) {
-        const auto eventLoop = EventLoop::make().transform([](EventLoop &&value) {
-            return std::make_shared<EventLoop>(std::move(value));
-        });
-        EXPECT(eventLoop);
+    run(const std::shared_ptr<EventLoop> &eventLoop, F &&f) {
+        setEventLoop(eventLoop);
 
-        setEventLoop(*eventLoop);
-
-        auto future = f().future().finally([&] {
-            eventLoop.value()->stop();
+        auto task = f().addCallback([&] {
+            eventLoop->stop();
         });
 
-        eventLoop.value()->run();
-        assert(future.isReady());
-        return {std::move(future).result()};
+        eventLoop->run();
+        assert(task.done());
+        return {task.future().result()};
+    }
+
+    template<typename F>
+        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
+    auto run(F &&f) {
+        return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
     }
 
     task::Task<void, std::error_code> reschedule();

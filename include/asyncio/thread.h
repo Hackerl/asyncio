@@ -11,22 +11,35 @@ namespace asyncio {
     toThread(F f) {
         using T = std::invoke_result_t<F>;
 
-        Promise<T> promise;
+        Promise<T, std::exception_ptr> promise;
 
         std::thread thread{
             [&] {
-                if constexpr (std::is_void_v<T>) {
-                    f();
-                    promise.resolve();
+                try {
+                    if constexpr (std::is_void_v<T>) {
+                        f();
+                        promise.resolve();
+                    }
+                    else {
+                        promise.resolve(f());
+                    }
                 }
-                else {
-                    promise.resolve(f());
+                catch (const std::exception &) {
+                    promise.reject(std::current_exception());
                 }
             }
         };
-        DEFER(thread.join());
+        Z_DEFER(thread.join());
 
-        co_return *co_await promise.getFuture();
+        auto result = co_await promise.getFuture();
+
+        if (!result)
+            std::rethrow_exception(result.error());
+
+        if constexpr (std::is_void_v<T>)
+            co_return;
+        else
+            co_return *std::move(result);
     }
 
     template<typename F, typename C>
@@ -38,33 +51,46 @@ namespace asyncio {
     toThread(F f, C cancel) {
         using T = std::invoke_result_t<F>;
 
-        Promise<T> promise;
+        Promise<T, std::exception_ptr> promise;
 
         std::thread thread{
             [&] {
-                if constexpr (std::is_void_v<T>) {
-                    f();
-                    promise.resolve();
+                try {
+                    if constexpr (std::is_void_v<T>) {
+                        f();
+                        promise.resolve();
+                    }
+                    else {
+                        promise.resolve(f());
+                    }
                 }
-                else {
-                    promise.resolve(f());
+                catch (const std::exception &) {
+                    promise.reject(std::current_exception());
                 }
             }
         };
-        DEFER(thread.join());
+        Z_DEFER(thread.join());
 
-        co_return *co_await task::CancellableFuture{
+        auto result = co_await task::CancellableFuture{
             promise.getFuture(),
-            [&]() -> std::expected<void, std::error_code> {
+            [&] {
                 return cancel(thread.native_handle());
             }
         };
+
+        if (!result)
+            std::rethrow_exception(result.error());
+
+        if constexpr (std::is_void_v<T>)
+            co_return;
+        else
+            co_return *std::move(result);
     }
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         ToThreadPoolError,
         "asyncio::toThreadPool",
-        CANCELLED, "request has been cancelled", std::errc::operation_canceled
+        Cancelled, "Request was cancelled", std::errc::operation_canceled
     )
 
     template<typename F>
@@ -96,14 +122,14 @@ namespace asyncio {
             if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
-                    EXPECT(uv::expected([&] {
+                    Z_EXPECT(uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }));
                     return {};
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+                co_return std::unexpected{ToThreadPoolError::Cancelled};
             }
 
             co_return {};
@@ -122,8 +148,8 @@ namespace asyncio {
                 getEventLoop()->raw(),
                 &request,
                 [](auto *req) {
-                    auto &[function, promise, result] = *static_cast<Context *>(req->data);
-                    result.emplace(function());
+                    auto &[function, promise, res] = *static_cast<Context *>(req->data);
+                    res.emplace(function());
                 },
                 [](auto *req, const int status) {
                     static_cast<Context *>(req->data)->promise.resolve(status);
@@ -134,14 +160,14 @@ namespace asyncio {
             if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
-                    EXPECT(uv::expected([&] {
+                    Z_EXPECT(uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }));
                     return {};
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+                co_return std::unexpected{ToThreadPoolError::Cancelled};
             }
 
             co_return std::move(*context.result);
@@ -177,7 +203,7 @@ namespace asyncio {
 
             if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                [&] {
                     return uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }).transform([](const auto &) {
@@ -187,7 +213,7 @@ namespace asyncio {
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+                co_return std::unexpected{ToThreadPoolError::Cancelled};
             }
 
             co_return {};
@@ -206,8 +232,8 @@ namespace asyncio {
                 getEventLoop()->raw(),
                 &request,
                 [](auto *req) {
-                    auto &[function, promise, result] = *static_cast<Context *>(req->data);
-                    result.emplace(function());
+                    auto &[function, promise, res] = *static_cast<Context *>(req->data);
+                    res.emplace(function());
                 },
                 [](auto *req, const int status) {
                     static_cast<Context *>(req->data)->promise.resolve(status);
@@ -217,7 +243,7 @@ namespace asyncio {
 
             if (const auto status = *co_await task::CancellableFuture{
                 context.promise.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                [&] {
                     return uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }).transform([](const auto &) {
@@ -227,7 +253,7 @@ namespace asyncio {
                 }
             }; status < 0) {
                 assert(status == UV_ECANCELED);
-                co_return std::unexpected{ToThreadPoolError::CANCELLED};
+                co_return std::unexpected{ToThreadPoolError::Cancelled};
             }
 
             co_return std::move(*context.result);
@@ -235,6 +261,6 @@ namespace asyncio {
     }
 }
 
-DECLARE_ERROR_CODE(asyncio::ToThreadPoolError)
+Z_DECLARE_ERROR_CODE(asyncio::ToThreadPoolError)
 
 #endif //ASYNCIO_THREAD_H

@@ -21,9 +21,9 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Mutex::lock() {
         promise->getFuture(),
         [=]() -> std::expected<void, std::error_code> {
             if (promise->isFulfilled())
-                return std::unexpected{task::Error::WILL_BE_DONE};
+                return std::unexpected{task::Error::CancellationTooLate};
 
-            promise->reject(task::Error::CANCELLED);
+            promise->reject(task::Error::Cancelled);
             return {};
         }
     };

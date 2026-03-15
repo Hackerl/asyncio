@@ -6,15 +6,15 @@ My work mainly revolves around `C++` client development, where I often find myse
 
 `C++` and network programming seem inherently incompatible. I have tried several open-source libraries like `libevent`, `libcurl`, and `gRPC`. Every time I decide to stick with one solution, I end up getting lost in the overwhelming maze of callbacks.
 
-> Can’t `C++` network asynchronous programming be simpler?
+> Can't `C++` network asynchronous programming be simpler?
 
-I wanted to change this, so not long ago, I created the [`aio`](https://github.com/Hackerl/aio) project, an asynchronous network library based on `promises`. However, as the project progressed, I escaped from callback hell, only to fall into the swamp of managing lifecycles. `C++` is just not as carefree as `JavaScript`—it has many more considerations to account for.
+I wanted to change this, so not long ago, I created the [`aio`](https://github.com/Hackerl/aio) project, an asynchronous network library based on `promises`. However, as the project progressed, I escaped from callback hell, only to fall into the swamp of managing lifecycles. `C++` is just not as carefree as `JavaScript` — it has many more considerations to account for.
 
 > In `JavaScript`, you can simply create a `promise` and bind callbacks, but in `C++`, there are so many things to consider.
 
 How should the lifecycle of variables captured by callback lambdas be managed? Once a `promise` binds a callback and the code runs out of scope, how can we ensure the callback remains alive? When binding callbacks in class methods, how do we capture `this`? Should we use `std::enable_shared_from_this`?
 
-See, that's `C++`—it's both frustrating and endearing!
+See, that's `C++` — it's both frustrating and endearing!
 
 > Despite the criticisms, I am still enamored with `C++`.
 
@@ -26,7 +26,6 @@ Just when I was about to give up, I suddenly remembered `C++20` coroutines, and 
 
 - `C++23` introduced `std::expected`.
 - `C++23` also made the `ranges` standard library quite complete.
-- `C++23`'s `deducing this` feature solves the issue of dangling coroutine variable captures in lambdas (although some compilers have yet to implement it).
 
 I prefer elegant, simple code, and `C++20` is caught in an awkward middle ground. Many components are incomplete, which hinders development. So, why not just use `C++23`?
 
@@ -58,6 +57,18 @@ As long as you are in the `Event Loop` thread, you can retrieve it.
 - Well-designed interfaces inspired by multiple languages
 - Simple and direct task cancellation mechanism
 - Easily integrates with synchronous code using threads and thread pools
+- Supports both error codes and exceptions for error handling
+- Built-in call stack tracing for debugging and analysis
+
+## Differences from Other Coroutine Libraries
+
+`asyncio` may surpass existing coroutine libraries in the following aspects:
+
+- Combination of error codes and exceptions with a comprehensive error handling mechanism.
+- Simple and direct task cancellation similar to Python's `asyncio` — `task.cancel()`.
+- Multiple sub-task aggregation methods with structured concurrency model, inspired by JavaScript's `Promise`.
+- Flexible dynamic task management solution, similar to Golang's `WaitGroup`.
+- Built-in call stack tracing that can traverse the task tree top-down or complete backtracing bottom-up.
 
 ## What features are currently available?
 
@@ -87,6 +98,7 @@ public:
 private:
     httplib::Server mServer;
 };
+
 
 asyncio::task::Task<void, std::error_code> agent::local::Server::run() {
     mServer.Get(

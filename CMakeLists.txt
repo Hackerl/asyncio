@@ -3,11 +3,12 @@ project(asyncio)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-set(ASYNCIO_VERSION 1.0.6)
+set(ASYNCIO_VERSION 1.1.0)
 
 option(BUILD_SAMPLES "Build asyncio samples" ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 option(BUILD_MODULES "Build asyncio modules" OFF)
+option(ASYNCIO_EMBED_CA_CERT "Use built-in CA certificates instead of system certificates" OFF)
 
 if (BUILD_SHARED_LIBS AND MSVC)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -25,33 +26,51 @@ find_package(libuv CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
 add_library(
-    asyncio
-    src/uv.cpp
-    src/io.cpp
-    src/fs.cpp
-    src/time.cpp
-    src/poll.cpp
-    src/pipe.cpp
-    src/thread.cpp
-    src/signal.cpp
-    src/stream.cpp
-    src/buffer.cpp
-    src/channel.cpp
-    src/process.cpp
-    src/task.cpp
-    src/event_loop.cpp
-    src/net/net.cpp
-    src/net/dns.cpp
-    src/net/tls.cpp
-    src/net/dgram.cpp
-    src/net/stream.cpp
-    src/http/url.cpp
-    src/http/request.cpp
-    src/http/websocket.cpp
-    src/sync/mutex.cpp
-    src/sync/event.cpp
-    src/sync/condition.cpp
+        asyncio
+        src/uv.cpp
+        src/io.cpp
+        src/fs.cpp
+        src/time.cpp
+        src/poll.cpp
+        src/pipe.cpp
+        src/thread.cpp
+        src/signal.cpp
+        src/stream.cpp
+        src/buffer.cpp
+        src/channel.cpp
+        src/task.cpp
+        src/event_loop.cpp
+        src/net/net.cpp
+        src/net/dns.cpp
+        src/net/tls.cpp
+        src/net/dgram.cpp
+        src/net/stream.cpp
+        src/http/url.cpp
+        src/http/request.cpp
+        src/http/websocket.cpp
+        src/sync/mutex.cpp
+        src/sync/event.cpp
+        src/sync/condition.cpp
+        $<$<PLATFORM_ID:Windows,Darwin,Linux,Android>:src/process.cpp>
 )
+
+if (ASYNCIO_EMBED_CA_CERT)
+    set(ca_cert_file ${CMAKE_CURRENT_BINARY_DIR}/cacert.pem)
+    set(ca_cert_header ${CMAKE_CURRENT_SOURCE_DIR}/include/ca_cert.h)
+
+    if (NOT EXISTS ${ca_cert_file})
+        file(DOWNLOAD "https://curl.se/ca/cacert.pem" ${ca_cert_file})
+    endif ()
+
+    if (NOT EXISTS ${ca_cert_header})
+        file(READ ${ca_cert_file} content)
+        string(REPLACE "\n" "\\n\"\n\"" content "${content}")
+        file(WRITE ${ca_cert_header} "constexpr std::string_view CACert = \"${content}\";")
+    endif ()
+
+    set(EXCLUDE_HEADERS ${EXCLUDE_HEADERS} PATTERN "ca_cert.h" EXCLUDE)
+    target_compile_definitions(asyncio PUBLIC ASYNCIO_EMBED_CA_CERT)
+endif ()
 
 if (WIN32)
     target_compile_definitions(asyncio PUBLIC NOMINMAX)
@@ -65,17 +84,17 @@ target_include_directories(
 )
 
 target_link_libraries(
-    asyncio
-    PRIVATE
-    $<$<PLATFORM_ID:Windows>:Crypt32>
-    PUBLIC
-    zero::zero
-    ZLIB::ZLIB
-    OpenSSL::SSL
-    OpenSSL::Crypto
-    CURL::libcurl
-    nlohmann_json::nlohmann_json
-    $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
+        asyncio
+        PRIVATE
+        $<$<PLATFORM_ID:Windows>:crypt32>
+        PUBLIC
+        zero::zero
+        ZLIB::ZLIB
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        CURL::libcurl
+        nlohmann_json::nlohmann_json
+        $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
 )
 
 add_library(asyncio-main STATIC src/main.cpp)

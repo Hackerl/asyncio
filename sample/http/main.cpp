@@ -1,18 +1,19 @@
 #include <asyncio/http/request.h>
+#include <asyncio/error.h>
 #include <zero/cmdline.h>
 
-asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[]) {
+asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
-    cmdline.add<asyncio::http::URL>("url", "http request url");
+    cmdline.add<asyncio::http::URL>("url", "HTTP request URL");
 
-    cmdline.addOptional<std::string>("method", 'm', "http request method", "GET");
-    cmdline.addOptional<std::vector<std::string>>("headers", 'h', "http request headers");
-    cmdline.addOptional<std::string>("body", '\0', "http request body");
-    cmdline.addOptional<std::filesystem::path>("output", '\0', "output file path");
+    cmdline.addOptional<std::string>("method", 'm', "HTTP request method", "GET");
+    cmdline.addOptional<std::vector<std::string>>("headers", 'h', "HTTP request headers (key=value)");
+    cmdline.addOptional<std::string>("body", '\0', "HTTP request body");
+    cmdline.addOptional<std::filesystem::path>("output", '\0', "Path to save response output");
 
-    cmdline.addOptional("json", '\0', "http body with json");
-    cmdline.addOptional("form", '\0', "http body with form");
+    cmdline.addOptional("json", '\0', "Send body as JSON");
+    cmdline.addOptional("form", '\0', "Send body as form data");
 
     cmdline.parse(argc, argv);
 
@@ -32,7 +33,7 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
             const auto tokens = zero::strings::split(header, "=");
 
             if (tokens.size() != 2) {
-                fmt::print(stderr, "invalid header[{}]\n", header);
+                fmt::print(stderr, "Invalid header[{}]\n", header);
                 continue;
             }
 
@@ -41,14 +42,15 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
     }
 
     auto requests = asyncio::http::Requests::make(options);
-    CO_EXPECT(requests);
 
-    auto response = co_await [&] {
+    auto response = co_await asyncio::task::spawn([&]() -> asyncio::task::Task<asyncio::http::Response> {
         if (!body)
-            return requests->request(*method, url, options);
+            co_return co_await asyncio::error::guard(requests.request(*method, url, options));
 
         if (json)
-            return requests->request(*method, url, options, nlohmann::json::parse(*body));
+            co_return co_await asyncio::error::guard(
+                requests.request(*method, url, options, nlohmann::json::parse(*body))
+            );
 
         if (form) {
             std::map<std::string, std::variant<std::string, std::filesystem::path>> data;
@@ -65,20 +67,16 @@ asyncio::task::Task<void, std::error_code> asyncMain(const int argc, char *argv[
                     data[tokens[0]] = tokens[1];
             }
 
-            return requests->request(*method, url, options, data);
+            co_return co_await asyncio::error::guard(requests.request(*method, url, options, data));
         }
 
-        return requests->request(*method, url, options, *body);
-    }();
-    CO_EXPECT(response);
+        co_return co_await asyncio::error::guard(requests.request(*method, url, options, *body));
+    });
 
     if (output) {
-        CO_EXPECT(co_await response->output(*output));
+        co_await asyncio::error::guard(response.output(*output));
+        co_return;
     }
 
-    const auto content = co_await response->string();
-    CO_EXPECT(content);
-
-    fmt::print("{}", *content);
-    co_return {};
+    fmt::print("{}", co_await asyncio::error::guard(response.string()));
 }

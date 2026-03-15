@@ -4,13 +4,12 @@
 #include <uv.h>
 #include <memory>
 #include <optional>
-#include <expected>
 #include <functional>
 #include <zero/error.h>
 #include <zero/expect.h>
 
 namespace asyncio::uv {
-    DEFINE_ERROR_TRANSFORMER_EX(
+    Z_DEFINE_ERROR_TRANSFORMER_EX(
         Error,
         "asyncio::uv",
         ([](const int value) -> std::string {
@@ -259,7 +258,7 @@ namespace asyncio::uv {
         [[nodiscard]] std::expected<uv_os_fd_t, std::error_code> fd() const {
             uv_os_fd_t fd;
 
-            EXPECT(expected([&] {
+            Z_EXPECT(expected([&] {
                 return uv_fileno(rawHandle(), &fd);
             }));
 
@@ -317,6 +316,6 @@ namespace asyncio::uv {
     };
 }
 
-DECLARE_ERROR_CODE(asyncio::uv::Error)
+Z_DECLARE_ERROR_CODE(asyncio::uv::Error)
 
 #endif //ASYNCIO_UV_H

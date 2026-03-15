@@ -12,7 +12,7 @@ namespace asyncio::sync {
             requires std::is_same_v<std::invoke_result_t<F>, bool>
         task::Task<void, std::error_code> wait(Mutex &mutex, F predicate) {
             while (!predicate()) {
-                CO_EXPECT(co_await wait(mutex));
+                Z_CO_EXPECT(co_await wait(mutex));
             }
 
             co_return {};

@@ -8,13 +8,13 @@
 #include <nlohmann/json.hpp>
 
 namespace asyncio::http {
-    DEFINE_ERROR_TRANSFORMER(
+    Z_DEFINE_ERROR_TRANSFORMER(
         CURLError,
         "asyncio::http::curl",
         [](const int value) { return curl_easy_strerror(static_cast<CURLcode>(value)); }
     )
 
-    DEFINE_ERROR_TRANSFORMER(
+    Z_DEFINE_ERROR_TRANSFORMER(
         CURLMError,
         "asyncio::http::curl::multi",
         [](const int value) { return curl_multi_strerror(static_cast<CURLMcode>(value)); }
@@ -134,7 +134,7 @@ namespace asyncio::http {
 
     public:
         explicit Requests(std::unique_ptr<Core> core);
-        static std::expected<Requests, std::error_code> make(Options options = {});
+        static Requests make(Options options = {});
 
     private:
         static std::size_t onRead(char *buffer, std::size_t size, std::size_t n, void *userdata);
@@ -186,7 +186,7 @@ namespace asyncio::http {
             opt.headers["Content-Type"] = "application/json";
 
             auto connection = prepare(std::move(method), url, std::move(opt));
-            CO_EXPECT(connection);
+            Z_CO_EXPECT(connection);
 
             std::string body;
 
@@ -195,37 +195,51 @@ namespace asyncio::http {
             else
                 body = nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
 
-            curl_easy_setopt(
-                connection->get()->easy.get(),
-                CURLOPT_COPYPOSTFIELDS,
-                body.c_str()
-            );
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(
+                    connection->get()->easy.get(),
+                    CURLOPT_COPYPOSTFIELDS,
+                    body.c_str()
+                );
+            }));
 
             co_return co_await perform(*std::move(connection));
         }
 
-        template<zero::detail::Trait<IReader> T>
+        template<zero::traits::Trait<IReader> T>
         task::Task<Response, std::error_code> request(
-            std::string method,
+            const std::string method,
             const URL url,
             const std::optional<Options> options,
             T payload
         ) {
             auto connection = prepare(method, url, options);
-            CO_EXPECT(connection);
+            Z_CO_EXPECT(connection);
 
             const auto easy = connection.value()->easy.get();
 
-            curl_easy_setopt(easy, CURLOPT_UPLOAD, 1L);
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(easy, CURLOPT_UPLOAD, 1L);
+            }));
 
             // `CURLOPT_UPLOAD` will cause the http method to become `PUT`.
-            curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
-            curl_easy_setopt(easy, CURLOPT_READFUNCTION, onRead);
-            curl_easy_setopt(easy, CURLOPT_READDATA, connection->get());
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
+            }));
 
-            if constexpr (zero::detail::Trait<T, ISeekable>) {
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(easy, CURLOPT_READFUNCTION, onRead);
+            }));
+
+            zero::error::guard(expected([&] {
+                return curl_easy_setopt(easy, CURLOPT_READDATA, connection->get());
+            }));
+
+            if constexpr (zero::traits::Trait<T, ISeekable>) {
                 if (const auto length = co_await std::invoke(&ISeekable::length, payload)) {
-                    curl_easy_setopt(easy, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(*length));
+                    zero::error::guard(expected([&] {
+                        return curl_easy_setopt(easy, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(*length));
+                    }));
                 }
             }
 
@@ -288,6 +302,6 @@ namespace asyncio::http {
     };
 }
 
-DECLARE_ERROR_CODES(asyncio::http::CURLError, asyncio::http::CURLMError)
+Z_DECLARE_ERROR_CODES(asyncio::http::CURLError, asyncio::http::CURLMError)
 
 #endif //ASYNCIO_REQUEST_H

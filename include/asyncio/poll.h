@@ -7,10 +7,10 @@ namespace asyncio {
     class Poll final : public IFileDescriptor {
     public:
         enum Event {
-            READABLE = UV_READABLE,
-            WRITABLE = UV_WRITABLE,
-            DISCONNECT = UV_DISCONNECT,
-            PRIORITIZED = UV_PRIORITIZED
+            Readable = UV_READABLE,
+            Writable = UV_WRITABLE,
+            Disconnect = UV_DISCONNECT,
+            Prioritized = UV_PRIORITIZED
         };
 
         explicit Poll(uv::Handle<uv_poll_t> poll);

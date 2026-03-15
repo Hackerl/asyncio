@@ -9,11 +9,11 @@ namespace asyncio::net {
     using IPv6 = zero::os::net::IPv6;
     using IP = zero::os::net::IP;
 
-    inline constexpr auto LOCALHOST_IPV4 = zero::os::net::LOCALHOST_IPV4;
-    inline constexpr auto BROADCAST_IPV4 = zero::os::net::BROADCAST_IPV4;
-    inline constexpr auto UNSPECIFIED_IPV4 = zero::os::net::UNSPECIFIED_IPV4;
-    inline constexpr auto LOCALHOST_IPV6 = zero::os::net::LOCALHOST_IPV6;
-    inline constexpr auto UNSPECIFIED_IPV6 = zero::os::net::UNSPECIFIED_IPV6;
+    inline constexpr auto LocalhostIPv4 = zero::os::net::LocalhostIPv4;
+    inline constexpr auto BroadcastIPv4 = zero::os::net::BroadcastIPv4;
+    inline constexpr auto UnspecifiedIPv4 = zero::os::net::UnspecifiedIPv4;
+    inline constexpr auto LocalhostIPv6 = zero::os::net::LocalhostIPv6;
+    inline constexpr auto UnspecifiedIPv6 = zero::os::net::UnspecifiedIPv6;
 
     struct IPv4Address {
         IPv4 ip{};
@@ -100,21 +100,21 @@ namespace asyncio::net {
         );
     }
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         ParseAddressError,
         "asyncio::net::addressFrom",
-        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
-        ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
+        InvalidArgument, "Invalid argument", std::errc::invalid_argument,
+        AddressFamilyNotSupported, "Address family not supported", std::errc::address_family_not_supported
     )
 
     std::expected<IPAddress, std::error_code> ipAddressFrom(const std::string &ip, std::uint16_t port);
     std::expected<Address, std::error_code> addressFrom(const sockaddr *addr, socklen_t length);
 
-    DEFINE_ERROR_CODE_EX(
+    Z_DEFINE_ERROR_CODE_EX(
         ConvertToSocketAddressError,
         "asyncio::net::socketAddressFrom",
-        INVALID_ARGUMENT, "invalid argument", std::errc::invalid_argument,
-        ADDRESS_FAMILY_NOT_SUPPORTED, "address family not supported", std::errc::address_family_not_supported
+        InvalidArgument, "Invalid argument", std::errc::invalid_argument,
+        AddressFamilyNotSupported, "Address family not supported", std::errc::address_family_not_supported
     )
 
     std::expected<SocketAddress, std::error_code> socketAddressFrom(const Address &address);
@@ -136,26 +136,26 @@ namespace asyncio::net {
 
     template<typename T, typename U>
         requires (
-            zero::detail::Trait<T, IReader> &&
-            zero::detail::Trait<T, IWriter> &&
-            zero::detail::Trait<T, IHalfCloseable> &&
-            zero::detail::Trait<U, IReader> &&
-            zero::detail::Trait<U, IWriter> &&
-            zero::detail::Trait<U, IHalfCloseable>
+            zero::traits::Trait<T, IReader> &&
+            zero::traits::Trait<T, IWriter> &&
+            zero::traits::Trait<T, IHalfCloseable> &&
+            zero::traits::Trait<U, IReader> &&
+            zero::traits::Trait<U, IWriter> &&
+            zero::traits::Trait<U, IHalfCloseable>
         )
     task::Task<std::array<std::size_t, 2>, std::error_code>
     copyBidirectional(T &first, U &second) {
         co_return co_await all(
             task::spawn([&]() -> task::Task<std::size_t, std::error_code> {
                 const auto result = co_await copy(first, second);
-                CO_EXPECT(result);
-                CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, second));
+                Z_CO_EXPECT(result);
+                Z_CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, second));
                 co_return *result;
             }),
             task::spawn([&]() -> task::Task<std::size_t, std::error_code> {
                 const auto result = co_await copy(second, first);
-                CO_EXPECT(result);
-                CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, first));
+                Z_CO_EXPECT(result);
+                Z_CO_EXPECT(co_await std::invoke(&IHalfCloseable::shutdown, first));
                 co_return *result;
             })
         );
@@ -208,6 +208,6 @@ struct fmt::formatter<asyncio::net::UnixAddress, Char> {
     }
 };
 
-DECLARE_ERROR_CODES(asyncio::net::ParseAddressError, asyncio::net::ConvertToSocketAddressError)
+Z_DECLARE_ERROR_CODES(asyncio::net::ParseAddressError, asyncio::net::ConvertToSocketAddressError)
 
 #endif //ASYNCIO_NET_H

@@ -2,7 +2,7 @@
 #include <asyncio/net/tls.h>
 #include <asyncio/net/stream.h>
 
-constexpr auto CA_CERT = R"(-----BEGIN CERTIFICATE-----
+constexpr auto CACert = R"(-----BEGIN CERTIFICATE-----
 MIIDTTCCAjUCFCvK20SUCJA9JqCcIpXa4ATR9O+BMA0GCSqGSIb3DQEBCwUAMGMx
 CzAJBgNVBAYTAkNOMREwDwYDVQQIDAhwcm92aW5jZTENMAsGA1UEBwwEY2l0eTEV
 MBMGA1UECgwMb3JnYW5pemF0aW9uMQ4wDAYDVQQLDAVncm91cDELMAkGA1UEAwwC
@@ -23,7 +23,7 @@ qhglQgrFE59S2EbeX7k9yZgrhmnH30y+rMxQley2UpuZ0cwq0Urk/oHIDQ98PH0G
 AAvp/KZkANu0m1tD1VBcbWF5o502z4+7Z+loklS4iDPx
 -----END CERTIFICATE-----)";
 
-constexpr auto SERVER_CERT = R"(-----BEGIN CERTIFICATE-----
+constexpr auto ServerCert = R"(-----BEGIN CERTIFICATE-----
 MIIDVDCCAjwCFHaLVGbQ4Fhrr5vqKSo8FBT3CRGGMA0GCSqGSIb3DQEBCwUAMGMx
 CzAJBgNVBAYTAkNOMREwDwYDVQQIDAhwcm92aW5jZTENMAsGA1UEBwwEY2l0eTEV
 MBMGA1UECgwMb3JnYW5pemF0aW9uMQ4wDAYDVQQLDAVncm91cDELMAkGA1UEAwwC
@@ -44,7 +44,7 @@ w5jX4Qipo7iFEn+4Dhio+ayJM/SY0qx3I6PHmJqRbZXPdJELfwvtZnKqIqXsgsFw
 2bhrfqj73zv0xjvd2dV2aPdziXNkqneOT06T3e4WgiJ78YKtRNd3wg==
 -----END CERTIFICATE-----)";
 
-constexpr auto SERVER_KEY = R"(-----BEGIN PRIVATE KEY-----
+constexpr auto ServerKey = R"(-----BEGIN PRIVATE KEY-----
 MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCbFzabm2gmXy3y
 c8HSsaE2ApxpKwGmQA8/Lg5PElECOdH+klDIVzMzzZNoqPn2zlDmQz0dXYj1eFbH
 TjEzAkpUEg7LOF8wq5eGKWfRNwQjYKlMRAL5/HKDYcORtZpjE8LXSIYJDw4qyxmC
@@ -73,7 +73,7 @@ hRtEqBlavZs7O3Vfmx5nrEaw54becy537a59C+aTA/FH0FxPYi0SupydCsued70Q
 IlQYsvqGkLQYa89tFQZxHA==
 -----END PRIVATE KEY-----)";
 
-constexpr auto CLIENT_CERT = R"(-----BEGIN CERTIFICATE-----
+constexpr auto ClientCert = R"(-----BEGIN CERTIFICATE-----
 MIIDUTCCAjkCFHaLVGbQ4Fhrr5vqKSo8FBT3CRGHMA0GCSqGSIb3DQEBCwUAMGMx
 CzAJBgNVBAYTAkNOMREwDwYDVQQIDAhwcm92aW5jZTENMAsGA1UEBwwEY2l0eTEV
 MBMGA1UECgwMb3JnYW5pemF0aW9uMQ4wDAYDVQQLDAVncm91cDELMAkGA1UEAwwC
@@ -94,7 +94,7 @@ VibLVnnMjsElEQCztj+VYfoFWnXJsw37sTeMAo//uTF29lyziqMaybfphMVu2+F2
 KA/lhyr+GODHSYcB9R2zCJ53ebgUx29HBhk2QCoDioLaHkTMOw==
 -----END CERTIFICATE-----)";
 
-constexpr auto CLIENT_KEY = R"(-----BEGIN PRIVATE KEY-----
+constexpr auto ClientKey = R"(-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC2nd636zdfWic8
 e3SnqiP5cofJKkgKyI+5vBCpqH+6ZXmOJl1ZctwbvevFi7a0O04Uey6DIUmVNzxE
 zlpj5115M7QS/dQOC3jkaREPICOY+0UkX+CljW3P2GjxVoeu4ZiFS+nNt3WQ4wjK
@@ -124,13 +124,13 @@ FReHT5LzsIm40VPPdsITh6c=
 -----END PRIVATE KEY-----)";
 
 ASYNC_TEST_CASE("tls stream", "[net::tls]") {
-    auto ca = asyncio::net::tls::Certificate::load(CA_CERT);
+    auto ca = asyncio::net::tls::Certificate::load(CACert);
     REQUIRE(ca);
 
-    auto serverCert = asyncio::net::tls::Certificate::load(SERVER_CERT);
+    auto serverCert = asyncio::net::tls::Certificate::load(ServerCert);
     REQUIRE(serverCert);
 
-    auto serverKey = asyncio::net::tls::PrivateKey::load(SERVER_KEY);
+    auto serverKey = asyncio::net::tls::PrivateKey::load(ServerKey);
     REQUIRE(serverKey);
 
     auto serverContext = asyncio::net::tls::ServerConfig{}
@@ -140,10 +140,10 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
                          .build();
     REQUIRE(serverContext);
 
-    auto clientCert = asyncio::net::tls::Certificate::load(CLIENT_CERT);
+    auto clientCert = asyncio::net::tls::Certificate::load(ClientCert);
     REQUIRE(clientCert);
 
-    auto clientKey = asyncio::net::tls::PrivateKey::load(CLIENT_KEY);
+    auto clientKey = asyncio::net::tls::PrivateKey::load(ClientKey);
     REQUIRE(clientKey);
 
     auto clientContext = asyncio::net::tls::ClientConfig{}

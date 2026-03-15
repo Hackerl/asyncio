@@ -6,10 +6,10 @@
 #include <zero/interface.h>
 
 namespace asyncio {
-    DEFINE_ERROR_CONDITION(
+    Z_DEFINE_ERROR_CONDITION(
         IOError,
         "asyncio::io",
-        UNEXPECTED_EOF, "unexpected end of file"
+        UnexpectedEOF, "Unexpected end of file"
     )
 
     using FileDescriptor = uv_os_fd_t;
@@ -31,10 +31,10 @@ namespace asyncio {
 
     class IReader : public virtual zero::Interface {
     public:
-        DEFINE_ERROR_CODE_INNER_EX(
+        Z_DEFINE_ERROR_CODE_INNER_EX(
             ReadExactlyError,
             "asyncio::IReader",
-            UNEXPECTED_EOF, "unexpected end of file", make_error_condition(IOError::UNEXPECTED_EOF)
+            UnexpectedEOF, "Unexpected end of file", make_error_condition(IOError::UnexpectedEOF)
         )
 
         virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
@@ -51,9 +51,9 @@ namespace asyncio {
     class ISeekable : public virtual zero::Interface {
     public:
         enum class Whence {
-            BEGIN,
-            CURRENT,
-            END
+            Begin,
+            Current,
+            End
         };
 
         virtual task::Task<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
@@ -77,23 +77,23 @@ namespace asyncio {
     };
 
     task::Task<std::size_t, std::error_code>
-    copy(zero::detail::Trait<IReader> auto &reader, zero::detail::Trait<IWriter> auto &writer) {
+    copy(zero::traits::Trait<IReader> auto &reader, zero::traits::Trait<IWriter> auto &writer) {
         std::size_t written{0};
 
         while (true) {
             if (co_await task::cancelled)
-                co_return std::unexpected{task::Error::CANCELLED};
+                co_return std::unexpected{task::Error::Cancelled};
 
             std::array<std::byte, 20480> data; // NOLINT(*-pro-type-member-init)
 
             const auto n = co_await std::invoke(&IReader::read, reader, data);
-            CO_EXPECT(n);
+            Z_CO_EXPECT(n);
 
             if (*n == 0)
                 break;
 
             co_await task::lock;
-            CO_EXPECT(co_await std::invoke(&IWriter::writeAll, writer, std::span{data.data(), *n}));
+            Z_CO_EXPECT(co_await std::invoke(&IWriter::writeAll, writer, std::span{data.data(), *n}));
             co_await task::unlock;
 
             written += *n;
@@ -159,7 +159,8 @@ namespace asyncio {
     };
 }
 
-DECLARE_ERROR_CONDITION(asyncio::IOError)
-DECLARE_ERROR_CODE(asyncio::IReader::ReadExactlyError)
+Z_DECLARE_ERROR_CONDITION(asyncio::IOError)
+
+Z_DECLARE_ERROR_CODE(asyncio::IReader::ReadExactlyError)
 
 #endif //ASYNCIO_IO_H

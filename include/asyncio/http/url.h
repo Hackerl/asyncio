@@ -6,15 +6,14 @@
 #include <curl/curl.h>
 #include <zero/cmdline.h>
 #include <zero/error.h>
-#include <fmt/std.h>
 
 namespace asyncio::http {
     std::string urlEscape(const std::string &str);
-    std::expected<std::string, std::error_code> urlUnescape(const std::string &str);
+    std::string urlUnescape(const std::string &str);
 
     class URL {
     public:
-        DEFINE_ERROR_TRANSFORMER_INNER(
+        Z_DEFINE_ERROR_TRANSFORMER_INNER(
             Error,
             "asyncio::http::url",
             [](const int value) { return curl_url_strerror(static_cast<CURLUcode>(value)); }
@@ -55,10 +54,9 @@ namespace asyncio::http {
         template<typename Self>
             requires (!std::is_const_v<Self>)
         Self &&scheme(this Self &&self, const std::string &scheme) {
-            if (const auto result = expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_url_set(self.mURL.get(), CURLUPART_SCHEME, scheme.c_str(), 0);
-            }); !result)
-                throw std::system_error{result.error()};
+            }));
 
             return std::forward<Self>(self);
         }
@@ -66,10 +64,9 @@ namespace asyncio::http {
         template<typename Self>
             requires (!std::is_const_v<Self>)
         Self &&user(this Self &&self, const std::optional<std::string> &user) {
-            if (const auto result = expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_url_set(self.mURL.get(), CURLUPART_USER, user ? user->c_str() : nullptr, CURLU_URLENCODE);
-            }); !result)
-                throw std::system_error{result.error()};
+            }));
 
             return std::forward<Self>(self);
         }
@@ -77,15 +74,14 @@ namespace asyncio::http {
         template<typename Self>
             requires (!std::is_const_v<Self>)
         Self &&password(this Self &&self, const std::optional<std::string> &password) {
-            if (const auto result = expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_url_set(
                     self.mURL.get(),
                     CURLUPART_PASSWORD,
                     password ? password->c_str() : nullptr,
                     CURLU_URLENCODE
                 );
-            }); !result)
-                throw std::system_error{result.error()};
+            }));
 
             return std::forward<Self>(self);
         }
@@ -93,10 +89,9 @@ namespace asyncio::http {
         template<typename Self>
             requires (!std::is_const_v<Self>)
         Self &&host(this Self &&self, const std::optional<std::string> &host) {
-            if (const auto result = expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_url_set(self.mURL.get(), CURLUPART_HOST, host ? host->c_str() : nullptr, 0);
-            }); !result)
-                throw std::system_error{result.error()};
+            }));
 
             return std::forward<Self>(self);
         }
@@ -104,10 +99,9 @@ namespace asyncio::http {
         template<typename Self>
             requires (!std::is_const_v<Self>)
         Self &&path(this Self &&self, const std::string &path) {
-            if (const auto result = expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_url_set(self.mURL.get(), CURLUPART_PATH, path.c_str(), CURLU_URLENCODE);
-            }); !result)
-                throw std::system_error{result.error()};
+            }));
 
             return std::forward<Self>(self);
         }
@@ -115,10 +109,9 @@ namespace asyncio::http {
         template<typename Self>
             requires (!std::is_const_v<Self>)
         Self &&query(this Self &&self, const std::optional<std::string> &query) {
-            if (const auto result = expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_url_set(self.mURL.get(), CURLUPART_QUERY, query ? query->c_str() : nullptr, 0);
-            }); !result)
-                throw std::system_error{result.error()};
+            }));
 
             return std::forward<Self>(self);
         }
@@ -126,15 +119,14 @@ namespace asyncio::http {
         template<typename Self>
             requires (!std::is_const_v<Self>)
         Self &&fragment(this Self &&self, const std::optional<std::string> &fragment) {
-            if (const auto result = expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_url_set(
                     self.mURL.get(),
                     CURLUPART_FRAGMENT,
                     fragment ? fragment->c_str() : nullptr,
                     CURLU_URLENCODE
                 );
-            }); !result)
-                throw std::system_error{result.error()};
+            }));
 
             return std::forward<Self>(self);
         }
@@ -142,10 +134,9 @@ namespace asyncio::http {
         template<typename Self>
             requires (!std::is_const_v<Self>)
         Self &&port(this Self &&self, const std::optional<std::uint16_t> port) {
-            if (const auto result = expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_url_set(self.mURL.get(), CURLUPART_PORT, port ? std::to_string(*port).c_str() : nullptr, 0);
-            }); !result)
-                throw std::system_error{result.error()};
+            }));
 
             return std::forward<Self>(self);
         }
@@ -153,15 +144,14 @@ namespace asyncio::http {
         template<typename Self>
             requires (!std::is_const_v<Self>)
         Self &&appendQuery(this Self &&self, const std::string &query) {
-            if (const auto result = expected([&] {
+            zero::error::guard(expected([&] {
                 return curl_url_set(
                     self.mURL.get(),
                     CURLUPART_QUERY,
                     query.c_str(),
                     CURLU_APPENDQUERY | CURLU_URLENCODE
                 );
-            }); !result)
-                throw std::system_error{result.error()};
+            }));
 
             return std::forward<Self>(self);
         }
@@ -213,7 +203,7 @@ namespace asyncio::http {
     bool operator==(const URL &lhs, const URL &rhs);
 }
 
-DECLARE_ERROR_CODE(asyncio::http::URL::Error)
+Z_DECLARE_ERROR_CODE(asyncio::http::URL::Error)
 
 template<>
 std::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input);

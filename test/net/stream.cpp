@@ -239,7 +239,7 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
 }
 #endif
 
-#if defined(__linux__)
+#ifdef __linux__
 ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
     const auto name = fmt::format("@asyncio-{}", GENERATE(take(1, randomAlphanumericString(8, 16))));
 

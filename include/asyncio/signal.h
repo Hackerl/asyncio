@@ -7,7 +7,7 @@ namespace asyncio {
     class Signal {
     public:
         explicit Signal(uv::Handle<uv_signal_t> signal);
-        static std::expected<Signal, std::error_code> make();
+        static Signal make();
 
         task::Task<int, std::error_code> on(int sig);
 

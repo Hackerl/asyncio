@@ -6,7 +6,6 @@
 
 ASYNC_TEST_CASE("signal", "[signal]") {
     auto signal = asyncio::Signal::make();
-    REQUIRE(signal);
 
     SECTION("normal") {
         std::thread thread{
@@ -16,12 +15,12 @@ ASYNC_TEST_CASE("signal", "[signal]") {
                 kill(getpid(), SIGINT);
             }
         };
-        DEFER(thread.join());
-        REQUIRE(co_await signal->on(SIGINT));
+        Z_DEFER(thread.join());
+        REQUIRE(co_await signal.on(SIGINT));
     }
 
     SECTION("cancel") {
-        auto task = signal->on(SIGINT);
+        auto task = signal.on(SIGINT);
         REQUIRE(task.cancel());
         REQUIRE_ERROR(co_await task, std::errc::operation_canceled);
     }

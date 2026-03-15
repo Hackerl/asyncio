@@ -17,7 +17,6 @@
     TEST_CASE(__VA_ARGS__) {                                \
         const auto _result = asyncio::run(func);            \
         REQUIRE(_result);                                   \
-        REQUIRE(*_result);                                  \
     }                                                       \
                                                             \
     asyncio::task::Task<void> func()
@@ -31,7 +30,6 @@
     TEMPLATE_TEST_CASE(__VA_ARGS__) {                       \
         const auto _result = asyncio::run(func<TestType>);  \
         REQUIRE(_result);                                   \
-        REQUIRE(*_result);                                  \
     }                                                       \
                                                             \
     template<typename TestType>                             \
@@ -113,7 +111,7 @@ private:
     }
 
 public:
-    const std::vector<std::byte> &get() const override {
+    [[nodiscard]] const std::vector<std::byte> &get() const override {
         return mBytes;
     }
 
@@ -138,8 +136,8 @@ public:
         const std::size_t maxLength,
         std::string charset,
         const unsigned int seed
-    ): mGenerator{seed}, mLengthDistribution{minLength, maxLength},
-       mIndexDistribution{0, charset.size() - 1}, mCharset{std::move(charset)} {
+    ) : mGenerator{seed}, mLengthDistribution{minLength, maxLength},
+        mIndexDistribution{0, charset.size() - 1}, mCharset{std::move(charset)} {
         next();
     }
 
@@ -151,7 +149,7 @@ private:
     }
 
 public:
-    const std::string &get() const override {
+    [[nodiscard]] const std::string &get() const override {
         return mString;
     }
 
