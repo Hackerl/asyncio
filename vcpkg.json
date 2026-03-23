@@ -15,6 +15,12 @@
     "tests"
   ],
   "features": {
+    "integration-samples": {
+      "description": "Build integration samples",
+      "dependencies": [
+        "cpp-httplib"
+      ]
+    },
     "tests": {
       "description": "Build Tests",
       "dependencies": [

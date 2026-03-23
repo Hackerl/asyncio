@@ -9,6 +9,9 @@ option(BUILD_SAMPLES "Build asyncio samples" ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 option(ASYNCIO_EMBED_CA_CERT "Use built-in CA certificates instead of system certificates" OFF)
 
+include(CMakeDependentOption)
+cmake_dependent_option(BUILD_INTEGRATION_SAMPLES "Build asyncio integration samples" OFF BUILD_SAMPLES OFF)
+
 if (BUILD_SHARED_LIBS AND MSVC)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif ()

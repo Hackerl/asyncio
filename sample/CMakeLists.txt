@@ -1,3 +1,7 @@
+if (BUILD_INTEGRATION_SAMPLES)
+    find_package(httplib CONFIG REQUIRED)
+endif ()
+
 add_executable(asyncio_tcp_client tcp/client.cpp)
 target_link_libraries(asyncio_tcp_client PRIVATE asyncio-main)
 
@@ -10,8 +14,13 @@ target_link_libraries(asyncio_tls_client PRIVATE asyncio-main)
 add_executable(asyncio_tls_server tls/server.cpp)
 target_link_libraries(asyncio_tls_server PRIVATE asyncio-main)
 
-add_executable(asyncio_http http/main.cpp)
-target_link_libraries(asyncio_http PRIVATE asyncio-main)
+add_executable(asyncio_http_client http/client.cpp)
+target_link_libraries(asyncio_http_client PRIVATE asyncio-main)
+
+if (BUILD_INTEGRATION_SAMPLES)
+    add_executable(asyncio_http_server http/server.cpp)
+    target_link_libraries(asyncio_http_server PRIVATE asyncio-main httplib::httplib)
+endif ()
 
 add_executable(asyncio_ws ws/main.cpp)
 target_link_libraries(asyncio_ws PRIVATE asyncio-main)
