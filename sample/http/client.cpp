@@ -73,6 +73,9 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
         co_return co_await asyncio::error::guard(requests.request(*method, url, options, *body));
     });
 
+    if (const auto code = response.statusCode(); code != 200)
+        throw std::runtime_error{fmt::format("Unexpected HTTP response status code: {}", code)};
+
     if (output) {
         co_await asyncio::error::guard(response.output(*output));
         co_return;
