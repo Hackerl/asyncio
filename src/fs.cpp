@@ -678,7 +678,7 @@ asyncio::task::Task<std::optional<asyncio::fs::DirectoryEntry>, std::error_code>
 }
 
 asyncio::task::Task<asyncio::fs::Asynchronous<std::filesystem::directory_iterator>, std::error_code>
-asyncio::fs::readDirectory(const std::filesystem::path &path) {
+asyncio::fs::readDirectory(const std::filesystem::path path) {
     co_return zero::flattenWith<std::error_code>(co_await toThreadPool(
         [&]() -> std::expected<Asynchronous<std::filesystem::directory_iterator>, std::error_code> {
             std::error_code ec;
@@ -693,7 +693,7 @@ asyncio::fs::readDirectory(const std::filesystem::path &path) {
 }
 
 asyncio::task::Task<asyncio::fs::Asynchronous<std::filesystem::recursive_directory_iterator>, std::error_code>
-asyncio::fs::walkDirectory(const std::filesystem::path &path) {
+asyncio::fs::walkDirectory(const std::filesystem::path path) {
     co_return zero::flattenWith<std::error_code>(co_await toThreadPool(
         [&]() -> std::expected<Asynchronous<std::filesystem::recursive_directory_iterator>, std::error_code> {
             std::error_code ec;

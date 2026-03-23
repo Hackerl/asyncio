@@ -63,8 +63,8 @@ asyncio::net::tls::Certificate::load(const std::string_view content) {
 }
 
 asyncio::task::Task<asyncio::net::tls::Certificate, std::error_code>
-asyncio::net::tls::Certificate::loadFile(const std::filesystem::path &path) {
-    co_return co_await fs::readString(path).andThen(load);
+asyncio::net::tls::Certificate::loadFile(std::filesystem::path path) {
+    co_return co_await fs::readString(std::move(path)).andThen(load);
 }
 
 std::expected<asyncio::net::tls::PrivateKey, std::error_code>
@@ -89,8 +89,8 @@ asyncio::net::tls::PrivateKey::load(const std::string_view content) {
 }
 
 asyncio::task::Task<asyncio::net::tls::PrivateKey, std::error_code>
-asyncio::net::tls::PrivateKey::loadFile(const std::filesystem::path &path) {
-    co_return co_await fs::readString(path).andThen(load);
+asyncio::net::tls::PrivateKey::loadFile(std::filesystem::path path) {
+    co_return co_await fs::readString(std::move(path)).andThen(load);
 }
 
 #ifdef ASYNCIO_EMBED_CA_CERT

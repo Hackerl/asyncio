@@ -49,14 +49,14 @@ namespace asyncio::net::tls {
         std::shared_ptr<X509> inner;
 
         static std::expected<Certificate, std::error_code> load(std::string_view content);
-        static task::Task<Certificate, std::error_code> loadFile(const std::filesystem::path &path);
+        static task::Task<Certificate, std::error_code> loadFile(std::filesystem::path path);
     };
 
     struct PrivateKey {
         std::shared_ptr<EVP_PKEY> inner;
 
         static std::expected<PrivateKey, std::error_code> load(std::string_view content);
-        static task::Task<PrivateKey, std::error_code> loadFile(const std::filesystem::path &path);
+        static task::Task<PrivateKey, std::error_code> loadFile(std::filesystem::path path);
     };
 
     struct CertKeyPair {
