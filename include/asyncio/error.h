@@ -54,6 +54,23 @@ namespace asyncio::error {
         else
             co_return *std::move(result);
     }
+
+    template<typename T>
+    task::Task<std::expected<T, std::exception_ptr>>
+    capture(task::Task<T> task) {
+        try {
+            if constexpr (std::is_void_v<T>) {
+                co_await task;
+                co_return {};
+            }
+            else {
+                co_return co_await task;
+            }
+        }
+        catch (const std::exception &) {
+            co_return std::unexpected{std::current_exception()};
+        }
+    }
 }
 
 #endif //ASYNCIO_ERROR_H

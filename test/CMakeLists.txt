@@ -6,6 +6,7 @@ add_executable(
         fs.cpp
         time.cpp
         poll.cpp
+        error.cpp
         thread.cpp
         buffer.cpp
         binary.cpp

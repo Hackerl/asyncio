@@ -39,9 +39,8 @@ namespace asyncio {
         co_return std::expected<std::expected<T, E>, TimeoutError>{std::move(result)};
     }
 
-    template<typename T, typename E>
-        requires std::is_same_v<E, std::exception_ptr>
-    task::Task<T> timeout(task::Task<T, E> task, const std::chrono::milliseconds ms) {
+    template<typename T>
+    task::Task<T> timeout(task::Task<T> task, const std::chrono::milliseconds ms) {
         if (ms == std::chrono::milliseconds::zero())
             co_return co_await task;
 
