@@ -6,8 +6,7 @@
 #include <fmt/ranges.h>
 
 namespace asyncio::error {
-    template<typename T>
-        requires std::derived_from<T, std::exception>
+    template<std::derived_from<std::exception> T>
     class StacktraceError final : public T {
     public:
         template<typename... Args>
@@ -29,8 +28,7 @@ namespace asyncio::error {
         std::string mMessage;
     };
 
-    template<typename T, typename E>
-        requires std::is_convertible_v<E, std::error_code>
+    template<typename T, std::convertible_to<std::error_code> E>
     task::Task<T> guard(std::expected<T, E> expected) {
         if (!expected)
             throw co_await StacktraceError<std::system_error>::make(expected.error());
@@ -41,8 +39,7 @@ namespace asyncio::error {
             co_return *std::move(expected);
     }
 
-    template<typename T, typename E>
-        requires std::is_convertible_v<E, std::error_code>
+    template<typename T, std::convertible_to<std::error_code> E>
     task::Task<T> guard(task::Task<T, E> task) {
         auto result = co_await task;
 

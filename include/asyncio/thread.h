@@ -43,7 +43,7 @@ namespace asyncio {
     }
 
     template<typename F, typename C>
-        requires std::is_same_v<
+        requires std::same_as<
             std::invoke_result_t<C, std::thread::native_handle_type>,
             std::expected<void, std::error_code>
         >
@@ -175,7 +175,7 @@ namespace asyncio {
     }
 
     template<typename F, typename C>
-        requires std::is_same_v<std::invoke_result_t<C>, std::expected<void, std::error_code>>
+        requires std::same_as<std::invoke_result_t<C>, std::expected<void, std::error_code>>
     task::Task<std::invoke_result_t<F>, ToThreadPoolError>
     toThreadPool(F f, C cancel) {
         using T = std::invoke_result_t<F>;

@@ -13,7 +13,7 @@ namespace asyncio {
     )
 
     template<typename T, typename E>
-        requires (!std::is_same_v<E, std::exception_ptr>)
+        requires (!std::same_as<E, std::exception_ptr>)
     task::Task<std::expected<T, E>, TimeoutError>
     timeout(task::Task<T, E> task, const std::chrono::milliseconds ms) {
         if (ms == std::chrono::milliseconds::zero())

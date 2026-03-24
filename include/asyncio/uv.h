@@ -223,7 +223,7 @@ namespace asyncio::uv {
     )
 
     template<typename F>
-        requires std::is_same_v<std::invoke_result_t<F>, int>
+        requires std::same_as<std::invoke_result_t<F>, int>
     std::expected<std::invoke_result_t<F>, std::error_code> expected(F &&f) {
         const auto result = f();
 

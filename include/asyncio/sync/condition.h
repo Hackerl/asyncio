@@ -9,7 +9,7 @@ namespace asyncio::sync {
         task::Task<void, std::error_code> wait(Mutex &mutex);
 
         template<typename F>
-            requires std::is_same_v<std::invoke_result_t<F>, bool>
+            requires std::same_as<std::invoke_result_t<F>, bool>
         task::Task<void, std::error_code> wait(Mutex &mutex, F predicate) {
             while (!predicate()) {
                 Z_CO_EXPECT(co_await wait(mutex));

@@ -77,14 +77,14 @@ Adds a `callback` associated with the task, which will be called when the task c
 ```c++
 template<typename F>
     requires (
-        !std::is_same_v<E, std::exception_ptr> &&
+        !std::same_as<E, std::exception_ptr> &&
         zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
     )
 Task<typename callback_result_t<F, T>::value_type, E> transform(F f) &&;
 
 template<typename F>
     requires (
-        !std::is_same_v<E, std::exception_ptr> &&
+        !std::same_as<E, std::exception_ptr> &&
         !zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
     )
 Task<callback_result_t<F, T>, E> transform(F f) &&;
@@ -99,14 +99,14 @@ Transforms the value type when the task succeeds, equivalent to `std::expected::
 ```c++
 template<typename F>
     requires (
-        !std::is_same_v<E, std::exception_ptr> &&
+        !std::same_as<E, std::exception_ptr> &&
         zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
     )
 Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
 
 template<typename F>
     requires (
-        !std::is_same_v<E, std::exception_ptr> &&
+        !std::same_as<E, std::exception_ptr> &&
         zero::traits::is_specialization_v<callback_result_t<F, T>, std::expected>
     )
 Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
@@ -121,14 +121,14 @@ Performs the next operation using the value when the task succeeds, equivalent t
 ```c++
 template<typename F>
     requires (
-        !std::is_same_v<E, std::exception_ptr> &&
+        !std::same_as<E, std::exception_ptr> &&
         zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
     )
 Task<T, typename callback_result_t<F, E>::value_type> transformError(F f) &&;
 
 template<typename F>
     requires (
-        !std::is_same_v<E, std::exception_ptr> &&
+        !std::same_as<E, std::exception_ptr> &&
         !zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
     )
 Task<T, callback_result_t<F, E>> transformError(F f) &&;
@@ -143,14 +143,14 @@ Transforms the error type when the task fails, equivalent to `std::expected::tra
 ```c++
 template<typename F>
     requires (
-        !std::is_same_v<E, std::exception_ptr> &&
+        !std::same_as<E, std::exception_ptr> &&
         zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
     )
 Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 
 template<typename F>
     requires (
-        !std::is_same_v<E, std::exception_ptr> &&
+        !std::same_as<E, std::exception_ptr> &&
         zero::traits::is_specialization_v<callback_result_t<F, E>, std::expected>
     )
 Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;

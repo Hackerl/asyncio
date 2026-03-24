@@ -54,13 +54,13 @@ namespace asyncio::task {
         }
 
         template<typename = void>
-            requires (!std::is_same_v<E, std::exception_ptr>)
+            requires (!std::same_as<E, std::exception_ptr>)
         std::expected<T, E> await_resume() {
             return std::move(*result);
         }
 
         template<typename = void>
-            requires std::is_same_v<E, std::exception_ptr>
+            requires std::same_as<E, std::exception_ptr>
         T await_resume() {
             if (!result->has_value())
                 std::rethrow_exception(result->error());
@@ -223,7 +223,7 @@ namespace asyncio::task {
 
         template<typename F>
             requires (
-                !std::is_same_v<E, std::exception_ptr> &&
+                !std::same_as<E, std::exception_ptr> &&
                 zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
             )
         Task<typename callback_result_t<F, T>::value_type, E> transform(F f) && {
@@ -244,7 +244,7 @@ namespace asyncio::task {
 
         template<typename F>
             requires (
-                !std::is_same_v<E, std::exception_ptr> &&
+                !std::same_as<E, std::exception_ptr> &&
                 !zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
             )
         Task<callback_result_t<F, T>, E> transform(F f) && {
@@ -253,7 +253,7 @@ namespace asyncio::task {
 
         template<typename F>
             requires (
-                !std::is_same_v<E, std::exception_ptr> &&
+                !std::same_as<E, std::exception_ptr> &&
                 zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
             )
         Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) && {
@@ -272,7 +272,7 @@ namespace asyncio::task {
 
         template<typename F>
             requires (
-                !std::is_same_v<E, std::exception_ptr> &&
+                !std::same_as<E, std::exception_ptr> &&
                 zero::traits::is_specialization_v<callback_result_t<F, T>, std::expected>
             )
         Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) && {
@@ -281,7 +281,7 @@ namespace asyncio::task {
 
         template<typename F>
             requires (
-                !std::is_same_v<E, std::exception_ptr> &&
+                !std::same_as<E, std::exception_ptr> &&
                 zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
             )
         Task<T, typename callback_result_t<F, E>::value_type> transformError(F f) && {
@@ -301,7 +301,7 @@ namespace asyncio::task {
 
         template<typename F>
             requires (
-                !std::is_same_v<E, std::exception_ptr> &&
+                !std::same_as<E, std::exception_ptr> &&
                 !zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
             )
         Task<T, callback_result_t<F, E>> transformError(F f) && {
@@ -310,7 +310,7 @@ namespace asyncio::task {
 
         template<typename F>
             requires (
-                !std::is_same_v<E, std::exception_ptr> &&
+                !std::same_as<E, std::exception_ptr> &&
                 zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
             )
         Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) && {
@@ -328,7 +328,7 @@ namespace asyncio::task {
 
         template<typename F>
             requires (
-                !std::is_same_v<E, std::exception_ptr> &&
+                !std::same_as<E, std::exception_ptr> &&
                 zero::traits::is_specialization_v<callback_result_t<F, E>, std::expected>
             )
         Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) && {
@@ -574,14 +574,14 @@ namespace asyncio::task {
         }
 
         template<typename U = T>
-            requires std::is_same_v<E, std::exception_ptr>
+            requires std::same_as<E, std::exception_ptr>
         void return_value(U &&value) {
             mFrame->end();
             mPromise->resolve(std::forward<U>(value));
         }
 
         template<typename = void>
-            requires (!std::is_same_v<E, std::exception_ptr>)
+            requires (!std::same_as<E, std::exception_ptr>)
         void return_value(std::expected<T, E> &&result) {
             mFrame->end();
 
@@ -597,7 +597,7 @@ namespace asyncio::task {
         }
 
         template<typename = void>
-            requires (!std::is_same_v<E, std::exception_ptr>)
+            requires (!std::same_as<E, std::exception_ptr>)
         void return_value(const std::expected<T, E> &result) {
             mFrame->end();
 

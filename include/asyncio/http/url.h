@@ -21,7 +21,7 @@ namespace asyncio::http {
 
     private:
         template<typename F>
-            requires std::is_same_v<std::invoke_result_t<F>, CURLUcode>
+            requires std::same_as<std::invoke_result_t<F>, CURLUcode>
         static std::expected<void, std::error_code> expected(F &&f) {
             if (const auto code = f(); code != CURLUE_OK)
                 return std::unexpected{make_error_code(static_cast<Error>(code))};
@@ -164,13 +164,13 @@ namespace asyncio::http {
 
         // `char *` will be implicitly converted to bool, not std::string.
         template<typename Self, typename T>
-            requires std::is_same_v<T, bool>
+            requires std::same_as<T, bool>
         Self &&appendQuery(this Self &&self, const std::string &key, const T value) {
             return std::forward<Self>(self).appendQuery(key, value ? "true" : "false");
         }
 
         template<typename Self, typename T>
-            requires (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
+            requires (std::is_arithmetic_v<T> && !std::same_as<T, bool>)
         Self &&appendQuery(this Self &&self, const std::string &key, const T value) {
             return std::forward<Self>(self).appendQuery(key, std::to_string(value));
         }
@@ -190,7 +190,7 @@ namespace asyncio::http {
         }
 
         template<typename Self, typename T>
-            requires (!std::is_const_v<Self> && std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
+            requires (!std::is_const_v<Self> && std::is_arithmetic_v<T> && !std::same_as<T, bool>)
         Self &&append(this Self &&self, T subPath) {
             return std::forward<Self>(self).append(std::to_string(subPath));
         }

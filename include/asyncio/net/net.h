@@ -45,7 +45,7 @@ namespace asyncio::net {
     using SocketAddress = std::pair<std::unique_ptr<sockaddr, decltype(&std::free)>, socklen_t>;
 
     template<typename T>
-        requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address>)
+        requires (std::same_as<T, IPv4Address> || std::same_as<T, IPv6Address>)
     bool operator==(const IPAddress &lhs, const T &rhs) {
         return std::visit(
             [&]<typename U>(const U &arg) {
@@ -59,7 +59,7 @@ namespace asyncio::net {
     }
 
     template<typename T>
-        requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address>)
+        requires (std::same_as<T, IPv4Address> || std::same_as<T, IPv6Address>)
     bool operator==(const T &lhs, const IPAddress &rhs) {
         return std::visit(
             [&]<typename U>(const U &arg) {
@@ -73,7 +73,7 @@ namespace asyncio::net {
     }
 
     template<typename T>
-        requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address> || std::is_same_v<T, UnixAddress>)
+        requires (std::same_as<T, IPv4Address> || std::same_as<T, IPv6Address> || std::same_as<T, UnixAddress>)
     bool operator==(const Address &lhs, const T &rhs) {
         return std::visit(
             [&]<typename U>(const U &arg) {
@@ -87,7 +87,7 @@ namespace asyncio::net {
     }
 
     template<typename T>
-        requires (std::is_same_v<T, IPv4Address> || std::is_same_v<T, IPv6Address> || std::is_same_v<T, UnixAddress>)
+        requires (std::same_as<T, IPv4Address> || std::same_as<T, IPv6Address> || std::same_as<T, UnixAddress>)
     bool operator==(const T &lhs, const Address &rhs) {
         return std::visit(
             [&]<typename U>(const U &arg) {

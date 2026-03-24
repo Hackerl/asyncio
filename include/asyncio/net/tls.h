@@ -27,7 +27,7 @@ namespace asyncio::net::tls {
 #endif
 
     template<typename F>
-        requires (std::is_same_v<std::invoke_result_t<F>, int> || std::is_same_v<std::invoke_result_t<F>, long>)
+        requires (std::same_as<std::invoke_result_t<F>, int> || std::same_as<std::invoke_result_t<F>, long>)
     std::expected<void, std::error_code> expected(F &&f) {
         const auto result = f();
 

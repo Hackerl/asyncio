@@ -10,7 +10,7 @@ task::Task<std::invoke_result_t<F>>
 toThread(F f);
 
 template<typename F, typename C>
-requires std::is_same_v<
+requires std::same_as<
     std::invoke_result_t<C, std::thread::native_handle_type>,
     std::expected<void, std::error_code>
 >

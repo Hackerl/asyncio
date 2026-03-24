@@ -21,7 +21,7 @@ namespace asyncio::http {
     )
 
     template<typename F>
-        requires std::is_same_v<std::invoke_result_t<F>, CURLcode>
+        requires std::same_as<std::invoke_result_t<F>, CURLcode>
     std::expected<void, std::error_code> expected(F &&f) {
         if (const auto code = f(); code != CURLE_OK)
             return std::unexpected{make_error_code(static_cast<CURLError>(code))};
@@ -30,7 +30,7 @@ namespace asyncio::http {
     }
 
     template<typename F>
-        requires std::is_same_v<std::invoke_result_t<F>, CURLMcode>
+        requires std::same_as<std::invoke_result_t<F>, CURLMcode>
     std::expected<void, std::error_code> expected(F &&f) {
         if (const auto code = f(); code != CURLM_OK)
             return std::unexpected{make_error_code(static_cast<CURLMError>(code))};
@@ -173,8 +173,8 @@ namespace asyncio::http {
         template<typename T>
             requires (
                 std::is_class_v<T> &&
-                !std::is_same_v<T, std::string> &&
-                (std::is_same_v<T, nlohmann::json> || nlohmann::detail::is_compatible_type<nlohmann::json, T>::value)
+                !std::same_as<T, std::string> &&
+                (std::same_as<T, nlohmann::json> || nlohmann::detail::is_compatible_type<nlohmann::json, T>::value)
             )
         task::Task<Response, std::error_code> request(
             std::string method,
