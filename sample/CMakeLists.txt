@@ -24,3 +24,7 @@ endif ()
 
 add_executable(asyncio_ws ws/main.cpp)
 target_link_libraries(asyncio_ws PRIVATE asyncio-main)
+
+if (BUILD_INTEGRATION_SAMPLES)
+    add_subdirectory(grpc)
+endif ()

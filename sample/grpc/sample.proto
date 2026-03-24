@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package sample;
+
+service SampleService {
+  rpc Echo(EchoRequest) returns (EchoResponse);
+
+  rpc GetNumbers(GetNumbersRequest) returns (stream Number);
+
+  rpc Sum(stream Number) returns (SumResponse);
+
+  rpc Chat(stream ChatMessage) returns (stream ChatMessage);
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+  string message = 1;
+  int64 timestamp = 2;
+}
+
+message GetNumbersRequest {
+  int32 value = 1;
+  int32 count = 2;
+}
+
+message Number {
+  int32 value = 1;
+}
+
+message SumResponse {
+  int32 total = 1;
+  int32 count = 2;
+}
+
+message ChatMessage {
+  string user = 1;
+  string content = 2;
+  int64 timestamp = 3;
+}

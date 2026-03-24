@@ -18,7 +18,8 @@
     "integration-samples": {
       "description": "Build integration samples",
       "dependencies": [
-        "cpp-httplib"
+        "cpp-httplib",
+        "grpc"
       ]
     },
     "tests": {
