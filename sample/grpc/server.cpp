@@ -157,9 +157,15 @@ public:
 
     virtual ~GenericServer() = default;
 
+private:
+    virtual asyncio::task::Task<void> dispatch() = 0;
+
 protected:
-    template<typename Service, typename Request, typename Response>
-        requires std::derived_from<AsyncService, Service>
+    template<typename Service, typename Request, typename Response, typename F>
+        requires std::derived_from<AsyncService, Service> &&
+        requires(F &&f, Request request) {
+            { std::invoke(std::forward<F>(f), std::move(request)) } -> std::same_as<asyncio::task::Task<Response>>;
+        }
     asyncio::task::Task<void>
     handle(
         void (Service::*method)(grpc::ServerContext *,
@@ -168,7 +174,7 @@ protected:
                                 grpc::CompletionQueue *,
                                 grpc::ServerCompletionQueue *,
                                 void *),
-        std::function<asyncio::task::Task<Response>(Request)> handler
+        F handler
     ) {
         asyncio::task::TaskGroup group;
 
@@ -200,7 +206,7 @@ protected:
                 [
                     &handler, context = std::move(context), request = std::move(request), writer = std::move(writer)
                 ]() mutable -> asyncio::task::Task<void> {
-                    const auto response = co_await asyncio::error::capture(handler(std::move(request)));
+                    const auto response = co_await asyncio::error::capture(std::invoke(handler, std::move(request)));
 
                     asyncio::Promise<bool> promise;
 
@@ -238,8 +244,13 @@ protected:
         co_await group;
     }
 
-    template<typename Service, typename Request, typename Element>
-        requires std::derived_from<AsyncService, Service>
+    template<typename Service, typename Request, typename Element, typename F>
+        requires std::derived_from<AsyncService, Service> &&
+        requires(F &&f, Request request, Writer<Element> writer) {
+            {
+                std::invoke(std::forward<F>(f), std::move(request), std::move(writer))
+            } -> std::same_as<asyncio::task::Task<void>>;
+        }
     asyncio::task::Task<void>
     handle(
         void (Service::*method)(grpc::ServerContext *,
@@ -248,7 +259,7 @@ protected:
                                 grpc::CompletionQueue *,
                                 grpc::ServerCompletionQueue *,
                                 void *),
-        std::function<asyncio::task::Task<void>(Request, Writer<Element>)> handler
+        F handler
     ) {
         asyncio::task::TaskGroup group;
 
@@ -281,7 +292,7 @@ protected:
                     &handler, context = std::move(context), request = std::move(request), writer = std::move(writer)
                 ]() mutable -> asyncio::task::Task<void> {
                     const auto result = co_await asyncio::error::capture(
-                        handler(std::move(request), Writer{context, writer})
+                        std::invoke(handler, std::move(request), Writer{context, writer})
                     );
 
                     asyncio::Promise<bool> promise;
@@ -320,8 +331,11 @@ protected:
         co_await group;
     }
 
-    template<typename Service, typename Element, typename Response>
-        requires std::derived_from<AsyncService, Service>
+    template<typename Service, typename Element, typename Response, typename F>
+        requires std::derived_from<AsyncService, Service> &&
+        requires(F &&f, Reader<Element> reader) {
+            { std::invoke(std::forward<F>(f), std::move(reader)) } -> std::same_as<asyncio::task::Task<Response>>;
+        }
     asyncio::task::Task<void>
     handle(
         void (Service::*method)(grpc::ServerContext *,
@@ -329,7 +343,7 @@ protected:
                                 grpc::CompletionQueue *,
                                 grpc::ServerCompletionQueue *,
                                 void *),
-        std::function<asyncio::task::Task<Response>(Reader<Element>)> handler
+        F handler
     ) {
         asyncio::task::TaskGroup group;
 
@@ -359,7 +373,7 @@ protected:
                     using Impl = Reader<Element>::template Impl<Response>;
 
                     const auto response = co_await asyncio::error::capture(
-                        handler(Reader<Element>{std::make_unique<Impl>(context, reader)})
+                        std::invoke(handler, Reader<Element>{std::make_unique<Impl>(context, reader)})
                     );
 
                     asyncio::Promise<bool> promise;
@@ -398,8 +412,11 @@ protected:
         co_await group;
     }
 
-    template<typename Service, typename RequestElement, typename ResponseElement>
-        requires std::derived_from<AsyncService, Service>
+    template<typename Service, typename RequestElement, typename ResponseElement, typename F>
+        requires std::derived_from<AsyncService, Service> &&
+        requires(F &&f, Stream<RequestElement, ResponseElement> stream) {
+            { std::invoke(std::forward<F>(f), std::move(stream)) } -> std::same_as<asyncio::task::Task<void>>;
+        }
     asyncio::task::Task<void>
     handle(
         void (Service::*method)(grpc::ServerContext *,
@@ -407,7 +424,7 @@ protected:
                                 grpc::CompletionQueue *,
                                 grpc::ServerCompletionQueue *,
                                 void *),
-        std::function<asyncio::task::Task<void>(Stream<RequestElement, ResponseElement>)> handler
+        F handler
     ) {
         asyncio::task::TaskGroup group;
 
@@ -436,7 +453,7 @@ protected:
 
             auto task = asyncio::task::spawn(
                 [&handler, context = std::move(context), stream = std::move(stream)]() -> asyncio::task::Task<void> {
-                    const auto result = co_await asyncio::error::capture(handler(Stream{context, stream}));
+                    const auto result = co_await asyncio::error::capture(std::invoke(handler, Stream{context, stream}));
 
                     asyncio::Promise<bool> promise;
 
@@ -473,8 +490,6 @@ protected:
         std::ignore = group.cancel();
         co_await group;
     }
-
-    virtual asyncio::task::Task<void> dispatch() = 0;
 
 public:
     asyncio::task::Task<void> shutdown() {
@@ -524,6 +539,7 @@ public:
         return {std::move(server), std::move(service), std::move(completionQueue)};
     }
 
+private:
     static asyncio::task::Task<sample::EchoResponse> echo(const sample::EchoRequest request) {
         sample::EchoResponse response;
         response.set_message(request.message());
@@ -574,10 +590,10 @@ public:
 
     asyncio::task::Task<void> dispatch() override {
         co_await all(
-            handle(&sample::SampleService::AsyncService::RequestEcho, std::function{echo}),
-            handle(&sample::SampleService::AsyncService::RequestGetNumbers, std::function{getNumbers}),
-            handle(&sample::SampleService::AsyncService::RequestSum, std::function{sum}),
-            handle(&sample::SampleService::AsyncService::RequestChat, std::function{chat})
+            handle(&sample::SampleService::AsyncService::RequestEcho, echo),
+            handle(&sample::SampleService::AsyncService::RequestGetNumbers, getNumbers),
+            handle(&sample::SampleService::AsyncService::RequestSum, sum),
+            handle(&sample::SampleService::AsyncService::RequestChat, chat)
         );
     }
 };

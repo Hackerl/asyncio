@@ -386,7 +386,7 @@ private:
     std::unique_ptr<Stub> mStub;
 };
 
-class Client : GenericClient<sample::SampleService> {
+class Client final : public GenericClient<sample::SampleService> {
 public:
     using GenericClient::GenericClient;
 
