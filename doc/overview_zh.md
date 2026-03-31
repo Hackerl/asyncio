@@ -57,8 +57,7 @@ tag:
 
 ```c++
 namespace asyncio {
-    template<typename F>
-        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
+    template<Invocable F>
     std::expected<
         typename std::invoke_result_t<F>::value_type,
         typename std::invoke_result_t<F>::error_type
@@ -66,7 +65,7 @@ namespace asyncio {
     run(const std::shared_ptr<EventLoop> &eventLoop, F &&f) {
         setEventLoop(eventLoop);
 
-        auto task = f().addCallback([&] {
+        auto task = std::invoke(std::forward<F>(f)).addCallback([&] {
             eventLoop->stop();
         });
 
@@ -75,8 +74,7 @@ namespace asyncio {
         return {task.future().result()};
     }
 
-    template<typename F>
-        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
+    template<Invocable F>
     auto run(F &&f) {
         return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
     }

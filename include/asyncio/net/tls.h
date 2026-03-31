@@ -27,9 +27,10 @@ namespace asyncio::net::tls {
 #endif
 
     template<typename F>
-        requires (std::same_as<std::invoke_result_t<F>, int> || std::same_as<std::invoke_result_t<F>, long>)
+        requires requires(F &&f) { { std::invoke(std::forward<F>(f)) } -> std::same_as<int>; } ||
+        requires(F &&f) { { std::invoke(std::forward<F>(f)) } -> std::same_as<long>; }
     std::expected<void, std::error_code> expected(F &&f) {
-        const auto result = f();
+        const auto result = std::invoke(std::forward<F>(f));
 
         if (result != 1)
             return std::unexpected{openSSLError()};
@@ -79,29 +80,25 @@ namespace asyncio::net::tls {
 #endif
 
     public:
-        template<typename Self>
-            requires (!std::is_const_v<Self>)
+        template<zero::meta::Mutable Self>
         Self &&minVersion(this Self &&self, const Version version) {
             self.mMinVersion = version;
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
-            requires (!std::is_const_v<Self>)
+        template<zero::meta::Mutable Self>
         Self &&maxVersion(this Self &&self, const Version version) {
             self.mMaxVersion = version;
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
-            requires (!std::is_const_v<Self>)
+        template<zero::meta::Mutable Self>
         Self &&rootCAs(this Self &&self, std::list<Certificate> certificates) {
             self.mRootCAs = std::move(certificates);
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
-            requires (!std::is_const_v<Self>)
+        template<zero::meta::Mutable Self>
         Self &&certKeyPairs(this Self &&self, std::list<CertKeyPair> pairs) {
             self.mCertKeyPairs = std::move(pairs);
             return std::forward<Self>(self);
@@ -200,8 +197,7 @@ namespace asyncio::net::tls {
 
     class ClientConfig : public Config {
     public:
-        template<typename Self>
-            requires (!std::is_const_v<Self>)
+        template<zero::meta::Mutable Self>
         Self &&insecure(this Self &&self, const bool enable) {
             self.mInsecure = enable;
             return std::forward<Self>(self);
@@ -212,8 +208,7 @@ namespace asyncio::net::tls {
     public:
         ServerConfig();
 
-        template<typename Self>
-            requires (!std::is_const_v<Self>)
+        template<zero::meta::Mutable Self>
         Self &&verifyClient(this Self &&self, const bool enable) {
             self.mInsecure = !enable;
             return std::forward<Self>(self);
@@ -228,9 +223,9 @@ namespace asyncio::net::tls {
 
     template<typename T>
         requires (
-            zero::traits::Trait<T, IReader> &&
-            zero::traits::Trait<T, IWriter> &&
-            zero::traits::Trait<T, ICloseable>
+            zero::meta::Trait<T, IReader> &&
+            zero::meta::Trait<T, IWriter> &&
+            zero::meta::Trait<T, ICloseable>
         )
     class TLS final : public IReader, public IWriter, public ICloseable, public IHalfCloseable {
     public:
@@ -428,9 +423,9 @@ namespace asyncio::net::tls {
 
     template<typename T>
         requires (
-            zero::traits::Trait<T, IReader> &&
-            zero::traits::Trait<T, IWriter> &&
-            zero::traits::Trait<T, ICloseable>
+            zero::meta::Trait<T, IReader> &&
+            zero::meta::Trait<T, IWriter> &&
+            zero::meta::Trait<T, ICloseable>
         )
     task::Task<TLS<T>, std::error_code> connect(
         T stream,
@@ -474,9 +469,9 @@ namespace asyncio::net::tls {
 
     template<typename T>
         requires (
-            zero::traits::Trait<T, IReader> &&
-            zero::traits::Trait<T, IWriter> &&
-            zero::traits::Trait<T, ICloseable>
+            zero::meta::Trait<T, IReader> &&
+            zero::meta::Trait<T, IWriter> &&
+            zero::meta::Trait<T, ICloseable>
         )
     task::Task<TLS<T>, std::error_code> accept(T stream, const Context context) {
         std::unique_ptr<SSL, decltype(&SSL_free)> ssl{SSL_new(context.get()), SSL_free};

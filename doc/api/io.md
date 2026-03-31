@@ -261,7 +261,7 @@ Writes all data in the buffer to the underlying `IO`.
 ## Function `copy`
 
 ```c++
-task::Task<std::size_t, std::error_code> copy(zero::traits::Trait<IReader> auto &reader, zero::traits::Trait<IWriter> auto &writer);
+task::Task<std::size_t, std::error_code> copy(zero::meta::Trait<IReader> auto &reader, zero::meta::Trait<IWriter> auto &writer);
 ```
 
 Reads data from `reader` and writes it to `writer` until `read` returns `0` or `write` encounters an error, returning the actual number of bytes copied.
@@ -289,14 +289,7 @@ Reads data from the string into `data`.
 
 ### Class `StringWriter`
 
-```c++
-class StringWriter final : public IWriter {
-public:
-    explicit StringWriter(std::string &string);
-};
-```
-
-Wraps a `std::string` object as an `IWriter` interface.
+An `IWriter` implementation that stores written data in an internal `std::string`.
 
 ### Method `write`
 
@@ -309,8 +302,9 @@ Writes data into the string.
 ### Method `data`
 
 ```c++
+template<typename Self>
 auto &&data(this Self &&self) {
-    return self.mString;
+    return std::forward<Self>(self).mString;
 }
 ```
 
@@ -319,8 +313,9 @@ Accesses the underlying `std::string` member.
 ### Method `operator*`
 
 ```c++
+template<typename Self>
 auto &&operator*(this Self &&self) {
-    return self.mString;
+    return std::forward<Self>(self).mString;
 }
 ```
 
@@ -347,14 +342,7 @@ Reads data from the byte array into `data`.
 
 ### Class `BytesWriter`
 
-```c++
-class BytesWriter final : public IWriter {
-public:
-    explicit BytesWriter(std::vector<std::byte> &bytes);
-};
-```
-
-Wraps a `std::vector<std::byte>` object as an `IWriter` interface.
+An `IWriter` implementation that stores written data in an internal `std::vector<std::byte>`.
 
 ### Method `write`
 
@@ -367,8 +355,9 @@ Writes data into the byte array.
 ### Method `data`
 
 ```c++
+template<typename Self>
 auto &&data(this Self &&self) {
-    return self.mBytes;
+    return std::forward<Self>(self).mBytes;
 }
 ```
 
@@ -377,8 +366,9 @@ Accesses the underlying `std::vector<std::byte>` member.
 ### Method `operator*`
 
 ```c++
+template<typename Self>
 auto &&operator*(this Self &&self) {
-    return self.mBytes;
+    return std::forward<Self>(self).mBytes;
 }
 ```
 

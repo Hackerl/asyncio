@@ -53,15 +53,11 @@ namespace asyncio::task {
             });
         }
 
-        template<typename = void>
-            requires (!std::same_as<E, std::exception_ptr>)
-        std::expected<T, E> await_resume() {
+        std::expected<T, E> await_resume() requires (!std::same_as<E, std::exception_ptr>) {
             return std::move(*result);
         }
 
-        template<typename = void>
-            requires std::same_as<E, std::exception_ptr>
-        T await_resume() {
+        T await_resume() requires std::same_as<E, std::exception_ptr> {
             if (!result->has_value())
                 std::rethrow_exception(result->error());
 
@@ -171,7 +167,29 @@ namespace asyncio::task {
     inline constexpr Backtrace backtrace;
 
     template<typename F, typename T>
-    using callback_result_t = zero::async::promise::callback_result_t<F, T>;
+    using InvokeResult = std::conditional_t<
+        std::is_void_v<T>,
+        std::invoke_result<F>,
+        std::invoke_result<F, T>
+    >::type;
+
+    template<typename F, typename T>
+    concept AsyncFunction =
+        (!std::is_void_v<T> && requires(F &&f, T &&arg) {
+            { std::invoke(std::forward<F>(f), std::forward<T>(arg)) } -> zero::meta::Specialization<Task>;
+        }) ||
+        (std::is_void_v<T> && requires(F &&f) {
+            { std::invoke(std::forward<F>(f)) } -> zero::meta::Specialization<Task>;
+        });
+
+    template<typename F, typename T>
+    concept FallibleFunction =
+        (!std::is_void_v<T> && requires(F &&f, T &&arg) {
+            { std::invoke(std::forward<F>(f), std::forward<T>(arg)) } -> zero::meta::Specialization<std::expected>;
+        }) ||
+        (std::is_void_v<T> && requires(F &&f) {
+            { std::invoke(std::forward<F>(f)) } -> zero::meta::Specialization<std::expected>;
+        });
 
     template<typename T, typename E = std::exception_ptr>
     class Task {
@@ -206,8 +224,7 @@ namespace asyncio::task {
             return mFrame->trace();
         }
 
-        template<typename Self>
-            requires (!std::is_const_v<Self>)
+        template<zero::meta::Mutable Self>
         Self &&addCallback(this Self &&self, std::function<void()> callback) {
             if (self.done()) {
                 getEventLoop()->post([callback = std::move(callback)] {
@@ -221,15 +238,10 @@ namespace asyncio::task {
             return std::forward<Self>(self);
         }
 
-        template<typename F>
-            requires (
-                !std::same_as<E, std::exception_ptr> &&
-                zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
-            )
-        Task<typename callback_result_t<F, T>::value_type, E> transform(F f) && {
-            static_assert(
-                std::is_same_v<typename callback_result_t<F, T>::error_type, std::exception_ptr>
-            );
+        template<AsyncFunction<T> F>
+            requires (!std::same_as<E, std::exception_ptr>)
+        Task<typename InvokeResult<F, T>::value_type, E> transform(F f) && {
+            static_assert(std::is_same_v<typename InvokeResult<F, T>::error_type, std::exception_ptr>);
 
             auto result = co_await *this;
 
@@ -237,27 +249,21 @@ namespace asyncio::task {
                 co_return std::unexpected{std::move(result).error()};
 
             if constexpr (std::is_void_v<T>)
-                co_return co_await f();
+                co_return co_await std::invoke(std::move(f));
             else
-                co_return co_await std::invoke(f, *std::move(result));
+                co_return co_await std::invoke(std::move(f), *std::move(result));
         }
 
         template<typename F>
-            requires (
-                !std::same_as<E, std::exception_ptr> &&
-                !zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
-            )
-        Task<callback_result_t<F, T>, E> transform(F f) && {
-            co_return (co_await *this).transform(f);
+            requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, T>)
+        Task<InvokeResult<F, T>, E> transform(F f) && {
+            co_return (co_await *this).transform(std::move(f));
         }
 
-        template<typename F>
-            requires (
-                !std::same_as<E, std::exception_ptr> &&
-                zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
-            )
-        Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) && {
-            static_assert(std::is_same_v<typename callback_result_t<F, T>::error_type, E>);
+        template<AsyncFunction<T> F>
+            requires (!std::same_as<E, std::exception_ptr>)
+        Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) && {
+            static_assert(std::is_same_v<typename InvokeResult<F, T>::error_type, E>);
 
             auto result = co_await *this;
 
@@ -265,33 +271,25 @@ namespace asyncio::task {
                 co_return std::unexpected{std::move(result).error()};
 
             if constexpr (std::is_void_v<T>)
-                co_return co_await f();
+                co_return co_await std::invoke(std::move(f));
             else
-                co_return co_await std::invoke(f, *std::move(result));
+                co_return co_await std::invoke(std::move(f), *std::move(result));
         }
 
-        template<typename F>
-            requires (
-                !std::same_as<E, std::exception_ptr> &&
-                zero::traits::is_specialization_v<callback_result_t<F, T>, std::expected>
-            )
-        Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) && {
-            co_return (co_await *this).and_then(f);
+        template<FallibleFunction<T> F>
+            requires (!std::same_as<E, std::exception_ptr>)
+        Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) && {
+            co_return (co_await *this).and_then(std::move(f));
         }
 
-        template<typename F>
-            requires (
-                !std::same_as<E, std::exception_ptr> &&
-                zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
-            )
-        Task<T, typename callback_result_t<F, E>::value_type> transformError(F f) && {
-            static_assert(
-                std::is_same_v<typename callback_result_t<F, E>::error_type, std::exception_ptr>
-            );
+        template<AsyncFunction<E> F>
+            requires (!std::same_as<E, std::exception_ptr>)
+        Task<T, typename InvokeResult<F, E>::value_type> transformError(F f) && {
+            static_assert(std::is_same_v<typename InvokeResult<F, E>::error_type, std::exception_ptr>);
             auto result = co_await *this;
 
             if (!result)
-                co_return std::unexpected{co_await std::invoke(f, std::move(result).error())};
+                co_return std::unexpected{co_await std::invoke(std::move(f), std::move(result).error())};
 
             if constexpr (std::is_void_v<T>)
                 co_return {};
@@ -300,25 +298,19 @@ namespace asyncio::task {
         }
 
         template<typename F>
-            requires (
-                !std::same_as<E, std::exception_ptr> &&
-                !zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
-            )
-        Task<T, callback_result_t<F, E>> transformError(F f) && {
-            co_return (co_await *this).transform_error(f);
+            requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, E>)
+        Task<T, InvokeResult<F, E>> transformError(F f) && {
+            co_return (co_await *this).transform_error(std::move(f));
         }
 
-        template<typename F>
-            requires (
-                !std::same_as<E, std::exception_ptr> &&
-                zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
-            )
-        Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) && {
-            static_assert(std::is_same_v<typename callback_result_t<F, E>::value_type, T>);
+        template<AsyncFunction<E> F>
+            requires (!std::same_as<E, std::exception_ptr>)
+        Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) && {
+            static_assert(std::is_same_v<typename InvokeResult<F, E>::value_type, T>);
             auto result = co_await *this;
 
             if (!result)
-                co_return co_await std::invoke(f, std::move(result).error());
+                co_return co_await std::invoke(std::move(f), std::move(result).error());
 
             if constexpr (std::is_void_v<T>)
                 co_return {};
@@ -326,13 +318,10 @@ namespace asyncio::task {
                 co_return *std::move(result);
         }
 
-        template<typename F>
-            requires (
-                !std::same_as<E, std::exception_ptr> &&
-                zero::traits::is_specialization_v<callback_result_t<F, E>, std::expected>
-            )
-        Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) && {
-            co_return (co_await *this).or_else(f);
+        template<FallibleFunction<E> F>
+            requires (!std::same_as<E, std::exception_ptr>)
+        Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) && {
+            co_return (co_await *this).or_else(std::move(f));
         }
 
         [[nodiscard]] bool done() const {
@@ -368,7 +357,7 @@ namespace asyncio::task {
         std::expected<void, std::error_code> cancel();
 
         template<typename T>
-            requires zero::traits::is_specialization_v<std::remove_cvref_t<T>, Task>
+            requires zero::meta::Specialization<std::remove_cvref_t<T>, Task>
         void add(T &&task) {
             if (task.mFrame->finished)
                 return;
@@ -580,9 +569,7 @@ namespace asyncio::task {
             mPromise->resolve(std::forward<U>(value));
         }
 
-        template<typename = void>
-            requires (!std::same_as<E, std::exception_ptr>)
-        void return_value(std::expected<T, E> &&result) {
+        void return_value(std::expected<T, E> &&result) requires (!std::same_as<E, std::exception_ptr>) {
             mFrame->end();
 
             if (!result) {
@@ -596,9 +583,7 @@ namespace asyncio::task {
                 mPromise->resolve(std::move(result).value());
         }
 
-        template<typename = void>
-            requires (!std::same_as<E, std::exception_ptr>)
-        void return_value(const std::expected<T, E> &result) {
+        void return_value(const std::expected<T, E> &result) requires (!std::same_as<E, std::exception_ptr>) {
             mFrame->end();
 
             if (!result) {
@@ -805,7 +790,7 @@ namespace asyncio::task {
     };
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using all_ranges_future_t = decltype(
+    using AllRangesFuture = decltype(
         zero::async::promise::all(
             std::ranges::subrange{std::declval<I>(), std::declval<S>()} | std::views::transform([](auto &task) {
                 return task.future();
@@ -814,22 +799,22 @@ namespace asyncio::task {
     );
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using all_ranges_value_t = all_ranges_future_t<I, S>::value_type;
+    using AllRangesValue = AllRangesFuture<I, S>::value_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using all_ranges_error_t = all_ranges_future_t<I, S>::error_type;
+    using AllRangesError = AllRangesFuture<I, S>::error_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-        requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+        requires zero::meta::Specialization<std::iter_value_t<I>, Task>
     Task<
-        all_ranges_value_t<I, S>,
-        all_ranges_error_t<I, S>
+        AllRangesValue<I, S>,
+        AllRangesError<I, S>
     >
     all(I first, S last) {
         assert(first != last);
 
-        using T = all_ranges_value_t<I, S>;
-        using E = all_ranges_error_t<I, S>;
+        using T = AllRangesValue<I, S>;
+        using E = AllRangesError<I, S>;
 
         TaskGroup group;
 
@@ -860,31 +845,31 @@ namespace asyncio::task {
     }
 
     template<std::ranges::input_range R>
-        requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+        requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
     auto all(R &&tasks) {
         return all(tasks.begin(), tasks.end());
     }
 
     template<typename... Ts>
-    using all_variadic_future_t = decltype(zero::async::promise::all(std::declval<Ts>().future()...));
+    using AllVariadicFuture = decltype(zero::async::promise::all(std::declval<Ts>().future()...));
 
     template<typename... Ts>
-    using all_variadic_value_t = all_variadic_future_t<Ts...>::value_type;
+    using AllVariadicValue = AllVariadicFuture<Ts...>::value_type;
 
     template<typename... Ts>
-    using all_variadic_error_t = all_variadic_future_t<Ts...>::error_type;
+    using AllVariadicError = AllVariadicFuture<Ts...>::error_type;
 
     template<typename... Ts>
-        requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+        requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
     Task<
-        all_variadic_value_t<Ts...>,
-        all_variadic_error_t<Ts...>
+        AllVariadicValue<Ts...>,
+        AllVariadicError<Ts...>
     >
     all(Ts &&... tasks) {
         static_assert(sizeof...(Ts) > 0);
 
-        using T = all_variadic_value_t<Ts...>;
-        using E = all_variadic_error_t<Ts...>;
+        using T = AllVariadicValue<Ts...>;
+        using E = AllVariadicError<Ts...>;
 
         TaskGroup group;
 
@@ -913,7 +898,7 @@ namespace asyncio::task {
     }
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using all_settled_ranges_future_t = decltype(
+    using AllSettledRangesFuture = decltype(
         zero::async::promise::allSettled(
             std::ranges::subrange{std::declval<I>(), std::declval<S>()} | std::views::transform([](auto &task) {
                 return task.future();
@@ -922,11 +907,11 @@ namespace asyncio::task {
     );
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using all_settled_ranges_value_t = all_settled_ranges_future_t<I, S>::value_type;
+    using AllSettledRangesValue = AllSettledRangesFuture<I, S>::value_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-        requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
-    Task<all_settled_ranges_value_t<I, S>>
+        requires zero::meta::Specialization<std::iter_value_t<I>, Task>
+    Task<AllSettledRangesValue<I, S>>
     allSettled(I first, S last) {
         assert(first != last);
 
@@ -947,20 +932,20 @@ namespace asyncio::task {
     }
 
     template<std::ranges::input_range R>
-        requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+        requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
     auto allSettled(R &&tasks) {
         return allSettled(tasks.begin(), tasks.end());
     }
 
     template<typename... Ts>
-    using all_settled_variadic_future_t = decltype(zero::async::promise::allSettled(std::declval<Ts>().future()...));
+    using AllSettledVariadicFuture = decltype(zero::async::promise::allSettled(std::declval<Ts>().future()...));
 
     template<typename... Ts>
-    using all_settled_variadic_value_t = all_settled_variadic_future_t<Ts...>::value_type;
+    using AllSettledVariadicValue = AllSettledVariadicFuture<Ts...>::value_type;
 
     template<typename... Ts>
-        requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
-    Task<all_settled_variadic_value_t<Ts...>>
+        requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
+    Task<AllSettledVariadicValue<Ts...>>
     allSettled(Ts &&... tasks) {
         static_assert(sizeof...(Ts) > 0);
 
@@ -979,7 +964,7 @@ namespace asyncio::task {
     }
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using any_ranges_future_t = decltype(
+    using AnyRangesFuture = decltype(
         zero::async::promise::any(
             std::ranges::subrange{std::declval<I>(), std::declval<S>()} | std::views::transform([](auto &task) {
                 return task.future();
@@ -988,16 +973,16 @@ namespace asyncio::task {
     );
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using any_ranges_value_t = any_ranges_future_t<I, S>::value_type;
+    using AnyRangesValue = AnyRangesFuture<I, S>::value_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using any_ranges_error_t = any_ranges_future_t<I, S>::error_type;
+    using AnyRangesError = AnyRangesFuture<I, S>::error_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-        requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+        requires zero::meta::Specialization<std::iter_value_t<I>, Task>
     Task<
-        any_ranges_value_t<I, S>,
-        any_ranges_error_t<I, S>
+        AnyRangesValue<I, S>,
+        AnyRangesError<I, S>
     >
     any(I first, S last) {
         assert(first != last);
@@ -1019,25 +1004,25 @@ namespace asyncio::task {
     }
 
     template<std::ranges::input_range R>
-        requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+        requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
     auto any(R &&tasks) {
         return any(tasks.begin(), tasks.end());
     }
 
     template<typename... Ts>
-    using any_variadic_future_t = decltype(zero::async::promise::any(std::declval<Ts>().future()...));
+    using AnyVariadicFuture = decltype(zero::async::promise::any(std::declval<Ts>().future()...));
 
     template<typename... Ts>
-    using any_variadic_value_t = any_variadic_future_t<Ts...>::value_type;
+    using AnyVariadicValue = AnyVariadicFuture<Ts...>::value_type;
 
     template<typename... Ts>
-    using any_variadic_error_t = any_variadic_future_t<Ts...>::error_type;
+    using AnyVariadicError = AnyVariadicFuture<Ts...>::error_type;
 
     template<typename... Ts>
-        requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+        requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
     Task<
-        any_variadic_value_t<Ts...>,
-        any_variadic_error_t<Ts...>
+        AnyVariadicValue<Ts...>,
+        AnyVariadicError<Ts...>
     >
     any(Ts &&... tasks) {
         static_assert(sizeof...(Ts) > 0);
@@ -1057,7 +1042,7 @@ namespace asyncio::task {
     }
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using race_ranges_future_t = decltype(
+    using RaceRangesFuture = decltype(
         zero::async::promise::race(
             std::ranges::subrange{std::declval<I>(), std::declval<S>()} | std::views::transform([](auto &task) {
                 return task.future();
@@ -1066,22 +1051,22 @@ namespace asyncio::task {
     );
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using race_ranges_value_t = race_ranges_future_t<I, S>::value_type;
+    using RaceRangesValue = RaceRangesFuture<I, S>::value_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-    using race_ranges_error_t = race_ranges_future_t<I, S>::error_type;
+    using RaceRangesError = RaceRangesFuture<I, S>::error_type;
 
     template<std::input_iterator I, std::sentinel_for<I> S>
-        requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+        requires zero::meta::Specialization<std::iter_value_t<I>, Task>
     Task<
-        race_ranges_value_t<I, S>,
-        race_ranges_error_t<I, S>
+        RaceRangesValue<I, S>,
+        RaceRangesError<I, S>
     >
     race(I first, S last) {
         assert(first != last);
 
-        using T = race_ranges_value_t<I, S>;
-        using E = race_ranges_error_t<I, S>;
+        using T = RaceRangesValue<I, S>;
+        using E = RaceRangesError<I, S>;
 
         TaskGroup group;
 
@@ -1112,31 +1097,31 @@ namespace asyncio::task {
     }
 
     template<std::ranges::input_range R>
-        requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+        requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
     auto race(R &&tasks) {
         return race(tasks.begin(), tasks.end());
     }
 
     template<typename... Ts>
-    using race_variadic_future_t = decltype(zero::async::promise::race(std::declval<Ts>().future()...));
+    using RaceVariadicFuture = decltype(zero::async::promise::race(std::declval<Ts>().future()...));
 
     template<typename... Ts>
-    using race_variadic_value_t = race_variadic_future_t<Ts...>::value_type;
+    using RaceVariadicValue = RaceVariadicFuture<Ts...>::value_type;
 
     template<typename... Ts>
-    using race_variadic_error_t = race_variadic_future_t<Ts...>::error_type;
+    using RaceVariadicError = RaceVariadicFuture<Ts...>::error_type;
 
     template<typename... Ts>
-        requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+        requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
     Task<
-        race_variadic_value_t<Ts...>,
-        race_variadic_error_t<Ts...>
+        RaceVariadicValue<Ts...>,
+        RaceVariadicError<Ts...>
     >
     race(Ts &&... tasks) {
         static_assert(sizeof...(Ts) > 0);
 
-        using T = race_variadic_value_t<Ts...>;
-        using E = race_variadic_error_t<Ts...>;
+        using T = RaceVariadicValue<Ts...>;
+        using E = RaceVariadicError<Ts...>;
 
         TaskGroup group;
 
@@ -1201,10 +1186,9 @@ namespace asyncio::task {
         co_return co_await std::move(cancellable);
     }
 
-    template<typename F>
-        requires zero::traits::is_specialization_v<std::invoke_result_t<F>, Task>
+    template<Invocable F>
     std::invoke_result_t<F> spawn(F f) {
-        co_return co_await f();
+        co_return co_await std::invoke(std::move(f));
     }
 }
 

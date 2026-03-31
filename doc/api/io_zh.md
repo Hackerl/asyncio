@@ -261,7 +261,7 @@ virtual task::Task<void, std::error_code> flush() = 0;
 ## Function `copy`
 
 ```c++
-task::Task<std::size_t, std::error_code> copy(zero::traits::Trait<IReader> auto &reader, zero::traits::Trait<IWriter> auto &writer);
+task::Task<std::size_t, std::error_code> copy(zero::meta::Trait<IReader> auto &reader, zero::meta::Trait<IWriter> auto &writer);
 ```
 
 从 `reader` 读取数据，然后写入到 `writer` 中，直到 `read` 返回 `0` 或 `write` 发生了错误，返回实际复制的字节数。
@@ -289,14 +289,7 @@ task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) overrid
 
 ### Class `StringWriter`
 
-```c++
-class StringWriter final : public IWriter {
-public:
-    explicit StringWriter(std::string &string);
-};
-```
-
-将 `std::string` 对象包装成 `IWriter` 接口。
+实现了 `IWriter` 接口，将写入的数据存储到内部的 `std::string` 中。
 
 ### Method `write`
 
@@ -309,8 +302,9 @@ task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) 
 ### Method `data`
 
 ```c++
+template<typename Self>
 auto &&data(this Self &&self) {
-    return self.mString;
+    return std::forward<Self>(self).mString;
 }
 ```
 
@@ -319,8 +313,9 @@ auto &&data(this Self &&self) {
 ### Method `operator*`
 
 ```c++
+template<typename Self>
 auto &&operator*(this Self &&self) {
-    return self.mString;
+    return std::forward<Self>(self).mString;
 }
 ```
 
@@ -347,14 +342,7 @@ task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) overrid
 
 ### Class `BytesWriter`
 
-```c++
-class BytesWriter final : public IWriter {
-public:
-    explicit BytesWriter(std::vector<std::byte> &bytes);
-};
-```
-
-将 `std::vector<std::byte>` 对象包装成 `IWriter` 接口。
+实现了 `IWriter` 接口，将写入的数据存储到内部的 `std::vector<std::byte>` 中。
 
 ### Method `write`
 
@@ -367,8 +355,9 @@ task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) 
 ### Method `data`
 
 ```c++
+template<typename Self>
 auto &&data(this Self &&self) {
-    return self.mBytes;
+    return std::forward<Self>(self).mBytes;
 }
 ```
 
@@ -377,8 +366,9 @@ auto &&data(this Self &&self) {
 ### Method `operator*`
 
 ```c++
+template<typename Self>
 auto &&operator*(this Self &&self) {
-    return self.mBytes;
+    return std::forward<Self>(self).mBytes;
 }
 ```
 

@@ -2,7 +2,7 @@
 
 #ifdef _WIN32
 #include <netioapi.h>
-#include <zero/strings/strings.h>
+#include <zero/strings.h>
 #elif defined(__linux__)
 #include <net/if.h>
 #include <netinet/in.h>

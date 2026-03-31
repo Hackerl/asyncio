@@ -21,18 +21,22 @@ namespace asyncio::http {
     )
 
     template<typename F>
-        requires std::same_as<std::invoke_result_t<F>, CURLcode>
+        requires requires(F &&f) {
+            { std::invoke(std::forward<F>(f)) } -> std::same_as<CURLcode>;
+        }
     std::expected<void, std::error_code> expected(F &&f) {
-        if (const auto code = f(); code != CURLE_OK)
+        if (const auto code = std::invoke(std::forward<F>(f)); code != CURLE_OK)
             return std::unexpected{make_error_code(static_cast<CURLError>(code))};
 
         return {};
     }
 
     template<typename F>
-        requires std::same_as<std::invoke_result_t<F>, CURLMcode>
+        requires requires(F &&f) {
+            { std::invoke(std::forward<F>(f)) } -> std::same_as<CURLMcode>;
+        }
     std::expected<void, std::error_code> expected(F &&f) {
-        if (const auto code = f(); code != CURLM_OK)
+        if (const auto code = std::invoke(std::forward<F>(f)); code != CURLM_OK)
             return std::unexpected{make_error_code(static_cast<CURLMError>(code))};
 
         return {};
@@ -206,7 +210,7 @@ namespace asyncio::http {
             co_return co_await perform(*std::move(connection));
         }
 
-        template<zero::traits::Trait<IReader> T>
+        template<zero::meta::Trait<IReader> T>
         task::Task<Response, std::error_code> request(
             const std::string method,
             const URL url,
@@ -235,7 +239,7 @@ namespace asyncio::http {
                 return curl_easy_setopt(easy, CURLOPT_READDATA, connection->get());
             }));
 
-            if constexpr (zero::traits::Trait<T, ISeekable>) {
+            if constexpr (zero::meta::Trait<T, ISeekable>) {
                 if (const auto length = co_await std::invoke(&ISeekable::length, payload)) {
                     zero::error::guard(expected([&] {
                         return curl_easy_setopt(easy, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(*length));

@@ -1,7 +1,7 @@
 #include "catch_extensions.h"
 #include <asyncio/process.h>
 #include <zero/os/os.h>
-#include <zero/strings/strings.h>
+#include <zero/strings.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 #ifdef _WIN32

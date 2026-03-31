@@ -5,17 +5,13 @@
 ## Function `toThread`
 
 ```c++
-template<typename F>
+template<std::invocable F>
 task::Task<std::invoke_result_t<F>>
 toThread(F f);
 
-template<typename F, typename C>
-requires std::same_as<
-    std::invoke_result_t<C, std::thread::native_handle_type>,
-    std::expected<void, std::error_code>
->
+template<std::invocable F>
 task::Task<std::invoke_result_t<F>>
-toThread(F f, C cancel);
+toThread(F f, const std::function<std::expected<void, std::error_code>(std::thread::native_handle_type)> cancel);
 ```
 
 将同步阻塞的代码放入新线程中运行，完成后返回对应的结果：
@@ -55,9 +51,13 @@ Z_DEFINE_ERROR_CODE_EX(
     Cancelled, "Request was cancelled", std::errc::operation_canceled
 )
 
-template<typename F>
+template<std::invocable F>
 task::Task<std::invoke_result_t<F>, ToThreadPoolError>
 toThreadPool(F f);
+
+template<std::invocable F>
+task::Task<std::invoke_result_t<F>, ToThreadPoolError>
+toThreadPool(F f, const std::function<std::expected<void, std::error_code>()> cancel);
 ```
 
 将耗时长的代码放入线程池中运行，完成后返回对应的结果：

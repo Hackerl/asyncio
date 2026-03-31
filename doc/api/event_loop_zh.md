@@ -49,16 +49,14 @@ void stop();
 ## Function `run`
 
 ```c++
-template<typename F>
-    requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
+template<Invocable F>
 std::expected<
     typename std::invoke_result_t<F>::value_type,
     typename std::invoke_result_t<F>::error_type
 >
 run(const std::shared_ptr<EventLoop> &eventLoop, F &&f);
 
-template<typename F>
-    requires zero::traits::is_specialization_v<std::invoke_result_t<F>, task::Task>
+template<Invocable F>
 auto run(F &&f) {
     return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
 }

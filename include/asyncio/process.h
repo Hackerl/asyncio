@@ -78,79 +78,79 @@ namespace asyncio::process {
         spawn(const std::array<StdioType, 3> &defaultTypes) const;
 
     public:
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&arg(this Self &&self, std::string arg) {
             self.mCommand.arg(std::move(arg));
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&args(this Self &&self, std::vector<std::string> args) {
             self.mCommand.args(std::move(args));
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&currentDirectory(this Self &&self, std::filesystem::path path) {
             self.mCommand.currentDirectory(std::move(path));
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&env(this Self &&self, std::string key, std::string value) {
             self.mCommand.env(std::move(key), std::move(value));
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&envs(this Self &&self, std::map<std::string, std::string> envs) {
             self.mCommand.envs(std::move(envs));
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&clearEnv(this Self &&self) {
             self.mCommand.clearEnv();
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&inheritedResource(this Self &&self, zero::os::Resource resource) {
             self.mCommand.inheritedResource(std::move(resource));
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&inheritedResources(this Self &&self, std::vector<zero::os::Resource> resource) {
             self.mCommand.inheritedResources(std::move(resource));
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&inheritedNativeResource(this Self &&self, const zero::os::Resource::Native resource) {
             self.mCommand.inheritedNativeResource(resource);
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&inheritedNativeResources(this Self &&self, std::vector<zero::os::Resource::Native> resource) {
             self.mCommand.inheritedNativeResources(std::move(resource));
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&stdInput(this Self &&self, StdioType type) {
             self.mCommand.stdInput(type);
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&stdOutput(this Self &&self, StdioType type) {
             self.mCommand.stdOutput(type);
             return std::forward<Self>(self);
         }
 
-        template<typename Self>
+        template<zero::meta::Mutable Self>
         Self &&stdError(this Self &&self, StdioType type) {
             self.mCommand.stdError(type);
             return std::forward<Self>(self);

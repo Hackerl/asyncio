@@ -11,7 +11,7 @@ Z_DEFINE_ERROR_CODE_EX(
     Cancelled, "Task was cancelled", std::errc::operation_canceled,
     CancellationNotSupported, "Task does not support cancellation", std::errc::operation_not_supported,
     Locked, "Task is locked", std::errc::resource_unavailable_try_again,
-    CancellationTooLate, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION,
+    CancellationTooLate, "Cancellation is too late", std::errc::operation_not_permitted,
     AlreadyCompleted, "Task is already completed", std::errc::operation_not_permitted
 )
 ```
@@ -50,7 +50,7 @@ REQUIRE_ERROR(result[1], std::errc::operation_canceled);
 ### Method `callTree`
 
 ```c++
-tree<std::source_location> callTree() const;
+[[nodiscard]] tree<std::source_location> callTree() const;
 ```
 
 追溯整个任务树，可以获取每一个子任务的调用栈。
@@ -66,7 +66,8 @@ tree<std::source_location> callTree() const;
 ### Method `addCallback`
 
 ```c++
-void addCallback(std::function<void()> callback);
+template<zero::meta::Mutable Self>
+Self &&addCallback(this Self &&self, std::function<void()> callback);
 ```
 
 添加任务关联的 `callback`，将在任务完成时调用。
@@ -76,19 +77,13 @@ void addCallback(std::function<void()> callback);
 ### Method `transform`
 
 ```c++
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
-    )
-Task<typename callback_result_t<F, T>::value_type, E> transform(F f) &&;
+template<AsyncFunction<T> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<typename InvokeResult<F, T>::value_type, E> transform(F f) &&;
 
 template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        !zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
-    )
-Task<callback_result_t<F, T>, E> transform(F f) &&;
+    requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, T> && !FallibleFunction<F, T>)
+Task<InvokeResult<F, T>, E> transform(F f) &&;
 ```
 
 当任务成功时转换值的类型，相当于 `std::expected::transofrm`，处理函数可以是异步的。
@@ -98,19 +93,13 @@ Task<callback_result_t<F, T>, E> transform(F f) &&;
 ### Method `andThen`
 
 ```c++
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
-    )
-Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
+template<AsyncFunction<T> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&;
 
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, T>, std::expected>
-    )
-Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
+template<FallibleFunction<T> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&;
 ```
 
 当任务成功时使用值进行下一步操作，相当于 `std::expected::and_then`，处理函数可以是异步的。
@@ -120,19 +109,13 @@ Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
 ### Method `transformError`
 
 ```c++
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
-    )
-Task<T, typename callback_result_t<F, E>::value_type> transformError(F f) &&;
+template<AsyncFunction<E> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<T, typename InvokeResult<F, E>::value_type> transformError(F f) &&;
 
 template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        !zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
-    )
-Task<T, callback_result_t<F, E>> transformError(F f) &&;
+    requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, E> && !FallibleFunction<F, E>)
+Task<T, InvokeResult<F, E>> transformError(F f) &&;
 ```
 
 当任务失败时转换错误类型，相当于 `std::expected::transform_error`，处理函数可以是异步的。
@@ -142,19 +125,13 @@ Task<T, callback_result_t<F, E>> transformError(F f) &&;
 ### Method `orElse`
 
 ```c++
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
-    )
-Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
+template<AsyncFunction<E> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&;
 
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, E>, std::expected>
-    )
-Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
+template<FallibleFunction<E> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&;
 ```
 
 当任务失败时使用错误进行下一步操作，相当于 `std::expected::or_else`，处理函数可以是异步的。
@@ -177,10 +154,10 @@ Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
 
 返回任务是否已标记为取消。
 
-### Method `cancelled`
+### Method `locked`
 
 ```c++
-[[nodiscard]] bool lock() const;
+[[nodiscard]] bool locked() const;
 ```
 
 返回任务是否已被锁定。
@@ -437,7 +414,7 @@ std::expected<void, std::error_code> cancel();
 
 ```c++
 template<typename T>
-    requires zero::traits::is_specialization_v<std::remove_cvref_t<T>, Task>
+    requires zero::meta::Specialization<std::remove_cvref_t<T>, Task>
 void add(T &&task);
 ```
 
@@ -454,7 +431,7 @@ void add(T &&task);
 
 ```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::meta::Specialization<std::iter_value_t<I>, Task>
 Task<
     all_ranges_value_t<I, S>,
     all_ranges_error_t<I, S>
@@ -462,7 +439,7 @@ Task<
 all(I first, S last);
 
 template<std::ranges::input_range R>
-    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
 auto all(R &&tasks) {
     return all(tasks.begin(), tasks.end());
 }
@@ -473,7 +450,7 @@ auto all(R &&tasks) {
 
 ```c++
 template<typename... Ts>
-    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
     all_variadic_value_t<Ts...>,
     all_variadic_error_t<Ts...>
@@ -491,12 +468,12 @@ all(Ts &&... tasks);
 
 ```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::meta::Specialization<std::iter_value_t<I>, Task>
 Task<all_settled_ranges_value_t<I, S>>
 allSettled(I first, S last);
 
 template<std::ranges::input_range R>
-    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
 auto allSettled(R &&tasks) {
     return allSettled(tasks.begin(), tasks.end());
 }
@@ -506,7 +483,7 @@ auto allSettled(R &&tasks) {
 
 ```c++
 template<typename... Ts>
-    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
 Task<all_settled_variadic_value_t<Ts...>>
 allSettled(Ts &&... tasks);
 ```
@@ -519,7 +496,7 @@ allSettled(Ts &&... tasks);
 
 ```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::meta::Specialization<std::iter_value_t<I>, Task>
 Task<
     any_ranges_value_t<I, S>,
     any_ranges_error_t<I, S>
@@ -527,7 +504,7 @@ Task<
 any(I first, S last);
 
 template<std::ranges::input_range R>
-    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
 auto any(R &&tasks) {
     return any(tasks.begin(), tasks.end());
 }
@@ -537,7 +514,7 @@ auto any(R &&tasks) {
 
 ```c++
 template<typename... Ts>
-    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
     any_variadic_value_t<Ts...>,
     any_variadic_error_t<Ts...>
@@ -554,7 +531,7 @@ any(Ts &&... tasks);
 
 ```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::meta::Specialization<std::iter_value_t<I>, Task>
 Task<
     race_ranges_value_t<I, S>,
     race_ranges_error_t<I, S>
@@ -562,7 +539,7 @@ Task<
 race(I first, S last);
 
 template<std::ranges::input_range R>
-    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
 auto race(R &&tasks) {
     return race(tasks.begin(), tasks.end());
 }
@@ -572,7 +549,7 @@ auto race(R &&tasks) {
 
 ```c++
 template<typename... Ts>
-    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
     race_variadic_value_t<Ts...>,
     race_variadic_error_t<Ts...>
@@ -590,10 +567,10 @@ template<typename T, typename E>
 Task<T, E> from(zero::async::promise::Future<T, E> future);
 
 template<typename T, typename E>
-Task<T, E> from(zero::async::promise::CancellableFuture<T, E> future);
+Task<T, E> from(CancellableFuture<T, E> cancellable);
 
 template<typename T, typename E>
-Task<T, E> from(zero::async::promise::CancellableTask<T, E> task);
+Task<T, E> from(CancellableTask<T, E> cancellable);
 ```
 
 将 `Future`、`CancellableFuture`、`CancellableTask` 转换为 `Task`；`asyncio` 的 `API` 都是针对 `Task` 的，转换后我们才能调用。
@@ -615,10 +592,9 @@ const auto status = zero::flattenWith<std::error_code>(
 ## Function `spawn`
 
 ```c++
-template<typename F>
-    requires zero::traits::is_specialization_v<std::invoke_result_t<F>, Task>
+template<Invocable F>
 std::invoke_result_t<F> spawn(F f) {
-    co_return co_await f();
+    co_return co_await std::invoke(std::move(f));
 }
 ```
 

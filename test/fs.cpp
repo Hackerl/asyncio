@@ -1,6 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/fs.h>
-#include <zero/strings/strings.h>
+#include <zero/strings.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("file", "[fs]") {

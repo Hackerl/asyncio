@@ -11,7 +11,7 @@ Z_DEFINE_ERROR_CODE_EX(
     Cancelled, "Task was cancelled", std::errc::operation_canceled,
     CancellationNotSupported, "Task does not support cancellation", std::errc::operation_not_supported,
     Locked, "Task is locked", std::errc::resource_unavailable_try_again,
-    CancellationTooLate, "Operation will be done soon", Z_DEFAULT_ERROR_CONDITION,
+    CancellationTooLate, "Cancellation is too late", std::errc::operation_not_permitted,
     AlreadyCompleted, "Task is already completed", std::errc::operation_not_permitted
 )
 ```
@@ -51,7 +51,7 @@ REQUIRE_ERROR(result[1], std::errc::operation_canceled);
 ### Method `callTree`
 
 ```c++
-tree<std::source_location> callTree() const;
+[[nodiscard]] tree<std::source_location> callTree() const;
 ```
 
 Traces the entire task tree, obtaining the call stack of each subtask.
@@ -67,7 +67,8 @@ Traces the entire task tree, converting the `call tree` into a highly readable s
 ### Method `addCallback`
 
 ```c++
-void addCallback(std::function<void()> callback);
+template<zero::meta::Mutable Self>
+Self &&addCallback(this Self &&self, std::function<void()> callback);
 ```
 
 Adds a `callback` associated with the task, which will be called when the task completes.
@@ -75,19 +76,13 @@ Adds a `callback` associated with the task, which will be called when the task c
 ### Method `transform`
 
 ```c++
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
-    )
-Task<typename callback_result_t<F, T>::value_type, E> transform(F f) &&;
+template<AsyncFunction<T> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<typename InvokeResult<F, T>::value_type, E> transform(F f) &&;
 
 template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        !zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
-    )
-Task<callback_result_t<F, T>, E> transform(F f) &&;
+    requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, T> && !FallibleFunction<F, T>)
+Task<InvokeResult<F, T>, E> transform(F f) &&;
 ```
 
 Transforms the value type when the task succeeds, equivalent to `std::expected::transform`. The handler function can be async.
@@ -97,19 +92,13 @@ Transforms the value type when the task succeeds, equivalent to `std::expected::
 ### Method `andThen`
 
 ```c++
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, T>, Task>
-    )
-Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
+template<AsyncFunction<T> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&;
 
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, T>, std::expected>
-    )
-Task<typename callback_result_t<F, T>::value_type, E> andThen(F f) &&;
+template<FallibleFunction<T> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&;
 ```
 
 Performs the next operation using the value when the task succeeds, equivalent to `std::expected::and_then`. The handler function can be async.
@@ -119,19 +108,13 @@ Performs the next operation using the value when the task succeeds, equivalent t
 ### Method `transformError`
 
 ```c++
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
-    )
-Task<T, typename callback_result_t<F, E>::value_type> transformError(F f) &&;
+template<AsyncFunction<E> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<T, typename InvokeResult<F, E>::value_type> transformError(F f) &&;
 
 template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        !zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
-    )
-Task<T, callback_result_t<F, E>> transformError(F f) &&;
+    requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, E> && !FallibleFunction<F, E>)
+Task<T, InvokeResult<F, E>> transformError(F f) &&;
 ```
 
 Transforms the error type when the task fails, equivalent to `std::expected::transform_error`. The handler function can be async.
@@ -141,19 +124,13 @@ Transforms the error type when the task fails, equivalent to `std::expected::tra
 ### Method `orElse`
 
 ```c++
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, E>, Task>
-    )
-Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
+template<AsyncFunction<E> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&;
 
-template<typename F>
-    requires (
-        !std::same_as<E, std::exception_ptr> &&
-        zero::traits::is_specialization_v<callback_result_t<F, E>, std::expected>
-    )
-Task<T, typename callback_result_t<F, E>::error_type> orElse(F f) &&;
+template<FallibleFunction<E> F>
+    requires (!std::same_as<E, std::exception_ptr>)
+Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&;
 ```
 
 Performs the next operation using the error when the task fails, equivalent to `std::expected::or_else`. The handler function can be async.
@@ -176,10 +153,10 @@ Returns whether the task is complete.
 
 Returns whether the task has been marked as cancelled.
 
-### Method `lock`
+### Method `locked`
 
 ```c++
-[[nodiscard]] bool lock() const;
+[[nodiscard]] bool locked() const;
 ```
 
 Returns whether the task is locked.
@@ -436,7 +413,7 @@ Cancels the task group. The cancellation operation applies to all tasks in the g
 
 ```c++
 template<typename T>
-    requires zero::traits::is_specialization_v<std::remove_cvref_t<T>, Task>
+    requires zero::meta::Specialization<std::remove_cvref_t<T>, Task>
 void add(T &&task);
 ```
 
@@ -453,7 +430,7 @@ Waits for all tasks. Returns success if all tasks succeed. Returns failure and c
 
 ```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::meta::Specialization<std::iter_value_t<I>, Task>
 Task<
     all_ranges_value_t<I, S>,
     all_ranges_error_t<I, S>
@@ -461,7 +438,7 @@ Task<
 all(I first, S last);
 
 template<std::ranges::input_range R>
-    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
 auto all(R &&tasks) {
     return all(tasks.begin(), tasks.end());
 }
@@ -472,7 +449,7 @@ auto all(R &&tasks) {
 
 ```c++
 template<typename... Ts>
-    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
     all_variadic_value_t<Ts...>,
     all_variadic_error_t<Ts...>
@@ -490,12 +467,12 @@ Waits for all tasks to complete, returns all task results, never fails.
 
 ```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::meta::Specialization<std::iter_value_t<I>, Task>
 Task<all_settled_ranges_value_t<I, S>>
 allSettled(I first, S last);
 
 template<std::ranges::input_range R>
-    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
 auto allSettled(R &&tasks) {
     return allSettled(tasks.begin(), tasks.end());
 }
@@ -505,7 +482,7 @@ Return value type is always `std::vector<Task<T, E>>`.
 
 ```c++
 template<typename... Ts>
-    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
 Task<all_settled_variadic_value_t<Ts...>>
 allSettled(Ts &&... tasks);
 ```
@@ -518,7 +495,7 @@ Succeeds if any task succeeds, cancelling remaining tasks.
 
 ```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::meta::Specialization<std::iter_value_t<I>, Task>
 Task<
     any_ranges_value_t<I, S>,
     any_ranges_error_t<I, S>
@@ -526,7 +503,7 @@ Task<
 any(I first, S last);
 
 template<std::ranges::input_range R>
-    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
 auto any(R &&tasks) {
     return any(tasks.begin(), tasks.end());
 }
@@ -536,7 +513,7 @@ Return value type is always `Task<T, std::vector<E>>`.
 
 ```c++
 template<typename... Ts>
-    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
     any_variadic_value_t<Ts...>,
     any_variadic_error_t<Ts...>
@@ -553,7 +530,7 @@ Uses the fastest-completing task as the result, cancelling other tasks.
 
 ```c++
 template<std::input_iterator I, std::sentinel_for<I> S>
-    requires zero::traits::is_specialization_v<std::iter_value_t<I>, Task>
+    requires zero::meta::Specialization<std::iter_value_t<I>, Task>
 Task<
     race_ranges_value_t<I, S>,
     race_ranges_error_t<I, S>
@@ -561,7 +538,7 @@ Task<
 race(I first, S last);
 
 template<std::ranges::input_range R>
-    requires zero::traits::is_specialization_v<std::ranges::range_value_t<R>, Task>
+    requires zero::meta::Specialization<std::ranges::range_value_t<R>, Task>
 auto race(R &&tasks) {
     return race(tasks.begin(), tasks.end());
 }
@@ -571,7 +548,7 @@ Return value type is always `Task<T, E>`.
 
 ```c++
 template<typename... Ts>
-    requires (zero::traits::is_specialization_v<std::remove_cvref_t<Ts>, Task> && ...)
+    requires (zero::meta::Specialization<std::remove_cvref_t<Ts>, Task> && ...)
 Task<
     race_variadic_value_t<Ts...>,
     race_variadic_error_t<Ts...>
@@ -589,10 +566,10 @@ template<typename T, typename E>
 Task<T, E> from(zero::async::promise::Future<T, E> future);
 
 template<typename T, typename E>
-Task<T, E> from(zero::async::promise::CancellableFuture<T, E> future);
+Task<T, E> from(CancellableFuture<T, E> cancellable);
 
 template<typename T, typename E>
-Task<T, E> from(zero::async::promise::CancellableTask<T, E> task);
+Task<T, E> from(CancellableTask<T, E> cancellable);
 ```
 
 Converts `Future`, `CancellableFuture`, `CancellableTask` to `Task`. The `asyncio` APIs are designed for `Task`, so conversion is needed before calling.
@@ -614,10 +591,9 @@ const auto status = zero::flattenWith<std::error_code>(
 ## Function `spawn`
 
 ```c++
-template<typename F>
-    requires zero::traits::is_specialization_v<std::invoke_result_t<F>, Task>
+template<Invocable F>
 std::invoke_result_t<F> spawn(F f) {
-    co_return co_await f();
+    co_return co_await std::invoke(std::move(f));
 }
 ```
 

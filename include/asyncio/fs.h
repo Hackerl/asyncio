@@ -2,7 +2,7 @@
 #define ASYNCIO_FS_H
 
 #include "io.h"
-#include <zero/filesystem/fs.h>
+#include <zero/filesystem.h>
 
 namespace asyncio::fs {
     class File final : public IFileDescriptor, public IReader, public IWriter, public ICloseable, public ISeekable {

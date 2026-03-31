@@ -6,7 +6,7 @@
 #include <zero/defer.h>
 
 namespace asyncio {
-    template<typename F>
+    template<std::invocable F>
     task::Task<std::invoke_result_t<F>>
     toThread(F f) {
         using T = std::invoke_result_t<F>;
@@ -17,11 +17,11 @@ namespace asyncio {
             [&] {
                 try {
                     if constexpr (std::is_void_v<T>) {
-                        f();
+                        std::invoke(std::move(f));
                         promise.resolve();
                     }
                     else {
-                        promise.resolve(f());
+                        promise.resolve(std::invoke(std::move(f)));
                     }
                 }
                 catch (const std::exception &) {
@@ -42,13 +42,9 @@ namespace asyncio {
             co_return *std::move(result);
     }
 
-    template<typename F, typename C>
-        requires std::same_as<
-            std::invoke_result_t<C, std::thread::native_handle_type>,
-            std::expected<void, std::error_code>
-        >
+    template<std::invocable F>
     task::Task<std::invoke_result_t<F>>
-    toThread(F f, C cancel) {
+    toThread(F f, const std::function<std::expected<void, std::error_code>(std::thread::native_handle_type)> cancel) {
         using T = std::invoke_result_t<F>;
 
         Promise<T, std::exception_ptr> promise;
@@ -57,11 +53,11 @@ namespace asyncio {
             [&] {
                 try {
                     if constexpr (std::is_void_v<T>) {
-                        f();
+                        std::invoke(std::move(f));
                         promise.resolve();
                     }
                     else {
-                        promise.resolve(f());
+                        promise.resolve(std::invoke(std::move(f)));
                     }
                 }
                 catch (const std::exception &) {
@@ -93,7 +89,7 @@ namespace asyncio {
         Cancelled, "Request was cancelled", std::errc::operation_canceled
     )
 
-    template<typename F>
+    template<std::invocable F>
     task::Task<std::invoke_result_t<F>, ToThreadPoolError>
     toThreadPool(F f) {
         using T = std::invoke_result_t<F>;
@@ -174,10 +170,9 @@ namespace asyncio {
         }
     }
 
-    template<typename F, typename C>
-        requires std::same_as<std::invoke_result_t<C>, std::expected<void, std::error_code>>
+    template<std::invocable F>
     task::Task<std::invoke_result_t<F>, ToThreadPoolError>
-    toThreadPool(F f, C cancel) {
+    toThreadPool(F f, const std::function<std::expected<void, std::error_code>()> cancel) {
         using T = std::invoke_result_t<F>;
 
         if constexpr (std::is_void_v<T>) {

@@ -77,7 +77,7 @@ namespace asyncio {
     };
 
     task::Task<std::size_t, std::error_code>
-    copy(zero::traits::Trait<IReader> auto &reader, zero::traits::Trait<IWriter> auto &writer) {
+    copy(zero::meta::Trait<IReader> auto &reader, zero::meta::Trait<IWriter> auto &writer) {
         std::size_t written{0};
 
         while (true) {

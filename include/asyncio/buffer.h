@@ -11,7 +11,7 @@ namespace asyncio {
         UnexpectedEOF, "Unexpected end of file", IOError::UnexpectedEOF
     )
 
-    template<zero::traits::Trait<IReader> T>
+    template<zero::meta::Trait<IReader> T>
     class BufReader final : public IBufReader {
         static constexpr auto DefaultBufferCapacity = 8192;
 
@@ -139,7 +139,7 @@ namespace asyncio {
         std::unique_ptr<std::byte[]> mBuffer;
     };
 
-    template<zero::traits::Trait<IWriter> T>
+    template<zero::meta::Trait<IWriter> T>
     class BufWriter final : public IBufWriter {
         static constexpr auto DefaultBufferCapacity = 8192;
 

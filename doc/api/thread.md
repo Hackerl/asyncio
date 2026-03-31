@@ -5,17 +5,13 @@ This module provides thread-related functionality for compatibility with synchro
 ## Function `toThread`
 
 ```c++
-template<typename F>
+template<std::invocable F>
 task::Task<std::invoke_result_t<F>>
 toThread(F f);
 
-template<typename F, typename C>
-requires std::same_as<
-    std::invoke_result_t<C, std::thread::native_handle_type>,
-    std::expected<void, std::error_code>
->
+template<std::invocable F>
 task::Task<std::invoke_result_t<F>>
-toThread(F f, C cancel);
+toThread(F f, const std::function<std::expected<void, std::error_code>(std::thread::native_handle_type)> cancel);
 ```
 
 Runs synchronous blocking code in a new thread and returns the corresponding result upon completion:
@@ -55,9 +51,13 @@ Z_DEFINE_ERROR_CODE_EX(
     Cancelled, "Request was cancelled", std::errc::operation_canceled
 )
 
-template<typename F>
+template<std::invocable F>
 task::Task<std::invoke_result_t<F>, ToThreadPoolError>
 toThreadPool(F f);
+
+template<std::invocable F>
+task::Task<std::invoke_result_t<F>, ToThreadPoolError>
+toThreadPool(F f, const std::function<std::expected<void, std::error_code>()> cancel);
 ```
 
 Runs time-consuming code in a thread pool and returns the corresponding result upon completion:

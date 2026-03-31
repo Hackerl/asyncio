@@ -223,9 +223,11 @@ namespace asyncio::uv {
     )
 
     template<typename F>
-        requires std::same_as<std::invoke_result_t<F>, int>
+        requires requires(F &&f) {
+            { std::invoke(std::forward<F>(f)) } -> std::same_as<int>;
+        }
     std::expected<std::invoke_result_t<F>, std::error_code> expected(F &&f) {
-        const auto result = f();
+        const auto result = std::invoke(std::forward<F>(f));
 
         if (result < 0)
             return std::unexpected{make_error_code(static_cast<Error>(result))};
