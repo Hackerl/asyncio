@@ -26,11 +26,14 @@ public:
     asyncio::task::Task<std::optional<T>> read() {
         T element;
 
-        if (!*co_await asyncio::task::CancellableFuture{
-            zero::async::promise::chain<bool, std::nullptr_t>([&](auto promise) {
-                mReadPromise.emplace(std::move(promise));
-                grpc::ClientReadReactor<T>::StartRead(&element);
-            }),
+        asyncio::Promise<bool> promise;
+        auto future = promise.getFuture();
+
+        mReadPromise.emplace(std::move(promise));
+        grpc::ClientReadReactor<T>::StartRead(&element);
+
+        if (!co_await asyncio::task::Cancellable{
+            std::move(future),
             [this]() -> std::expected<void, std::error_code> {
                 mContext->TryCancel();
                 return {};
@@ -76,11 +79,14 @@ public:
     }
 
     asyncio::task::Task<bool> write(const T element) {
-        co_return *co_await asyncio::task::CancellableFuture{
-            zero::async::promise::chain<bool, std::nullptr_t>([&](auto promise) {
-                mWritePromise.emplace(std::move(promise));
-                grpc::ClientWriteReactor<T>::StartWrite(&element);
-            }),
+        asyncio::Promise<bool> promise;
+        auto future = promise.getFuture();
+
+        mWritePromise.emplace(std::move(promise));
+        grpc::ClientWriteReactor<T>::StartWrite(&element);
+
+        co_return co_await asyncio::task::Cancellable{
+            std::move(future),
             [this]() -> std::expected<void, std::error_code> {
                 mContext->TryCancel();
                 return {};
@@ -89,11 +95,14 @@ public:
     }
 
     asyncio::task::Task<bool> writeDone() {
-        co_return *co_await asyncio::task::CancellableFuture{
-            zero::async::promise::chain<bool, std::nullptr_t>([this](auto promise) {
-                mWriteDonePromise.emplace(std::move(promise));
-                grpc::ClientWriteReactor<T>::StartWritesDone();
-            }),
+        asyncio::Promise<bool> promise;
+        auto future = promise.getFuture();
+
+        mWriteDonePromise.emplace(std::move(promise));
+        grpc::ClientWriteReactor<T>::StartWritesDone();
+
+        co_return co_await asyncio::task::Cancellable{
+            std::move(future),
             [this]() -> std::expected<void, std::error_code> {
                 mContext->TryCancel();
                 return {};
@@ -143,11 +152,14 @@ public:
     asyncio::task::Task<std::optional<ResponseElement>> read() {
         ResponseElement element;
 
-        if (!*co_await asyncio::task::CancellableFuture{
-            zero::async::promise::chain<bool, std::nullptr_t>([&](auto promise) {
-                mReadPromise.emplace(std::move(promise));
-                grpc::ClientBidiReactor<RequestElement, ResponseElement>::StartRead(&element);
-            }),
+        asyncio::Promise<bool> promise;
+        auto future = promise.getFuture();
+
+        mReadPromise.emplace(std::move(promise));
+        grpc::ClientBidiReactor<RequestElement, ResponseElement>::StartRead(&element);
+
+        if (!co_await asyncio::task::Cancellable{
+            std::move(future),
             [this]() -> std::expected<void, std::error_code> {
                 mContext->TryCancel();
                 return {};
@@ -159,11 +171,14 @@ public:
     }
 
     asyncio::task::Task<bool> write(const RequestElement element) {
-        co_return *co_await asyncio::task::CancellableFuture{
-            zero::async::promise::chain<bool, std::nullptr_t>([&](auto promise) {
-                mWritePromise.emplace(std::move(promise));
-                grpc::ClientBidiReactor<RequestElement, ResponseElement>::StartWrite(&element);
-            }),
+        asyncio::Promise<bool> promise;
+        auto future = promise.getFuture();
+
+        mWritePromise.emplace(std::move(promise));
+        grpc::ClientBidiReactor<RequestElement, ResponseElement>::StartWrite(&element);
+
+        co_return co_await asyncio::task::Cancellable{
+            std::move(future),
             [this]() -> std::expected<void, std::error_code> {
                 mContext->TryCancel();
                 return {};
@@ -172,11 +187,14 @@ public:
     }
 
     asyncio::task::Task<bool> writeDone() {
-        co_return *co_await asyncio::task::CancellableFuture{
-            zero::async::promise::chain<bool, std::nullptr_t>([this](auto promise) {
-                mWriteDonePromise.emplace(std::move(promise));
-                grpc::ClientBidiReactor<RequestElement, ResponseElement>::StartWritesDone();
-            }),
+        asyncio::Promise<bool> promise;
+        auto future = promise.getFuture();
+
+        mWriteDonePromise.emplace(std::move(promise));
+        grpc::ClientBidiReactor<RequestElement, ResponseElement>::StartWritesDone();
+
+        co_return co_await asyncio::task::Cancellable{
+            std::move(future),
             [this]() -> std::expected<void, std::error_code> {
                 mContext->TryCancel();
                 return {};
@@ -236,7 +254,7 @@ protected:
             }
         );
 
-        if (const auto result = co_await asyncio::task::CancellableFuture{
+        if (const auto result = co_await asyncio::task::Cancellable{
             promise.getFuture(),
             [&]() -> std::expected<void, std::error_code> {
                 context->TryCancel();

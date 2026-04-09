@@ -184,13 +184,12 @@ namespace asyncio {
                     continue;
                 }
 
-                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
-                const auto future = promise->getFuture();
+                const auto promise = std::make_shared<Promise<void, std::error_code>>();
 
                 mCore->sender.pending.push_back(promise);
                 mCore->mutex.unlock();
 
-                if (const auto result = future.wait(timeout); !result) {
+                if (const auto result = promise->getFuture().wait(timeout); !result) {
                     assert(result.error() == std::errc::timed_out);
                     const std::lock_guard guard{mCore->mutex};
                     mCore->sender.pending.remove(promise);
@@ -226,13 +225,12 @@ namespace asyncio {
                     continue;
                 }
 
-                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
-                const auto future = promise->getFuture();
+                const auto promise = std::make_shared<Promise<void, std::error_code>>();
 
                 mCore->sender.pending.push_back(promise);
                 mCore->mutex.unlock();
 
-                if (const auto result = future.wait(timeout); !result) {
+                if (const auto result = promise->getFuture().wait(timeout); !result) {
                     assert(result.error() == std::errc::timed_out);
                     const std::lock_guard guard{mCore->mutex};
                     mCore->sender.pending.remove(promise);
@@ -267,12 +265,12 @@ namespace asyncio {
                     continue;
                 }
 
-                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+                const auto promise = std::make_shared<Promise<void, std::error_code>>();
 
                 mCore->sender.pending.push_back(promise);
                 mCore->mutex.unlock();
 
-                if (const auto result = co_await task::CancellableFuture{
+                if (const auto result = co_await task::Cancellable{
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())
@@ -316,12 +314,12 @@ namespace asyncio {
                     continue;
                 }
 
-                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+                const auto promise = std::make_shared<Promise<void, std::error_code>>();
 
                 mCore->sender.pending.push_back(promise);
                 mCore->mutex.unlock();
 
-                if (const auto result = co_await task::CancellableFuture{
+                if (const auto result = co_await task::Cancellable{
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())
@@ -457,13 +455,12 @@ namespace asyncio {
                     return std::unexpected{ReceiveSyncError::Disconnected};
                 }
 
-                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
-                const auto future = promise->getFuture();
+                const auto promise = std::make_shared<Promise<void, std::error_code>>();
 
                 mCore->receiver.pending.push_back(promise);
                 mCore->mutex.unlock();
 
-                if (const auto result = future.wait(timeout); !result) {
+                if (const auto result = promise->getFuture().wait(timeout); !result) {
                     assert(result.error() == std::errc::timed_out);
                     const std::lock_guard guard{mCore->mutex};
                     mCore->receiver.pending.remove(promise);
@@ -495,12 +492,12 @@ namespace asyncio {
                     co_return std::unexpected{ReceiveError::Disconnected};
                 }
 
-                const auto promise = std::make_shared<Promise<void, std::error_code>>(mCore->eventLoop);
+                const auto promise = std::make_shared<Promise<void, std::error_code>>();
 
                 mCore->receiver.pending.push_back(promise);
                 mCore->mutex.unlock();
 
-                if (const auto result = co_await task::CancellableFuture{
+                if (const auto result = co_await task::Cancellable{
                     promise->getFuture(),
                     [=]() -> std::expected<void, std::error_code> {
                         if (promise->isFulfilled())

@@ -125,7 +125,7 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
         return curl_easy_pause(mConnection->easy.get(), CURLPAUSE_RECV_CONT);
     }));
 
-    co_return co_await task::CancellableFuture{
+    co_return co_await task::Cancellable{
         std::move(future),
         [this]() -> std::expected<void, std::error_code> {
             auto &promise = mConnection->downstream.promise;
@@ -675,7 +675,7 @@ asyncio::http::Requests::perform(std::shared_ptr<Connection> connection) {
         }
     );
 
-    Z_CO_EXPECT(co_await task::CancellableFuture{
+    Z_CO_EXPECT(co_await task::Cancellable{
         connection->promise.getFuture(),
         [&promise = connection->promise]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())

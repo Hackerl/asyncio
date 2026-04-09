@@ -178,7 +178,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
         );
     }));
 
-    co_return co_await task::CancellableFuture{
+    co_return co_await task::Cancellable{
         context.promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())

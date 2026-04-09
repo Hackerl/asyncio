@@ -25,7 +25,7 @@ ASYNC_TEST_CASE("timeout - error", "[time]") {
         asyncio::Promise<void, std::error_code> promise;
 
         auto task = asyncio::timeout(
-            from(asyncio::task::CancellableFuture{
+            from(asyncio::task::Cancellable{
                 promise.getFuture(),
                 []() -> std::expected<void, std::error_code> {
                     return std::unexpected{asyncio::task::Error::CancellationTooLate};
@@ -89,7 +89,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
 
         auto task = asyncio::timeout(
             asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
-                co_await asyncio::error::guard(from(asyncio::task::CancellableFuture{
+                co_await asyncio::error::guard(from(asyncio::task::Cancellable{
                     promise.getFuture(),
                     []() -> std::expected<void, std::error_code> {
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};

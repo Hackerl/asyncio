@@ -47,7 +47,7 @@ namespace asyncio::http {
             std::vector<std::byte> data;
             std::shared_ptr<IReader> reader;
             std::optional<task::Task<std::size_t, std::error_code>> task;
-            std::optional<zero::async::promise::Future<std::size_t, std::error_code>> future;
+            std::optional<Future<std::size_t, std::error_code>> future;
             bool aborted{};
         };
 

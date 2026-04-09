@@ -9,16 +9,14 @@
 #include <zero/os/unix/error.h>
 #endif
 
-asyncio::fs::File::File(const uv_file file) : mFile{file}, mEventLoop{getEventLoop()} {
+asyncio::fs::File::File(const uv_file file) : mFile{file} {
 }
 
-asyncio::fs::File::File(File &&rhs) noexcept
-    : mFile{std::exchange(rhs.mFile, -1)}, mEventLoop{std::move(rhs.mEventLoop)} {
+asyncio::fs::File::File(File &&rhs) noexcept : mFile{std::exchange(rhs.mFile, -1)} {
 }
 
 asyncio::fs::File &asyncio::fs::File::operator=(File &&rhs) noexcept {
     mFile = std::exchange(rhs.mFile, -1);
-    mEventLoop = std::move(rhs.mEventLoop);
     return *this;
 }
 
@@ -50,7 +48,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const 
         buffer.len = static_cast<decltype(uv_buf_t::len)>(data.size());
 
         return uv_fs_read(
-            mEventLoop->raw(),
+            getEventLoop()->raw(),
             &request,
             mFile,
             &buffer,
@@ -74,7 +72,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const 
 }
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const std::span<const std::byte> data) {
-    Promise<std::size_t, std::error_code> promise{mEventLoop};
+    Promise<std::size_t, std::error_code> promise;
     uv_fs_t request{.data = &promise};
 
     Z_CO_EXPECT(uv::expected([&] {
@@ -84,7 +82,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const
         buffer.len = static_cast<decltype(uv_buf_t::len)>(data.size());
 
         return uv_fs_write(
-            mEventLoop->raw(),
+            getEventLoop()->raw(),
             &request,
             mFile,
             &buffer,
@@ -108,12 +106,12 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
-    Promise<void, std::error_code> promise{mEventLoop};
+    Promise<void, std::error_code> promise;
     uv_fs_t request{.data = &promise};
 
     Z_CO_EXPECT(uv::expected([&] {
         return uv_fs_close(
-            mEventLoop->raw(),
+            getEventLoop()->raw(),
             &request,
             mFile,
             [](auto *req) {

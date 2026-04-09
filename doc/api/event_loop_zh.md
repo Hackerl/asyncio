@@ -3,7 +3,7 @@
 
 ## Class `EventLoop`
 
-基于 `uv_loop_t` 封装的 `Event Loop`，几乎所有功能都依赖它，但你通常不会直接使用到它。
+基于 `uv_loop_t` 封装的 `Event Loop`，实现了 `zero::async::promise::IExecutor` 接口。几乎所有功能都依赖它，但你通常不会直接使用到它。
 
 ### Static Method `make`
 
@@ -25,10 +25,10 @@ uv_loop_t *raw();
 ### Method `post`
 
 ```c++
-void post(std::function<void()> function);
+void post(std::function<void()> f) override;
 ```
 
-在下一次事件循环执行可调用对象。
+实现 `zero::async::promise::IExecutor::post`。在下一次事件循环执行可调用对象。
 
 ### Method `run`
 

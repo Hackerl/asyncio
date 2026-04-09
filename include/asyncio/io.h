@@ -3,7 +3,6 @@
 
 #include "task.h"
 #include <span>
-#include <zero/interface.h>
 
 namespace asyncio {
     Z_DEFINE_ERROR_CONDITION(
@@ -14,41 +13,48 @@ namespace asyncio {
 
     using FileDescriptor = uv_os_fd_t;
 
-    class IFileDescriptor : public virtual zero::Interface {
+    class IFileDescriptor {
     public:
+        virtual ~IFileDescriptor() = default;
         [[nodiscard]] virtual FileDescriptor fd() const = 0;
     };
 
-    class ICloseable : public virtual zero::Interface {
+    class ICloseable {
     public:
+        virtual ~ICloseable() = default;
         virtual task::Task<void, std::error_code> close() = 0;
     };
 
-    class IHalfCloseable : public virtual zero::Interface {
+    class IHalfCloseable {
     public:
+        virtual ~IHalfCloseable() = default;
         virtual task::Task<void, std::error_code> shutdown() = 0;
     };
 
-    class IReader : public virtual zero::Interface {
+    class IReader {
     public:
         Z_DEFINE_ERROR_CODE_INNER_EX(
             ReadExactlyError,
             "asyncio::IReader",
-            UnexpectedEOF, "Unexpected end of file", make_error_condition(IOError::UnexpectedEOF)
+            UnexpectedEOF,
+            "Unexpected end of file",
+            make_error_condition(IOError::UnexpectedEOF)
         )
 
+        virtual ~IReader() = default;
         virtual task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) = 0;
         virtual task::Task<void, std::error_code> readExactly(std::span<std::byte> data);
         virtual task::Task<std::vector<std::byte>, std::error_code> readAll();
     };
 
-    class IWriter : public virtual zero::Interface {
+    class IWriter {
     public:
+        virtual ~IWriter() = default;
         virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
         virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
     };
 
-    class ISeekable : public virtual zero::Interface {
+    class ISeekable {
     public:
         enum class Whence {
             Begin,
@@ -56,6 +62,7 @@ namespace asyncio {
             End
         };
 
+        virtual ~ISeekable() = default;
         virtual task::Task<std::uint64_t, std::error_code> seek(std::int64_t offset, Whence whence) = 0;
         virtual task::Task<void, std::error_code> rewind();
         virtual task::Task<std::uint64_t, std::error_code> length();

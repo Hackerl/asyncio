@@ -6,9 +6,10 @@
 #include <mutex>
 #include <queue>
 #include <cassert>
+#include <zero/async/promise.h>
 
 namespace asyncio {
-    class EventLoop {
+    class EventLoop final : public zero::async::promise::IExecutor {
         struct TaskQueue {
             uv::Handle<uv_async_t> async;
             std::mutex mutex;
@@ -24,14 +25,14 @@ namespace asyncio {
         EventLoop(EventLoop &&rhs) = default;
         EventLoop &operator=(EventLoop &&rhs) noexcept = default;
 
-        ~EventLoop();
+        ~EventLoop() override;
 
         static EventLoop make();
 
         uv_loop_t *raw();
         [[nodiscard]] const uv_loop_t *raw() const;
 
-        void post(std::function<void()> function);
+        void post(std::function<void()> f) override;
 
         void stop();
         void run();

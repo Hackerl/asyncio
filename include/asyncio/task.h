@@ -20,7 +20,7 @@ namespace asyncio::task {
         AlreadyCompleted, "Task is already completed", std::errc::operation_not_permitted
     )
 
-    template<typename T, typename E>
+    template<typename T, typename E = std::exception_ptr>
     struct Awaitable {
         [[nodiscard]] bool await_ready() {
             if (!future.isReady())
@@ -67,49 +67,7 @@ namespace asyncio::task {
                 return;
         }
 
-        zero::async::promise::Future<T, E> future;
-        std::function<void()> onReady;
-        std::optional<std::expected<T, E>> result;
-    };
-
-    template<typename T, typename E>
-    struct NoExceptAwaitable {
-        [[nodiscard]] bool await_ready() {
-            if (!future.isReady())
-                return false;
-
-            if (onReady)
-                std::exchange(onReady, nullptr)();
-
-            result.emplace(std::move(future).result());
-            return true;
-        }
-
-        void await_suspend(const std::coroutine_handle<> handle) {
-            future.setCallback([=, this](std::expected<T, E> &&res) {
-                if (onReady)
-                    std::exchange(onReady, nullptr)();
-
-                if (!res) {
-                    result.emplace(std::unexpected{std::move(res).error()});
-                    handle.resume();
-                    return;
-                }
-
-                if constexpr (std::is_void_v<T>)
-                    result.emplace();
-                else
-                    result.emplace(*std::move(res));
-
-                handle.resume();
-            });
-        }
-
-        std::expected<T, E> await_resume() {
-            return std::move(*result);
-        }
-
-        zero::async::promise::Future<T, E> future;
+        Future<T, E> future;
         std::function<void()> onReady;
         std::optional<std::expected<T, E>> result;
     };
@@ -125,6 +83,7 @@ namespace asyncio::task {
         std::optional<std::source_location> location;
         std::function<std::expected<void, std::error_code>()> cancel;
         std::list<std::function<void()>> callbacks;
+        std::shared_ptr<EventLoop> eventLoop{getEventLoop()};
         bool finished{false};
         bool locked{false};
         bool cancelled{false};
@@ -137,15 +96,14 @@ namespace asyncio::task {
         [[nodiscard]] std::string trace() const;
     };
 
-    template<typename T, typename E>
-    struct CancellableFuture {
-        zero::async::promise::Future<T, E> future;
-        std::function<std::expected<void, std::error_code>()> cancel;
-    };
-
-    template<typename T, typename E>
-    struct CancellableTask {
-        Task<T, E> task;
+    template<typename T>
+        requires (
+            zero::meta::Specialization<T, SemiFuture> ||
+            zero::meta::Specialization<T, Future> ||
+            zero::meta::Specialization<T, Task>
+        )
+    struct Cancellable {
+        T awaitable;
         std::function<std::expected<void, std::error_code>()> cancel;
     };
 
@@ -227,7 +185,7 @@ namespace asyncio::task {
         template<zero::meta::Mutable Self>
         Self &&addCallback(this Self &&self, std::function<void()> callback) {
             if (self.done()) {
-                getEventLoop()->post([callback = std::move(callback)] {
+                self.mFrame->eventLoop->post([callback = std::move(callback)] {
                     callback();
                 });
 
@@ -239,8 +197,8 @@ namespace asyncio::task {
         }
 
         template<AsyncFunction<T> F>
-            requires (!std::same_as<E, std::exception_ptr>)
-        Task<typename InvokeResult<F, T>::value_type, E> transform(F f) && {
+        Task<typename InvokeResult<F, T>::value_type, E> transform(F f) &&
+            requires (!std::same_as<E, std::exception_ptr>) {
             static_assert(std::is_same_v<typename InvokeResult<F, T>::error_type, std::exception_ptr>);
 
             auto result = co_await *this;
@@ -255,14 +213,14 @@ namespace asyncio::task {
         }
 
         template<typename F>
-            requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, T>)
-        Task<InvokeResult<F, T>, E> transform(F f) && {
+            requires (!AsyncFunction<F, T>)
+        Task<InvokeResult<F, T>, E> transform(F f) && requires (!std::same_as<E, std::exception_ptr>) {
             co_return (co_await *this).transform(std::move(f));
         }
 
         template<AsyncFunction<T> F>
-            requires (!std::same_as<E, std::exception_ptr>)
-        Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) && {
+        Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&
+            requires (!std::same_as<E, std::exception_ptr>) {
             static_assert(std::is_same_v<typename InvokeResult<F, T>::error_type, E>);
 
             auto result = co_await *this;
@@ -277,14 +235,14 @@ namespace asyncio::task {
         }
 
         template<FallibleFunction<T> F>
-            requires (!std::same_as<E, std::exception_ptr>)
-        Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) && {
+        Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&
+            requires (!std::same_as<E, std::exception_ptr>) {
             co_return (co_await *this).and_then(std::move(f));
         }
 
         template<AsyncFunction<E> F>
-            requires (!std::same_as<E, std::exception_ptr>)
-        Task<T, typename InvokeResult<F, E>::value_type> transformError(F f) && {
+        Task<T, typename InvokeResult<F, E>::value_type> transformError(F f) &&
+            requires (!std::same_as<E, std::exception_ptr>) {
             static_assert(std::is_same_v<typename InvokeResult<F, E>::error_type, std::exception_ptr>);
             auto result = co_await *this;
 
@@ -298,14 +256,14 @@ namespace asyncio::task {
         }
 
         template<typename F>
-            requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, E>)
-        Task<T, InvokeResult<F, E>> transformError(F f) && {
+            requires (!AsyncFunction<F, E>)
+        Task<T, InvokeResult<F, E>> transformError(F f) && requires (!std::same_as<E, std::exception_ptr>) {
             co_return (co_await *this).transform_error(std::move(f));
         }
 
         template<AsyncFunction<E> F>
-            requires (!std::same_as<E, std::exception_ptr>)
-        Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) && {
+        Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&
+            requires (!std::same_as<E, std::exception_ptr>) {
             static_assert(std::is_same_v<typename InvokeResult<F, E>::value_type, T>);
             auto result = co_await *this;
 
@@ -319,8 +277,8 @@ namespace asyncio::task {
         }
 
         template<FallibleFunction<E> F>
-            requires (!std::same_as<E, std::exception_ptr>)
-        Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) && {
+        Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&
+            requires (!std::same_as<E, std::exception_ptr>) {
             co_return (co_await *this).or_else(std::move(f));
         }
 
@@ -336,8 +294,8 @@ namespace asyncio::task {
             return mFrame->locked;
         }
 
-        zero::async::promise::Future<T, E> future() {
-            return mPromise->getFuture();
+        Future<T, E> future() {
+            return mPromise->getFuture().via(mFrame->eventLoop);
         }
 
     private:
@@ -345,7 +303,7 @@ namespace asyncio::task {
         std::shared_ptr<asyncio::Promise<T, E>> mPromise;
 
         template<typename, typename>
-        friend class Promise;
+        friend class PromiseBase;
 
         friend class TaskGroup;
     };
@@ -379,15 +337,15 @@ namespace asyncio::task {
         std::list<std::shared_ptr<Frame>> mFrames;
 
         template<typename T, typename E>
-        friend class Promise;
+        friend class PromiseBase;
 
         friend struct Frame;
     };
 
     template<typename T, typename E>
-    class Promise {
+    class PromiseBase {
     public:
-        Promise() : mFrame{std::make_shared<Frame>()}, mPromise{std::make_shared<asyncio::Promise<T, E>>()} {
+        PromiseBase() : mFrame{std::make_shared<Frame>()}, mPromise{std::make_shared<asyncio::Promise<T, E>>()} {
         }
 
         std::suspend_never initial_suspend() {
@@ -411,91 +369,126 @@ namespace asyncio::task {
             return {mFrame, mPromise};
         }
 
-        [[nodiscard]] Awaitable<bool, std::exception_ptr> await_transform(const Cancelled) const {
-            return {zero::async::promise::resolve<bool, std::exception_ptr>(mFrame->cancelled)};
+        [[nodiscard]] Awaitable<bool> await_transform(const Cancelled) const {
+            return {Future<bool>::resolved(mFrame->cancelled)};
         }
 
-        [[nodiscard]] Awaitable<void, std::exception_ptr> await_transform(const Lock) const {
+        [[nodiscard]] Awaitable<void> await_transform(const Lock) const {
             mFrame->locked = true;
-            return {zero::async::promise::resolve<void, std::exception_ptr>()};
+            return {Future<void>::resolved()};
         }
 
-        [[nodiscard]] Awaitable<void, std::exception_ptr> await_transform(const Unlock) const {
+        [[nodiscard]] Awaitable<void> await_transform(const Unlock) const {
             assert(mFrame->locked);
             mFrame->locked = false;
-            return {zero::async::promise::resolve<void, std::exception_ptr>()};
+            return {Future<void>::resolved()};
         }
 
-        [[nodiscard]] Awaitable<std::vector<std::source_location>, std::exception_ptr>
+        [[nodiscard]] Awaitable<std::vector<std::source_location>>
         await_transform(const Backtrace, const std::source_location location = std::source_location::current()) const {
-            auto promise = std::make_shared<asyncio::Promise<std::vector<std::source_location>, std::exception_ptr>>();
-            auto future = promise->getFuture();
+            const auto &eventLoop = mFrame->eventLoop;
+            auto [promise, future] = contract<std::vector<std::source_location>>(eventLoop);
 
-            getEventLoop()->post([=, this, promise = std::move(promise)] {
-                std::vector stacktrace{location};
+            eventLoop->post(
+                [
+                    =,
+                    this,
+                    promise = std::make_shared<asyncio::Promise<std::vector<std::source_location>>>(
+                        std::move(promise)
+                    )
+                ] {
+                    std::vector stacktrace{location};
 
-                auto frame = mFrame->parent.lock();
+                    auto frame = mFrame->parent.lock();
 
-                while (frame) {
-                    assert(frame->location);
-                    stacktrace.push_back(*frame->location);
-                    frame = frame->parent.lock();
+                    while (frame) {
+                        assert(frame->location);
+                        stacktrace.push_back(*frame->location);
+                        frame = frame->parent.lock();
+                    }
+
+                    promise->resolve(std::move(stacktrace));
                 }
+            );
 
-                promise->resolve(std::move(stacktrace));
-            });
-
-            return {std::move(future)};
-        }
-
-        template<typename Result, typename Error>
-        NoExceptAwaitable<Result, Error>
-        await_transform(
-            CancellableFuture<Result, Error> cancellable,
-            const std::source_location location = std::source_location::current()
-        ) {
-            mFrame->location = location;
-
-            if (mFrame->cancelled && !mFrame->locked)
-                std::ignore = cancellable.cancel();
-            else
-                mFrame->cancel = std::move(cancellable.cancel);
-
-            return {std::move(cancellable.future), [this] { mFrame->step(); }};
-        }
-
-        template<typename Result, typename Error>
-        Awaitable<Result, Error>
-        await_transform(
-            CancellableTask<Result, Error> cancellable,
-            const std::source_location location = std::source_location::current()
-        ) {
-            cancellable.task.mFrame->parent = mFrame;
-            mFrame->children.push_back(cancellable.task.mFrame);
-            mFrame->location = location;
-
-            if (mFrame->cancelled && !mFrame->locked)
-                std::ignore = cancellable.cancel();
-            else
-                mFrame->cancel = std::move(cancellable.cancel);
-
-            return {cancellable.task.future(), [this] { mFrame->step(); }};
-        }
-
-        template<typename Result, typename Error>
-        NoExceptAwaitable<Result, Error>
-        await_transform(
-            zero::async::promise::Future<Result, Error> future,
-            const std::source_location location = std::source_location::current()
-        ) {
             mFrame->location = location;
             return {std::move(future), [this] { mFrame->step(); }};
         }
 
-        template<typename Result, typename Error>
-        Awaitable<Result, Error>
+        template<typename Value, typename Error>
+        Awaitable<Value, Error>
         await_transform(
-            Task<Result, Error> &&task,
+            Cancellable<SemiFuture<Value, Error>> cancellable,
+            const std::source_location location = std::source_location::current()
+        ) {
+            mFrame->location = location;
+
+            if (mFrame->cancelled && !mFrame->locked)
+                std::ignore = cancellable.cancel();
+            else
+                mFrame->cancel = std::move(cancellable.cancel);
+
+            return {std::move(cancellable.awaitable).via(mFrame->eventLoop), [this] { mFrame->step(); }};
+        }
+
+        template<typename Value, typename Error>
+        Awaitable<Value, Error>
+        await_transform(
+            Cancellable<Future<Value, Error>> cancellable,
+            const std::source_location location = std::source_location::current()
+        ) {
+            mFrame->location = location;
+
+            if (mFrame->cancelled && !mFrame->locked)
+                std::ignore = cancellable.cancel();
+            else
+                mFrame->cancel = std::move(cancellable.cancel);
+
+            return {std::move(cancellable.awaitable).via(mFrame->eventLoop), [this] { mFrame->step(); }};
+        }
+
+        template<typename Value, typename Error>
+        Awaitable<Value, Error>
+        await_transform(
+            Cancellable<Task<Value, Error>> cancellable,
+            const std::source_location location = std::source_location::current()
+        ) {
+            cancellable.awaitable.mFrame->parent = mFrame;
+            mFrame->children.push_back(cancellable.awaitable.mFrame);
+            mFrame->location = location;
+
+            if (mFrame->cancelled && !mFrame->locked)
+                std::ignore = cancellable.cancel();
+            else
+                mFrame->cancel = std::move(cancellable.cancel);
+
+            return {cancellable.awaitable.future(), [this] { mFrame->step(); }};
+        }
+
+        template<typename Value, typename Error>
+        Awaitable<Value, Error>
+        await_transform(
+            SemiFuture<Value, Error> future,
+            const std::source_location location = std::source_location::current()
+        ) {
+            mFrame->location = location;
+            return {std::move(future).via(mFrame->eventLoop), [this] { mFrame->step(); }};
+        }
+
+        template<typename Value, typename Error>
+        Awaitable<Value, Error>
+        await_transform(
+            Future<Value, Error> future,
+            const std::source_location location = std::source_location::current()
+        ) {
+            mFrame->location = location;
+            return {std::move(future).via(mFrame->eventLoop), [this] { mFrame->step(); }};
+        }
+
+        template<typename Value, typename Error>
+        Awaitable<Value, Error>
+        await_transform(
+            Task<Value, Error> &&task,
             const std::source_location location = std::source_location::current()
         ) {
             task.mFrame->parent = mFrame;
@@ -508,10 +501,10 @@ namespace asyncio::task {
             return {task.future(), [this] { mFrame->step(); }};
         }
 
-        template<typename Result, typename Error>
-        Awaitable<Result, Error>
+        template<typename Value, typename Error>
+        Awaitable<Value, Error>
         await_transform(
-            Task<Result, Error> &task,
+            Task<Value, Error> &task,
             const std::source_location location = std::source_location::current()
         ) {
             task.mFrame->parent = mFrame;
@@ -524,33 +517,35 @@ namespace asyncio::task {
             return {task.future(), [this] { mFrame->step(); }};
         }
 
-        Awaitable<void, std::exception_ptr>
+        Awaitable<void>
         await_transform(TaskGroup &group, const std::source_location location = std::source_location::current()) {
-            if (group.mFrames.empty() || std::ranges::all_of(
-                group.mFrames,
-                [](const auto &frame) {
-                    return frame->finished;
-                }
-            ))
-                return {zero::async::promise::resolve<void, std::exception_ptr>()};
+            if (group.mFrames.empty())
+                return {Future<void>::resolved()};
 
-            const auto promise = std::make_shared<asyncio::Promise<void, std::exception_ptr>>();
+            const auto promise = std::make_shared<asyncio::Promise<void>>();
             const auto count = std::make_shared<std::size_t>(group.mFrames.size());
 
             for (const auto &frame: group.mFrames) {
                 frame->parent = mFrame;
 
-                if (frame->finished) {
-                    --*count;
-                    continue;
-                }
-
-                frame->callbacks.emplace_back([=] {
+                auto callback = [=] {
                     if (--*count > 0)
                         return;
 
                     promise->resolve();
-                });
+                };
+
+                /*
+                 * All tasks may have all been completed, but the callbacks have not yet been executed.
+                 * We cannot allow the `co_await group` to complete synchronously,
+                 * otherwise the upper-level coroutine might return immediately, causing the task group to be destroyed.
+                 */
+                if (frame->finished) {
+                    mFrame->eventLoop->post(std::move(callback));
+                    continue;
+                }
+
+                frame->callbacks.emplace_back(std::move(callback));
             }
 
             mFrame->children = group.mFrames;
@@ -559,234 +554,59 @@ namespace asyncio::task {
             if (mFrame->cancelled && !mFrame->locked)
                 std::ignore = group.cancel();
 
-            return {promise->getFuture(), [this] { mFrame->step(); }};
+            return {promise->getFuture().via(mFrame->eventLoop), [this] { mFrame->step(); }};
         }
 
-        template<typename U = T>
-            requires std::same_as<E, std::exception_ptr>
-        void return_value(U &&value) {
-            mFrame->end();
-            mPromise->resolve(std::forward<U>(value));
-        }
-
-        void return_value(std::expected<T, E> &&result) requires (!std::same_as<E, std::exception_ptr>) {
-            mFrame->end();
-
-            if (!result) {
-                mPromise->reject(std::move(result).error());
-                return;
-            }
-
-            if constexpr (std::is_void_v<T>)
-                mPromise->resolve();
-            else
-                mPromise->resolve(std::move(result).value());
-        }
-
-        void return_value(const std::expected<T, E> &result) requires (!std::same_as<E, std::exception_ptr>) {
-            mFrame->end();
-
-            if (!result) {
-                mPromise->reject(result.error());
-                return;
-            }
-
-            if constexpr (std::is_void_v<T>)
-                mPromise->resolve();
-            else
-                mPromise->resolve(result.value());
-        }
-
-    private:
+    protected:
         std::shared_ptr<Frame> mFrame;
         std::shared_ptr<asyncio::Promise<T, E>> mPromise;
     };
 
-    template<>
-    class Promise<void, std::exception_ptr> {
+    template<typename T, typename E>
+    class Promise final : public PromiseBase<T, E> {
     public:
-        Promise() : mFrame{std::make_shared<Frame>()},
-                    mPromise{std::make_shared<asyncio::Promise<void, std::exception_ptr>>()} {
+        template<typename U = T>
+        void return_value(U &&value) requires std::same_as<E, std::exception_ptr> {
+            this->mFrame->end();
+            this->mPromise->resolve(std::forward<U>(value));
         }
 
-        // ReSharper disable once CppMemberFunctionMayBeStatic
-        std::suspend_never initial_suspend() {
-            return {};
-        }
+        void return_value(std::expected<T, E> &&result) requires (!std::same_as<E, std::exception_ptr>) {
+            this->mFrame->end();
 
-        // ReSharper disable once CppMemberFunctionMayBeStatic
-        std::suspend_never final_suspend() noexcept {
-            return {};
-        }
-
-        void unhandled_exception() {
-            mFrame->end();
-            mPromise->reject(std::current_exception());
-        }
-
-        [[nodiscard]] Task<void> get_return_object() {
-            return {mFrame, mPromise};
-        }
-
-        [[nodiscard]] Awaitable<bool, std::exception_ptr> await_transform(const Cancelled) const {
-            return {zero::async::promise::resolve<bool, std::exception_ptr>(mFrame->cancelled)};
-        }
-
-        [[nodiscard]] Awaitable<void, std::exception_ptr> await_transform(const Lock) const {
-            mFrame->locked = true;
-            return {zero::async::promise::resolve<void, std::exception_ptr>()};
-        }
-
-        [[nodiscard]] Awaitable<void, std::exception_ptr> await_transform(const Unlock) const {
-            assert(mFrame->locked);
-            mFrame->locked = false;
-            return {zero::async::promise::resolve<void, std::exception_ptr>()};
-        }
-
-        [[nodiscard]] Awaitable<std::vector<std::source_location>, std::exception_ptr>
-        await_transform(const Backtrace, const std::source_location location = std::source_location::current()) const {
-            auto promise = std::make_shared<asyncio::Promise<std::vector<std::source_location>, std::exception_ptr>>();
-            auto future = promise->getFuture();
-
-            getEventLoop()->post([=, this, promise = std::move(promise)] {
-                std::vector stacktrace{location};
-
-                auto frame = mFrame->parent.lock();
-
-                while (frame) {
-                    assert(frame->location);
-                    stacktrace.push_back(*frame->location);
-                    frame = frame->parent.lock();
-                }
-
-                promise->resolve(std::move(stacktrace));
-            });
-
-            return {std::move(future)};
-        }
-
-        template<typename Result, typename Error>
-        NoExceptAwaitable<Result, Error>
-        await_transform(
-            CancellableFuture<Result, Error> cancellable,
-            const std::source_location location = std::source_location::current()
-        ) {
-            mFrame->location = location;
-
-            if (mFrame->cancelled && !mFrame->locked)
-                std::ignore = cancellable.cancel();
-            else
-                mFrame->cancel = std::move(cancellable.cancel);
-
-            return {std::move(cancellable.future), [this] { mFrame->step(); }};
-        }
-
-        template<typename Result, typename Error>
-        Awaitable<Result, Error>
-        await_transform(
-            CancellableTask<Result, Error> cancellable,
-            const std::source_location location = std::source_location::current()
-        ) {
-            cancellable.task.mFrame->parent = mFrame;
-            mFrame->children.push_back(cancellable.task.mFrame);
-            mFrame->location = location;
-
-            if (mFrame->cancelled && !mFrame->locked)
-                std::ignore = cancellable.cancel();
-            else
-                mFrame->cancel = std::move(cancellable.cancel);
-
-            return {cancellable.task.future(), [this] { mFrame->step(); }};
-        }
-
-        template<typename Result, typename Error>
-        NoExceptAwaitable<Result, Error>
-        await_transform(
-            zero::async::promise::Future<Result, Error> future,
-            const std::source_location location = std::source_location::current()
-        ) {
-            mFrame->location = location;
-            return {std::move(future), [this] { mFrame->step(); }};
-        }
-
-        template<typename Result, typename Error>
-        Awaitable<Result, Error>
-        await_transform(
-            Task<Result, Error> &&task,
-            const std::source_location location = std::source_location::current()
-        ) {
-            task.mFrame->parent = mFrame;
-            mFrame->children.push_back(task.mFrame);
-            mFrame->location = location;
-
-            if (mFrame->cancelled && !mFrame->locked)
-                std::ignore = task.cancel();
-
-            return {task.future(), [this] { mFrame->step(); }};
-        }
-
-        template<typename Result, typename Error>
-        Awaitable<Result, Error>
-        await_transform(
-            Task<Result, Error> &task,
-            const std::source_location location = std::source_location::current()
-        ) {
-            task.mFrame->parent = mFrame;
-            mFrame->children.push_back(task.mFrame);
-            mFrame->location = location;
-
-            if (mFrame->cancelled && !mFrame->locked)
-                std::ignore = task.cancel();
-
-            return {task.future(), [this] { mFrame->step(); }};
-        }
-
-        Awaitable<void, std::exception_ptr>
-        await_transform(TaskGroup &group, const std::source_location location = std::source_location::current()) {
-            if (group.mFrames.empty() || std::ranges::all_of(
-                group.mFrames,
-                [](const auto &frame) {
-                    return frame->finished;
-                }
-            ))
-                return {zero::async::promise::resolve<void, std::exception_ptr>()};
-
-            const auto promise = std::make_shared<asyncio::Promise<void, std::exception_ptr>>();
-            const auto count = std::make_shared<std::size_t>(group.mFrames.size());
-
-            for (const auto &frame: group.mFrames) {
-                frame->parent = mFrame;
-
-                if (frame->finished) {
-                    --*count;
-                    continue;
-                }
-
-                frame->callbacks.emplace_back([=] {
-                    if (--*count > 0)
-                        return;
-
-                    promise->resolve();
-                });
+            if (!result) {
+                this->mPromise->reject(std::move(result).error());
+                return;
             }
 
-            mFrame->children = group.mFrames;
-            mFrame->location = location;
-
-            if (mFrame->cancelled && !mFrame->locked)
-                std::ignore = group.cancel();
-
-            return {promise->getFuture(), [this] { mFrame->step(); }};
+            if constexpr (std::is_void_v<T>)
+                this->mPromise->resolve();
+            else
+                this->mPromise->resolve(std::move(result).value());
         }
 
+        void return_value(const std::expected<T, E> &result) requires (!std::same_as<E, std::exception_ptr>) {
+            this->mFrame->end();
+
+            if (!result) {
+                this->mPromise->reject(result.error());
+                return;
+            }
+
+            if constexpr (std::is_void_v<T>)
+                this->mPromise->resolve();
+            else
+                this->mPromise->resolve(result.value());
+        }
+    };
+
+    template<>
+    class Promise<void, std::exception_ptr> final : public PromiseBase<void, std::exception_ptr> {
+    public:
         void return_void() {
-            mFrame->end();
-            mPromise->resolve();
+            this->mFrame->end();
+            this->mPromise->resolve();
         }
-
-    private:
-        std::shared_ptr<Frame> mFrame;
-        std::shared_ptr<asyncio::Promise<void, std::exception_ptr>> mPromise;
     };
 
     template<std::input_iterator I, std::sentinel_for<I> S>
@@ -813,35 +633,24 @@ namespace asyncio::task {
     all(I first, S last) {
         assert(first != last);
 
-        using T = AllRangesValue<I, S>;
-        using E = AllRangesError<I, S>;
+        using T = std::iter_value_t<I>::value_type;
+        using E = std::iter_value_t<I>::error_type;
 
         TaskGroup group;
+        std::list<Future<T, E>> futures;
 
-        std::for_each(first, last, [&](auto &task) { group.add(task); });
+        while (first != last) {
+            group.add(*first);
+            futures.push_back(first->future());
+            ++first;
+        }
 
-        auto future = zero::async::promise::all(
-            std::ranges::subrange{first, last} | std::views::transform([](auto &task) {
-                return task.future();
-            })
-        ).finally([&] {
+        auto future = zero::async::promise::all(std::move(futures)).via(getEventLoop()).finally([&] {
             std::ignore = group.cancel();
         });
 
         co_await group;
-
-        auto result = co_await std::move(future);
-
-        if constexpr (std::is_same_v<E, std::exception_ptr>) {
-            if (!result)
-                std::rethrow_exception(result.error());
-
-            if constexpr (!std::is_void_v<T>)
-                co_return *std::move(result);
-        }
-        else {
-            co_return result;
-        }
+        co_return co_await std::move(future);
     }
 
     template<std::ranges::input_range R>
@@ -868,33 +677,18 @@ namespace asyncio::task {
     all(Ts &&... tasks) {
         static_assert(sizeof...(Ts) > 0);
 
-        using T = AllVariadicValue<Ts...>;
-        using E = AllVariadicError<Ts...>;
-
         TaskGroup group;
 
         (group.add(tasks), ...);
 
         auto future = zero::async::promise::all(
             tasks.future()...
-        ).finally([&] {
+        ).via(getEventLoop()).finally([&] {
             std::ignore = group.cancel();
         });
 
         co_await group;
-
-        auto result = co_await std::move(future);
-
-        if constexpr (std::is_same_v<E, std::exception_ptr>) {
-            if (!result)
-                std::rethrow_exception(std::move(result).error());
-
-            if constexpr (!std::is_void_v<T>)
-                co_return *std::move(result);
-        }
-        else {
-            co_return result;
-        }
+        co_return co_await std::move(future);
     }
 
     template<std::input_iterator I, std::sentinel_for<I> S>
@@ -915,20 +709,24 @@ namespace asyncio::task {
     allSettled(I first, S last) {
         assert(first != last);
 
+        using T = std::iter_value_t<I>::value_type;
+        using E = std::iter_value_t<I>::error_type;
+
         TaskGroup group;
+        std::list<Future<T, E>> futures;
 
-        std::for_each(first, last, [&](auto &task) { group.add(task); });
+        while (first != last) {
+            group.add(*first);
+            futures.push_back(first->future());
+            ++first;
+        }
 
-        auto future = zero::async::promise::allSettled(
-            std::ranges::subrange{first, last} | std::views::transform([](auto &task) {
-                return task.future();
-            })
-        ).finally([&] {
+        auto future = zero::async::promise::allSettled(std::move(futures)).via(getEventLoop()).finally([&] {
             std::ignore = group.cancel();
         });
 
         co_await group;
-        co_return *std::move(future).result();
+        co_return co_await std::move(future);
     }
 
     template<std::ranges::input_range R>
@@ -955,12 +753,12 @@ namespace asyncio::task {
 
         auto future = zero::async::promise::allSettled(
             tasks.future()...
-        ).finally([&] {
+        ).via(getEventLoop()).finally([&] {
             std::ignore = group.cancel();
         });
 
         co_await group;
-        co_return *std::move(future).result();
+        co_return co_await std::move(future);
     }
 
     template<std::input_iterator I, std::sentinel_for<I> S>
@@ -987,20 +785,24 @@ namespace asyncio::task {
     any(I first, S last) {
         assert(first != last);
 
+        using T = std::iter_value_t<I>::value_type;
+        using E = std::iter_value_t<I>::error_type;
+
         TaskGroup group;
+        std::list<Future<T, E>> futures;
 
-        std::for_each(first, last, [&](auto &task) { group.add(task); });
+        while (first != last) {
+            group.add(*first);
+            futures.push_back(first->future());
+            ++first;
+        }
 
-        auto future = zero::async::promise::any(
-            std::ranges::subrange{first, last} | std::views::transform([](auto &task) {
-                return task.future();
-            })
-        ).finally([&] {
+        auto future = zero::async::promise::any(std::move(futures)).via(getEventLoop()).finally([&] {
             std::ignore = group.cancel();
         });
 
         co_await group;
-        co_return std::move(future).result();
+        co_return co_await std::move(future);
     }
 
     template<std::ranges::input_range R>
@@ -1033,12 +835,12 @@ namespace asyncio::task {
 
         auto future = zero::async::promise::any(
             tasks.future()...
-        ).finally([&] {
+        ).via(getEventLoop()).finally([&] {
             std::ignore = group.cancel();
         });
 
         co_await group;
-        co_return std::move(future).result();
+        co_return co_await std::move(future);
     }
 
     template<std::input_iterator I, std::sentinel_for<I> S>
@@ -1065,35 +867,24 @@ namespace asyncio::task {
     race(I first, S last) {
         assert(first != last);
 
-        using T = RaceRangesValue<I, S>;
-        using E = RaceRangesError<I, S>;
+        using T = std::iter_value_t<I>::value_type;
+        using E = std::iter_value_t<I>::error_type;
 
         TaskGroup group;
+        std::list<Future<T, E>> futures;
 
-        std::for_each(first, last, [&](auto &task) { group.add(task); });
+        while (first != last) {
+            group.add(*first);
+            futures.push_back(first->future());
+            ++first;
+        }
 
-        auto future = zero::async::promise::race(
-            std::ranges::subrange{first, last} | std::views::transform([](auto &task) {
-                return task.future();
-            })
-        ).finally([&] {
+        auto future = zero::async::promise::race(std::move(futures)).via(getEventLoop()).finally([&] {
             std::ignore = group.cancel();
         });
 
         co_await group;
-
-        auto result = co_await std::move(future);
-
-        if constexpr (std::is_same_v<E, std::exception_ptr>) {
-            if (!result)
-                std::rethrow_exception(result.error());
-
-            if constexpr (!std::is_void_v<T>)
-                co_return *std::move(result);
-        }
-        else {
-            co_return result;
-        }
+        co_return co_await std::move(future);
     }
 
     template<std::ranges::input_range R>
@@ -1120,69 +911,42 @@ namespace asyncio::task {
     race(Ts &&... tasks) {
         static_assert(sizeof...(Ts) > 0);
 
-        using T = RaceVariadicValue<Ts...>;
-        using E = RaceVariadicError<Ts...>;
-
         TaskGroup group;
 
         (group.add(tasks), ...);
 
         auto future = zero::async::promise::race(
             tasks.future()...
-        ).finally([&] {
+        ).via(getEventLoop()).finally([&] {
             std::ignore = group.cancel();
         });
 
         co_await group;
-
-        auto result = co_await std::move(future);
-
-        if constexpr (std::is_same_v<E, std::exception_ptr>) {
-            if (!result)
-                std::rethrow_exception(std::move(result).error());
-
-            if constexpr (!std::is_void_v<T>)
-                co_return *std::move(result);
-        }
-        else {
-            co_return result;
-        }
+        co_return co_await std::move(future);
     }
 
     template<typename T, typename E>
-    Task<T, E> from(zero::async::promise::Future<T, E> future) {
-        auto result = co_await std::move(future);
-
-        if constexpr (std::is_same_v<E, std::exception_ptr>) {
-            if (!result)
-                std::rethrow_exception(result.error());
-
-            if constexpr (!std::is_void_v<T>)
-                co_return *std::move(result);
-        }
-        else {
-            co_return result;
-        }
+    Task<T, E> from(SemiFuture<T, E> future) {
+        co_return co_await std::move(future);
     }
 
     template<typename T, typename E>
-    Task<T, E> from(CancellableFuture<T, E> cancellable) {
-        auto result = co_await std::move(cancellable);
-
-        if constexpr (std::is_same_v<E, std::exception_ptr>) {
-            if (!result)
-                std::rethrow_exception(result.error());
-
-            if constexpr (!std::is_void_v<T>)
-                co_return *std::move(result);
-        }
-        else {
-            co_return result;
-        }
+    Task<T, E> from(Future<T, E> future) {
+        co_return co_await std::move(future);
     }
 
     template<typename T, typename E>
-    Task<T, E> from(CancellableTask<T, E> cancellable) {
+    Task<T, E> from(Cancellable<SemiFuture<T, E>> cancellable) {
+        co_return co_await std::move(cancellable);
+    }
+
+    template<typename T, typename E>
+    Task<T, E> from(Cancellable<Future<T, E>> cancellable) {
+        co_return co_await std::move(cancellable);
+    }
+
+    template<typename T, typename E>
+    Task<T, E> from(Cancellable<Task<T, E>> cancellable) {
         co_return co_await std::move(cancellable);
     }
 

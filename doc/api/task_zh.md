@@ -78,12 +78,13 @@ Self &&addCallback(this Self &&self, std::function<void()> callback);
 
 ```c++
 template<AsyncFunction<T> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<typename InvokeResult<F, T>::value_type, E> transform(F f) &&;
+Task<typename InvokeResult<F, T>::value_type, E> transform(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 
 template<typename F>
-    requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, T> && !FallibleFunction<F, T>)
-Task<InvokeResult<F, T>, E> transform(F f) &&;
+    requires (!AsyncFunction<F, T>)
+Task<InvokeResult<F, T>, E> transform(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 ```
 
 当任务成功时转换值的类型，相当于 `std::expected::transofrm`，处理函数可以是异步的。
@@ -94,12 +95,12 @@ Task<InvokeResult<F, T>, E> transform(F f) &&;
 
 ```c++
 template<AsyncFunction<T> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&;
+Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 
 template<FallibleFunction<T> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&;
+Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 ```
 
 当任务成功时使用值进行下一步操作，相当于 `std::expected::and_then`，处理函数可以是异步的。
@@ -110,12 +111,13 @@ Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&;
 
 ```c++
 template<AsyncFunction<E> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<T, typename InvokeResult<F, E>::value_type> transformError(F f) &&;
+Task<T, typename InvokeResult<F, E>::value_type> transformError(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 
 template<typename F>
-    requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, E> && !FallibleFunction<F, E>)
-Task<T, InvokeResult<F, E>> transformError(F f) &&;
+    requires (!AsyncFunction<F, E>)
+Task<T, InvokeResult<F, E>> transformError(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 ```
 
 当任务失败时转换错误类型，相当于 `std::expected::transform_error`，处理函数可以是异步的。
@@ -126,12 +128,12 @@ Task<T, InvokeResult<F, E>> transformError(F f) &&;
 
 ```c++
 template<AsyncFunction<E> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&;
+Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 
 template<FallibleFunction<E> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&;
+Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 ```
 
 当任务失败时使用错误进行下一步操作，相当于 `std::expected::or_else`，处理函数可以是异步的。
@@ -167,7 +169,7 @@ Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&;
 ### Method `future`
 
 ```c++
-zero::async::promise::Future<T, E> future();
+Future<T, E> future();
 ```
 
 获取任务关联的 `future`，之后任务不能再被 `co_await`。
@@ -186,12 +188,17 @@ task.future()
 
 > `Future` 类似于 `JavaScript` 的 `Promise`，可以绑定回调，也支持 `all` 等聚合操作。
 
-## Struct `CancellableFuture`
+## Struct `Cancellable`
 
 ```c++
-template<typename T, typename E>
-struct CancellableFuture {
-    zero::async::promise::Future<T, E> future;
+template<typename T>
+    requires (
+        Specialization<T, SemiFuture> ||
+        Specialization<T, Future> ||
+        Specialization<T, Task>
+    )
+struct Cancellable {
+    T awaitable;
     std::function<std::expected<void, std::error_code>()> cancel;
 };
 ```
@@ -223,7 +230,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         );
     }));
 
-    co_return co_await task::CancellableFuture{
+    co_return co_await task::Cancellable{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
@@ -240,16 +247,6 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
 当截止时间还未达到，回调还没发生时，可以通过 `task.cancel()` 进行取消。
 
 > `Promise` 被 `resolve` 后，回调需要等待到下一次事件循环，所以我们通过 `promise.isFulfilled()` 进行判断任务是否即将完成。
-
-## Struct `CancellableTask`
-
-```c++
-template<typename T, typename E>
-struct CancellableTask {
-    Task<T, E> task;
-    std::function<std::expected<void, std::error_code>()> cancel;
-};
-```
 
 极少数的 `Task` 是无法被取消的，例如 `ChildProcess::wait`：
 
@@ -279,7 +276,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
 无论 `Task` 能否取消，我们都可以重载它的取消函数：
 
 ```c++
-co_await asyncio::task::CancellableTask{
+co_await asyncio::task::Cancellable{
     child->wait(),
     [&] {
         return child->kill();
@@ -288,7 +285,7 @@ co_await asyncio::task::CancellableTask{
 ```
 
 > 取消操作是自顶而下的，依次遍历任务树的每一个分支，当某个节点上重载了取消函数时，将会直接调用它并提早返回，然后继续遍历下一个分支。
-> 当然，大部分 `Task` 的底部都是 `CancellableFuture`，所以绝大多数时候你不必进行重载。
+> 当然，大部分 `Task` 的底部都是 `Cancellable`，所以绝大多数时候你不必进行重载。
 
 ## Constant `cancelled`
 
@@ -460,7 +457,7 @@ all(Ts &&... tasks);
 
 - 子任务类型都是 `Task<void, E>` 时，返回值类型是 `Task<void, E>`。
 - 子任务类型都是 `Task<T, E>` 时，返回值类型是 `Task<std::array<T, N>, E>`。
-- 子任务类型不同时，返回值类型是 `Task<std::tuple<T1, T2, ...>, E>`，`std::tuple` 中不能包含 `void`，所以如果 `T` 是 `void`，那么它将被转为 `std::nullptr_t`。
+- 子任务类型不同时，返回值类型是 `Task<std::tuple<T1, T2, ...>, E>`，`std::tuple` 中不能包含 `void`，所以如果 `T` 是 `void`，那么它将被转为 `std::monostate`。
 
 ## Function `allSettled`
 
@@ -564,21 +561,27 @@ race(Ts &&... tasks);
 
 ```c++
 template<typename T, typename E>
-Task<T, E> from(zero::async::promise::Future<T, E> future);
+Task<T, E> from(SemiFuture<T, E> future);
 
 template<typename T, typename E>
-Task<T, E> from(CancellableFuture<T, E> cancellable);
+Task<T, E> from(Future<T, E> future);
 
 template<typename T, typename E>
-Task<T, E> from(CancellableTask<T, E> cancellable);
+Task<T, E> from(Cancellable<SemiFuture<T, E>> cancellable);
+
+template<typename T, typename E>
+Task<T, E> from(Cancellable<Future<T, E>> cancellable);
+
+template<typename T, typename E>
+Task<T, E> from(Cancellable<Task<T, E>> cancellable);
 ```
 
-将 `Future`、`CancellableFuture`、`CancellableTask` 转换为 `Task`；`asyncio` 的 `API` 都是针对 `Task` 的，转换后我们才能调用。
+将 `SemiFuture`、`Future`、`Cancellable` 转换为 `Task`；`asyncio` 的 `API` 都是针对 `Task` 的，转换后我们才能调用。
 
 ```c++
 const auto status = zero::flattenWith<std::error_code>(
     co_await asyncio::timeout(
-        from(asyncio::task::CancellableTask{
+        from(asyncio::task::Cancellable{
             child->wait(),
             [&] {
                 return child->kill();

@@ -3,7 +3,6 @@
 #include <asyncio/signal.h>
 #include <asyncio/sync/event.h>
 #include <zero/cmdline.h>
-#include <zero/interface.h>
 #include <zero/formatter.h>
 #include <grpcpp/grpcpp.h>
 #include <sample.grpc.pb.h>
@@ -11,8 +10,9 @@
 template<typename Element>
 class Reader {
 public:
-    class IReader : public zero::Interface {
+    class IReader {
     public:
+        virtual ~IReader() = default;
         virtual asyncio::task::Task<std::optional<Element>> read() = 0;
     };
 
@@ -31,7 +31,7 @@ public:
 
             mReader->Read(&element, &promise);
 
-            if (!*co_await asyncio::task::CancellableFuture{
+            if (!co_await asyncio::task::Cancellable{
                 promise.getFuture(),
                 [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
@@ -76,7 +76,7 @@ public:
         asyncio::Promise<bool> promise;
         mWriter->Write(element, &promise);
 
-        if (!*co_await asyncio::task::CancellableFuture{
+        if (!co_await asyncio::task::Cancellable{
             promise.getFuture(),
             [this]() -> std::expected<void, std::error_code> {
                 mContext->TryCancel();
@@ -106,7 +106,7 @@ public:
 
         mStream->Read(&element, &promise);
 
-        if (!*co_await asyncio::task::CancellableFuture{
+        if (!co_await asyncio::task::Cancellable{
             promise.getFuture(),
             [this]() -> std::expected<void, std::error_code> {
                 mContext->TryCancel();
@@ -128,7 +128,7 @@ public:
         asyncio::Promise<bool> promise;
         mStream->Write(element, &promise);
 
-        if (!*co_await asyncio::task::CancellableFuture{
+        if (!co_await asyncio::task::Cancellable{
             promise.getFuture(),
             [this]() -> std::expected<void, std::error_code> {
                 mContext->TryCancel();
@@ -198,7 +198,7 @@ protected:
                     &promise
                 );
 
-                if (!*co_await promise.getFuture())
+                if (!co_await promise.getFuture())
                     break;
             }
 
@@ -220,7 +220,7 @@ protected:
                         );
                     }
 
-                    if (!*co_await asyncio::task::CancellableFuture{
+                    if (!co_await asyncio::task::Cancellable{
                         promise.getFuture(),
                         [&]() -> std::expected<void, std::error_code> {
                             context->TryCancel();
@@ -283,7 +283,7 @@ protected:
                     &promise
                 );
 
-                if (!*co_await promise.getFuture())
+                if (!co_await promise.getFuture())
                     break;
             }
 
@@ -307,7 +307,7 @@ protected:
                         );
                     }
 
-                    if (!*co_await asyncio::task::CancellableFuture{
+                    if (!co_await asyncio::task::Cancellable{
                         promise.getFuture(),
                         [&]() -> std::expected<void, std::error_code> {
                             context->TryCancel();
@@ -364,7 +364,7 @@ protected:
                     &promise
                 );
 
-                if (!*co_await promise.getFuture())
+                if (!co_await promise.getFuture())
                     break;
             }
 
@@ -388,7 +388,7 @@ protected:
                         );
                     }
 
-                    if (!*co_await asyncio::task::CancellableFuture{
+                    if (!co_await asyncio::task::Cancellable{
                         promise.getFuture(),
                         [&]() -> std::expected<void, std::error_code> {
                             context->TryCancel();
@@ -447,7 +447,7 @@ protected:
                     &promise
                 );
 
-                if (!*co_await promise.getFuture())
+                if (!co_await promise.getFuture())
                     break;
             }
 
@@ -467,7 +467,7 @@ protected:
                         );
                     }
 
-                    if (!*co_await asyncio::task::CancellableFuture{
+                    if (!co_await asyncio::task::Cancellable{
                         promise.getFuture(),
                         [&]() -> std::expected<void, std::error_code> {
                             context->TryCancel();
@@ -613,7 +613,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
         asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
             asyncio::sync::Event event;
 
-            co_await asyncio::task::CancellableTask{
+            co_await asyncio::task::Cancellable{
                 all(
                     server.run(),
                     asyncio::task::spawn([&]() -> asyncio::task::Task<void> {

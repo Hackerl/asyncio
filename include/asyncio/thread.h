@@ -11,7 +11,7 @@ namespace asyncio {
     toThread(F f) {
         using T = std::invoke_result_t<F>;
 
-        Promise<T, std::exception_ptr> promise;
+        Promise<T> promise;
 
         std::thread thread{
             [&] {
@@ -31,15 +31,7 @@ namespace asyncio {
         };
         Z_DEFER(thread.join());
 
-        auto result = co_await promise.getFuture();
-
-        if (!result)
-            std::rethrow_exception(result.error());
-
-        if constexpr (std::is_void_v<T>)
-            co_return;
-        else
-            co_return *std::move(result);
+        co_return co_await promise.getFuture();
     }
 
     template<std::invocable F>
@@ -47,7 +39,7 @@ namespace asyncio {
     toThread(F f, const std::function<std::expected<void, std::error_code>(std::thread::native_handle_type)> cancel) {
         using T = std::invoke_result_t<F>;
 
-        Promise<T, std::exception_ptr> promise;
+        Promise<T> promise;
 
         std::thread thread{
             [&] {
@@ -67,20 +59,12 @@ namespace asyncio {
         };
         Z_DEFER(thread.join());
 
-        auto result = co_await task::CancellableFuture{
+        co_return co_await task::Cancellable{
             promise.getFuture(),
             [&] {
                 return cancel(thread.native_handle());
             }
         };
-
-        if (!result)
-            std::rethrow_exception(result.error());
-
-        if constexpr (std::is_void_v<T>)
-            co_return;
-        else
-            co_return *std::move(result);
     }
 
     Z_DEFINE_ERROR_CODE_EX(
@@ -115,7 +99,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const auto status = *co_await task::CancellableFuture{
+            if (const auto status = co_await task::Cancellable{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     Z_EXPECT(uv::expected([&] {
@@ -153,7 +137,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const auto status = *co_await task::CancellableFuture{
+            if (const auto status = co_await task::Cancellable{
                 context.promise.getFuture(),
                 [&]() -> std::expected<void, std::error_code> {
                     Z_EXPECT(uv::expected([&] {
@@ -196,7 +180,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const auto status = *co_await task::CancellableFuture{
+            if (const auto status = co_await task::Cancellable{
                 context.promise.getFuture(),
                 [&] {
                     return uv::expected([&] {
@@ -236,7 +220,7 @@ namespace asyncio {
             );
             assert(result == 0);
 
-            if (const auto status = *co_await task::CancellableFuture{
+            if (const auto status = co_await task::Cancellable{
                 context.promise.getFuture(),
                 [&] {
                     return uv::expected([&] {

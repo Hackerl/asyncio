@@ -5,9 +5,9 @@
 #include <zero/os/net.h>
 
 namespace asyncio::net {
-    using IPv4 = zero::os::net::IPv4;
-    using IPv6 = zero::os::net::IPv6;
-    using IP = zero::os::net::IP;
+    using zero::os::net::IPv4;
+    using zero::os::net::IPv6;
+    using zero::os::net::IP;
 
     inline constexpr auto LocalhostIPv4 = zero::os::net::LocalhostIPv4;
     inline constexpr auto BroadcastIPv4 = zero::os::net::BroadcastIPv4;
@@ -119,8 +119,9 @@ namespace asyncio::net {
 
     std::expected<SocketAddress, std::error_code> socketAddressFrom(const Address &address);
 
-    class IEndpoint : public virtual zero::Interface {
+    class IEndpoint {
     public:
+        virtual ~IEndpoint() = default;
         [[nodiscard]] virtual std::expected<Address, std::error_code> localAddress() const = 0;
         [[nodiscard]] virtual std::expected<Address, std::error_code> remoteAddress() const = 0;
     };

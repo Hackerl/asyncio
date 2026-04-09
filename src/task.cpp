@@ -12,8 +12,6 @@ void asyncio::task::Frame::step() {
 void asyncio::task::Frame::end() {
     finished = true;
 
-    const auto eventLoop = getEventLoop();
-
     for (auto &callback: std::exchange(callbacks, {})) {
         eventLoop->post([callback = std::move(callback)] {
             callback();

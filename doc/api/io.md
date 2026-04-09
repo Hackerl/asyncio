@@ -25,7 +25,7 @@ On `Unix` systems, `FileDescriptor` is of type `int`, on `Windows` systems, `Fil
 ## Interface `IFileDescriptor`
 
 ```c++
-class IFileDescriptor : public virtual zero::Interface {
+class IFileDescriptor {
 public:
     [[nodiscard]] virtual FileDescriptor fd() const = 0;
 };
@@ -36,7 +36,7 @@ Used to obtain the underlying file descriptor.
 ## Interface `ICloseable`
 
 ```c++
-class ICloseable : public virtual zero::Interface {
+class ICloseable {
 public:
     virtual task::Task<void, std::error_code> close() = 0;
 };
@@ -47,7 +47,7 @@ Used to close the underlying resource.
 ### Interface `IHalfCloseable`
 
 ```c++
-class IHalfCloseable : public virtual zero::Interface {
+class IHalfCloseable {
 public:
     virtual task::Task<void, std::error_code> shutdown() = 0;
 };
@@ -56,7 +56,7 @@ public:
 Closes the write end of `IO` while keeping the read end open. Only a few connection types support this operation.
 
 ```c++
-class IReader : public virtual zero::Interface {
+class IReader {
 public:
     Z_DEFINE_ERROR_CODE_INNER_EX(
         ReadExactlyError,
@@ -101,7 +101,7 @@ Reads all data and returns a `std::vector<std::byte>` object.
 ## Interface `IWriter`
 
 ```c++
-class IWriter : public virtual zero::Interface {
+class IWriter {
 public:
     virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
     virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
@@ -133,7 +133,7 @@ Writes all data. If an error occurs, returns the error.
 ## Interface `ISeekable`
 
 ```c++
-class ISeekable : public virtual zero::Interface {
+class ISeekable {
 public:
     enum class Whence {
         Begin,

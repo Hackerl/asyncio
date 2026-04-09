@@ -21,7 +21,6 @@ namespace asyncio::fs {
 
     private:
         uv_file mFile;
-        std::shared_ptr<EventLoop> mEventLoop;
     };
 
     task::Task<File, std::error_code> open(std::filesystem::path path, int flags, int mode = 0644);

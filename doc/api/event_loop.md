@@ -4,7 +4,7 @@ This module implements the `Event Loop` and related functionality.
 
 ## Class `EventLoop`
 
-An `Event Loop` encapsulated around `uv_loop_t`. Almost all functionality depends on it, but you typically won't use it directly.
+An `Event Loop` encapsulated around `uv_loop_t`, implementing the `zero::async::promise::IExecutor` interface. Almost all functionality depends on it, but you typically won't use it directly.
 
 ### Static Method `make`
 
@@ -26,10 +26,10 @@ Returns the underlying `uv_loop_t` pointer.
 ### Method `post`
 
 ```c++
-void post(std::function<void()> function);
+void post(std::function<void()> f) override;
 ```
 
-Executes a callable object on the next event loop iteration.
+Implements `zero::async::promise::IExecutor::post`. Executes a callable object on the next event loop iteration.
 
 ### Method `run`
 

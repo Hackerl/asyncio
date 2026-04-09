@@ -232,7 +232,7 @@ std::expected<void, std::error_code> asyncio::process::PseudoConsole::resize(con
 std::expected<asyncio::process::ChildProcess, std::error_code>
 asyncio::process::PseudoConsole::spawn(const Command &command) {
     return mPseudoConsole.spawn(command.mCommand).transform([](zero::os::process::ChildProcess &&process) {
-        return ChildProcess{zero::os::process::Process{std::move(process.impl())}, {}};
+        return ChildProcess{Process{std::move(process.impl())}, {}};
     });
 }
 
@@ -316,7 +316,7 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
         stdio[i].emplace(*std::move(pipe));
     }
 
-    return ChildProcess{zero::os::process::Process{std::move(child->impl())}, std::move(stdio)};
+    return ChildProcess{Process{std::move(child->impl())}, std::move(stdio)};
 }
 
 const std::filesystem::path &asyncio::process::Command::program() const {
@@ -350,7 +350,7 @@ std::expected<asyncio::process::ChildProcess, std::error_code> asyncio::process:
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::Command::status() const {
     auto child = spawn();
     Z_CO_EXPECT(child);
-    co_return co_await task::CancellableTask{
+    co_return co_await task::Cancellable{
         child->wait(),
         [&] {
             return child->kill();
@@ -405,7 +405,7 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
         co_return std::unexpected{result.error()};
     }
 
-    const auto status = co_await task::CancellableTask{
+    const auto status = co_await task::Cancellable{
         child->wait(),
         [&] {
             return child->kill();

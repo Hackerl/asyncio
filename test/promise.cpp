@@ -2,10 +2,11 @@
 #include <asyncio/sync/event.h>
 
 ASYNC_TEST_CASE("promise", "[promise]") {
-    asyncio::Promise<void> promise;
     asyncio::sync::Event event;
 
-    promise.getFuture().then([&] {
+    auto [promise, future] = contract<void>(asyncio::getEventLoop());
+
+    std::move(future).then([&] {
         event.set();
     });
 

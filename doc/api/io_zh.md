@@ -25,7 +25,7 @@ using FileDescriptor = uv_os_fd_t;
 ## Interface `IFileDescriptor`
 
 ```c++
-class IFileDescriptor : public virtual zero::Interface {
+class IFileDescriptor {
 public:
     [[nodiscard]] virtual FileDescriptor fd() const = 0;
 };
@@ -36,7 +36,7 @@ public:
 ## Interface `ICloseable`
 
 ```c++
-class ICloseable : public virtual zero::Interface {
+class ICloseable {
 public:
     virtual task::Task<void, std::error_code> close() = 0;
 };
@@ -47,7 +47,7 @@ public:
 ### Interface `IHalfCloseable`
 
 ```c++
-class IHalfCloseable : public virtual zero::Interface {
+class IHalfCloseable {
 public:
     virtual task::Task<void, std::error_code> shutdown() = 0;
 };
@@ -56,7 +56,7 @@ public:
 关闭 `IO` 的写端，保留读端，只有少数几类连接支持此操作。
 
 ```c++
-class IReader : public virtual zero::Interface {
+class IReader {
 public:
     Z_DEFINE_ERROR_CODE_INNER_EX(
         ReadExactlyError,
@@ -101,7 +101,7 @@ virtual task::Task<std::vector<std::byte>, std::error_code> readAll();
 ## Interface `IWriter`
 
 ```c++
-class IWriter : public virtual zero::Interface {
+class IWriter {
 public:
     virtual task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) = 0;
     virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> data);
@@ -133,7 +133,7 @@ virtual task::Task<void, std::error_code> writeAll(std::span<const std::byte> da
 ## Interface `ISeekable`
 
 ```c++
-class ISeekable : public virtual zero::Interface {
+class ISeekable {
 public:
     enum class Whence {
         Begin,

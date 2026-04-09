@@ -5,9 +5,9 @@
 #include <zero/os/process.h>
 
 namespace asyncio::process {
-    using Process = zero::os::process::Process;
-    using ExitStatus = zero::os::process::ExitStatus;
-    using Output = zero::os::process::Output;
+    using zero::os::process::Process;
+    using zero::os::process::ExitStatus;
+    using zero::os::process::Output;
 
     class ChildProcess final : public Process {
     public:

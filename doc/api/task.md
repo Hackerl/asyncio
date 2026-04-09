@@ -77,12 +77,13 @@ Adds a `callback` associated with the task, which will be called when the task c
 
 ```c++
 template<AsyncFunction<T> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<typename InvokeResult<F, T>::value_type, E> transform(F f) &&;
+Task<typename InvokeResult<F, T>::value_type, E> transform(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 
 template<typename F>
-    requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, T> && !FallibleFunction<F, T>)
-Task<InvokeResult<F, T>, E> transform(F f) &&;
+    requires (!AsyncFunction<F, T>)
+Task<InvokeResult<F, T>, E> transform(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 ```
 
 Transforms the value type when the task succeeds, equivalent to `std::expected::transform`. The handler function can be async.
@@ -93,12 +94,12 @@ Transforms the value type when the task succeeds, equivalent to `std::expected::
 
 ```c++
 template<AsyncFunction<T> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&;
+Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 
 template<FallibleFunction<T> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&;
+Task<typename InvokeResult<F, T>::value_type, E> andThen(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 ```
 
 Performs the next operation using the value when the task succeeds, equivalent to `std::expected::and_then`. The handler function can be async.
@@ -109,12 +110,13 @@ Performs the next operation using the value when the task succeeds, equivalent t
 
 ```c++
 template<AsyncFunction<E> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<T, typename InvokeResult<F, E>::value_type> transformError(F f) &&;
+Task<T, typename InvokeResult<F, E>::value_type> transformError(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 
 template<typename F>
-    requires (!std::same_as<E, std::exception_ptr> && !AsyncFunction<F, E> && !FallibleFunction<F, E>)
-Task<T, InvokeResult<F, E>> transformError(F f) &&;
+    requires (!AsyncFunction<F, E>)
+Task<T, InvokeResult<F, E>> transformError(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 ```
 
 Transforms the error type when the task fails, equivalent to `std::expected::transform_error`. The handler function can be async.
@@ -125,12 +127,12 @@ Transforms the error type when the task fails, equivalent to `std::expected::tra
 
 ```c++
 template<AsyncFunction<E> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&;
+Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 
 template<FallibleFunction<E> F>
-    requires (!std::same_as<E, std::exception_ptr>)
-Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&;
+Task<T, typename InvokeResult<F, E>::error_type> orElse(F f) &&
+    requires (!std::same_as<E, std::exception_ptr>);
 ```
 
 Performs the next operation using the error when the task fails, equivalent to `std::expected::or_else`. The handler function can be async.
@@ -166,7 +168,7 @@ Returns whether the task is locked.
 ### Method `future`
 
 ```c++
-zero::async::promise::Future<T, E> future();
+Future<T, E> future();
 ```
 
 Gets the `future` associated with the task, after which the task can no longer be `co_await`ed.
@@ -185,12 +187,17 @@ task.future()
 
 > `Future` is similar to JavaScript's `Promise`, can bind callbacks, and supports aggregation operations like `all`.
 
-## Struct `CancellableFuture`
+## Struct `Cancellable`
 
 ```c++
-template<typename T, typename E>
-struct CancellableFuture {
-    zero::async::promise::Future<T, E> future;
+template<typename T>
+    requires (
+        Specialization<T, SemiFuture> ||
+        Specialization<T, Future> ||
+        Specialization<T, Task>
+    )
+struct Cancellable {
+    T awaitable;
     std::function<std::expected<void, std::error_code>()> cancel;
 };
 ```
@@ -222,7 +229,7 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
         );
     }));
 
-    co_return co_await task::CancellableFuture{
+    co_return co_await task::Cancellable{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
@@ -239,16 +246,6 @@ asyncio::task::Task<void, std::error_code> asyncio::sleep(const std::chrono::mil
 When the deadline hasn't been reached and the callback hasn't occurred, cancellation can be performed via `task.cancel()`.
 
 > After a `Promise` is `resolve`d, the callback needs to wait until the next event loop, so we use `promise.isFulfilled()` to determine if the task is about to complete.
-
-## Struct `CancellableTask`
-
-```c++
-template<typename T, typename E>
-struct CancellableTask {
-    Task<T, E> task;
-    std::function<std::expected<void, std::error_code>()> cancel;
-};
-```
 
 A very small number of `Task`s cannot be cancelled, such as `ChildProcess::wait`:
 
@@ -278,7 +275,7 @@ We create a new thread to blockingly execute `waitpid`, and we have no way to ca
 Regardless of whether a `Task` can be cancelled, we can override its cancellation function:
 
 ```c++
-co_await asyncio::task::CancellableTask{
+co_await asyncio::task::Cancellable{
     child->wait(),
     [&] {
         return child->kill();
@@ -287,7 +284,7 @@ co_await asyncio::task::CancellableTask{
 ```
 
 > Cancellation is top-down, traversing each branch of the task tree. When a cancellation function is overridden at a node, it will be called directly and returned early, then continue traversing the next branch.
-> Of course, most `Task`s have `CancellableFuture` at their base, so most of the time you don't need to override.
+> Of course, most `Task`s have `Cancellable` at their base, so most of the time you don't need to override.
 
 ## Constant `cancelled`
 
@@ -459,7 +456,7 @@ all(Ts &&... tasks);
 
 - When all subtask types are `Task<void, E>`, return value type is `Task<void, E>`.
 - When all subtask types are `Task<T, E>`, return value type is `Task<std::array<T, N>, E>`.
-- When subtask types differ, return value type is `Task<std::tuple<T1, T2, ...>, E>`. `std::tuple` cannot contain `void`, so if `T` is `void`, it will be converted to `std::nullptr_t`.
+- When subtask types differ, return value type is `Task<std::tuple<T1, T2, ...>, E>`. `std::tuple` cannot contain `void`, so if `T` is `void`, it will be converted to `std::monostate`.
 
 ## Function `allSettled`
 
@@ -563,21 +560,27 @@ race(Ts &&... tasks);
 
 ```c++
 template<typename T, typename E>
-Task<T, E> from(zero::async::promise::Future<T, E> future);
+Task<T, E> from(SemiFuture<T, E> future);
 
 template<typename T, typename E>
-Task<T, E> from(CancellableFuture<T, E> cancellable);
+Task<T, E> from(Future<T, E> future);
 
 template<typename T, typename E>
-Task<T, E> from(CancellableTask<T, E> cancellable);
+Task<T, E> from(Cancellable<SemiFuture<T, E>> cancellable);
+
+template<typename T, typename E>
+Task<T, E> from(Cancellable<Future<T, E>> cancellable);
+
+template<typename T, typename E>
+Task<T, E> from(Cancellable<Task<T, E>> cancellable);
 ```
 
-Converts `Future`, `CancellableFuture`, `CancellableTask` to `Task`. The `asyncio` APIs are designed for `Task`, so conversion is needed before calling.
+Converts `SemiFuture`, `Future`, `Cancellable` to `Task`. The `asyncio` APIs are designed for `Task`, so conversion is needed before calling.
 
 ```c++
 const auto status = zero::flattenWith<std::error_code>(
     co_await asyncio::timeout(
-        from(asyncio::task::CancellableTask{
+        from(asyncio::task::Cancellable{
             child->wait(),
             [&] {
                 return child->kill();

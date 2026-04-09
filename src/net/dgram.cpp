@@ -297,12 +297,12 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
                     return;
                 }
 
-                promise.resolve(static_cast<std::size_t>(n), *std::move(address));
+                promise.resolve({static_cast<std::size_t>(n), *std::move(address)});
             }
         );
     }));
 
-    co_return co_await task::CancellableFuture{
+    co_return co_await task::Cancellable{
         context.promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())

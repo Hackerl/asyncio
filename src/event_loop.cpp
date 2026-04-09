@@ -81,9 +81,9 @@ asyncio::EventLoop asyncio::EventLoop::make() {
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-void asyncio::EventLoop::post(std::function<void()> function) {
+void asyncio::EventLoop::post(std::function<void()> f) {
     const std::lock_guard guard{mTaskQueue->mutex};
-    mTaskQueue->queue.push(std::move(function));
+    mTaskQueue->queue.push(std::move(f));
 
     zero::error::guard(uv::expected([this] {
         return uv_async_send(mTaskQueue->async.raw());
@@ -137,7 +137,7 @@ asyncio::task::Task<void, std::error_code> asyncio::reschedule() {
         );
     }));
 
-    co_return co_await task::CancellableFuture{
+    co_return co_await task::Cancellable{
         promise.getFuture(),
         [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())

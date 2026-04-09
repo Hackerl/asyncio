@@ -317,7 +317,7 @@ The specific error code is defined when implementing the interface:
 
 ```c++
 namespace asyncio {
-    class IReader : public virtual zero::Interface {
+    class IReader {
     public:
         Z_DEFINE_ERROR_CODE_INNER_EX(
             ReadExactlyError,
