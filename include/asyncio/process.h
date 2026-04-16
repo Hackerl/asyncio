@@ -18,7 +18,7 @@ namespace asyncio::process {
         std::optional<Pipe> &stdError();
 
         task::Task<ExitStatus, std::error_code> wait();
-        std::expected<std::optional<ExitStatus>, std::error_code> tryWait();
+        std::optional<ExitStatus> tryWait();
 
     private:
         std::array<std::optional<Pipe>, 3> mStdio;

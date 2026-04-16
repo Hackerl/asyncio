@@ -32,7 +32,10 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
     const zero::os::Resource event{CreateEventA(nullptr, false, false, nullptr)};
 
     if (!event)
-        co_return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
+        throw co_await error::StacktraceError<std::system_error>::make(
+            static_cast<int>(GetLastError()),
+            std::system_category()
+        );
 
     co_return co_await toThread(
         [&]() -> std::expected<ExitStatus, std::error_code> {
@@ -42,14 +45,15 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
             const auto result = WaitForMultipleObjects(handles.size(), handles.data(), false, INFINITE);
 
             if (result >= WAIT_OBJECT_0 + handles.size())
-                return std::unexpected{std::error_code{static_cast<int>(GetLastError()), std::system_category()}};
+                throw zero::error::StacktraceError<std::system_error>{
+                    static_cast<int>(GetLastError()),
+                    std::system_category()
+                };
 
             if (result == WAIT_OBJECT_0 + 1)
                 return std::unexpected{task::Error::Cancelled};
 
-            return impl.exitCode().transform([](const auto &code) {
-                return ExitStatus{code};
-            });
+            return ExitStatus{zero::error::guard(impl.exitCode())};
         },
         [&](std::thread::native_handle_type) -> std::expected<void, std::error_code> {
             return zero::os::windows::expected([&] {
@@ -61,13 +65,12 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
     co_return co_await toThread(
         [this]() -> std::expected<ExitStatus, std::error_code> {
             int s{};
-
             const auto pid = this->impl().pid();
-            const auto id = zero::os::unix::ensure([&] {
+
+            const auto id = zero::error::guard(zero::os::unix::ensure([&] {
                 return waitpid(pid, &s, 0);
-            });
-            Z_EXPECT(id);
-            assert(*id == pid);
+            }));
+            assert(id == pid);
 
             return ExitStatus{s};
         }
@@ -76,7 +79,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-std::expected<std::optional<asyncio::process::ExitStatus>, std::error_code> asyncio::process::ChildProcess::tryWait() {
+std::optional<asyncio::process::ExitStatus> asyncio::process::ChildProcess::tryWait() {
 #ifdef _WIN32
     using namespace std::chrono_literals;
 
@@ -84,24 +87,21 @@ std::expected<std::optional<asyncio::process::ExitStatus>, std::error_code> asyn
 
     if (const auto result = impl.wait(0ms); !result) {
         if (const auto &error = result.error(); error != std::errc::timed_out)
-            return std::unexpected{error};
+            throw zero::error::StacktraceError<std::system_error>{error};
 
         return std::nullopt;
     }
 
-    return impl.exitCode().transform([](const auto &code) {
-        return ExitStatus{code};
-    });
+    return ExitStatus{zero::error::guard(impl.exitCode())};
 #else
     int s{};
-
     const auto pid = this->impl().pid();
-    const auto id = zero::os::unix::expected([&] {
-        return waitpid(pid, &s, WNOHANG);
-    });
-    Z_EXPECT(id);
 
-    if (*id == 0)
+    const auto id = zero::error::guard(zero::os::unix::expected([&] {
+        return waitpid(pid, &s, WNOHANG);
+    }));
+
+    if (id == 0)
         return std::nullopt;
 
     return ExitStatus{s};
