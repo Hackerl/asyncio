@@ -1,4 +1,5 @@
 #include <asyncio/signal.h>
+#include <asyncio/error.h>
 
 asyncio::Signal::Signal(uv::Handle<uv_signal_t> signal) : mSignal{std::move(signal)} {
 }
@@ -17,7 +18,7 @@ asyncio::task::Task<int, std::error_code> asyncio::Signal::on(const int sig) {
     Promise<int, std::error_code> promise;
     mSignal->data = &promise;
 
-    Z_CO_EXPECT(uv::expected([&] {
+    co_await error::guard(uv::expected([&] {
         return uv_signal_start_oneshot(
             mSignal.raw(),
             [](auto *handle, const int s) {

@@ -196,15 +196,15 @@ void asyncio::http::Requests::Core::recycle() {
     }
 }
 
-std::expected<void, std::error_code> asyncio::http::Requests::Core::setTimer(const long ms) {
+void asyncio::http::Requests::Core::setTimer(const long ms) {
     if (ms == -1) {
         zero::error::guard(uv::expected([&] {
             return uv_timer_stop(timer.raw());
         }));
-        return {};
+        return;
     }
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_timer_start(
             timer.raw(),
             [](auto *handle) {
@@ -224,15 +224,12 @@ std::expected<void, std::error_code> asyncio::http::Requests::Core::setTimer(con
             0
         );
     }));
-
-    return {};
 }
 
-std::expected<void, std::error_code>
-asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, Context *context) {
+void asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, Context *context) {
     if (action == CURL_POLL_REMOVE) {
         if (!context)
-            return {};
+            return;
 
         zero::error::guard(uv::expected([&] {
             return uv_poll_stop(context->poll.raw());
@@ -244,13 +241,13 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
             return curl_multi_assign(multi, s, nullptr);
         }));
 
-        return {};
+        return;
     }
 
     if (!context) {
         auto poll = std::make_unique<uv_poll_t>();
 
-        Z_EXPECT(uv::expected([&] {
+        zero::error::guard(uv::expected([&] {
             return uv_poll_init_socket(getEventLoop()->raw(), poll.get(), s);
         }));
 
@@ -262,7 +259,7 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
         }));
     }
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_poll_start(
             context->poll.raw(),
             (action & CURL_POLL_IN ? UV_READABLE : 0) | (action & CURL_POLL_OUT ? UV_WRITABLE : 0),
@@ -290,8 +287,6 @@ asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, C
             }
         );
     }));
-
-    return {};
 }
 
 asyncio::http::Requests::Requests(std::unique_ptr<Core> core) : mCore{std::move(core)} {
@@ -340,9 +335,7 @@ asyncio::http::Requests asyncio::http::Requests::make(Options options) {
             CURLMOPT_SOCKETFUNCTION,
             static_cast<curl_socket_callback>(
                 [](CURL *, const curl_socket_t s, const int action, void *ctx, void *socketContext) {
-                    if (!static_cast<Core *>(ctx)->handle(s, action, static_cast<Core::Context *>(socketContext)))
-                        return -1;
-
+                    static_cast<Core *>(ctx)->handle(s, action, static_cast<Core::Context *>(socketContext));
                     return 0;
                 }
             )
@@ -358,9 +351,7 @@ asyncio::http::Requests asyncio::http::Requests::make(Options options) {
             multi,
             CURLMOPT_TIMERFUNCTION,
             static_cast<curl_multi_timer_callback>([](CURLM *, const long ms, void *ctx) {
-                if (!static_cast<Core *>(ctx)->setTimer(ms))
-                    return -1;
-
+                static_cast<Core *>(ctx)->setTimer(ms);
                 return 0;
             })
         );
@@ -405,9 +396,9 @@ std::size_t asyncio::http::Requests::onRead(char *buffer, const std::size_t size
 
             // The `onRead` callback will not be executed immediately,
             // otherwise it needs to be put into the next event loop.
-            zero::error::guard(expected([&] {
+            std::ignore = expected([&] {
                 return curl_easy_pause(easy, CURLPAUSE_SEND_CONT);
-            }));
+            });
         });
 
         return CURL_READFUNC_PAUSE;
@@ -663,7 +654,7 @@ asyncio::http::Requests::perform(std::shared_ptr<Connection> connection) {
     const auto easy = connection->easy.get();
     const auto multi = mCore->multi;
 
-    Z_CO_EXPECT(expected([&] {
+    co_await error::guard(expected([&] {
         return curl_multi_add_handle(multi, easy);
     }));
 
@@ -769,13 +760,13 @@ asyncio::http::Requests::request(
     };
 
     if (!form)
-        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
+        throw co_await error::StacktraceError<std::system_error>::make(errno, std::generic_category());
 
     for (const auto &[k, v]: payload) {
         const auto field = curl_mime_addpart(form.get());
 
         if (!field)
-            throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
+            throw co_await error::StacktraceError<std::system_error>::make(errno, std::generic_category());
 
         zero::error::guard(expected([&] {
             return curl_mime_name(field, k.c_str());

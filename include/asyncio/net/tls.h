@@ -7,6 +7,7 @@
 #include <openssl/x509v3.h>
 #include <zero/defer.h>
 #include <asyncio/io.h>
+#include <asyncio/error.h>
 #include <asyncio/sync/mutex.h>
 
 namespace asyncio::net::tls {
@@ -109,30 +110,26 @@ namespace asyncio::net::tls {
             Context context{SSL_CTX_new(TLS_method()), SSL_CTX_free};
 
             if (!context)
-                return std::unexpected{openSSLError()};
+                throw zero::error::StacktraceError<std::system_error>{openSSLError()};
 
-            Z_EXPECT(expected([&] {
+            zero::error::guard(expected([&] {
                 return SSL_CTX_set_min_proto_version(context.get(), std::to_underlying(self.mMinVersion));
             }));
 
-            Z_EXPECT(expected([&] {
+            zero::error::guard(expected([&] {
                 return SSL_CTX_set_max_proto_version(context.get(), std::to_underlying(self.mMaxVersion));
             }));
 
             if (self.mRootCAs.empty()) {
 #ifdef ASYNCIO_EMBED_CA_CERT
                 const auto store = SSL_CTX_get_cert_store(context.get());
+                assert(store);
 
-                if (!store)
-                    return std::unexpected{openSSLError()};
-
-                Z_EXPECT(loadEmbeddedCA(store));
+                zero::error::guard(loadEmbeddedCA(store));
 #else
 #ifdef _WIN32
                 const auto store = SSL_CTX_get_cert_store(context.get());
-
-                if (!store)
-                    return std::unexpected{openSSLError()};
+                assert(store);
 
                 Z_EXPECT(loadSystemCerts(store, "CA"));
                 Z_EXPECT(loadSystemCerts(store, "AuthRoot"));
@@ -153,9 +150,7 @@ namespace asyncio::net::tls {
             }
             else {
                 const auto store = SSL_CTX_get_cert_store(context.get());
-
-                if (!store)
-                    return std::unexpected{openSSLError()};
+                assert(store);
 
                 for (const auto &[cert]: self.mRootCAs) {
                     Z_EXPECT(expected([&] {
@@ -222,11 +217,7 @@ namespace asyncio::net::tls {
     )
 
     template<typename T>
-        requires (
-            zero::meta::Trait<T, IReader> &&
-            zero::meta::Trait<T, IWriter> &&
-            zero::meta::Trait<T, ICloseable>
-        )
+        requires (zero::meta::Trait<T, IReader> && zero::meta::Trait<T, IWriter>)
     class TLS final : public IReader, public IWriter, public ICloseable, public IHalfCloseable {
     public:
         TLS(T stream, std::unique_ptr<SSL, decltype(&SSL_free)> ssl)
@@ -411,8 +402,11 @@ namespace asyncio::net::tls {
                 }
             }
 
-            Z_CO_EXPECT(co_await std::invoke(&ICloseable::close, mStream));
             co_return {};
+        }
+
+        task::Task<void, std::error_code> closeUnderlying() requires zero::meta::Trait<T, ICloseable> {
+            co_return co_await std::invoke(&ICloseable::close, mStream);
         }
 
     private:
@@ -435,7 +429,7 @@ namespace asyncio::net::tls {
         std::unique_ptr<SSL, decltype(&SSL_free)> ssl{SSL_new(context.get()), SSL_free};
 
         if (!ssl)
-            co_return std::unexpected{openSSLError()};
+            throw co_await error::StacktraceError<std::system_error>::make(openSSLError());
 
         if (serverName) {
             Z_CO_EXPECT(expected([&] {
@@ -452,12 +446,12 @@ namespace asyncio::net::tls {
         std::unique_ptr<BIO, decltype(&BIO_free)> readBIO{BIO_new(BIO_s_mem()), BIO_free};
 
         if (!readBIO)
-            co_return std::unexpected{openSSLError()};
+            throw co_await error::StacktraceError<std::system_error>::make(openSSLError());
 
         std::unique_ptr<BIO, decltype(&BIO_free)> writeBIO{BIO_new(BIO_s_mem()), BIO_free};
 
         if (!writeBIO)
-            co_return std::unexpected{openSSLError()};
+            throw co_await error::StacktraceError<std::system_error>::make(openSSLError());
 
         SSL_set_bio(ssl.get(), readBIO.release(), writeBIO.release());
         SSL_set_connect_state(ssl.get());
@@ -477,17 +471,17 @@ namespace asyncio::net::tls {
         std::unique_ptr<SSL, decltype(&SSL_free)> ssl{SSL_new(context.get()), SSL_free};
 
         if (!ssl)
-            co_return std::unexpected{openSSLError()};
+            throw co_await error::StacktraceError<std::system_error>::make(openSSLError());
 
         std::unique_ptr<BIO, decltype(&BIO_free)> readBIO{BIO_new(BIO_s_mem()), BIO_free};
 
         if (!readBIO)
-            co_return std::unexpected{openSSLError()};
+            throw co_await error::StacktraceError<std::system_error>::make(openSSLError());
 
         std::unique_ptr<BIO, decltype(&BIO_free)> writeBIO{BIO_new(BIO_s_mem()), BIO_free};
 
         if (!writeBIO)
-            co_return std::unexpected{openSSLError()};
+            throw co_await error::StacktraceError<std::system_error>::make(openSSLError());
 
         SSL_set_bio(ssl.get(), readBIO.release(), writeBIO.release());
         SSL_set_accept_state(ssl.get());

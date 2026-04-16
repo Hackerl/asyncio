@@ -17,16 +17,13 @@ ASYNC_TEST_CASE("spawn child process and collect status", "[process]") {
 }
 
 ASYNC_TEST_CASE("spawn child process and collect output", "[process]") {
-    const auto hostname = zero::os::hostname();
-    REQUIRE(hostname);
-
     const auto output = co_await asyncio::process::Command{"hostname"}.output();
     REQUIRE(output);
     REQUIRE(output->status.success());
 
     REQUIRE(
         zero::strings::trim({reinterpret_cast<const char *>(output->out.data()), output->out.size()}) ==
-        *hostname
+        zero::os::hostname()
     );
 }
 

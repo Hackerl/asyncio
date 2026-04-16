@@ -14,7 +14,7 @@ namespace asyncio::net {
         static task::Task<TCPStream, std::error_code> connect(SocketAddress address);
 
     public:
-        static std::expected<TCPStream, std::error_code> from(uv_os_sock_t socket);
+        static TCPStream from(uv_os_sock_t socket);
 
         static task::Task<TCPStream, std::error_code> connect(std::string host, std::uint16_t port);
         static task::Task<TCPStream, std::error_code> connect(IPAddress address);
@@ -75,7 +75,7 @@ namespace asyncio::net {
     public:
         explicit NamedPipeStream(Pipe pipe);
 
-        static std::expected<NamedPipeStream, std::error_code> from(int fd);
+        static NamedPipeStream from(int fd);
         static task::Task<NamedPipeStream, std::error_code> connect(std::string name);
 
         [[nodiscard]] FileDescriptor fd() const override;
@@ -119,7 +119,7 @@ namespace asyncio::net {
 
         explicit UnixStream(Pipe pipe);
 
-        static std::expected<UnixStream, std::error_code> from(int socket);
+        static UnixStream from(int socket);
         static task::Task<UnixStream, std::error_code> connect(std::string path);
 
         [[nodiscard]] FileDescriptor fd() const override;

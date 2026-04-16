@@ -1,5 +1,4 @@
 #include <asyncio/http/request.h>
-#include <asyncio/error.h>
 #include <zero/cmdline.h>
 
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {

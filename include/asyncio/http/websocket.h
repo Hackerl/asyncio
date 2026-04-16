@@ -137,7 +137,7 @@ namespace asyncio::http::ws {
         static std::expected<Compressor, std::error_code> make(int windowBits);
 
         task::Task<std::vector<std::byte>, std::error_code> compress(std::span<const std::byte> data);
-        std::expected<void, std::error_code> reset();
+        void reset();
 
     private:
         std::unique_ptr<z_stream, void (*)(z_stream *)> mStream;
@@ -150,7 +150,7 @@ namespace asyncio::http::ws {
         static std::expected<Decompressor, std::error_code> make(int windowBits);
 
         task::Task<std::vector<std::byte>, std::error_code> decompress(std::span<const std::byte> data);
-        std::expected<void, std::error_code> reset();
+        void reset();
 
     private:
         std::unique_ptr<z_stream, void (*)(z_stream *)> mStream;

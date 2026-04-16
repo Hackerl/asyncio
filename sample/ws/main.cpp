@@ -1,5 +1,4 @@
 #include <asyncio/http/websocket.h>
-#include <asyncio/error.h>
 #include <zero/cmdline.h>
 #include <zero/encoding/hex.h>
 

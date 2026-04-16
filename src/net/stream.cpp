@@ -1,5 +1,6 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/dns.h>
+#include <asyncio/error.h>
 
 #ifdef _WIN32
 #include <zero/os/windows/error.h>
@@ -71,10 +72,10 @@ asyncio::net::TCPStream::connect(SocketAddress address) {
     co_return tcp;
 }
 
-std::expected<asyncio::net::TCPStream, std::error_code> asyncio::net::TCPStream::from(const uv_os_sock_t socket) {
+asyncio::net::TCPStream asyncio::net::TCPStream::from(const uv_os_sock_t socket) {
     auto tcp = make();
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_tcp_open(reinterpret_cast<uv_tcp_t *>(tcp.mStream.mStream.raw()), socket);
     }));
 
@@ -97,10 +98,7 @@ asyncio::net::TCPStream::connect(const std::string host, const std::uint16_t por
     auto it = addresses->begin();
 
     while (true) {
-        auto socketAddress = socketAddressFrom(*it);
-        Z_CO_EXPECT(socketAddress);
-
-        auto result = co_await connect(*std::move(socketAddress));
+        auto result = co_await connect(co_await error::guard(socketAddressFrom(*it)));
 
         if (result)
             co_return *std::move(result);
@@ -123,9 +121,7 @@ asyncio::net::TCPStream::connect(const IPAddress address) {
 }
 
 asyncio::FileDescriptor asyncio::net::TCPStream::fd() const {
-    const auto fd = mStream.mStream.fd();
-    assert(fd);
-    return *fd;
+    return zero::error::guard(mStream.mStream.fd());
 }
 
 std::expected<asyncio::net::Address, std::error_code> asyncio::net::TCPStream::localAddress() const {
@@ -195,12 +191,14 @@ asyncio::task::Task<void, std::error_code> asyncio::net::TCPStream::closeReset()
     Promise<void, std::error_code> promise;
     handle->data = &promise;
 
-    uv_tcp_close_reset(
-        reinterpret_cast<uv_tcp_t *>(handle.get()),
-        [](auto *h) {
-            static_cast<Promise<void, std::error_code> *>(h->data)->resolve();
-        }
-    );
+    Z_CO_EXPECT(uv::expected([&] {
+        return uv_tcp_close_reset(
+            reinterpret_cast<uv_tcp_t *>(handle.get()),
+            [](auto *h) {
+                static_cast<Promise<void, std::error_code> *>(h->data)->resolve();
+            }
+        );
+    }));
 
     co_return co_await promise.getFuture();
 }
@@ -295,9 +293,7 @@ asyncio::net::TCPListener::listen(const IPAddress &address) {
 }
 
 asyncio::FileDescriptor asyncio::net::TCPListener::fd() const {
-    const auto fd = mListener.mCore->stream.fd();
-    assert(fd);
-    return *fd;
+    return zero::error::guard(mListener.mCore->stream.fd());
 }
 
 std::expected<asyncio::net::IPAddress, std::error_code> asyncio::net::TCPListener::address() const {
@@ -334,9 +330,9 @@ asyncio::net::TCPListener::accept() {
     };
 
     if (!tcp)
-        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
+        throw co_await error::StacktraceError<std::system_error>::make(errno, std::generic_category());
 
-    zero::error::guard(uv::expected([&] {
+    co_await error::guard(uv::expected([&] {
         return uv_tcp_init(getEventLoop()->raw(), tcp.get());
     }));
 
@@ -359,10 +355,8 @@ asyncio::task::Task<void, std::error_code> asyncio::net::TCPListener::close() {
 asyncio::net::NamedPipeStream::NamedPipeStream(Pipe pipe) : mPipe{std::move(pipe)} {
 }
 
-std::expected<asyncio::net::NamedPipeStream, std::error_code> asyncio::net::NamedPipeStream::from(const int fd) {
-    auto pipe = Pipe::from(fd);
-    Z_EXPECT(pipe);
-    return NamedPipeStream{*std::move(pipe)};
+asyncio::net::NamedPipeStream asyncio::net::NamedPipeStream::from(const int fd) {
+    return NamedPipeStream{Pipe::from(fd)};
 }
 
 asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code>
@@ -373,9 +367,9 @@ asyncio::net::NamedPipeStream::connect(const std::string name) {
     };
 
     if (!pipe)
-        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
+        throw co_await error::StacktraceError<std::system_error>::make(errno, std::generic_category());
 
-    zero::error::guard(uv::expected([&] {
+    co_await error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
@@ -508,9 +502,9 @@ asyncio::task::Task<asyncio::net::NamedPipeStream, std::error_code> asyncio::net
     };
 
     if (!pipe)
-        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
+        throw co_await error::StacktraceError<std::system_error>::make(errno, std::generic_category());
 
-    zero::error::guard(uv::expected([&] {
+    co_await error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
@@ -532,10 +526,8 @@ asyncio::task::Task<void, std::error_code> asyncio::net::NamedPipeListener::clos
 asyncio::net::UnixStream::UnixStream(Pipe pipe) : mPipe{std::move(pipe)} {
 }
 
-std::expected<asyncio::net::UnixStream, std::error_code> asyncio::net::UnixStream::from(const int socket) {
-    auto pipe = Pipe::from(socket);
-    Z_EXPECT(pipe);
-    return UnixStream{*std::move(pipe)};
+asyncio::net::UnixStream asyncio::net::UnixStream::from(const int socket) {
+    return UnixStream{Pipe::from(socket)};
 }
 
 asyncio::task::Task<asyncio::net::UnixStream, std::error_code>
@@ -551,9 +543,9 @@ asyncio::net::UnixStream::connect(std::string path) {
     };
 
     if (!pipe)
-        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
+        throw co_await error::StacktraceError<std::system_error>::make(errno, std::generic_category());
 
-    zero::error::guard(uv::expected([&] {
+    co_await error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 
@@ -755,9 +747,9 @@ asyncio::task::Task<asyncio::net::UnixStream, std::error_code> asyncio::net::Uni
     };
 
     if (!pipe)
-        throw zero::error::StacktraceError<std::system_error>{errno, std::generic_category()};
+        throw co_await error::StacktraceError<std::system_error>::make(errno, std::generic_category());
 
-    zero::error::guard(uv::expected([&] {
+    co_await error::guard(uv::expected([&] {
         return uv_pipe_init(getEventLoop()->raw(), pipe.get(), 0);
     }));
 

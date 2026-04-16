@@ -1,4 +1,5 @@
 #include <asyncio/fs.h>
+#include <asyncio/error.h>
 #include <asyncio/thread.h>
 #include <zero/utility.h>
 
@@ -25,12 +26,16 @@ asyncio::fs::File::~File() {
         return;
 
     uv_fs_t request{};
+    Z_DEFER(uv_fs_req_cleanup(&request));
 
     zero::error::guard(uv::expected([&] {
         return uv_fs_close(nullptr, &request, mFile, nullptr);
-    }));
+    }).or_else([](const auto &ec) -> std::expected<int, std::error_code> {
+        if (ec != std::errc::interrupted)
+            return std::unexpected{ec};
 
-    uv_fs_req_cleanup(&request);
+        return {};
+    }));
 }
 
 asyncio::FileDescriptor asyncio::fs::File::fd() const {
@@ -39,7 +44,9 @@ asyncio::FileDescriptor asyncio::fs::File::fd() const {
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const std::span<std::byte> data) {
     Promise<std::size_t, std::error_code> promise;
+
     uv_fs_t request{.data = &promise};
+    Z_DEFER(uv_fs_req_cleanup(&request));
 
     Z_CO_EXPECT(uv::expected([&] {
         uv_buf_t buffer;
@@ -66,14 +73,15 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const 
             }
         );
     }));
-    Z_DEFER(uv_fs_req_cleanup(&request));
 
     co_return co_await promise.getFuture();
 }
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const std::span<const std::byte> data) {
     Promise<std::size_t, std::error_code> promise;
+
     uv_fs_t request{.data = &promise};
+    Z_DEFER(uv_fs_req_cleanup(&request));
 
     Z_CO_EXPECT(uv::expected([&] {
         uv_buf_t buffer;
@@ -100,24 +108,25 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const
             }
         );
     }));
-    Z_DEFER(uv_fs_req_cleanup(&request));
 
     co_return co_await promise.getFuture();
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
     Promise<void, std::error_code> promise;
-    uv_fs_t request{.data = &promise};
 
-    Z_CO_EXPECT(uv::expected([&] {
+    uv_fs_t request{.data = &promise};
+    Z_DEFER(uv_fs_req_cleanup(&request));
+
+    co_await error::guard(uv::expected([&] {
         return uv_fs_close(
             getEventLoop()->raw(),
             &request,
-            mFile,
+            std::exchange(mFile, -1),
             [](auto *req) {
                 const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
 
-                if (req->result < 0) {
+                if (req->result < 0 && req->result != UV_EINTR) {
                     p->reject(static_cast<uv::Error>(req->result));
                     return;
                 }
@@ -126,9 +135,7 @@ asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
             }
         );
     }));
-    Z_DEFER(uv_fs_req_cleanup(&request));
 
-    mFile = -1;
     co_return co_await promise.getFuture();
 }
 
@@ -174,6 +181,7 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
     Promise<uv_file, std::error_code> promise;
 
     uv_fs_t request{.data = &promise};
+    Z_DEFER(uv_fs_req_cleanup(&request));
 
     Z_CO_EXPECT(uv::expected([&] {
         return uv_fs_open(
@@ -194,7 +202,6 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
             }
         );
     }));
-    Z_DEFER(uv_fs_req_cleanup(&request));
 
     const auto file = co_await promise.getFuture();
     Z_CO_EXPECT(file);
@@ -231,9 +238,9 @@ asyncio::fs::write(std::filesystem::path path, const std::string content) {
 }
 
 asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::absolute(const std::filesystem::path path) {
-    co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
+    co_return co_await toThreadPool([&] {
         return zero::filesystem::absolute(path);
-    }));
+    });
 }
 
 asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::canonical(const std::filesystem::path path) {
@@ -359,9 +366,9 @@ asyncio::fs::createDirectorySymlink(const std::filesystem::path target, const st
 }
 
 asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::currentPath() {
-    co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
+    co_return co_await toThreadPool([&] {
         return zero::filesystem::currentPath();
-    }));
+    });
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::currentPath(const std::filesystem::path path) {
@@ -473,9 +480,9 @@ asyncio::fs::symlinkStatus(const std::filesystem::path path) {
 }
 
 asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::temporaryDirectory() {
-    co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
+    co_return co_await toThreadPool([&] {
         return zero::filesystem::temporaryDirectory();
-    }));
+    });
 }
 
 asyncio::task::Task<bool, std::error_code> asyncio::fs::isBlockFile(const std::filesystem::path path) {

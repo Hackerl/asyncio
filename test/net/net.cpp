@@ -109,10 +109,9 @@ TEST_CASE("convert network address to socket address", "[net]") {
 
     SECTION("IPv6") {
         const auto interfaces = zero::os::net::interfaces();
-        REQUIRE(interfaces);
-        REQUIRE_THAT(*interfaces, !Catch::Matchers::IsEmpty());
+        REQUIRE_THAT(interfaces, !Catch::Matchers::IsEmpty());
 
-        const auto &zone = (*interfaces | std::views::keys).front();
+        const auto &zone = (interfaces | std::views::keys).front();
         const auto index = if_nametoindex(zone.c_str());
         REQUIRE(index != 0);
 

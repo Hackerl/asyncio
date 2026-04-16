@@ -1,5 +1,6 @@
 #include <asyncio/net/dgram.h>
 #include <asyncio/net/dns.h>
+#include <asyncio/error.h>
 
 asyncio::net::UDPSocket::UDPSocket(uv::Handle<uv_udp_t> udp) : mUDP{std::move(udp)} {
 }
@@ -36,10 +37,10 @@ asyncio::net::UDPSocket::connect(const SocketAddress &address) {
     return udp;
 }
 
-std::expected<asyncio::net::UDPSocket, std::error_code> asyncio::net::UDPSocket::from(const uv_os_sock_t socket) {
+asyncio::net::UDPSocket asyncio::net::UDPSocket::from(const uv_os_sock_t socket) {
     auto udp = make();
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_udp_open(udp.mUDP.raw(), socket);
     }));
 
@@ -64,9 +65,7 @@ asyncio::net::UDPSocket::bind(const std::string &ip, const std::uint16_t port) {
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::bind(const IPv4Address &address) {
-    auto socketAddress = socketAddressFrom(address);
-    Z_EXPECT(socketAddress);
-    return bind(*std::move(socketAddress));
+    return bind(zero::error::guard(socketAddressFrom(address)));
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
@@ -92,10 +91,7 @@ asyncio::net::UDPSocket::connect(const std::string host, const std::uint16_t por
     auto it = addresses->begin();
 
     while (true) {
-        auto socketAddress = socketAddressFrom(*it);
-        Z_CO_EXPECT(socketAddress);
-
-        auto result = connect(*std::move(socketAddress));
+        auto result = connect(co_await error::guard(socketAddressFrom(*it)));
 
         if (result)
             co_return *std::move(result);
@@ -107,9 +103,7 @@ asyncio::net::UDPSocket::connect(const std::string host, const std::uint16_t por
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
 asyncio::net::UDPSocket::connect(const IPv4Address &address) {
-    auto socketAddress = socketAddressFrom(address);
-    Z_EXPECT(socketAddress);
-    return connect(*std::move(socketAddress));
+    return connect(zero::error::guard(socketAddressFrom(address)));
 }
 
 std::expected<asyncio::net::UDPSocket, std::error_code>
@@ -120,9 +114,7 @@ asyncio::net::UDPSocket::connect(const IPv6Address &address) {
 }
 
 asyncio::FileDescriptor asyncio::net::UDPSocket::fd() const {
-    const auto fd = mUDP.fd();
-    assert(fd);
-    return *fd;
+    return zero::error::guard(mUDP.fd());
 }
 
 std::expected<asyncio::net::Address, std::error_code> asyncio::net::UDPSocket::localAddress() const {

@@ -7,7 +7,7 @@ namespace asyncio {
     class Pipe : public IFileDescriptor, public Stream {
     public:
         explicit Pipe(uv::Handle<uv_stream_t> stream);
-        static std::expected<Pipe, std::error_code> from(uv_file file);
+        static Pipe from(uv_file file);
 
         [[nodiscard]] FileDescriptor fd() const override;
 
@@ -30,7 +30,7 @@ namespace asyncio {
         std::expected<void, std::error_code> chmod(int mode);
     };
 
-    std::expected<std::array<Pipe, 2>, std::error_code> pipe();
+    std::array<Pipe, 2> pipe();
 }
 
 #endif //ASYNCIO_PIPE_H

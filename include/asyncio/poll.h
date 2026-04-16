@@ -14,9 +14,9 @@ namespace asyncio {
         };
 
         explicit Poll(uv::Handle<uv_poll_t> poll);
-        static std::expected<Poll, std::error_code> make(int fd);
+        static Poll make(int fd);
 #ifdef _WIN32
-        static std::expected<Poll, std::error_code> make(SOCKET socket);
+        static Poll make(SOCKET socket);
 #endif
 
         [[nodiscard]] FileDescriptor fd() const override;

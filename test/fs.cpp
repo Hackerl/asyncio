@@ -283,25 +283,25 @@ ASYNC_TEST_CASE("read directory", "[fs]") {
             REQUIRE(co_await asyncio::fs::write(file, ""));
         }
 
-        auto it = co_await asyncio::fs::readDirectory(directory);
-        REQUIRE(it);
+        auto iterator = co_await asyncio::fs::readDirectory(directory);
+        REQUIRE(iterator);
 
-        auto entry = co_await it->next();
+        auto entry = co_await iterator->next();
         REQUIRE(entry);
         REQUIRE(*entry);
         REQUIRE_THAT(files, Catch::Matchers::Contains(entry.value()->path()));
 
-        entry = co_await it->next();
+        entry = co_await iterator->next();
         REQUIRE(entry);
         REQUIRE(*entry);
         REQUIRE_THAT(files, Catch::Matchers::Contains(entry.value()->path()));
 
-        entry = co_await it->next();
+        entry = co_await iterator->next();
         REQUIRE(entry);
         REQUIRE(*entry);
         REQUIRE_THAT(files, Catch::Matchers::Contains(entry.value()->path()));
 
-        entry = co_await it->next();
+        entry = co_await iterator->next();
         REQUIRE(entry);
         REQUIRE_FALSE(*entry);
 
@@ -329,13 +329,13 @@ ASYNC_TEST_CASE("walk directory", "[fs]") {
             REQUIRE(co_await asyncio::fs::write(file, ""));
         }
 
-        auto it = co_await asyncio::fs::walkDirectory(directory);
-        REQUIRE(it);
+        auto iterator = co_await asyncio::fs::walkDirectory(directory);
+        REQUIRE(iterator);
 
         std::list<std::filesystem::path> paths;
 
         while (true) {
-            const auto entry = co_await it->next();
+            const auto entry = co_await iterator->next();
             REQUIRE(entry);
 
             if (!*entry)

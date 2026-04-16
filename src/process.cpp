@@ -1,5 +1,6 @@
 #include <asyncio/process.h>
 #include <asyncio/thread.h>
+#include <asyncio/error.h>
 
 #ifdef _WIN32
 #include <zero/defer.h>
@@ -154,68 +155,63 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
 #ifdef _WIN32
     auto &[reader, writer] = pc->master();
 
-    const auto firstFD = uv::expected([&] {
+    std::array fds{-1, -1};
+
+    Z_DEFER(
+        for (const auto &fd: fds) {
+            if (fd == -1)
+                continue;
+
+            uv_fs_t request{};
+            Z_DEFER(uv_fs_req_cleanup(&request));
+
+            zero::error::guard(uv::expected([&] {
+                return uv_fs_close(nullptr, &request, fd, nullptr);
+            }));
+        }
+    );
+
+    fds[0] = zero::error::guard(uv::expected([&] {
         return uv_open_osfhandle(reader.fd());
-    });
-    Z_EXPECT(firstFD);
+    }));
     std::ignore = reader.release();
 
-    auto first = asyncio::Pipe::from(*firstFD);
-
-    if (!first) {
-        uv_fs_t request{};
-
-        zero::error::guard(uv::expected([&] {
-            return uv_fs_close(nullptr, &request, *firstFD, nullptr);
-        }));
-
-        uv_fs_req_cleanup(&request);
-        return std::unexpected{first.error()};
-    }
-
-    const auto secondFD = uv::expected([&] {
+    fds[1] = zero::error::guard(uv::expected([&] {
         return uv_open_osfhandle(writer.fd());
-    });
-    Z_EXPECT(secondFD);
+    }));
     std::ignore = writer.release();
 
-    auto second = asyncio::Pipe::from(*secondFD);
+    auto first = asyncio::Pipe::from(fds[0]);
+    fds[0] = -1;
 
-    if (!second) {
-        uv_fs_t request{};
+    auto second = asyncio::Pipe::from(fds[1]);
+    fds[1] = -1;
 
-        zero::error::guard(uv::expected([&] {
-            return uv_fs_close(nullptr, &request, *secondFD, nullptr);
-        }));
-
-        uv_fs_req_cleanup(&request);
-        return std::unexpected{second.error()};
-    }
-
-    return PseudoConsole{*std::move(pc), {*std::move(first), *std::move(second)}};
+    return PseudoConsole{*std::move(pc), {std::move(first), std::move(second)}};
 #else
     auto &resource = pc->master();
 
-    const auto fd = uv::expected([&] {
+    auto fd = zero::error::guard(uv::expected([&] {
         return uv_open_osfhandle(resource.fd());
-    });
-    Z_EXPECT(fd);
+    }));
     std::ignore = resource.release();
 
-    auto pipe = asyncio::Pipe::from(*fd);
+    Z_DEFER(
+        if (fd == -1)
+            return;
 
-    if (!pipe) {
         uv_fs_t request{};
+        Z_DEFER(uv_fs_req_cleanup(&request));
 
         zero::error::guard(uv::expected([&] {
-            return uv_fs_close(nullptr, &request, *fd, nullptr);
+            return uv_fs_close(nullptr, &request, fd, nullptr);
         }));
+    );
 
-        uv_fs_req_cleanup(&request);
-        return std::unexpected{pipe.error()};
-    }
+    auto pipe = asyncio::Pipe::from(fd);
+    fd = -1;
 
-    return PseudoConsole{*std::move(pc), Pipe{*std::move(pipe)}};
+    return PseudoConsole{*std::move(pc), Pipe{std::move(pipe)}};
 #endif
 }
 
@@ -225,8 +221,8 @@ void asyncio::process::PseudoConsole::close() {
 }
 #endif
 
-std::expected<void, std::error_code> asyncio::process::PseudoConsole::resize(const short rows, const short columns) {
-    return mPseudoConsole.resize(rows, columns);
+void asyncio::process::PseudoConsole::resize(const short rows, const short columns) {
+    mPseudoConsole.resize(rows, columns);
 }
 
 std::expected<asyncio::process::ChildProcess, std::error_code>
@@ -279,13 +275,15 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
                     return {};
                 })
             );
-            zero::error::guard(child->wait());
-            return std::unexpected{fd.error()};
+            child->wait();
+            throw zero::error::StacktraceError<std::system_error>{fd.error()};
         }
 
         std::ignore = resource->release();
 
-        auto pipe = Pipe::from(*fd);
+        auto pipe = zero::error::capture([&] {
+            return Pipe::from(*fd);
+        });
 
         if (!pipe) {
             zero::error::guard(
@@ -300,17 +298,16 @@ asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) c
                     return {};
                 })
             );
-            zero::error::guard(child->wait());
+            child->wait();
 
             uv_fs_t request{};
+            Z_DEFER(uv_fs_req_cleanup(&request));
 
             zero::error::guard(uv::expected([&] {
                 return uv_fs_close(nullptr, &request, *fd, nullptr);
             }));
 
-            uv_fs_req_cleanup(&request);
-
-            return std::unexpected{pipe.error()};
+            std::rethrow_exception(pipe.error());
         }
 
         stdio[i].emplace(*std::move(pipe));
@@ -363,7 +360,7 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     Z_CO_EXPECT(child);
 
     if (auto input = std::exchange(child->stdInput(), std::nullopt))
-        zero::error::guard(co_await input->close());
+        co_await error::guard(input->close());
 
     auto result = co_await all(
         task::spawn([&]() -> task::Task<std::vector<std::byte>, std::error_code> {
@@ -399,7 +396,7 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
                 return {};
             })
         );
-        zero::error::guard(co_await child->wait());
+        co_await error::guard(child->wait());
 
         co_await task::unlock;
         co_return std::unexpected{result.error()};

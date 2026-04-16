@@ -1,4 +1,5 @@
 #include <asyncio/event_loop.h>
+#include <asyncio/error.h>
 #include <asyncio/task.h>
 
 thread_local std::weak_ptr<asyncio::EventLoop> threadEventLoop;
@@ -116,7 +117,7 @@ void asyncio::setEventLoop(const std::weak_ptr<EventLoop> &eventLoop) {
 asyncio::task::Task<void, std::error_code> asyncio::reschedule() {
     auto ptr = std::make_unique<uv_idle_t>();
 
-    Z_CO_EXPECT(uv::expected([&] {
+    co_await error::guard(uv::expected([&] {
         return uv_idle_init(getEventLoop()->raw(), ptr.get());
     }));
 
@@ -125,7 +126,7 @@ asyncio::task::Task<void, std::error_code> asyncio::reschedule() {
     Promise<void, std::error_code> promise;
     idle->data = &promise;
 
-    Z_CO_EXPECT(uv::expected([&] {
+    co_await error::guard(uv::expected([&] {
         return uv_idle_start(
             idle.raw(),
             [](auto *handle) {

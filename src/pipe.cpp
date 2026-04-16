@@ -4,7 +4,7 @@
 asyncio::Pipe::Pipe(uv::Handle<uv_stream_t> stream) : Stream{std::move(stream)} {
 }
 
-std::expected<asyncio::Pipe, std::error_code> asyncio::Pipe::from(const uv_file file) {
+asyncio::Pipe asyncio::Pipe::from(const uv_file file) {
     std::unique_ptr<uv_pipe_t, decltype(&std::free)> pipe{
         static_cast<uv_pipe_t *>(std::malloc(sizeof(uv_pipe_t))),
         std::free
@@ -24,7 +24,7 @@ std::expected<asyncio::Pipe, std::error_code> asyncio::Pipe::from(const uv_file 
         }
     };
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe_open(reinterpret_cast<uv_pipe_t *>(handle.raw()), file);
     }));
 
@@ -93,10 +93,10 @@ std::expected<std::string, std::error_code> asyncio::Pipe::remoteAddress() const
     return address;
 }
 
-std::expected<std::array<asyncio::Pipe, 2>, std::error_code> asyncio::pipe() {
+std::array<asyncio::Pipe, 2> asyncio::pipe() {
     std::array<uv_file, 2> fds{};
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_pipe(fds.data(), UV_NONBLOCK_PIPE, UV_NONBLOCK_PIPE);
     }));
 
@@ -106,24 +106,21 @@ std::expected<std::array<asyncio::Pipe, 2>, std::error_code> asyncio::pipe() {
                 continue;
 
             uv_fs_t request{};
+            Z_DEFER(uv_fs_req_cleanup(&request));
 
             zero::error::guard(uv::expected([&] {
                 return uv_fs_close(nullptr, &request, fd, nullptr);
             }));
-
-            uv_fs_req_cleanup(&request);
         }
     );
 
     auto reader = Pipe::from(fds[0]);
-    Z_EXPECT(reader);
     fds[0] = -1;
 
     auto writer = Pipe::from(fds[1]);
-    Z_EXPECT(writer);
     fds[1] = -1;
 
-    return std::array{*std::move(reader), *std::move(writer)};
+    return std::array{std::move(reader), std::move(writer)};
 }
 
 asyncio::PipeListener::PipeListener(Listener listener) : Listener(std::move(listener)) {

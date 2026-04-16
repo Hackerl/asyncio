@@ -1,7 +1,6 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/tls.h>
 #include <asyncio/signal.h>
-#include <asyncio/error.h>
 #include <zero/cmdline.h>
 #include <zero/formatter.h>
 

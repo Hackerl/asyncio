@@ -1,7 +1,6 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/net/tls.h>
 #include <asyncio/time.h>
-#include <asyncio/error.h>
 #include <zero/cmdline.h>
 
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {

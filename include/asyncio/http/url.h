@@ -198,7 +198,7 @@ namespace asyncio::http {
 Z_DECLARE_ERROR_CODE(asyncio::http::URL::Error)
 
 template<>
-std::expected<asyncio::http::URL, std::error_code> zero::scan(std::string_view input);
+asyncio::http::URL zero::scan(std::string_view input);
 
 template<typename Char>
 struct fmt::formatter<asyncio::http::URL, Char> {

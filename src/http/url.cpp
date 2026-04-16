@@ -1,4 +1,5 @@
 #include <asyncio/http/url.h>
+#include <zero/expect.h>
 
 std::string asyncio::http::urlEscape(const std::string &str) {
     const std::unique_ptr<char, decltype(&curl_free)> ptr{
@@ -228,8 +229,13 @@ bool asyncio::http::operator==(const URL &lhs, const URL &rhs) {
 }
 
 template<>
-std::expected<asyncio::http::URL, std::error_code> zero::scan(const std::string_view input) {
-    return asyncio::http::URL::from({input.begin(), input.end()});
+asyncio::http::URL zero::scan(const std::string_view input) {
+    auto url = asyncio::http::URL::from({input.begin(), input.end()});
+
+    if (!url)
+        throw std::system_error{url.error()};
+
+    return *std::move(url);
 }
 
 Z_DEFINE_ERROR_CATEGORY_INSTANCE(asyncio::http::URL::Error)

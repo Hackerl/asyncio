@@ -57,7 +57,7 @@ namespace asyncio::process {
         void close();
 #endif
 
-        std::expected<void, std::error_code> resize(short rows, short columns);
+        void resize(short rows, short columns);
         std::expected<ChildProcess, std::error_code> spawn(const Command &command);
 
         Pipe &master();

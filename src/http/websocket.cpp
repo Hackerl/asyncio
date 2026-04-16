@@ -184,38 +184,34 @@ asyncio::http::ws::Compressor::make(const int windowBits) {
 // ReSharper disable once CppMemberFunctionMayBeConst
 asyncio::task::Task<std::vector<std::byte>, std::error_code>
 asyncio::http::ws::Compressor::compress(const std::span<const std::byte> data) {
-    co_return zero::flattenWith<std::error_code>(
-        co_await toThreadPool([&]() -> std::expected<std::vector<std::byte>, std::error_code> {
-            std::vector<std::byte> output;
+    co_return co_await toThreadPool([&] {
+        std::vector<std::byte> output;
 
-            mStream->avail_in = data.size();
-            mStream->next_in = reinterpret_cast<Bytef *>(const_cast<std::byte *>(data.data()));
+        mStream->avail_in = data.size();
+        mStream->next_in = reinterpret_cast<Bytef *>(const_cast<std::byte *>(data.data()));
 
-            do {
-                std::array<std::byte, 16384> buffer; // NOLINT(*-pro-type-member-init)
+        do {
+            std::array<std::byte, 16384> buffer; // NOLINT(*-pro-type-member-init)
 
-                mStream->avail_out = buffer.size();
-                mStream->next_out = reinterpret_cast<Bytef *>(buffer.data());
+            mStream->avail_out = buffer.size();
+            mStream->next_out = reinterpret_cast<Bytef *>(buffer.data());
 
-                if (const auto result = deflate(mStream.get(), Z_SYNC_FLUSH); result != Z_OK && result != Z_BUF_ERROR)
-                    return std::unexpected{static_cast<ZLIBError>(result)};
+            if (const auto result = deflate(mStream.get(), Z_SYNC_FLUSH); result != Z_OK && result != Z_BUF_ERROR)
+                throw zero::error::StacktraceError<std::system_error>{static_cast<ZLIBError>(result)};
 
-                output.append_range(std::span{buffer.data(), buffer.size() - mStream->avail_out});
-            }
-            while (mStream->avail_out == 0);
-            assert(mStream->avail_in == 0);
+            output.append_range(std::span{buffer.data(), buffer.size() - mStream->avail_out});
+        }
+        while (mStream->avail_out == 0);
+        assert(mStream->avail_in == 0);
 
-            return output;
-        })
-    );
+        return output;
+    });
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-std::expected<void, std::error_code> asyncio::http::ws::Compressor::reset() {
+void asyncio::http::ws::Compressor::reset() {
     if (const auto result = deflateReset(mStream.get()); result != Z_OK)
-        return std::unexpected{static_cast<ZLIBError>(result)};
-
-    return {};
+        throw zero::error::StacktraceError<std::system_error>{static_cast<ZLIBError>(result)};
 }
 
 asyncio::http::ws::Decompressor::Decompressor(std::unique_ptr<z_stream, void(*)(z_stream *)> stream)
@@ -271,11 +267,9 @@ asyncio::http::ws::Decompressor::decompress(const std::span<const std::byte> dat
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
-std::expected<void, std::error_code> asyncio::http::ws::Decompressor::reset() {
+void asyncio::http::ws::Decompressor::reset() {
     if (const auto result = inflateReset(mStream.get()); result != Z_OK)
-        return std::unexpected{static_cast<ZLIBError>(result)};
-
-    return {};
+        throw zero::error::StacktraceError<std::system_error>{static_cast<ZLIBError>(result)};
 }
 
 asyncio::http::ws::WebSocket::WebSocket(
@@ -316,7 +310,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
         Z_CO_EXPECT(stream);
 
         if (!context) {
-            auto ctx = net::tls::ClientConfig().build();
+            auto ctx = net::tls::ClientConfig{}.build();
             Z_CO_EXPECT(ctx);
             context = *std::move(ctx);
         }
@@ -480,9 +474,8 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
 
         frame->data = *std::move(decompressed);
 
-        if (config.serverNoContextTakeover) {
-            Z_CO_EXPECT(decompressor.reset());
-        }
+        if (config.serverNoContextTakeover)
+            decompressor.reset();
     }
 
     co_return InternalMessage{frame->header.opcode(), std::move(frame->data)};

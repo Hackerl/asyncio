@@ -5,6 +5,7 @@
 #include <map>
 #include <variant>
 #include <asyncio/io.h>
+#include <asyncio/error.h>
 #include <nlohmann/json.hpp>
 
 namespace asyncio::http {
@@ -132,8 +133,8 @@ namespace asyncio::http {
             CURLM *multi;
 
             void recycle();
-            std::expected<void, std::error_code> setTimer(long ms);
-            std::expected<void, std::error_code> handle(curl_socket_t s, int action, Context *context);
+            void setTimer(long ms);
+            void handle(curl_socket_t s, int action, Context *context);
         };
 
     public:
@@ -199,7 +200,7 @@ namespace asyncio::http {
             else
                 body = nlohmann::json(payload).dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
 
-            zero::error::guard(expected([&] {
+            co_await error::guard(expected([&] {
                 return curl_easy_setopt(
                     connection->get()->easy.get(),
                     CURLOPT_COPYPOSTFIELDS,
@@ -222,26 +223,26 @@ namespace asyncio::http {
 
             const auto easy = connection.value()->easy.get();
 
-            zero::error::guard(expected([&] {
+            co_await error::guard(expected([&] {
                 return curl_easy_setopt(easy, CURLOPT_UPLOAD, 1L);
             }));
 
             // `CURLOPT_UPLOAD` will cause the http method to become `PUT`.
-            zero::error::guard(expected([&] {
+            co_await error::guard(expected([&] {
                 return curl_easy_setopt(easy, CURLOPT_CUSTOMREQUEST, method.c_str());
             }));
 
-            zero::error::guard(expected([&] {
+            co_await error::guard(expected([&] {
                 return curl_easy_setopt(easy, CURLOPT_READFUNCTION, onRead);
             }));
 
-            zero::error::guard(expected([&] {
+            co_await error::guard(expected([&] {
                 return curl_easy_setopt(easy, CURLOPT_READDATA, connection->get());
             }));
 
             if constexpr (zero::meta::Trait<T, ISeekable>) {
                 if (const auto length = co_await std::invoke(&ISeekable::length, payload)) {
-                    zero::error::guard(expected([&] {
+                    co_await error::guard(expected([&] {
                         return curl_easy_setopt(easy, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(*length));
                     }));
                 }

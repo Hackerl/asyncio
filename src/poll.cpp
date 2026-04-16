@@ -1,12 +1,13 @@
 #include <asyncio/poll.h>
+#include <asyncio/error.h>
 
 asyncio::Poll::Poll(uv::Handle<uv_poll_t> poll) : mPoll{std::move(poll)} {
 }
 
-std::expected<asyncio::Poll, std::error_code> asyncio::Poll::make(const int fd) {
+asyncio::Poll asyncio::Poll::make(const int fd) {
     auto poll = std::make_unique<uv_poll_t>();
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_poll_init(getEventLoop()->raw(), poll.get(), fd);
     }));
 
@@ -14,10 +15,10 @@ std::expected<asyncio::Poll, std::error_code> asyncio::Poll::make(const int fd) 
 }
 
 #ifdef _WIN32
-std::expected<asyncio::Poll, std::error_code> asyncio::Poll::make(const SOCKET socket) {
+asyncio::Poll asyncio::Poll::make(const SOCKET socket) {
     auto poll = std::make_unique<uv_poll_t>();
 
-    Z_EXPECT(uv::expected([&] {
+    zero::error::guard(uv::expected([&] {
         return uv_poll_init_socket(getEventLoop()->raw(), poll.get(), socket);
     }));
 
@@ -26,16 +27,14 @@ std::expected<asyncio::Poll, std::error_code> asyncio::Poll::make(const SOCKET s
 #endif
 
 asyncio::FileDescriptor asyncio::Poll::fd() const {
-    const auto fd = mPoll.fd();
-    assert(fd);
-    return *fd;
+    return zero::error::guard(mPoll.fd());
 }
 
 asyncio::task::Task<int, std::error_code> asyncio::Poll::on(const int events) {
     Promise<int, std::error_code> promise;
     mPoll->data = &promise;
 
-    Z_CO_EXPECT(uv::expected([&] {
+    co_await error::guard(uv::expected([&] {
         return uv_poll_start(
             mPoll.raw(),
             events,

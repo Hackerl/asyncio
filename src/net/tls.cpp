@@ -49,7 +49,7 @@ asyncio::net::tls::Certificate::load(const std::string_view content) {
     };
 
     if (!bio)
-        return std::unexpected{openSSLError()};
+        throw zero::error::StacktraceError<std::system_error>{openSSLError()};
 
     std::shared_ptr<X509> cert{
         PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr),
@@ -75,7 +75,7 @@ asyncio::net::tls::PrivateKey::load(const std::string_view content) {
     };
 
     if (!bio)
-        return std::unexpected{openSSLError()};
+        throw zero::error::StacktraceError<std::system_error>{openSSLError()};
 
     std::shared_ptr<EVP_PKEY> key{
         PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr),
@@ -101,7 +101,7 @@ std::expected<void, std::error_code> asyncio::net::tls::Config::loadEmbeddedCA(X
     };
 
     if (!bio)
-        return std::unexpected{openSSLError()};
+        throw zero::error::StacktraceError<std::system_error>{openSSLError()};
 
     const auto info = PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr);
 
