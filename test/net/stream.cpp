@@ -1,5 +1,6 @@
 #include <catch_extensions.h>
 #include <asyncio/net/stream.h>
+#include <asyncio/error.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 #ifndef _WIN32
@@ -158,10 +159,8 @@ ASYNC_TEST_CASE("named pipe stream", "[net]") {
 
 #if defined(__unix__) || defined(__APPLE__)
 ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 16)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 16)));
 
     auto listener = asyncio::net::UnixListener::listen(path.string());
     REQUIRE(listener);

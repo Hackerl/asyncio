@@ -23,6 +23,11 @@ namespace asyncio::fs {
         uv_file mFile;
     };
 
+    using zero::filesystem::absolute;
+    using zero::filesystem::relative;
+    using zero::filesystem::proximate;
+    using zero::filesystem::currentPath;
+
     task::Task<File, std::error_code> open(std::filesystem::path path, int flags, int mode = 0644);
 
     task::Task<std::vector<std::byte>, std::error_code> read(std::filesystem::path path);
@@ -31,18 +36,8 @@ namespace asyncio::fs {
     task::Task<void, std::error_code> write(std::filesystem::path path, std::span<const std::byte> content);
     task::Task<void, std::error_code> write(std::filesystem::path path, std::string content);
 
-    task::Task<std::filesystem::path, std::error_code> absolute(std::filesystem::path path);
     task::Task<std::filesystem::path, std::error_code> canonical(std::filesystem::path path);
     task::Task<std::filesystem::path, std::error_code> weaklyCanonical(std::filesystem::path path);
-    task::Task<std::filesystem::path, std::error_code> relative(std::filesystem::path path);
-
-    task::Task<std::filesystem::path, std::error_code>
-    relative(std::filesystem::path path, std::filesystem::path base);
-
-    task::Task<std::filesystem::path, std::error_code> proximate(std::filesystem::path path);
-
-    task::Task<std::filesystem::path, std::error_code>
-    proximate(std::filesystem::path path, std::filesystem::path base);
 
     task::Task<void, std::error_code> copy(std::filesystem::path from, std::filesystem::path to);
 
@@ -73,11 +68,8 @@ namespace asyncio::fs {
     task::Task<void, std::error_code>
     createDirectorySymlink(std::filesystem::path target, std::filesystem::path link);
 
-    task::Task<std::filesystem::path, std::error_code> currentPath();
     task::Task<void, std::error_code> currentPath(std::filesystem::path path);
-
     task::Task<bool, std::error_code> exists(std::filesystem::path path);
-
     task::Task<bool, std::error_code> equivalent(std::filesystem::path p1, std::filesystem::path p2);
 
     task::Task<std::uintmax_t, std::error_code> fileSize(std::filesystem::path path);

@@ -78,6 +78,10 @@ if (WIN32)
     target_compile_definitions(asyncio PUBLIC NOMINMAX)
 endif ()
 
+if (MINGW)
+    target_compile_options(asyncio PRIVATE -Wa,-mbig-obj)
+endif ()
+
 target_include_directories(
         asyncio
         PUBLIC

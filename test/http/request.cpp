@@ -60,10 +60,8 @@ namespace {
 }
 
 ASYNC_TEST_CASE("requests", "[http::request]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
 
     auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 0);
     REQUIRE(listener);

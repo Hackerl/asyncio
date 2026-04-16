@@ -1,13 +1,12 @@
 #include "catch_extensions.h"
 #include <asyncio/fs.h>
+#include <asyncio/error.h>
 #include <zero/strings.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("file", "[fs]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
     const auto content = GENERATE(take(1, randomBytes(1, 102400)));
 
     auto file = co_await asyncio::fs::open(path, O_RDWR | O_CREAT);
@@ -46,10 +45,8 @@ ASYNC_TEST_CASE("file", "[fs]") {
 }
 
 ASYNC_TEST_CASE("open file", "[fs]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
     const auto input = GENERATE(take(1, randomBytes(1, 102400)));
 
     SECTION("read only") {
@@ -150,10 +147,8 @@ ASYNC_TEST_CASE("open file", "[fs]") {
 }
 
 ASYNC_TEST_CASE("seekable file", "[fs]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
     const auto content = GENERATE(take(1, randomBytes(1, 102400)));
 
     REQUIRE(co_await asyncio::fs::write(path, content));
@@ -205,10 +200,8 @@ ASYNC_TEST_CASE("seekable file", "[fs]") {
 }
 
 ASYNC_TEST_CASE("read bytes from file", "[fs]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
 
     SECTION("file does not exist") {
         REQUIRE_ERROR(co_await asyncio::fs::read(path), std::errc::no_such_file_or_directory);
@@ -223,10 +216,8 @@ ASYNC_TEST_CASE("read bytes from file", "[fs]") {
 }
 
 ASYNC_TEST_CASE("read string from file", "[fs]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
 
     SECTION("file does not exist") {
         REQUIRE_ERROR(co_await asyncio::fs::readString(path), std::errc::no_such_file_or_directory);
@@ -241,10 +232,8 @@ ASYNC_TEST_CASE("read string from file", "[fs]") {
 }
 
 ASYNC_TEST_CASE("write bytes to file", "[fs]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
     const auto content = GENERATE(take(1, randomBytes(1, 102400)));
 
     REQUIRE(co_await asyncio::fs::write(path, content));
@@ -253,10 +242,8 @@ ASYNC_TEST_CASE("write bytes to file", "[fs]") {
 }
 
 ASYNC_TEST_CASE("write string to file", "[fs]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto path = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
     const auto content = GENERATE(take(1, randomString(1, 102400)));
 
     REQUIRE(co_await asyncio::fs::write(path, content));
@@ -265,10 +252,8 @@ ASYNC_TEST_CASE("write string to file", "[fs]") {
 }
 
 ASYNC_TEST_CASE("read directory", "[fs]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto directory = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto directory = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
 
     SECTION("directory not exists") {
         REQUIRE_ERROR(co_await asyncio::fs::readDirectory(directory / "z"), std::errc::no_such_file_or_directory);
@@ -310,10 +295,8 @@ ASYNC_TEST_CASE("read directory", "[fs]") {
 }
 
 ASYNC_TEST_CASE("walk directory", "[fs]") {
-    const auto temp = co_await asyncio::fs::temporaryDirectory();
-    REQUIRE(temp);
-
-    const auto directory = *temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
+    const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
+    const auto directory = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
 
     SECTION("directory not exists") {
         REQUIRE_ERROR(co_await asyncio::fs::walkDirectory(directory / "z"), std::errc::no_such_file_or_directory);

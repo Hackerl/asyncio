@@ -237,12 +237,6 @@ asyncio::fs::write(std::filesystem::path path, const std::string content) {
     co_return co_await file->writeAll(std::as_bytes(std::span{content}));
 }
 
-asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::absolute(const std::filesystem::path path) {
-    co_return co_await toThreadPool([&] {
-        return zero::filesystem::absolute(path);
-    });
-}
-
 asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::canonical(const std::filesystem::path path) {
     co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
         return zero::filesystem::canonical(path);
@@ -253,32 +247,6 @@ asyncio::task::Task<std::filesystem::path, std::error_code>
 asyncio::fs::weaklyCanonical(const std::filesystem::path path) {
     co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
         return zero::filesystem::weaklyCanonical(path);
-    }));
-}
-
-asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::relative(const std::filesystem::path path) {
-    co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
-        return zero::filesystem::relative(path);
-    }));
-}
-
-asyncio::task::Task<std::filesystem::path, std::error_code>
-asyncio::fs::relative(const std::filesystem::path path, const std::filesystem::path base) {
-    co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
-        return zero::filesystem::relative(path, base);
-    }));
-}
-
-asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::proximate(const std::filesystem::path path) {
-    co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
-        return zero::filesystem::proximate(path);
-    }));
-}
-
-asyncio::task::Task<std::filesystem::path, std::error_code>
-asyncio::fs::proximate(const std::filesystem::path path, const std::filesystem::path base) {
-    co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
-        return zero::filesystem::proximate(path, base);
     }));
 }
 
@@ -363,12 +331,6 @@ asyncio::fs::createDirectorySymlink(const std::filesystem::path target, const st
     co_return zero::flattenWith<std::error_code>(co_await toThreadPool([&] {
         return zero::filesystem::createDirectorySymlink(target, link);
     }));
-}
-
-asyncio::task::Task<std::filesystem::path, std::error_code> asyncio::fs::currentPath() {
-    co_return co_await toThreadPool([&] {
-        return zero::filesystem::currentPath();
-    });
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::currentPath(const std::filesystem::path path) {
