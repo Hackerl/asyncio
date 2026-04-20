@@ -1,6 +1,7 @@
 #include <catch_extensions.h>
 #include <asyncio/net/net.h>
 #include <asyncio/stream.h>
+#include <asyncio/error.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 #ifdef _WIN32
@@ -109,11 +110,15 @@ TEST_CASE("convert network address to socket address", "[net]") {
 
     SECTION("IPv6") {
         const auto interfaces = zero::os::net::interfaces();
-        REQUIRE_THAT(interfaces, !Catch::Matchers::IsEmpty());
+
+        if (interfaces.empty())
+            throw zero::error::StacktraceError<std::runtime_error>{"No network interfaces found"};
 
         const auto &zone = (interfaces | std::views::keys).front();
         const auto index = if_nametoindex(zone.c_str());
-        REQUIRE(index != 0);
+
+        if (index == 0)
+            throw zero::error::StacktraceError<std::runtime_error>{"Failed to get interface index"};
 
         const auto address = socketAddressFrom(asyncio::net::IPv6Address{asyncio::net::LocalhostIPv6, 80, zone});
         REQUIRE(address);
@@ -233,24 +238,20 @@ TEST_CASE("convert socket address to network address", "[net]") {
 ASYNC_TEST_CASE("copy bidirectional", "[net]") {
     const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
-    auto pair1 = asyncio::Stream::pair();
-    auto pair2 = asyncio::Stream::pair();
+    auto [stream1, stream2] = asyncio::Stream::pair();
+    auto [stream3, stream4] = asyncio::Stream::pair();
 
-    auto task = asyncio::net::copyBidirectional(pair1.at(1), pair2.at(0));
+    auto task = asyncio::net::copyBidirectional(stream2, stream3);
+    auto task1 = stream4.readAll();
 
-    auto &stream1 = pair1.at(0);
-    auto &stream2 = pair2.at(1);
-
-    auto task1 = stream2.readAll();
-
-    REQUIRE(co_await stream1.writeAll(input));
-    REQUIRE(co_await stream1.shutdown());
+    co_await asyncio::error::guard(stream1.writeAll(input));
+    co_await asyncio::error::guard(stream1.shutdown());
     REQUIRE(co_await task1 == input);
 
     auto task2 = stream1.readAll();
 
-    REQUIRE(co_await stream2.writeAll(input));
-    REQUIRE(co_await stream2.shutdown());
+    co_await asyncio::error::guard(stream4.writeAll(input));
+    co_await asyncio::error::guard(stream4.shutdown());
     REQUIRE(co_await task2 == input);
 
     const auto result = co_await task;

@@ -33,7 +33,7 @@ ASYNC_TEST_CASE("timeout - error", "[time]") {
             10ms
         );
 
-        REQUIRE(co_await asyncio::sleep(50ms));
+        co_await asyncio::error::guard(asyncio::sleep(50ms));
         REQUIRE_FALSE(task.done());
 
         promise.resolve();
@@ -98,7 +98,7 @@ ASYNC_TEST_CASE("timeout - exception", "[time]") {
             10ms
         );
 
-        REQUIRE(co_await asyncio::sleep(50ms));
+        co_await asyncio::error::guard(asyncio::sleep(50ms));
         REQUIRE_FALSE(task.done());
 
         promise.resolve();

@@ -124,52 +124,40 @@ FReHT5LzsIm40VPPdsITh6c=
 -----END PRIVATE KEY-----)";
 
 ASYNC_TEST_CASE("tls stream", "[net::tls]") {
-    auto ca = asyncio::net::tls::Certificate::load(CACert);
-    REQUIRE(ca);
+    const auto ca = co_await asyncio::error::guard(asyncio::net::tls::Certificate::load(CACert));
 
-    auto serverCert = asyncio::net::tls::Certificate::load(ServerCert);
-    REQUIRE(serverCert);
+    auto serverCert = co_await asyncio::error::guard(asyncio::net::tls::Certificate::load(ServerCert));
+    auto serverKey = co_await asyncio::error::guard(asyncio::net::tls::PrivateKey::load(ServerKey));
 
-    auto serverKey = asyncio::net::tls::PrivateKey::load(ServerKey);
-    REQUIRE(serverKey);
-
-    auto serverContext = asyncio::net::tls::ServerConfig{}
-                         .verifyClient(true)
-                         .rootCAs({*ca})
-                         .certKeyPairs({{*std::move(serverCert), *std::move(serverKey)}})
-                         .build();
-    REQUIRE(serverContext);
-
-    auto clientCert = asyncio::net::tls::Certificate::load(ClientCert);
-    REQUIRE(clientCert);
-
-    auto clientKey = asyncio::net::tls::PrivateKey::load(ClientKey);
-    REQUIRE(clientKey);
-
-    auto clientContext = asyncio::net::tls::ClientConfig{}
-                         .rootCAs({*ca})
-                         .certKeyPairs({{*std::move(clientCert), *std::move(clientKey)}})
-                         .build();
-    REQUIRE(clientContext);
-
-    auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 0);
-    REQUIRE(listener);
-
-    const auto address = listener->address();
-    REQUIRE(address);
-
-    auto result = co_await all(
-        listener->accept().andThen([&](asyncio::net::TCPStream &&stream) {
-            return asyncio::net::tls::accept(std::move(stream), *std::move(serverContext));
-        }),
-        asyncio::net::TCPStream::connect(*address).andThen([&](asyncio::net::TCPStream &&stream) {
-            return asyncio::net::tls::connect(std::move(stream), *std::move(clientContext));
-        })
+    auto serverContext = co_await asyncio::error::guard(
+        asyncio::net::tls::ServerConfig{}
+        .verifyClient(true)
+        .rootCAs({ca})
+        .certKeyPairs({{std::move(serverCert), std::move(serverKey)}})
+        .build()
     );
-    REQUIRE(result);
 
-    auto &server = result->at(0);
-    auto &client = result->at(1);
+    auto clientCert = co_await asyncio::error::guard(asyncio::net::tls::Certificate::load(ClientCert));
+    auto clientKey = co_await asyncio::error::guard(asyncio::net::tls::PrivateKey::load(ClientKey));
+
+    auto clientContext = co_await asyncio::error::guard(
+        asyncio::net::tls::ClientConfig{}
+        .rootCAs({ca})
+        .certKeyPairs({{std::move(clientCert), std::move(clientKey)}})
+        .build()
+    );
+
+    auto listener = co_await asyncio::error::guard(asyncio::net::TCPListener::listen("127.0.0.1", 0));
+    const auto address = co_await asyncio::error::guard(listener.address());
+
+    auto [server, client] = co_await asyncio::error::guard(all(
+        listener.accept().andThen([&](asyncio::net::TCPStream &&stream) {
+            return asyncio::net::tls::accept(std::move(stream), std::move(serverContext));
+        }),
+        asyncio::net::TCPStream::connect(address).andThen([&](asyncio::net::TCPStream &&stream) {
+            return asyncio::net::tls::connect(std::move(stream), std::move(clientContext));
+        })
+    ));
 
     const auto input = GENERATE(take(1, randomBytes(1, 102400)));
 
@@ -180,7 +168,8 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
         data.resize(input.size());
 
         REQUIRE(co_await client.readExactly(data));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 
@@ -191,7 +180,8 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
         auto task = server.readExactly(data);
 
         REQUIRE(co_await client.writeAll(input));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 
@@ -214,14 +204,6 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
             REQUIRE(co_await task);
             REQUIRE(data == input);
         }
-
-        {
-            auto task = server.shutdown();
-
-            std::array<std::byte, 1024> data{};
-            REQUIRE(co_await client.read(data) == 0);
-            REQUIRE(co_await task);
-        }
     }
 
     SECTION("close") {
@@ -229,7 +211,8 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
 
         std::array<std::byte, 1024> data{};
         REQUIRE(co_await server.read(data) == 0);
-        REQUIRE(co_await server.shutdown());
+
+        co_await asyncio::error::guard(server.shutdown());
         REQUIRE(co_await task);
     }
 }

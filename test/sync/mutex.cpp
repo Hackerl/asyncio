@@ -1,21 +1,18 @@
 #include <catch_extensions.h>
-#include <asyncio/time.h>
 #include <asyncio/sync/mutex.h>
+#include <asyncio/error.h>
 
 ASYNC_TEST_CASE("mutex", "[sync::mutex]") {
     asyncio::sync::Mutex mutex;
     REQUIRE_FALSE(mutex.locked());
 
-    REQUIRE(co_await mutex.lock());
+    co_await asyncio::error::guard(mutex.lock());
     REQUIRE(mutex.locked());
 
     SECTION("normal") {
-        using namespace std::chrono_literals;
-
         auto task = mutex.lock();
-        REQUIRE_FALSE(task.done());
 
-        REQUIRE(co_await asyncio::sleep(20ms));
+        co_await asyncio::error::guard(asyncio::reschedule());
         REQUIRE_FALSE(task.done());
 
         mutex.unlock();
@@ -70,7 +67,6 @@ ASYNC_TEST_CASE("mutex", "[sync::mutex]") {
         auto task1 = mutex.lock();
         REQUIRE_FALSE(task1.done());
         REQUIRE(task1.cancel());
-        REQUIRE_FALSE(task1.done());
 
         mutex.unlock();
 

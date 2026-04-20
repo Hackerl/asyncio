@@ -1,20 +1,18 @@
 #include "catch_extensions.h"
 #include <asyncio/sync/condition.h>
-#include <asyncio/time.h>
+#include <asyncio/error.h>
 
 ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
     asyncio::sync::Condition condition;
     asyncio::sync::Mutex mutex;
 
     SECTION("notify") {
-        using namespace std::chrono_literals;
-
-        REQUIRE(co_await mutex.lock());
+        co_await asyncio::error::guard(mutex.lock());
 
         auto task = condition.wait(mutex);
         REQUIRE_FALSE(mutex.locked());
 
-        REQUIRE(co_await asyncio::sleep(20ms));
+        co_await asyncio::error::guard(asyncio::reschedule());
         REQUIRE_FALSE(task.done());
 
         condition.notify();
@@ -23,19 +21,17 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
     }
 
     SECTION("broadcast") {
-        using namespace std::chrono_literals;
-
-        REQUIRE(co_await mutex.lock());
+        co_await asyncio::error::guard(mutex.lock());
 
         auto task1 = condition.wait(mutex);
         REQUIRE_FALSE(mutex.locked());
 
-        REQUIRE(co_await mutex.lock());
+        co_await asyncio::error::guard(mutex.lock());
 
         auto task2 = condition.wait(mutex);
         REQUIRE_FALSE(mutex.locked());
 
-        REQUIRE(co_await asyncio::sleep(20ms));
+        co_await asyncio::error::guard(asyncio::reschedule());
         REQUIRE_FALSE(task1.done());
         REQUIRE_FALSE(task2.done());
 
@@ -49,9 +45,7 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
     }
 
     SECTION("predicate") {
-        using namespace std::chrono_literals;
-
-        REQUIRE(co_await mutex.lock());
+        co_await asyncio::error::guard(mutex.lock());
 
         int value{};
 
@@ -63,12 +57,12 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
         );
         REQUIRE_FALSE(mutex.locked());
 
-        REQUIRE(co_await asyncio::sleep(20ms));
+        co_await asyncio::error::guard(asyncio::reschedule());
         REQUIRE_FALSE(task.done());
 
         condition.notify();
 
-        REQUIRE(co_await asyncio::sleep(20ms));
+        co_await asyncio::error::guard(asyncio::reschedule());
         REQUIRE_FALSE(task.done());
 
         value = 1;
@@ -78,7 +72,7 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
     }
 
     SECTION("cancel") {
-        REQUIRE(co_await mutex.lock());
+        co_await asyncio::error::guard(mutex.lock());
 
         auto task = condition.wait(mutex);
         REQUIRE_FALSE(mutex.locked());
@@ -89,7 +83,7 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
     }
 
     SECTION("cancel after notify") {
-        REQUIRE(co_await mutex.lock());
+        co_await asyncio::error::guard(mutex.lock());
 
         auto task = condition.wait(mutex);
         REQUIRE_FALSE(mutex.locked());
@@ -102,7 +96,7 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
     }
 
     SECTION("notify after cancel") {
-        REQUIRE(co_await mutex.lock());
+        co_await asyncio::error::guard(mutex.lock());
 
         auto task1 = condition.wait(mutex);
         REQUIRE_FALSE(task1.done());
@@ -111,7 +105,7 @@ ASYNC_TEST_CASE("condition variable", "[sync::condition]") {
 
         condition.notify();
 
-        REQUIRE(co_await mutex.lock());
+        co_await asyncio::error::guard(mutex.lock());
 
         auto task2 = condition.wait(mutex);
         REQUIRE_FALSE(task2.done());

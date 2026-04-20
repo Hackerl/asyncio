@@ -1,5 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/buffer.h>
+#include <asyncio/error.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("buffer reader", "[buffer]") {
@@ -20,7 +21,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
 
         SECTION("not empty") {
             std::vector<std::byte> data;
-            REQUIRE(co_await reader.read(data) == 0);
+            REQUIRE(co_await asyncio::error::guard(reader.read(data)) == 0);
             REQUIRE(reader.available() == (std::min)(input.size(), capacity));
         }
     }
@@ -42,7 +43,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
         }
 
         SECTION("eof") {
-            REQUIRE(co_await reader.readAll());
+            co_await asyncio::error::guard(reader.readAll());
             std::array<std::byte, 64> data{};
             REQUIRE(co_await reader.read(data) == 0);
         }
@@ -135,7 +136,7 @@ ASYNC_TEST_CASE("buffer writer", "[buffer]") {
         }
 
         SECTION("not empty") {
-            REQUIRE(co_await writer.writeAll(input));
+            co_await asyncio::error::guard(writer.writeAll(input));
             REQUIRE(writer.pending() > 0);
         }
     }
@@ -146,7 +147,7 @@ ASYNC_TEST_CASE("buffer writer", "[buffer]") {
     }
 
     SECTION("flush") {
-        REQUIRE(co_await writer.writeAll(input));
+        co_await asyncio::error::guard(writer.writeAll(input));
         REQUIRE(co_await writer.flush());
         REQUIRE(writer.pending() == 0);
         REQUIRE_THAT(bytesWriter->data(), Catch::Matchers::RangeEquals(input));

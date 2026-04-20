@@ -1,13 +1,12 @@
 #include "catch_extensions.h"
 #include <asyncio/event_loop.h>
-#include <asyncio/time.h>
+#include <asyncio/error.h>
 
 TEST_CASE("event loop", "[event loop]") {
     SECTION("with error") {
         SECTION("success") {
             const auto result = asyncio::run([]() -> asyncio::task::Task<int, std::error_code> {
-                using namespace std::chrono_literals;
-                REQUIRE(co_await asyncio::sleep(10ms));
+                co_await asyncio::error::guard(asyncio::reschedule());
                 co_return 1024;
             });
             REQUIRE(result == 1024);
@@ -15,8 +14,7 @@ TEST_CASE("event loop", "[event loop]") {
 
         SECTION("failure") {
             const auto result = asyncio::run([]() -> asyncio::task::Task<void, std::error_code> {
-                using namespace std::chrono_literals;
-                REQUIRE(co_await asyncio::sleep(10ms));
+                co_await asyncio::error::guard(asyncio::reschedule());
                 co_return std::unexpected{make_error_code(std::errc::invalid_argument)};
             });
             REQUIRE_ERROR(result, std::errc::invalid_argument);
@@ -26,8 +24,7 @@ TEST_CASE("event loop", "[event loop]") {
     SECTION("with exception") {
         SECTION("success") {
             const auto result = asyncio::run([]() -> asyncio::task::Task<int> {
-                using namespace std::chrono_literals;
-                REQUIRE(co_await asyncio::sleep(10ms));
+                co_await asyncio::error::guard(asyncio::reschedule());
                 co_return 1024;
             });
             REQUIRE(result == 1024);
@@ -35,8 +32,7 @@ TEST_CASE("event loop", "[event loop]") {
 
         SECTION("failure") {
             const auto result = asyncio::run([]() -> asyncio::task::Task<void> {
-                using namespace std::chrono_literals;
-                REQUIRE(co_await asyncio::sleep(10ms));
+                co_await asyncio::error::guard(asyncio::reschedule());
                 throw std::system_error{make_error_code(std::errc::invalid_argument)};
             });
             REQUIRE_FALSE(result);

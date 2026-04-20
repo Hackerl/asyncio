@@ -1,5 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/thread.h>
+#include <asyncio/error.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
 ASYNC_TEST_CASE("post task to a new thread", "[thread]") {
@@ -229,7 +230,7 @@ ASYNC_TEST_CASE("post task to thread pool", "[thread]") {
             REQUIRE(std::chrono::system_clock::now() - tp < 50ms);
         }
 
-        REQUIRE(co_await all(tasks));
+        co_await asyncio::error::guard(all(tasks));
     }
 }
 
@@ -256,7 +257,7 @@ ASYNC_TEST_CASE("post cancellable task to thread pool", "[thread]") {
             }
         );
 
-        REQUIRE(events[0].wait());
+        co_await asyncio::error::guard(events[0].wait());
 
         SECTION("normal") {
             REQUIRE(co_await task);
@@ -293,7 +294,7 @@ ASYNC_TEST_CASE("post cancellable task to thread pool", "[thread]") {
             }
         );
 
-        REQUIRE(events[0].wait());
+        co_await asyncio::error::guard(events[0].wait());
 
         SECTION("normal") {
             REQUIRE(co_await task == 1024);

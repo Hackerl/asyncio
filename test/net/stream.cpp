@@ -9,20 +9,15 @@
 #endif
 
 ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
-    auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 0);
-    REQUIRE(listener);
+    auto listener = co_await asyncio::error::guard(asyncio::net::TCPListener::listen("127.0.0.1", 0));
+    const auto serverAddress = co_await asyncio::error::guard(listener.address());
 
-    const auto serverAddress = listener->address();
-    REQUIRE(serverAddress);
-
-    auto result = co_await all(
-        listener->accept(),
-        asyncio::net::TCPStream::connect(*serverAddress)
+    auto [server, client] = co_await asyncio::error::guard(
+        all(
+            listener.accept(),
+            asyncio::net::TCPStream::connect(serverAddress)
+        )
     );
-    REQUIRE(result);
-
-    auto &server = result->at(0);
-    auto &client = result->at(1);
 
     SECTION("fd") {
         const auto fd = client.fd();
@@ -36,13 +31,13 @@ ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
     SECTION("local address") {
         const auto address = server.localAddress();
         REQUIRE(address);
-        REQUIRE(std::get<asyncio::net::IPv4Address>(*address) == std::get<asyncio::net::IPv4Address>(*serverAddress));
+        REQUIRE(std::get<asyncio::net::IPv4Address>(*address) == std::get<asyncio::net::IPv4Address>(serverAddress));
     }
 
     SECTION("remote address") {
         const auto address = client.remoteAddress();
         REQUIRE(address);
-        REQUIRE(std::get<asyncio::net::IPv4Address>(*address) == std::get<asyncio::net::IPv4Address>(*serverAddress));
+        REQUIRE(std::get<asyncio::net::IPv4Address>(*address) == std::get<asyncio::net::IPv4Address>(serverAddress));
     }
 
     const auto input = GENERATE(take(1, randomBytes(1, 102400)));
@@ -54,7 +49,8 @@ ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
         data.resize(input.size());
 
         REQUIRE(co_await client.readExactly(data));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 
@@ -65,15 +61,29 @@ ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
         auto task = server.readExactly(data);
 
         REQUIRE(co_await client.writeAll(input));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 
     SECTION("shutdown") {
-        REQUIRE(co_await client.shutdown());
+        {
+            REQUIRE(co_await client.shutdown());
 
-        std::array<std::byte, 1024> data{};
-        REQUIRE(co_await server.read(data) == 0);
+            std::array<std::byte, 1024> data{};
+            REQUIRE(co_await server.read(data) == 0);
+        }
+
+        {
+            auto task = server.writeAll(input);
+
+            std::vector<std::byte> data;
+            data.resize(input.size());
+
+            REQUIRE(co_await client.readExactly(data));
+            REQUIRE(co_await task);
+            REQUIRE(data == input);
+        }
     }
 
     SECTION("close reset") {
@@ -95,17 +105,14 @@ ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
 ASYNC_TEST_CASE("named pipe stream", "[net]") {
     const auto name = fmt::format(R"(\\.\pipe\asyncio-{})", GENERATE(take(1, randomAlphanumericString(8, 16))));
 
-    auto listener = asyncio::net::NamedPipeListener::listen(name);
-    REQUIRE(listener);
+    auto listener = co_await asyncio::error::guard(asyncio::net::NamedPipeListener::listen(name));
 
-    auto result = co_await all(
-        listener->accept(),
-        asyncio::net::NamedPipeStream::connect(name)
+    auto [server, client] = co_await asyncio::error::guard(
+        all(
+            listener.accept(),
+            asyncio::net::NamedPipeStream::connect(name)
+        )
     );
-    REQUIRE(result);
-
-    auto &server = result->at(0);
-    auto &client = result->at(1);
 
     SECTION("fd") {
         const auto fd = client.fd();
@@ -133,7 +140,8 @@ ASYNC_TEST_CASE("named pipe stream", "[net]") {
         data.resize(input.size());
 
         REQUIRE(co_await client.readExactly(data));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 
@@ -144,7 +152,8 @@ ASYNC_TEST_CASE("named pipe stream", "[net]") {
         auto task = server.readExactly(data);
 
         REQUIRE(co_await client.writeAll(input));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 
@@ -162,17 +171,14 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
     const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
     const auto path = temp / GENERATE(take(1, randomAlphanumericString(8, 16)));
 
-    auto listener = asyncio::net::UnixListener::listen(path.string());
-    REQUIRE(listener);
+    auto listener = co_await asyncio::error::guard(asyncio::net::UnixListener::listen(path.string()));
 
-    auto result = co_await all(
-        listener->accept(),
-        asyncio::net::UnixStream::connect(path.string())
+    auto [server, client] = co_await asyncio::error::guard(
+        all(
+            listener.accept(),
+            asyncio::net::UnixStream::connect(path.string())
+        )
     );
-    REQUIRE(result);
-
-    auto &server = result->at(0);
-    auto &client = result->at(1);
 
     SECTION("fd") {
         const auto fd = client.fd();
@@ -202,6 +208,7 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
         REQUIRE(credential);
         REQUIRE(credential->uid == getuid());
         REQUIRE(credential->gid == getgid());
+        REQUIRE(credential->pid);
         REQUIRE(*credential->pid == getpid());
     }
 
@@ -214,7 +221,8 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
         data.resize(input.size());
 
         REQUIRE(co_await client.readExactly(data));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 
@@ -225,7 +233,8 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
         auto task = server.readExactly(data);
 
         REQUIRE(co_await client.writeAll(input));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 
@@ -242,17 +251,14 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
 ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
     const auto name = fmt::format("@asyncio-{}", GENERATE(take(1, randomAlphanumericString(8, 16))));
 
-    auto listener = asyncio::net::UnixListener::listen(name);
-    REQUIRE(listener);
+    auto listener = co_await asyncio::error::guard(asyncio::net::UnixListener::listen(name));
 
-    auto result = co_await all(
-        listener->accept(),
-        asyncio::net::UnixStream::connect(name)
+    auto [server, client] = co_await asyncio::error::guard(
+        all(
+            listener.accept(),
+            asyncio::net::UnixStream::connect(name)
+        )
     );
-    REQUIRE(result);
-
-    auto &server = result->at(0);
-    auto &client = result->at(1);
 
     SECTION("fd") {
         const auto fd = client.fd();
@@ -284,6 +290,7 @@ ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
         REQUIRE(credential);
         REQUIRE(credential->uid == getuid());
         REQUIRE(credential->gid == getgid());
+        REQUIRE(credential->pid);
         REQUIRE(*credential->pid == getpid());
     }
 
@@ -296,7 +303,8 @@ ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
         data.resize(input.size());
 
         REQUIRE(co_await client.readExactly(data));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 
@@ -307,7 +315,8 @@ ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
         auto task = server.readExactly(data);
 
         REQUIRE(co_await client.writeAll(input));
-        REQUIRE(co_await task);
+        co_await asyncio::error::guard(std::move(task));
+
         REQUIRE(data == input);
     }
 

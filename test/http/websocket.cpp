@@ -20,24 +20,17 @@ constexpr auto MaxTwoBytePayloadLength = (std::numeric_limits<std::uint16_t>::ma
 namespace {
     class Server {
     public:
-        Z_DEFINE_ERROR_CODE_INNER(
-            Error,
-            "WebSocketServer",
-            NoKeyHeader, "No websocket key header"
-        )
-
         explicit Server(asyncio::net::TCPStream stream) : mStream{std::move(stream)} {
         }
 
-        static asyncio::task::Task<Server, std::error_code> accept(asyncio::net::TCPStream stream) {
+        static asyncio::task::Task<Server> accept(asyncio::net::TCPStream stream) {
             std::string rawHeader;
 
             while (true) {
                 std::array<std::byte, 1024> data{};
-                const auto n = co_await stream.read(data);
-                Z_CO_EXPECT(n);
+                const auto n = co_await asyncio::error::guard(stream.read(data));
 
-                rawHeader.append(reinterpret_cast<const char *>(data.data()), *n);
+                rawHeader.append(reinterpret_cast<const char *>(data.data()), n);
 
                 if (rawHeader.ends_with("\r\n\r\n"))
                     break;
@@ -46,7 +39,7 @@ namespace {
             std::smatch match;
 
             if (!std::regex_search(rawHeader, match, std::regex(R"(Sec-WebSocket-Key: (.+))")))
-                co_return std::unexpected{make_error_code(Error::NoKeyHeader)};
+                throw co_await asyncio::error::StacktraceError<std::runtime_error>::make("No websocket key header");
 
             std::array<std::byte, SHA_DIGEST_LENGTH> digest{};
             const auto data = match.str(1) + WebSocketMagic;
@@ -65,35 +58,30 @@ namespace {
                 zero::encoding::base64::encode(digest)
             );
 
-            Z_CO_EXPECT(co_await stream.writeAll(std::as_bytes(std::span{response})));
+            co_await asyncio::error::guard(stream.writeAll(std::as_bytes(std::span{response})));
             co_return Server{std::move(stream)};
         }
 
-        asyncio::task::Task<std::pair<asyncio::http::ws::Opcode, std::vector<std::byte>>, std::error_code>
-        readMessage() {
+        asyncio::task::Task<std::pair<asyncio::http::ws::Opcode, std::vector<std::byte>>> readMessage() {
             asyncio::http::ws::Header header;
 
-            Z_CO_EXPECT(co_await mStream.readExactly({reinterpret_cast<std::byte *>(&header), sizeof(header)}));
+            co_await asyncio::error::guard(
+                mStream.readExactly({reinterpret_cast<std::byte *>(&header), sizeof(header)})
+            );
 
             std::vector<std::byte> payload;
 
-            if (const auto length = header.length(); length == EightBytePayloadLength) {
-                const auto n = co_await asyncio::binary::readBE<std::uint64_t>(mStream);
-                Z_CO_EXPECT(n);
-                payload.resize(*n);
-            }
-            else if (length == TwoBytePayloadLength) {
-                const auto n = co_await asyncio::binary::readBE<std::uint16_t>(mStream);
-                Z_CO_EXPECT(n);
-                payload.resize(*n);
-            }
-            else {
+            if (const auto length = header.length(); length == EightBytePayloadLength)
+                payload.resize(co_await asyncio::error::guard(asyncio::binary::readBE<std::uint64_t>(mStream)));
+            else if (length == TwoBytePayloadLength)
+                payload.resize(co_await asyncio::error::guard(asyncio::binary::readBE<std::uint16_t>(mStream)));
+            else
                 payload.resize(length);
-            }
 
             std::array<std::byte, MaskingKeyLength> key{};
-            Z_CO_EXPECT(co_await mStream.readExactly(std::as_writable_bytes(std::span{key})));
-            Z_CO_EXPECT(co_await mStream.readExactly(payload));
+
+            co_await asyncio::error::guard(mStream.readExactly(std::as_writable_bytes(std::span{key})));
+            co_await asyncio::error::guard(mStream.readExactly(payload));
 
             for (std::size_t i{0}; i < payload.size(); ++i)
                 payload[i] ^= key[i % 4];
@@ -101,7 +89,7 @@ namespace {
             co_return std::pair{header.opcode(), std::move(payload)};
         }
 
-        asyncio::task::Task<void, std::error_code>
+        asyncio::task::Task<void>
         writeMessage(const asyncio::http::ws::Opcode opcode, const std::span<const std::byte> payload) {
             asyncio::http::ws::Header header;
 
@@ -124,16 +112,16 @@ namespace {
                 header.length(length);
             }
 
-            Z_CO_EXPECT(co_await mStream.writeAll({reinterpret_cast<const std::byte *>(&header), sizeof(header)}));
+            co_await asyncio::error::guard(
+                mStream.writeAll({reinterpret_cast<const std::byte *>(&header), sizeof(header)})
+            );
 
-            if (extendedBytes == 2) {
-                Z_CO_EXPECT(co_await asyncio::binary::writeBE(mStream, static_cast<std::uint16_t>(length)));
-            }
-            else if (extendedBytes == 8) {
-                Z_CO_EXPECT(co_await asyncio::binary::writeBE<std::uint64_t>(mStream, length));
-            }
+            if (extendedBytes == 2)
+                co_await asyncio::error::guard(asyncio::binary::writeBE(mStream, static_cast<std::uint16_t>(length)));
+            else if (extendedBytes == 8)
+                co_await asyncio::error::guard(asyncio::binary::writeBE<std::uint64_t>(mStream, length));
 
-            co_return co_await mStream.writeAll(payload);
+            co_await asyncio::error::guard(mStream.writeAll(payload));
         }
 
     private:
@@ -141,41 +129,30 @@ namespace {
     };
 }
 
-Z_DECLARE_ERROR_CODE(Server::Error)
-
-Z_DEFINE_ERROR_CATEGORY_INSTANCE(Server::Error)
-
 ASYNC_TEST_CASE("websocket", "[http::websocket]") {
-    auto listener = asyncio::net::TCPListener::listen("127.0.0.1", 0);
-    REQUIRE(listener);
+    auto listener = co_await asyncio::error::guard(asyncio::net::TCPListener::listen("127.0.0.1", 0));
+    const auto address = co_await asyncio::error::guard(listener.address());
 
-    const auto address = listener->address();
-    REQUIRE(address);
+    auto url = co_await asyncio::error::guard(asyncio::http::URL::from("http://127.0.0.1"));
+    url.port(std::get<asyncio::net::IPv4Address>(address).port);
 
-    auto url = asyncio::http::URL::from("http://127.0.0.1");
-    REQUIRE(url);
-
-    url->port(std::get<asyncio::net::IPv4Address>(*address).port);
-
-    auto result = co_await all(
-        listener->accept().andThen(Server::accept),
-        asyncio::http::ws::WebSocket::connect(*url)
+    auto [server, ws] = co_await all(
+        asyncio::task::spawn([&]() -> asyncio::task::Task<Server> {
+            auto stream = co_await asyncio::error::guard(listener.accept());
+            co_return co_await Server::accept(std::move(stream));
+        }),
+        asyncio::task::spawn([&]() -> asyncio::task::Task<asyncio::http::ws::WebSocket> {
+            co_return co_await asyncio::error::guard(asyncio::http::ws::WebSocket::connect(url));
+        })
     );
-    REQUIRE(result);
-
-    auto &server = std::get<0>(*result);
-    auto &ws = std::get<1>(*result);
 
     SECTION("send text") {
         const auto payload = GENERATE(take(1, randomString(1, 102400)));
         auto task = ws.sendText(payload);
 
-        const auto message = co_await server.readMessage();
-        REQUIRE(message);
-        REQUIRE(message->first == asyncio::http::ws::Opcode::Text);
-        REQUIRE(
-            std::string_view{reinterpret_cast<const char *>(message->second.data()), message->second.size()} == payload
-        );
+        const auto [opcode, data] = co_await server.readMessage();
+        REQUIRE(opcode == asyncio::http::ws::Opcode::Text);
+        REQUIRE(std::string_view{reinterpret_cast<const char *>(data.data()), data.size()} == payload);
 
         REQUIRE(co_await task);
     }
@@ -184,10 +161,9 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
         const auto payload = GENERATE(take(1, randomBytes(1, 102400)));
         auto task = ws.sendBinary(payload);
 
-        const auto message = co_await server.readMessage();
-        REQUIRE(message);
-        REQUIRE(message->first == asyncio::http::ws::Opcode::Binary);
-        REQUIRE(message->second == payload);
+        const auto [opcode, data] = co_await server.readMessage();
+        REQUIRE(opcode == asyncio::http::ws::Opcode::Binary);
+        REQUIRE(data == payload);
 
         REQUIRE(co_await task);
     }
@@ -197,7 +173,7 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
             const auto payload = GENERATE(take(1, randomString(1, 102400)));
             auto task = ws.readMessage();
 
-            REQUIRE(co_await server.writeMessage(asyncio::http::ws::Opcode::Text, std::as_bytes(std::span{payload})));
+            co_await server.writeMessage(asyncio::http::ws::Opcode::Text, std::as_bytes(std::span{payload}));
 
             const auto message = co_await task;
             REQUIRE(message);
@@ -209,7 +185,7 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
             const auto payload = GENERATE(take(1, randomBytes(1, 102400)));
             auto task = ws.readMessage();
 
-            REQUIRE(co_await server.writeMessage(asyncio::http::ws::Opcode::Binary, payload));
+            co_await server.writeMessage(asyncio::http::ws::Opcode::Binary, payload);
 
             const auto message = co_await task;
             REQUIRE(message);
@@ -221,17 +197,15 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
     SECTION("client close") {
         auto task = ws.close(asyncio::http::ws::CloseCode::NormalClosure);
 
-        const auto message = co_await server.readMessage();
-        REQUIRE(message);
-        REQUIRE(message->first == asyncio::http::ws::Opcode::Close);
+        const auto [opcode, data] = co_await server.readMessage();
+        REQUIRE(opcode == asyncio::http::ws::Opcode::Close);
 
         REQUIRE(
-            static_cast<asyncio::http::ws::CloseCode>(
-                ntohs(*reinterpret_cast<const std::uint16_t *>(message->second.data()))
-            ) == asyncio::http::ws::CloseCode::NormalClosure
+            static_cast<asyncio::http::ws::CloseCode>(ntohs(*reinterpret_cast<const std::uint16_t *>(data.data()))) ==
+            asyncio::http::ws::CloseCode::NormalClosure
         );
 
-        REQUIRE(co_await server.writeMessage(message->first, message->second));
+        co_await server.writeMessage(opcode, data);
         REQUIRE(co_await task);
     }
 
@@ -240,10 +214,10 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
 
         const auto code = htons(std::to_underlying(asyncio::http::ws::CloseCode::NormalClosure));
 
-        REQUIRE(co_await server.writeMessage(
+        co_await server.writeMessage(
             asyncio::http::ws::Opcode::Close,
             {reinterpret_cast<const std::byte *>(&code), sizeof(code)}
-        ));
+        );
 
         REQUIRE_ERROR(co_await task, asyncio::http::ws::CloseCode::NormalClosure);
     }
@@ -252,19 +226,16 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
 ASYNC_TEST_CASE("message deflate", "[http::websocket]") {
     const auto windowBits = GENERATE(9, 10, 11, 12, 13, 14, 15);
 
-    auto compressor = asyncio::http::ws::Compressor::make(windowBits);
-    REQUIRE(compressor);
-
-    auto decompressor = asyncio::http::ws::Decompressor::make(windowBits);
-    REQUIRE(decompressor);
+    auto compressor = co_await asyncio::error::guard(asyncio::http::ws::Compressor::make(windowBits));
+    auto decompressor = co_await asyncio::error::guard(asyncio::http::ws::Decompressor::make(windowBits));
 
     const auto times = GENERATE(take(1, random(1, 64)));
 
     for (int i{0}; i < times; ++i) {
         const auto input = GENERATE(take(1, randomBytes(1, 102400)));
 
-        const auto compressed = co_await compressor->compress(input);
+        const auto compressed = co_await compressor.compress(input);
         REQUIRE(compressed);
-        REQUIRE(co_await decompressor->decompress(*compressed) == input);
+        REQUIRE(co_await decompressor.decompress(*compressed) == input);
     }
 }

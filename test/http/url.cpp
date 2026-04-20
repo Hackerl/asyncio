@@ -19,200 +19,199 @@ TEST_CASE("URL unescape", "[http::url]") {
 }
 
 TEST_CASE("URL", "[http::url]") {
-    auto url = asyncio::http::URL::from("http://root:123456@localhost:8080/login?name=rose#page=1");
-    REQUIRE(url);
+    auto url = zero::error::guard(asyncio::http::URL::from("http://root:123456@localhost:8080/login?name=rose#page=1"));
 
     SECTION("scheme") {
         SECTION("get") {
-            REQUIRE(url->scheme() == "http");
+            REQUIRE(url.scheme() == "http");
         }
 
         SECTION("set") {
-            url->scheme("https");
-            REQUIRE(url->scheme() == "https");
+            url.scheme("https");
+            REQUIRE(url.scheme() == "https");
         }
     }
 
     SECTION("user") {
         SECTION("get") {
-            REQUIRE(url->user() == "root");
+            REQUIRE(url.user() == "root");
         }
 
         SECTION("set") {
-            url->user("admin");
-            REQUIRE(url->user() == "admin");
+            url.user("admin");
+            REQUIRE(url.user() == "admin");
         }
 
         SECTION("reset") {
-            url->user(std::nullopt);
-            REQUIRE_FALSE(url->user());
+            url.user(std::nullopt);
+            REQUIRE_FALSE(url.user());
         }
     }
 
     SECTION("password") {
         SECTION("get") {
-            REQUIRE(url->password() == "123456");
+            REQUIRE(url.password() == "123456");
         }
 
         SECTION("set") {
-            url->password("admin");
-            REQUIRE(url->password() == "admin");
+            url.password("admin");
+            REQUIRE(url.password() == "admin");
         }
 
         SECTION("reset") {
-            url->password(std::nullopt);
-            REQUIRE_FALSE(url->password());
+            url.password(std::nullopt);
+            REQUIRE_FALSE(url.password());
         }
     }
 
     SECTION("host") {
         SECTION("get") {
-            REQUIRE(url->host() == "localhost");
+            REQUIRE(url.host() == "localhost");
         }
 
         SECTION("set") {
-            url->host("127.0.0.1");
-            REQUIRE(url->host() == "127.0.0.1");
+            url.host("127.0.0.1");
+            REQUIRE(url.host() == "127.0.0.1");
         }
 
         SECTION("reset") {
-            url->host(std::nullopt);
-            REQUIRE_FALSE(url->host());
+            url.host(std::nullopt);
+            REQUIRE_FALSE(url.host());
         }
     }
 
     SECTION("port") {
         SECTION("get") {
-            REQUIRE(url->port() == 8080);
+            REQUIRE(url.port() == 8080);
         }
 
         SECTION("set") {
-            url->port(1080);
-            REQUIRE(url->port() == 1080);
+            url.port(1080);
+            REQUIRE(url.port() == 1080);
         }
 
         SECTION("reset") {
-            url->port(std::nullopt);
+            url.port(std::nullopt);
 
             SECTION("default port") {
-                REQUIRE(url->port() == 80);
+                REQUIRE(url.port() == 80);
             }
 
             SECTION("no default port") {
-                url->scheme("file");
-                REQUIRE_FALSE(url->port());
+                url.scheme("file");
+                REQUIRE_FALSE(url.port());
             }
         }
     }
 
     SECTION("path") {
         SECTION("get") {
-            REQUIRE(url->path() == "/login");
-            REQUIRE(url->rawPath() == url->path());
+            REQUIRE(url.path() == "/login");
+            REQUIRE(url.rawPath() == url.path());
         }
 
         SECTION("set") {
             SECTION("unencoded") {
-                url->path("/logout");
-                REQUIRE(url->path() == "/logout");
+                url.path("/logout");
+                REQUIRE(url.path() == "/logout");
             }
 
             SECTION("encoded") {
-                url->path(R"(/test/路径/with spaces/and!@#$%^&*()_+-=[]{}|;':",./<>?)");
-                REQUIRE(url->path() == R"(/test/路径/with spaces/and!@#$%^&*()_+-=[]{}|;':",./<>?)");
+                url.path(R"(/test/路径/with spaces/and!@#$%^&*()_+-=[]{}|;':",./<>?)");
+                REQUIRE(url.path() == R"(/test/路径/with spaces/and!@#$%^&*()_+-=[]{}|;':",./<>?)");
                 REQUIRE(
-                    url->rawPath() ==
+                    url.rawPath() ==
                     "/test/%E8%B7%AF%E5%BE%84/with%20spaces/and!@%23$%25%5E&*()_+-=[]{}%7C;':%22,./%3C%3E%3F"
                 );
             }
         }
 
         SECTION("append") {
-            url->path("/");
+            url.path("/");
 
             SECTION("normal") {
-                url->append("api");
-                REQUIRE(url->path() == "/api");
+                url.append("api");
+                REQUIRE(url.path() == "/api");
 
-                url->append("login/");
-                REQUIRE(url->path() == "/api/login/");
+                url.append("login/");
+                REQUIRE(url.path() == "/api/login/");
             }
 
             SECTION("number") {
-                url->append("id");
-                REQUIRE(url->path() == "/id");
+                url.append("id");
+                REQUIRE(url.path() == "/id");
 
-                url->append(100);
-                REQUIRE(url->path() == "/id/100");
+                url.append(100);
+                REQUIRE(url.path() == "/id/100");
             }
         }
     }
 
     SECTION("query") {
         SECTION("get") {
-            REQUIRE(url->query() == "name=rose");
-            REQUIRE(url->rawQuery() == "name=rose");
+            REQUIRE(url.query() == "name=rose");
+            REQUIRE(url.rawQuery() == "name=rose");
         }
 
         SECTION("set") {
-            url->query("name=jack");
-            REQUIRE(url->query() == "name=jack");
-            REQUIRE(url->rawQuery() == "name=jack");
+            url.query("name=jack");
+            REQUIRE(url.query() == "name=jack");
+            REQUIRE(url.rawQuery() == "name=jack");
         }
 
         SECTION("append") {
-            url->query(std::nullopt);
+            url.query(std::nullopt);
 
             SECTION("overloading") {
                 SECTION("entry") {
-                    url->appendQuery("name=jack");
-                    REQUIRE(url->query() == "name=jack");
+                    url.appendQuery("name=jack");
+                    REQUIRE(url.query() == "name=jack");
 
-                    url->appendQuery("age=18");
-                    REQUIRE(url->query() == "name=jack&age=18");
+                    url.appendQuery("age=18");
+                    REQUIRE(url.query() == "name=jack&age=18");
                 }
 
                 SECTION("kv pair") {
                     SECTION("string") {
-                        url->appendQuery("name", "jack");
-                        REQUIRE(url->query() == "name=jack");
+                        url.appendQuery("name", "jack");
+                        REQUIRE(url.query() == "name=jack");
 
-                        url->appendQuery("sex", "male");
-                        REQUIRE(url->query() == "name=jack&sex=male");
+                        url.appendQuery("sex", "male");
+                        REQUIRE(url.query() == "name=jack&sex=male");
                     }
 
                     SECTION("boolean") {
-                        url->appendQuery("adult", true);
-                        REQUIRE(url->query() == "adult=true");
+                        url.appendQuery("adult", true);
+                        REQUIRE(url.query() == "adult=true");
 
-                        url->appendQuery("single", false);
-                        REQUIRE(url->query() == "adult=true&single=false");
+                        url.appendQuery("single", false);
+                        REQUIRE(url.query() == "adult=true&single=false");
                     }
 
                     SECTION("number") {
-                        url->appendQuery("age", 18);
-                        REQUIRE(url->query() == "age=18");
+                        url.appendQuery("age", 18);
+                        REQUIRE(url.query() == "age=18");
 
-                        url->appendQuery("height", 180);
-                        REQUIRE(url->query() == "age=18&height=180");
+                        url.appendQuery("height", 180);
+                        REQUIRE(url.query() == "age=18&height=180");
                     }
                 }
             }
 
             SECTION("encoded") {
-                url->appendQuery("name", "测试");
-                REQUIRE(url->query() == "name=测试");
-                REQUIRE(url->rawQuery() == "name=%E6%B5%8B%E8%AF%95");
+                url.appendQuery("name", "测试");
+                REQUIRE(url.query() == "name=测试");
+                REQUIRE(url.rawQuery() == "name=%E6%B5%8B%E8%AF%95");
 
-                url->appendQuery("description", R"(special chars !@#$%^&*()_+-=[]{}|;':",./<>? and spaces)");
+                url.appendQuery("description", R"(special chars !@#$%^&*()_+-=[]{}|;':",./<>? and spaces)");
 
                 REQUIRE(
-                    url->query() ==
+                    url.query() ==
                     R"(name=测试&description=special chars !@#$%^&*()_+-=[]{}|;':",./<>? and spaces)"
                 );
 
                 REQUIRE(
-                    url->rawQuery() ==
+                    url.rawQuery() ==
                     "name=%E6%B5%8B%E8%AF%95&description=special+chars+%21%40%23%24%25%5E%26%2A%28%29_"
                     "%2B-%3D%5B%5D%7B%7D%7C%3B%27%3A%22%2C.%2F%3C%3E%3F+and+spaces"
                 );
@@ -220,63 +219,53 @@ TEST_CASE("URL", "[http::url]") {
         }
 
         SECTION("reset") {
-            url->query(std::nullopt);
-            REQUIRE_FALSE(url->query());
+            url.query(std::nullopt);
+            REQUIRE_FALSE(url.query());
         }
     }
 
     SECTION("fragment") {
         SECTION("get") {
-            REQUIRE(url->fragment() == "page=1");
+            REQUIRE(url.fragment() == "page=1");
         }
 
         SECTION("set") {
-            url->fragment("page=2");
-            REQUIRE(url->fragment() == "page=2");
+            url.fragment("page=2");
+            REQUIRE(url.fragment() == "page=2");
         }
 
         SECTION("reset") {
-            url->fragment(std::nullopt);
-            REQUIRE_FALSE(url->fragment());
+            url.fragment(std::nullopt);
+            REQUIRE_FALSE(url.fragment());
         }
     }
 
     SECTION("string") {
-        REQUIRE(url->string() == "http://root:123456@localhost:8080/login?name=rose#page=1");
+        REQUIRE(url.string() == "http://root:123456@localhost:8080/login?name=rose#page=1");
     }
 }
 
 TEST_CASE("URL comparison", "[http::url]") {
     SECTION("equal") {
-        const auto url = asyncio::http::URL::from("http://localhost:8080");
-        REQUIRE(url);
-        REQUIRE(*url == *url);
+        const auto url = zero::error::guard(asyncio::http::URL::from("http://localhost:8080"));
+        REQUIRE(url == url);
     }
 
     SECTION("not equal") {
-        const auto url1 = asyncio::http::URL::from("http://localhost:8080");
-        REQUIRE(url1);
-
-        const auto url2 = asyncio::http::URL::from("http://localhost:8081");
-        REQUIRE(url2);
-        REQUIRE(*url1 != *url2);
+        const auto url1 = zero::error::guard(asyncio::http::URL::from("http://localhost:8080"));
+        const auto url2 = zero::error::guard(asyncio::http::URL::from("http://localhost:8081"));
+        REQUIRE(url1 != url2);
     }
 
     SECTION("less") {
-        const auto url1 = asyncio::http::URL::from("http://localhost:8080");
-        REQUIRE(url1);
-
-        const auto url2 = asyncio::http::URL::from("http://localhost:8081");
-        REQUIRE(url2);
-        REQUIRE(*url1 < *url2);
+        const auto url1 = zero::error::guard(asyncio::http::URL::from("http://localhost:8080"));
+        const auto url2 = zero::error::guard(asyncio::http::URL::from("http://localhost:8081"));
+        REQUIRE(url1 < url2);
     }
 
     SECTION("greater") {
-        const auto url1 = asyncio::http::URL::from("http://localhost:8080");
-        REQUIRE(url1);
-
-        const auto url2 = asyncio::http::URL::from("http://localhost:8081");
-        REQUIRE(url2);
-        REQUIRE(*url2 > *url1);
+        const auto url1 = zero::error::guard(asyncio::http::URL::from("http://localhost:8080"));
+        const auto url2 = zero::error::guard(asyncio::http::URL::from("http://localhost:8081"));
+        REQUIRE(url2 > url1);
     }
 }

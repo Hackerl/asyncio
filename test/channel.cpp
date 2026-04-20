@@ -102,9 +102,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         }
 
         SECTION("full") {
-            for (std::size_t i{0}; i < capacity; ++i) {
-                REQUIRE(sender.trySend(element));
-            }
+            for (std::size_t i{0}; i < capacity; ++i)
+                co_await asyncio::error::guard(sender.trySend(element));
 
             REQUIRE_ERROR(sender.trySend(element), asyncio::TrySendError::Full);
         }
@@ -125,9 +124,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         }
 
         SECTION("full") {
-            for (std::size_t i{0}; i < capacity; ++i) {
-                REQUIRE(sender.trySend(element));
-            }
+            for (std::size_t i{0}; i < capacity; ++i)
+                co_await asyncio::error::guard(sender.trySend(element));
 
             const auto result = sender.trySendEx(std::string{element});
             REQUIRE_FALSE(result);
@@ -143,9 +141,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             }
 
             SECTION("wait") {
-                for (std::size_t i{0}; i < capacity; ++i) {
-                    REQUIRE(sender.trySend(element));
-                }
+                for (std::size_t i{0}; i < capacity; ++i)
+                    co_await asyncio::error::guard(sender.trySend(element));
 
                 auto task = asyncio::toThread([&] {
                     return sender.sendSync(element);
@@ -157,15 +154,14 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             SECTION("wait with timeout") {
                 using namespace std::chrono_literals;
 
-                for (std::size_t i{0}; i < capacity; ++i) {
-                    REQUIRE(sender.trySend(element));
-                }
+                for (std::size_t i{0}; i < capacity; ++i)
+                    co_await asyncio::error::guard(sender.trySend(element));
 
                 auto task = asyncio::toThread([&] {
                     return sender.sendSync(element, 1s);
                 });
 
-                REQUIRE(co_await asyncio::sleep(10ms));
+                co_await asyncio::error::guard(asyncio::sleep(10ms));
                 REQUIRE(co_await receiver.receive() == element);
                 REQUIRE(co_await task);
             }
@@ -179,9 +175,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         SECTION("timeout") {
             using namespace std::chrono_literals;
 
-            for (std::size_t i{0}; i < capacity; ++i) {
-                REQUIRE(sender.trySend(element));
-            }
+            for (std::size_t i{0}; i < capacity; ++i)
+                co_await asyncio::error::guard(sender.trySend(element));
 
             REQUIRE_ERROR(sender.sendSync(element, 10ms), asyncio::SendSyncError::Timeout);
         }
@@ -194,9 +189,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             }
 
             SECTION("wait") {
-                for (std::size_t i{0}; i < capacity; ++i) {
-                    REQUIRE(sender.trySend(element));
-                }
+                for (std::size_t i{0}; i < capacity; ++i)
+                    co_await asyncio::error::guard(sender.trySend(element));
 
                 auto task = asyncio::toThread([&] {
                     return sender.sendSyncEx(std::string{element});
@@ -208,15 +202,14 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             SECTION("wait with timeout") {
                 using namespace std::chrono_literals;
 
-                for (std::size_t i{0}; i < capacity; ++i) {
-                    REQUIRE(sender.trySend(element));
-                }
+                for (std::size_t i{0}; i < capacity; ++i)
+                    co_await asyncio::error::guard(sender.trySend(element));
 
                 auto task = asyncio::toThread([&] {
                     return sender.sendSyncEx(std::string{element}, 1s);
                 });
 
-                REQUIRE(co_await asyncio::sleep(10ms));
+                co_await asyncio::error::guard(asyncio::sleep(10ms));
                 REQUIRE(co_await receiver.receive() == element);
                 REQUIRE(co_await task);
             }
@@ -234,9 +227,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         SECTION("timeout") {
             using namespace std::chrono_literals;
 
-            for (std::size_t i{0}; i < capacity; ++i) {
-                REQUIRE(sender.trySend(element));
-            }
+            for (std::size_t i{0}; i < capacity; ++i)
+                co_await asyncio::error::guard(sender.trySend(element));
 
             const auto result = sender.sendSyncEx(std::string{element}, 10ms);
             REQUIRE_FALSE(result);
@@ -252,9 +244,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             }
 
             SECTION("wait") {
-                for (std::size_t i{0}; i < capacity; ++i) {
-                    REQUIRE(sender.trySend(element));
-                }
+                for (std::size_t i{0}; i < capacity; ++i)
+                    co_await asyncio::error::guard(sender.trySend(element));
 
                 auto task = sender.send(element);
                 REQUIRE(co_await receiver.receive() == element);
@@ -268,11 +259,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         }
 
         SECTION("cancelled") {
-            using namespace std::chrono_literals;
-
-            for (std::size_t i{0}; i < capacity; ++i) {
-                REQUIRE(sender.trySend(element));
-            }
+            for (std::size_t i{0}; i < capacity; ++i)
+                co_await asyncio::error::guard(sender.trySend(element));
 
             auto task = sender.send(element);
             REQUIRE(task.cancel());
@@ -287,9 +275,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
             }
 
             SECTION("wait") {
-                for (std::size_t i{0}; i < capacity; ++i) {
-                    REQUIRE(sender.trySend(element));
-                }
+                for (std::size_t i{0}; i < capacity; ++i)
+                    co_await asyncio::error::guard(sender.trySend(element));
 
                 auto task = sender.sendEx(std::string{element});
                 REQUIRE(co_await receiver.receive() == element);
@@ -307,11 +294,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         }
 
         SECTION("cancelled") {
-            using namespace std::chrono_literals;
-
-            for (std::size_t i{0}; i < capacity; ++i) {
-                REQUIRE(sender.trySend(element));
-            }
+            for (std::size_t i{0}; i < capacity; ++i)
+                co_await asyncio::error::guard(sender.trySend(element));
 
             auto task = sender.sendEx(element);
             REQUIRE(task.cancel());
@@ -331,9 +315,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
     SECTION("size") {
         const auto size = GENERATE_REF(take(1, random(0uz, capacity)));
 
-        for (std::size_t i{0}; i < size; ++i) {
-            REQUIRE(sender.trySend(element));
-        }
+        for (std::size_t i{0}; i < size; ++i)
+            co_await asyncio::error::guard(sender.trySend(element));
 
         REQUIRE(sender.size() == size);
     }
@@ -348,7 +331,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         }
 
         SECTION("not empty") {
-            REQUIRE(sender.trySend(element));
+            co_await asyncio::error::guard(sender.trySend(element));
             REQUIRE_FALSE(sender.empty());
         }
     }
@@ -359,9 +342,8 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         }
 
         SECTION("full") {
-            for (std::size_t i{0}; i < capacity; ++i) {
-                REQUIRE(sender.trySend(element));
-            }
+            for (std::size_t i{0}; i < capacity; ++i)
+                co_await asyncio::error::guard(sender.trySend(element));
 
             REQUIRE(sender.full());
         }
@@ -387,7 +369,7 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
 
     SECTION("try receive") {
         SECTION("success") {
-            REQUIRE(sender.trySend(element));
+            co_await asyncio::error::guard(sender.trySend(element));
 
             SECTION("closed") {
                 sender.close();
@@ -409,7 +391,7 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
     SECTION("receive sync") {
         SECTION("success") {
             SECTION("no wait") {
-                REQUIRE(sender.trySend(element));
+                co_await asyncio::error::guard(sender.trySend(element));
 
                 SECTION("closed") {
                     sender.close();
@@ -473,7 +455,7 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
     SECTION("receive") {
         SECTION("success") {
             SECTION("no wait") {
-                REQUIRE(sender.trySend(element));
+                co_await asyncio::error::guard(sender.trySend(element));
 
                 SECTION("closed") {
                     sender.close();
@@ -508,7 +490,6 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
         }
 
         SECTION("cancelled") {
-            using namespace std::chrono_literals;
             auto task = receiver.receive();
             REQUIRE(task.cancel());
             REQUIRE_ERROR(co_await task, asyncio::ReceiveError::Cancelled);
@@ -518,9 +499,8 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
     SECTION("size") {
         const auto size = GENERATE_REF(take(1, random(0uz, capacity)));
 
-        for (std::size_t i{0}; i < size; ++i) {
-            REQUIRE(sender.trySend(element));
-        }
+        for (std::size_t i{0}; i < size; ++i)
+            co_await asyncio::error::guard(sender.trySend(element));
 
         REQUIRE(receiver.size() == size);
     }
@@ -535,7 +515,7 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
         }
 
         SECTION("not empty") {
-            REQUIRE(sender.trySend(element));
+            co_await asyncio::error::guard(sender.trySend(element));
             REQUIRE_FALSE(receiver.empty());
         }
     }
@@ -546,9 +526,8 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
         }
 
         SECTION("full") {
-            for (std::size_t i{0}; i < capacity; ++i) {
-                REQUIRE(sender.trySend(element));
-            }
+            for (std::size_t i{0}; i < capacity; ++i)
+                co_await asyncio::error::guard(sender.trySend(element));
 
             REQUIRE(receiver.full());
         }
@@ -609,60 +588,50 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
 
     std::atomic<int> counter;
 
-    const auto produce = [&]() -> asyncio::task::Task<void, std::error_code> {
-        for (int i{0}; i < times; ++i) {
-            Z_CO_EXPECT(co_await sender.send(element));
-        }
-
-        co_return {};
+    const auto produce = [&]() -> asyncio::task::Task<void> {
+        for (int i{0}; i < times; ++i)
+            co_await asyncio::error::guard(sender.send(element));
     };
 
-    const auto produceSync = [&]() -> std::expected<void, std::error_code> {
-        for (int i{0}; i < times; ++i) {
-            Z_EXPECT(sender.sendSync(element));
-        }
-
-        return {};
+    const auto produceSync = [&] {
+        for (int i{0}; i < times; ++i)
+            zero::error::guard(sender.sendSync(element));
     };
 
-    const auto consume = [&]() -> asyncio::task::Task<void, std::error_code> {
+    const auto consume = [&]() -> asyncio::task::Task<void> {
         while (true) {
             const auto result = co_await receiver.receive();
 
             if (!result) {
                 if (const auto &error = result.error(); error != asyncio::ReceiveError::Disconnected)
-                    co_return std::unexpected{error};
+                    throw co_await asyncio::error::StacktraceError<std::system_error>::make(error);
 
                 break;
             }
 
             if (*result != element)
-                co_return std::unexpected{make_error_code(std::errc::bad_message)};
+                throw co_await asyncio::error::StacktraceError<std::runtime_error>::make("Received incorrect element");
 
             ++counter;
         }
-
-        co_return {};
     };
 
-    const auto consumeSync = [&]() -> std::expected<void, std::error_code> {
+    const auto consumeSync = [&] {
         while (true) {
             const auto result = receiver.receiveSync();
 
             if (!result) {
                 if (const auto &error = result.error(); error != asyncio::ReceiveSyncError::Disconnected)
-                    return std::unexpected{error};
+                    throw zero::error::StacktraceError<std::system_error>{error};
 
                 break;
             }
 
             if (*result != element)
-                return std::unexpected{make_error_code(std::errc::bad_message)};
+                throw zero::error::StacktraceError<std::runtime_error>{"Received incorrect element"};
 
             ++counter;
         }
-
-        return {};
     };
 
     std::array producers{asyncio::task::spawn(produce), asyncio::task::spawn(produce)};
@@ -671,21 +640,21 @@ ASYNC_TEST_CASE("channel concurrency testing", "[channel]") {
     std::array syncConsumers{asyncio::toThread(consumeSync), asyncio::toThread(consumeSync)};
 
     for (auto &task: producers) {
-        REQUIRE(co_await task);
+        REQUIRE_NOTHROW(co_await task);
     }
 
     for (auto &task: syncProducers) {
-        REQUIRE(co_await task);
+        REQUIRE_NOTHROW(co_await task);
     }
 
     sender.close();
 
     for (auto &task: consumers) {
-        REQUIRE(co_await task);
+        REQUIRE_NOTHROW(co_await task);
     }
 
     for (auto &task: syncConsumers) {
-        REQUIRE(co_await task);
+        REQUIRE_NOTHROW(co_await task);
     }
 
     REQUIRE(counter == times * 4);

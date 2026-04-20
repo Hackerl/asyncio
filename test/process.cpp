@@ -1,5 +1,6 @@
 #include "catch_extensions.h"
 #include <asyncio/process.h>
+#include <asyncio/error.h>
 #include <zero/os/os.h>
 #include <zero/strings.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
@@ -45,10 +46,10 @@ ASYNC_TEST_CASE("spawn child process with pseudo console", "[process]") {
     auto task = master.readAll();
 
     REQUIRE(co_await master.writeAll(std::as_bytes(std::span{"echo hello\rexit\r"sv})));
-    REQUIRE(co_await child->wait());
+    co_await asyncio::error::guard(child->wait());
 
 #ifdef _WIN32
-    REQUIRE(co_await asyncio::toThreadPool([&] {
+    co_await asyncio::error::guard(asyncio::toThreadPool([&] {
         pc->close();
     }));
 #endif
