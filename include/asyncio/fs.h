@@ -158,8 +158,14 @@ namespace asyncio::fs {
     task::Task<Asynchronous<std::filesystem::directory_iterator>, std::error_code>
     readDirectory(std::filesystem::path path);
 
+    task::Task<Asynchronous<std::filesystem::directory_iterator>, std::error_code>
+    readDirectory(std::filesystem::path path, std::filesystem::directory_options options);
+
     task::Task<Asynchronous<std::filesystem::recursive_directory_iterator>, std::error_code>
     walkDirectory(std::filesystem::path path);
+
+    task::Task<Asynchronous<std::filesystem::recursive_directory_iterator>, std::error_code>
+    walkDirectory(std::filesystem::path path, std::filesystem::directory_options options);
 }
 
 #endif //ASYNCIO_FS_H
