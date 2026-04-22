@@ -236,7 +236,7 @@ protected:
             group.add(task);
 
             task.future().fail([](const auto &e) {
-                fmt::print(stderr, "Unhandled exception: {}", e);
+                fmt::print(stderr, "Unhandled exception: {}\n", e);
             });
         }
 
@@ -323,7 +323,7 @@ protected:
             group.add(task);
 
             task.future().fail([](const auto &e) {
-                fmt::print(stderr, "Unhandled exception: {}", e);
+                fmt::print(stderr, "Unhandled exception: {}\n", e);
             });
         }
 
@@ -404,7 +404,7 @@ protected:
             group.add(task);
 
             task.future().fail([](const auto &e) {
-                fmt::print(stderr, "Unhandled exception: {}", e);
+                fmt::print(stderr, "Unhandled exception: {}\n", e);
             });
         }
 
@@ -483,7 +483,7 @@ protected:
             group.add(task);
 
             task.future().fail([](const auto &e) {
-                fmt::print(stderr, "Unhandled exception: {}", e);
+                fmt::print(stderr, "Unhandled exception: {}\n", e);
             });
         }
 
