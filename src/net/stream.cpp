@@ -98,6 +98,9 @@ asyncio::net::TCPStream::connect(const std::string host, const std::uint16_t por
     auto it = addresses->begin();
 
     while (true) {
+        if (co_await task::cancelled)
+            co_return std::unexpected{task::Error::Cancelled};
+
         auto result = co_await connect(co_await error::guard(socketAddressFrom(*it)));
 
         if (result)

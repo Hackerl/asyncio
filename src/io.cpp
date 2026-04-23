@@ -4,6 +4,9 @@ asyncio::task::Task<void, std::error_code> asyncio::IReader::readExactly(const s
     std::size_t offset{0};
 
     while (offset < data.size()) {
+        if (co_await task::cancelled)
+            co_return std::unexpected{task::Error::Cancelled};
+
         const auto n = co_await read(data.subspan(offset));
         Z_CO_EXPECT(n);
 
@@ -20,6 +23,9 @@ asyncio::task::Task<std::vector<std::byte>, std::error_code> asyncio::IReader::r
     std::vector<std::byte> data;
 
     while (true) {
+        if (co_await task::cancelled)
+            co_return std::unexpected{task::Error::Cancelled};
+
         std::array<std::byte, 10240> buffer; // NOLINT(*-pro-type-member-init)
 
         const auto n = co_await read(buffer);
