@@ -204,18 +204,25 @@ namespace asyncio {
         }
 
         task::Task<void, std::error_code> flush() override {
+            std::expected<void, std::error_code> result;
             std::size_t offset{0};
 
             while (offset < mPending) {
-                if (co_await task::cancelled)
-                    co_return std::unexpected{task::Error::Cancelled};
+                if (co_await task::cancelled) {
+                    result = std::unexpected{task::Error::Cancelled};
+                    break;
+                }
 
                 const auto n = co_await std::invoke(
                     &IWriter::write,
                     mWriter,
                     std::span{mBuffer.get() + offset, mPending - offset}
                 );
-                Z_CO_EXPECT(n);
+
+                if (!n) {
+                    result = std::unexpected{n.error()};
+                    break;
+                }
 
                 offset += *n;
             }
@@ -224,7 +231,7 @@ namespace asyncio {
                 std::copy(mBuffer.get() + offset, mBuffer.get() + mPending, mBuffer.get());
 
             mPending -= offset;
-            co_return {};
+            co_return result;
         }
 
     private:
