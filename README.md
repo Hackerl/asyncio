@@ -67,6 +67,7 @@
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
+    <li><a href="#projects">Projects</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
@@ -345,6 +346,19 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
 > You can also send signal or event to trace the call tree.
 
 _For more examples, please refer to the [Documentation](https://github.com/Hackerl/asyncio/tree/master/doc)_
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+
+<!-- PROJECTS -->
+## Projects
+
+Real-world projects built with `asyncio`:
+
+| Project | Description |
+|---------|-------------|
+| [sSocks](https://github.com/Hackerl/sSocks) | A tiny SOCKS5 VPN with TLS mutual authentication |
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
