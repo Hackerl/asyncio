@@ -89,6 +89,7 @@ Based on the `libuv` event loop, use C++20 stackless `coroutines` to implement n
 - Multiple sub-task aggregation methods with structured concurrency model, inspired by JavaScript's `Promise`.
 - Flexible dynamic task management solution, similar to Golang's `WaitGroup`.
 - Built-in call stack tracing that can traverse the task tree top-down or complete backtracing bottom-up.
+- Support for C++20 modules.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
