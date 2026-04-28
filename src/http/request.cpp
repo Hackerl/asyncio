@@ -772,9 +772,9 @@ asyncio::http::Requests::request(
             return curl_mime_name(field, k.c_str());
         }));
 
-        if (std::holds_alternative<std::string>(v)) {
+        if (const auto str = std::get_if<std::string>(&v)) {
             zero::error::guard(expected([&] {
-                return curl_mime_data(field, std::get<std::string>(v).c_str(), CURL_ZERO_TERMINATED);
+                return curl_mime_data(field, str->c_str(), CURL_ZERO_TERMINATED);
             }));
             continue;
         }

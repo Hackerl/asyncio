@@ -70,8 +70,8 @@ asyncio::net::dns::lookupIP(std::string host) {
         return addresses
             | std::views::transform(
                 [](const auto &address) -> IP {
-                    if (std::holds_alternative<IPv4Address>(address))
-                        return std::get<IPv4Address>(address).ip;
+                    if (const auto addr = std::get_if<IPv4Address>(&address))
+                        return addr->ip;
 
                     return std::get<IPv6Address>(address).ip;
                 }
