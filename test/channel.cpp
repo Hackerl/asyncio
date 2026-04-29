@@ -325,7 +325,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         REQUIRE(sender.capacity() == capacity);
     }
 
-    SECTION("empty") {
+    SECTION("is empty") {
         SECTION("empty") {
             REQUIRE(sender.empty());
         }
@@ -336,7 +336,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         }
     }
 
-    SECTION("full") {
+    SECTION("is full") {
         SECTION("not full") {
             REQUIRE_FALSE(sender.full());
         }
@@ -349,7 +349,7 @@ ASYNC_TEST_CASE("channel sender", "[channel]") {
         }
     }
 
-    SECTION("closed") {
+    SECTION("is closed") {
         SECTION("not closed") {
             REQUIRE_FALSE(sender.closed());
         }
@@ -509,7 +509,7 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
         REQUIRE(receiver.capacity() == capacity);
     }
 
-    SECTION("empty") {
+    SECTION("is empty") {
         SECTION("empty") {
             REQUIRE(receiver.empty());
         }
@@ -520,7 +520,7 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
         }
     }
 
-    SECTION("full") {
+    SECTION("is full") {
         SECTION("not full") {
             REQUIRE_FALSE(receiver.full());
         }
@@ -533,7 +533,7 @@ ASYNC_TEST_CASE("channel receiver", "[channel]") {
         }
     }
 
-    SECTION("closed") {
+    SECTION("is closed") {
         SECTION("not closed") {
             REQUIRE_FALSE(receiver.closed());
         }

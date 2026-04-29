@@ -2,7 +2,7 @@
 #include <asyncio/error.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
-ASYNC_TEST_CASE("guard", "[error]") {
+ASYNC_TEST_CASE("throw when task returns an error", "[error]") {
     SECTION("void") {
         SECTION("success") {
             REQUIRE_NOTHROW(
@@ -56,7 +56,7 @@ ASYNC_TEST_CASE("guard", "[error]") {
     }
 }
 
-ASYNC_TEST_CASE("capture", "[error]") {
+ASYNC_TEST_CASE("catch task exception as std::expected error", "[error]") {
     SECTION("void") {
         SECTION("success") {
             REQUIRE(

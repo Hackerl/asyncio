@@ -2,7 +2,7 @@
 #include <asyncio/event_loop.h>
 #include <asyncio/error.h>
 
-TEST_CASE("event loop", "[event loop]") {
+TEST_CASE("run coroutine on event loop", "[event loop]") {
     SECTION("with error") {
         SECTION("success") {
             const auto result = asyncio::run([]() -> asyncio::task::Task<int, std::error_code> {

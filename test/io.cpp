@@ -1,7 +1,7 @@
 #include "catch_extensions.h"
 #include <asyncio/io.h>
 
-ASYNC_TEST_CASE("copy", "[io]") {
+ASYNC_TEST_CASE("copy bytes from reader to writer", "[io]") {
     const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
     asyncio::BytesReader reader{input};

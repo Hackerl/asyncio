@@ -252,7 +252,7 @@ ASYNC_TEST_CASE("read directory", "[fs]") {
     const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
     const auto directory = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
 
-    SECTION("directory not exists") {
+    SECTION("directory does not exist") {
         REQUIRE_ERROR(co_await asyncio::fs::readDirectory(directory / "z"), std::errc::no_such_file_or_directory);
     }
 
@@ -294,7 +294,7 @@ ASYNC_TEST_CASE("walk directory", "[fs]") {
     const auto temp = co_await asyncio::error::guard(asyncio::fs::temporaryDirectory());
     const auto directory = temp / GENERATE(take(1, randomAlphanumericString(8, 64)));
 
-    SECTION("directory not exists") {
+    SECTION("directory does not exist") {
         REQUIRE_ERROR(co_await asyncio::fs::walkDirectory(directory / "z"), std::errc::no_such_file_or_directory);
     }
 
