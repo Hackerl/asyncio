@@ -58,7 +58,7 @@ run(const std::shared_ptr<EventLoop> &eventLoop, F &&f);
 
 template<Invocable F>
 auto run(F &&f) {
-    return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
+    return run(EventLoop::make(), std::forward<F>(f));
 }
 ```
 

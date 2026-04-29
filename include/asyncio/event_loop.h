@@ -22,12 +22,9 @@ namespace asyncio {
             std::unique_ptr<TaskQueue> taskQueue
         );
 
-        EventLoop(EventLoop &&rhs) = default;
-        EventLoop &operator=(EventLoop &&rhs) noexcept = default;
-
         ~EventLoop() override;
 
-        static EventLoop make();
+        static std::shared_ptr<EventLoop> make();
 
         uv_loop_t *raw();
         [[nodiscard]] const uv_loop_t *raw() const;
@@ -113,7 +110,7 @@ namespace asyncio {
 
     template<Invocable F>
     auto run(F &&f) {
-        return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
+        return run(EventLoop::make(), std::forward<F>(f));
     }
 
     task::Task<void, std::error_code> reschedule();

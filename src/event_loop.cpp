@@ -11,9 +11,6 @@ asyncio::EventLoop::EventLoop(
 }
 
 asyncio::EventLoop::~EventLoop() {
-    if (!mLoop)
-        return;
-
     mTaskQueue.reset();
 
     while (true) {
@@ -30,7 +27,7 @@ const uv_loop_t *asyncio::EventLoop::raw() const {
     return mLoop.get();
 }
 
-asyncio::EventLoop asyncio::EventLoop::make() {
+std::shared_ptr<asyncio::EventLoop> asyncio::EventLoop::make() {
     auto loop = std::make_unique<uv_loop_t>();
 
     zero::error::guard(uv::expected([&] {
@@ -67,8 +64,8 @@ asyncio::EventLoop asyncio::EventLoop::make() {
     auto taskQueue = std::make_unique<TaskQueue>(uv::Handle{std::move(async)});
     taskQueue->async->data = taskQueue.get();
 
-    return EventLoop{
-        {
+    return std::make_shared<EventLoop>(
+        std::unique_ptr<uv_loop_t, void (*)(uv_loop_t *)>{
             loop.release(),
             [](uv_loop_t *ptr) {
                 zero::error::guard(uv::expected([&] {
@@ -78,7 +75,7 @@ asyncio::EventLoop asyncio::EventLoop::make() {
             }
         },
         std::move(taskQueue)
-    };
+    );
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst

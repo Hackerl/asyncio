@@ -74,7 +74,7 @@ namespace asyncio {
 
     template<Invocable F>
     auto run(F &&f) {
-        return run(std::make_shared<EventLoop>(EventLoop::make()), std::forward<F>(f));
+        return run(EventLoop::make(), std::forward<F>(f));
     }
 }
 
