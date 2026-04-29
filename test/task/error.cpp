@@ -84,7 +84,6 @@ ASYNC_TEST_CASE("check if the current task has been cancelled - error", "[task]"
                 return {};
             }
         };
-        REQUIRE_FALSE(result);
         REQUIRE_ERROR(result, std::errc::operation_canceled);
         REQUIRE(co_await asyncio::task::cancelled);
     });
