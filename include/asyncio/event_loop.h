@@ -2,11 +2,11 @@
 #define ASYNCIO_EVENT_LOOP_H
 
 #include "uv.h"
+#include "promise.h"
 #include "concepts.h"
 #include <mutex>
 #include <queue>
 #include <cassert>
-#include <zero/async/promise.h>
 
 namespace asyncio {
     class EventLoop final : public zero::async::promise::IExecutor {
@@ -33,6 +33,55 @@ namespace asyncio {
         [[nodiscard]] const uv_loop_t *raw() const;
 
         void post(std::function<void()> f) override;
+
+        template<typename F>
+            requires (std::invocable<F> && !Invocable<F>)
+        SemiFuture<std::invoke_result_t<F>> submit(F &&f) {
+            using T = std::invoke_result_t<F>;
+
+            auto promise = std::make_shared<Promise<T>>();
+            auto future = promise->getFuture();
+
+            post([promise = std::move(promise), f = std::forward<F>(f)] mutable {
+                auto result = zero::error::capture(std::move(f));
+
+                if (!result) {
+                    promise->reject(std::move(result).error());
+                    return;
+                }
+
+                if constexpr (std::is_void_v<T>)
+                    promise->resolve();
+                else
+                    promise->resolve(*std::move(result));
+            });
+
+            return future;
+        }
+
+        template<Invocable F>
+        SemiFuture<
+            typename std::invoke_result_t<F>::value_type,
+            typename std::invoke_result_t<F>::error_type
+        > submit(F &&f) {
+            using T = std::invoke_result_t<F>::value_type;
+            using E = std::invoke_result_t<F>::error_type;
+
+            auto promise = std::make_shared<Promise<T, E>>();
+            auto future = promise->getFuture();
+
+            post([promise = std::move(promise), f = std::forward<F>(f)] mutable {
+                std::invoke(std::move(f))
+                    .future()
+                    .then([=]<typename... Args>(Args &&... args) {
+                        promise->resolve(std::forward<Args>(args)...);
+                    }).fail([=](E &&error) {
+                        promise->reject(std::move(error));
+                    });
+            });
+
+            return future;
+        }
 
         void stop();
         void run();

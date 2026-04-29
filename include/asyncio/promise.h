@@ -1,7 +1,7 @@
 #ifndef ASYNCIO_PROMISE_H
 #define ASYNCIO_PROMISE_H
 
-#include "event_loop.h"
+#include <zero/async/promise.h>
 
 namespace asyncio {
     using zero::async::promise::Promise;
