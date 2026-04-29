@@ -23,7 +23,7 @@
       ]
     },
     "tests": {
-      "description": "Build Tests",
+      "description": "Build tests",
       "dependencies": [
         "catch2"
       ]
