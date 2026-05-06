@@ -1,6 +1,5 @@
 #include <asyncio/process.h>
 #include <asyncio/thread.h>
-#include <asyncio/error.h>
 
 #ifdef _WIN32
 #include <zero/defer.h>

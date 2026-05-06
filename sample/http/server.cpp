@@ -1,6 +1,5 @@
 #include <asyncio/thread.h>
 #include <asyncio/signal.h>
-#include <asyncio/error.h>
 #include <zero/cmdline.h>
 #include <httplib.h>
 

@@ -1,4 +1,3 @@
-#include <asyncio/error.h>
 #include <asyncio/thread.h>
 #include <asyncio/signal.h>
 #include <asyncio/sync/event.h>

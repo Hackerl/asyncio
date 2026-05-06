@@ -1,5 +1,4 @@
 #include <asyncio/fs.h>
-#include <asyncio/error.h>
 #include <asyncio/thread.h>
 #include <zero/utility.h>
 
