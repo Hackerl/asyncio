@@ -39,7 +39,7 @@ namespace asyncio {
             auto promise = std::make_shared<Promise<T>>();
             auto future = promise->getFuture();
 
-            post([promise = std::move(promise), f = std::forward<F>(f)] mutable {
+            post([promise = std::move(promise), f = std::forward<F>(f)]() mutable {
                 auto result = zero::error::capture(std::move(f));
 
                 if (!result) {
@@ -67,7 +67,7 @@ namespace asyncio {
             auto promise = std::make_shared<Promise<T, E>>();
             auto future = promise->getFuture();
 
-            post([promise = std::move(promise), f = std::forward<F>(f)] mutable {
+            post([promise = std::move(promise), f = std::forward<F>(f)]() mutable {
                 std::invoke(std::move(f))
                     .future()
                     .then([=]<typename... Args>(Args &&... args) {

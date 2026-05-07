@@ -552,7 +552,7 @@ ASYNC_TEST_CASE("channel receiver dropped", "[channel]") {
     auto [sender, receiver] = asyncio::channel<std::string>(capacity);
 
     auto task = asyncio::toThread(
-        [receiver = std::move(receiver)] mutable {
+        [receiver = std::move(receiver)]() mutable {
             return receiver.receiveSync();
         }
     );
@@ -569,7 +569,7 @@ ASYNC_TEST_CASE("channel sender dropped", "[channel]") {
     auto [sender, receiver] = asyncio::channel<std::string>(capacity);
 
     auto task = asyncio::toThread(
-        [&, sender = std::move(sender)] mutable {
+        [&, sender = std::move(sender)]() mutable {
             return sender.trySend(element);
         }
     );
