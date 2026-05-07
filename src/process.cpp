@@ -383,7 +383,7 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     if (!result) {
         co_await task::lock;
 
-        zero::error::guard(
+        co_await error::guard(
             child->kill().or_else([](const auto &ec) -> std::expected<void, std::error_code> {
 #ifdef _WIN32
                 if (ec != std::errc::permission_denied)
