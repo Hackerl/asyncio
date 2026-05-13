@@ -87,7 +87,7 @@ Task<InvokeResult<F, T>, E> transform(F f) &&
     requires (!std::same_as<E, std::exception_ptr>);
 ```
 
-当任务成功时转换值的类型，相当于 `std::expected::transofrm`，处理函数可以是异步的。
+当任务成功时转换值的类型，相当于 `std::expected::transform`，处理函数可以是异步的。
 
 > 仅当 `E` 不为 `std::exception_ptr` 时可用。
 

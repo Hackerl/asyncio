@@ -72,4 +72,46 @@ REQUIRE(result == 1024);
 
 `toThreadPool` uses `uv_queue_work` internally, managed and scheduled by `libuv`. The upper layer can call `task.cancel()`, and the lower layer will attempt to terminate execution using `uv_cancel`. If the task is still in the queue and hasn't started, cancellation will succeed and return a `ToThreadPoolError::Cancelled` error.
 
+`uv_cancel` can only cancel tasks that haven't started yet — once a task is running, `uv_cancel` will fail. The second overload accepts a custom `cancel` function as a fallback, called when `uv_cancel` fails, to signal the running task to exit early:
+
+```c++
+bool exit{false};
+
+co_await asyncio::toThreadPool(
+    [&exit = std::as_const(exit)] {
+        while (!exit) {
+            std::this_thread::sleep_for(50ms);
+        }
+    },
+    [&]() -> std::expected<void, std::error_code> {
+        exit = true;
+        return {};
+    }
+);
+```
+
 > Long-blocking code should not be placed in the thread pool, as the number of threads in the pool is limited, which would cause all worker threads to block.
+
+## Function `toThreadPoolCatching`
+
+```c++
+template<std::invocable F>
+task::Task<std::invoke_result_t<F>>
+toThreadPoolCatching(F f);
+
+template<std::invocable F>
+task::Task<std::invoke_result_t<F>>
+toThreadPoolCatching(F f, const std::function<std::expected<void, std::error_code>()> cancel);
+```
+
+Similar to `toThreadPool`, but returns an exception-based `Task<T>`. Exceptions thrown in the worker thread are captured and rethrown when the coroutine resumes; cancellation errors are also thrown as exceptions rather than returned as error codes:
+
+```c++
+try {
+    co_await asyncio::toThreadPoolCatching([] {
+        throw std::runtime_error{"Something went wrong"};
+    });
+} catch (const std::exception &e) {
+    fmt::print(stderr, "Exception: {}\n", e);
+}
+```

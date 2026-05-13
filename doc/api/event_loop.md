@@ -9,10 +9,10 @@ An `Event Loop` encapsulated around `uv_loop_t`, implementing the `zero::async::
 ### Static Method `make`
 
 ```c++
-static EventLoop make();
+static std::shared_ptr<EventLoop> make();
 ```
 
-Creates a new `Event Loop`.
+Creates a new `Event Loop` and returns it wrapped in a `shared_ptr`.
 
 ### Method `raw`
 
@@ -46,6 +46,57 @@ void stop();
 ```
 
 Stops running.
+
+### Method `submit`
+
+```c++
+template<typename F>
+    requires (std::invocable<F> && !Invocable<F>)
+SemiFuture<std::invoke_result_t<F>> submit(F &&f);
+
+template<Invocable F>
+SemiFuture<
+    typename std::invoke_result_t<F>::value_type,
+    typename std::invoke_result_t<F>::error_type
+> submit(F &&f);
+```
+
+Schedules a callable to run on the event loop and returns a `SemiFuture`. The first overload accepts any plain invocable; the second accepts a coroutine function that returns a `Task`. `SemiFuture` has no executor bound — it supports blocking wait, timed wait, and callbacks can be attached after calling `.via()` to bind an executor.
+
+> Particularly useful for cross-thread interaction between synchronous code and the async event loop.
+
+```c++
+auto future = eventLoop->submit([] { return 1024; });
+
+// 1. Block indefinitely until the event loop finishes the task
+const auto value = *std::move(future).get();
+
+// 2. Wait up to 5 seconds, then access the result
+zero::error::guard(future.wait(5s));  // throws on timeout
+assert(*future.result() == 1024);
+
+// 3. Bind to the inline executor and attach callbacks (non-blocking)
+std::move(future).via().then(
+    [](const int value) {
+        assert(value == 1024);
+    },
+    [](const std::exception &e) {
+        fmt::print(stderr, "Exception: {}\n", e);
+    }
+);
+```
+
+## Function `reschedule`
+
+```c++
+task::Task<void, std::error_code> reschedule();
+```
+
+Yields execution and resumes on the next event loop iteration, allowing other pending callbacks or tasks to run first:
+
+```c++
+co_await asyncio::reschedule();
+```
 
 ## Function `run`
 
