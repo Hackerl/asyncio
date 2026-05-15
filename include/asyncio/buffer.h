@@ -42,7 +42,7 @@ namespace asyncio {
                 mTail = *n;
             }
 
-            const auto size = (std::min)(available(), data.size());
+            const auto size = std::min(available(), data.size());
 
             std::copy_n(mBuffer.get() + mHead, size, data.begin());
             mHead += size;
@@ -157,7 +157,7 @@ namespace asyncio {
                 Z_CO_EXPECT(co_await flush());
             }
 
-            const auto size = (std::min)(mCapacity - mPending, data.size());
+            const auto size = std::min(mCapacity - mPending, data.size());
             std::copy_n(data.begin(), size, mBuffer.get() + mPending);
 
             mPending += size;

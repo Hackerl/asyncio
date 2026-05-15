@@ -84,7 +84,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::StringReader::read(co
     if (mString.empty())
         co_return 0;
 
-    const auto n = (std::min)(data.size(), mString.size());
+    const auto n = std::min(data.size(), mString.size());
 
     std::copy_n(mString.begin(), n, reinterpret_cast<char *>(data.data()));
     mString.erase(0, n);
@@ -104,7 +104,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::BytesReader::read(con
     if (mBytes.empty())
         co_return 0;
 
-    const auto n = (std::min)(data.size(), mBytes.size());
+    const auto n = std::min(data.size(), mBytes.size());
 
     std::copy_n(mBytes.begin(), n, data.begin());
     mBytes.erase(mBytes.begin(), mBytes.begin() + static_cast<std::ptrdiff_t>(n));

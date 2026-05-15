@@ -7,7 +7,7 @@ ASYNC_TEMPLATE_TEST_CASE(
     std::int16_t, std::uint16_t, std::int32_t, std::uint32_t, std::int64_t, std::uint64_t
 ) {
     const auto input = GENERATE(
-        take(100, random((std::numeric_limits<TestType>::min)(), (std::numeric_limits<TestType>::max)()))
+        take(100, random(std::numeric_limits<TestType>::min(), std::numeric_limits<TestType>::max()))
     );
 
     SECTION("little endian") {

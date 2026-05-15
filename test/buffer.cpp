@@ -22,7 +22,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
         SECTION("not empty") {
             std::vector<std::byte> data;
             REQUIRE(co_await asyncio::error::guard(reader.read(data)) == 0);
-            REQUIRE(reader.available() == (std::min)(input.size(), capacity));
+            REQUIRE(reader.available() == std::min(input.size(), capacity));
         }
     }
 
@@ -36,7 +36,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
             data.resize(size);
 
             const auto n = co_await reader.read(data);
-            REQUIRE(n == (std::min)(size, input.size()));
+            REQUIRE(n == std::min(size, input.size()));
 
             data.resize(*n);
             REQUIRE_THAT(data, Catch::Matchers::RangeEquals(std::span{input.data(), *n}));
@@ -53,7 +53,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
         asyncio::BufReader reader{asyncio::BytesReader{input}, capacity};
 
         SECTION("normal") {
-            const auto limit = (std::min)(input.size(), capacity);
+            const auto limit = std::min(input.size(), capacity);
             const auto size = GENERATE_REF(take(1, random(1uz, limit)));
 
             std::vector<std::byte> data;

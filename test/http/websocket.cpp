@@ -15,7 +15,7 @@ constexpr auto TwoBytePayloadLength = 126;
 constexpr auto EightBytePayloadLength = 127;
 
 constexpr auto MaxSingleBytePayloadLength = 125;
-constexpr auto MaxTwoBytePayloadLength = (std::numeric_limits<std::uint16_t>::max)();
+constexpr auto MaxTwoBytePayloadLength = std::numeric_limits<std::uint16_t>::max();
 
 namespace {
     class Server {

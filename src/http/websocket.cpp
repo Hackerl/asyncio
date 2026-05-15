@@ -22,7 +22,7 @@ constexpr auto TwoBytePayloadLength = 126;
 constexpr auto EightBytePayloadLength = 127;
 
 constexpr auto MaxSingleBytePayloadLength = 125;
-constexpr auto MaxTwoBytePayloadLength = (std::numeric_limits<std::uint16_t>::max)();
+constexpr auto MaxTwoBytePayloadLength = std::numeric_limits<std::uint16_t>::max();
 
 constexpr auto OpcodeMask = std::byte{0x0f};
 constexpr auto RSV1Bit = std::byte{0x40};
