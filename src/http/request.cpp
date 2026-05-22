@@ -5,7 +5,7 @@
 
 #ifdef ASYNCIO_EMBED_CA_CERT
 #include <ca_cert.h>
-#elif defined(__linux__)
+#elifdef __linux__
 #include <asyncio/net/tls.h>
 #endif
 
@@ -615,7 +615,7 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
         zero::error::guard(expected([&] {
             return curl_easy_setopt(easy, CURLOPT_CAINFO_BLOB, &blob);
         }));
-#elif defined(__linux__)
+#elifdef __linux__
         if (const auto bundle = net::tls::systemCABundle()) {
             zero::error::guard(expected([&] {
                 return curl_easy_setopt(easy, CURLOPT_CAINFO, bundle->c_str());

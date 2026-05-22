@@ -3,10 +3,10 @@
 #ifdef _WIN32
 #include <netioapi.h>
 #include <zero/strings.h>
-#elif defined(__linux__)
+#elifdef __linux__
 #include <net/if.h>
 #include <netinet/in.h>
-#elif defined(__APPLE__)
+#elifdef __APPLE__
 #include <net/if.h>
 #endif
 
