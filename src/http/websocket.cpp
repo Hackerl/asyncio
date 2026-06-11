@@ -15,6 +15,10 @@
 #include <endian.h>
 #endif
 
+using namespace std::chrono_literals;
+
+constexpr auto DefaultTCPKeepAliveDelay = 60s;
+
 constexpr auto SwitchingProtocolsStatus = 101;
 constexpr auto MaskingKeyLength = 4;
 
@@ -301,6 +305,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
                 return std::make_shared<net::TCPStream>(std::move(value));
             });
         Z_CO_EXPECT(stream);
+        Z_CO_EXPECT(stream.value()->keepalive(true, DefaultTCPKeepAliveDelay));
         reader = *stream;
         writer = *stream;
         closeable = *std::move(stream);
@@ -308,6 +313,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
     else if (scheme == WebSocketSecureScheme) {
         auto stream = co_await net::TCPStream::connect(*host, *port);
         Z_CO_EXPECT(stream);
+        Z_CO_EXPECT(stream->keepalive(true, DefaultTCPKeepAliveDelay));
 
         if (!context) {
             auto ctx = net::tls::ClientConfig{}.build();
