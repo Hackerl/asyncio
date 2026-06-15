@@ -8,6 +8,7 @@ set(ASYNCIO_VERSION 1.2.0)
 option(BUILD_SAMPLES "Build asyncio samples" ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 option(ASYNCIO_EMBED_CA_CERT "Use built-in CA certificates instead of system certificates" OFF)
+option(ASYNCIO_ENABLE_STACKTRACE "Enable async call stack recording" ON)
 
 include(CMakeDependentOption)
 cmake_dependent_option(BUILD_INTEGRATION_SAMPLES "Build asyncio integration samples" OFF BUILD_SAMPLES OFF)
@@ -72,6 +73,10 @@ if (ASYNCIO_EMBED_CA_CERT)
 
     set(EXCLUDE_HEADERS ${EXCLUDE_HEADERS} PATTERN "ca_cert.h" EXCLUDE)
     target_compile_definitions(asyncio PUBLIC ASYNCIO_EMBED_CA_CERT)
+endif ()
+
+if (ASYNCIO_ENABLE_STACKTRACE)
+    target_compile_definitions(asyncio PUBLIC ASYNCIO_ENABLE_STACKTRACE)
 endif ()
 
 if (WIN32)

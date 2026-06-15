@@ -68,6 +68,7 @@ std::expected<void, std::error_code> asyncio::task::Frame::cancelAll() {
 }
 
 tree<std::source_location> asyncio::task::Frame::callTree() const {
+#ifdef ASYNCIO_ENABLE_STACKTRACE
     tree<std::source_location> tr;
     std::stack<std::pair<tree<std::source_location>::iterator, const Frame *>> stack;
 
@@ -99,9 +100,13 @@ tree<std::source_location> asyncio::task::Frame::callTree() const {
     }
 
     return tr;
+#else
+    return {};
+#endif
 }
 
 std::string asyncio::task::Frame::trace() const {
+#ifdef ASYNCIO_ENABLE_STACKTRACE
     std::vector<std::string> frames;
 
     const auto tr = callTree();
@@ -120,6 +125,9 @@ std::string asyncio::task::Frame::trace() const {
     }
 
     return to_string(fmt::join(frames, "\n"));
+#else
+    return {};
+#endif
 }
 
 bool asyncio::task::TaskGroup::cancelled() const {

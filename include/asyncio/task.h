@@ -384,6 +384,7 @@ namespace asyncio::task {
             return {Future<void>::resolved()};
         }
 
+#ifdef ASYNCIO_ENABLE_STACKTRACE
         [[nodiscard]] Awaitable<std::vector<std::source_location>>
         await_transform(const Backtrace, const std::source_location location = std::source_location::current()) const {
             const auto &eventLoop = mFrame->eventLoop;
@@ -414,14 +415,27 @@ namespace asyncio::task {
             mFrame->location = location;
             return {std::move(future), [this] { mFrame->step(); }};
         }
+#else
+        [[nodiscard]] Awaitable<std::vector<std::source_location>>
+        await_transform(const Backtrace) const {
+            return {Future<std::vector<std::source_location>>::resolved({})};
+        }
+#endif
 
         template<typename Value, typename Error>
         Awaitable<Value, Error>
+#ifdef ASYNCIO_ENABLE_STACKTRACE
         await_transform(
             Cancellable<SemiFuture<Value, Error>> cancellable,
             const std::source_location location = std::source_location::current()
-        ) {
+        )
+#else
+        await_transform(Cancellable<SemiFuture<Value, Error>> cancellable)
+#endif
+        {
+#ifdef ASYNCIO_ENABLE_STACKTRACE
             mFrame->location = location;
+#endif
 
             if (mFrame->cancelled && !mFrame->locked)
                 std::ignore = cancellable.cancel();
@@ -433,11 +447,18 @@ namespace asyncio::task {
 
         template<typename Value, typename Error>
         Awaitable<Value, Error>
+#ifdef ASYNCIO_ENABLE_STACKTRACE
         await_transform(
             Cancellable<Future<Value, Error>> cancellable,
             const std::source_location location = std::source_location::current()
-        ) {
+        )
+#else
+        await_transform(Cancellable<Future<Value, Error>> cancellable)
+#endif
+        {
+#ifdef ASYNCIO_ENABLE_STACKTRACE
             mFrame->location = location;
+#endif
 
             if (mFrame->cancelled && !mFrame->locked)
                 std::ignore = cancellable.cancel();
@@ -449,13 +470,21 @@ namespace asyncio::task {
 
         template<typename Value, typename Error>
         Awaitable<Value, Error>
+#ifdef ASYNCIO_ENABLE_STACKTRACE
         await_transform(
             Cancellable<Task<Value, Error>> cancellable,
             const std::source_location location = std::source_location::current()
-        ) {
+        )
+#else
+        await_transform(Cancellable<Task<Value, Error>> cancellable)
+#endif
+        {
             cancellable.awaitable.mFrame->parent = mFrame;
             mFrame->children.push_back(cancellable.awaitable.mFrame);
+
+#ifdef ASYNCIO_ENABLE_STACKTRACE
             mFrame->location = location;
+#endif
 
             if (mFrame->cancelled && !mFrame->locked)
                 std::ignore = cancellable.cancel();
@@ -467,33 +496,55 @@ namespace asyncio::task {
 
         template<typename Value, typename Error>
         Awaitable<Value, Error>
+#ifdef ASYNCIO_ENABLE_STACKTRACE
         await_transform(
             SemiFuture<Value, Error> future,
             const std::source_location location = std::source_location::current()
-        ) {
+        )
+#else
+        await_transform(SemiFuture<Value, Error> future)
+#endif
+        {
+#ifdef ASYNCIO_ENABLE_STACKTRACE
             mFrame->location = location;
+#endif
             return {std::move(future).via(mFrame->eventLoop), [this] { mFrame->step(); }};
         }
 
         template<typename Value, typename Error>
         Awaitable<Value, Error>
+#ifdef ASYNCIO_ENABLE_STACKTRACE
         await_transform(
             Future<Value, Error> future,
             const std::source_location location = std::source_location::current()
-        ) {
+        )
+#else
+        await_transform(Future<Value, Error> future)
+#endif
+        {
+#ifdef ASYNCIO_ENABLE_STACKTRACE
             mFrame->location = location;
+#endif
             return {std::move(future).via(mFrame->eventLoop), [this] { mFrame->step(); }};
         }
 
         template<typename Value, typename Error>
         Awaitable<Value, Error>
+#ifdef ASYNCIO_ENABLE_STACKTRACE
         await_transform(
             Task<Value, Error> &&task,
             const std::source_location location = std::source_location::current()
-        ) {
+        )
+#else
+        await_transform(Task<Value, Error> &&task)
+#endif
+        {
             task.mFrame->parent = mFrame;
             mFrame->children.push_back(task.mFrame);
+
+#ifdef ASYNCIO_ENABLE_STACKTRACE
             mFrame->location = location;
+#endif
 
             if (mFrame->cancelled && !mFrame->locked)
                 std::ignore = task.cancel();
@@ -503,13 +554,21 @@ namespace asyncio::task {
 
         template<typename Value, typename Error>
         Awaitable<Value, Error>
+#ifdef ASYNCIO_ENABLE_STACKTRACE
         await_transform(
             Task<Value, Error> &task,
             const std::source_location location = std::source_location::current()
-        ) {
+        )
+#else
+        await_transform(Task<Value, Error> &task)
+#endif
+        {
             task.mFrame->parent = mFrame;
             mFrame->children.push_back(task.mFrame);
+
+#ifdef ASYNCIO_ENABLE_STACKTRACE
             mFrame->location = location;
+#endif
 
             if (mFrame->cancelled && !mFrame->locked)
                 std::ignore = task.cancel();
@@ -518,7 +577,12 @@ namespace asyncio::task {
         }
 
         Awaitable<void>
-        await_transform(TaskGroup &group, const std::source_location location = std::source_location::current()) {
+#ifdef ASYNCIO_ENABLE_STACKTRACE
+        await_transform(TaskGroup &group, const std::source_location location = std::source_location::current())
+#else
+        await_transform(TaskGroup &group)
+#endif
+        {
             if (group.mFrames.empty())
                 return {Future<void>::resolved()};
 
@@ -549,7 +613,9 @@ namespace asyncio::task {
             }
 
             mFrame->children = group.mFrames;
+#ifdef ASYNCIO_ENABLE_STACKTRACE
             mFrame->location = location;
+#endif
 
             if (mFrame->cancelled && !mFrame->locked)
                 std::ignore = group.cancel();
