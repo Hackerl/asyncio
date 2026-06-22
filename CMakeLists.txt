@@ -62,7 +62,12 @@ if (ASYNCIO_EMBED_CA_CERT)
     set(ca_cert_header ${CMAKE_CURRENT_SOURCE_DIR}/include/ca_cert.h)
 
     if (NOT EXISTS ${ca_cert_file})
-        file(DOWNLOAD "https://curl.se/ca/cacert.pem" ${ca_cert_file})
+        file(DOWNLOAD "https://curl.se/ca/cacert.pem" ${ca_cert_file} STATUS download_status)
+        list(GET download_status 0 status_code)
+        if (NOT status_code EQUAL 0)
+            list(GET download_status 1 error_message)
+            message(FATAL_ERROR "Failed to download CA cert: ${error_message}")
+        endif ()
     endif ()
 
     if (NOT EXISTS ${ca_cert_header})
