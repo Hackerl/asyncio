@@ -48,7 +48,7 @@ Z_DEFINE_ERROR_CATEGORY_INSTANCE(ZLIBError)
 namespace {
     std::expected<void, std::error_code>
     validateWebSocketAccept(const std::map<std::string, std::string> &headers, const std::string &key) {
-        const auto it = headers.find("Sec-WebSocket-Accept");
+        const auto it = headers.find("sec-websocket-accept");
 
         if (it == headers.end())
             return std::unexpected{asyncio::http::ws::WebSocket::Error::NoAcceptHeader};
@@ -70,7 +70,7 @@ namespace {
 
     std::expected<std::optional<asyncio::http::ws::DeflateConfig>, std::error_code>
     parseExtensionConfig(const std::map<std::string, std::string> &headers) {
-        const auto it = headers.find("Sec-WebSocket-Extensions");
+        const auto it = headers.find("sec-websocket-extensions");
 
         if (it == headers.end())
             return std::nullopt;
@@ -394,7 +394,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
         if (tokens.size() != 2)
             co_return std::unexpected{Error::InvalidHTTPHeader};
 
-        headers[tokens[0]] = zero::strings::trim(tokens[1]);
+        headers[zero::strings::tolower(tokens[0])] = zero::strings::trim(tokens[1]);
     }
 
     Z_CO_EXPECT(validateWebSocketAccept(headers, key));
