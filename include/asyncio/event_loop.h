@@ -4,6 +4,7 @@
 #include "uv.h"
 #include "promise.h"
 #include "concepts.h"
+#include <list>
 #include <mutex>
 #include <queue>
 #include <cassert>
@@ -29,6 +30,7 @@ namespace asyncio {
         uv_loop_t *raw();
         [[nodiscard]] const uv_loop_t *raw() const;
 
+        void onDestroy(std::function<void()> callback);
         void post(std::function<void()> f) override;
 
         template<typename F>
@@ -86,6 +88,7 @@ namespace asyncio {
     private:
         std::unique_ptr<uv_loop_t, void (*)(uv_loop_t *)> mLoop;
         std::unique_ptr<TaskQueue> mTaskQueue;
+        std::list<std::function<void()>> mDestroyCallbacks;
     };
 
     std::shared_ptr<EventLoop> getEventLoop();

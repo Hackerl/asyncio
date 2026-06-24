@@ -9,6 +9,7 @@ option(BUILD_SAMPLES "Build asyncio samples" ON)
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 option(ASYNCIO_EMBED_CA_CERT "Use built-in CA certificates instead of system certificates" OFF)
 option(ASYNCIO_ENABLE_STACKTRACE "Enable async call stack recording" ON)
+option(ASYNCIO_ENABLE_C_ARES "Use c-ares for DNS resolution, enabling custom DNS server configuration" OFF)
 
 include(CMakeDependentOption)
 cmake_dependent_option(BUILD_INTEGRATION_SAMPLES "Build asyncio integration samples" OFF BUILD_SAMPLES OFF)
@@ -27,6 +28,10 @@ find_package(zero CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
 find_package(libuv CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+
+if (ASYNCIO_ENABLE_C_ARES)
+    find_package(c-ares CONFIG REQUIRED)
+endif ()
 
 add_library(
         asyncio
@@ -84,6 +89,10 @@ if (ASYNCIO_ENABLE_STACKTRACE)
     target_compile_definitions(asyncio PUBLIC ASYNCIO_ENABLE_STACKTRACE)
 endif ()
 
+if (ASYNCIO_ENABLE_C_ARES)
+    target_compile_definitions(asyncio PUBLIC ASYNCIO_ENABLE_C_ARES)
+endif ()
+
 if (WIN32)
     target_compile_definitions(asyncio PUBLIC NOMINMAX)
 endif ()
@@ -103,6 +112,7 @@ target_link_libraries(
         asyncio
         PRIVATE
         $<$<PLATFORM_ID:Windows>:crypt32>
+        $<$<BOOL:${ASYNCIO_ENABLE_C_ARES}>:c-ares::cares>
         PUBLIC
         zero::zero
         ZLIB::ZLIB

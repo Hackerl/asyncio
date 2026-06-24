@@ -4,6 +4,30 @@
 #include "net.h"
 
 namespace asyncio::net::dns {
+#ifdef ASYNCIO_ENABLE_C_ARES
+    class Resolver {
+        struct Core;
+
+        explicit Resolver(std::unique_ptr<Core> core);
+
+    public:
+        static Resolver make();
+
+        void cancelAll();
+
+        task::Task<std::vector<Address>, std::error_code>
+        getAddressInfo(std::string node, std::optional<std::string> service, std::optional<addrinfo> hints);
+
+        task::Task<std::vector<IP>, std::error_code> lookupIP(std::string host);
+
+        task::Task<std::vector<IPv4>, std::error_code> lookupIPv4(std::string host);
+        task::Task<std::vector<IPv6>, std::error_code> lookupIPv6(std::string host);
+
+    private:
+        std::unique_ptr<Core> mCore;
+    };
+#endif
+
     task::Task<std::vector<Address>, std::error_code>
     getAddressInfo(std::string node, std::optional<std::string> service, std::optional<addrinfo> hints);
 

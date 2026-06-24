@@ -13,6 +13,9 @@ asyncio::EventLoop::EventLoop(
 asyncio::EventLoop::~EventLoop() {
     mTaskQueue.reset();
 
+    for (const auto &callback: std::exchange(mDestroyCallbacks, {}))
+        callback();
+
     while (true) {
         if (uv_run(mLoop.get(), UV_RUN_NOWAIT) == 0)
             break;
@@ -25,6 +28,10 @@ uv_loop_t *asyncio::EventLoop::raw() {
 
 const uv_loop_t *asyncio::EventLoop::raw() const {
     return mLoop.get();
+}
+
+void asyncio::EventLoop::onDestroy(std::function<void()> callback) {
+    mDestroyCallbacks.push_back(std::move(callback));
 }
 
 std::shared_ptr<asyncio::EventLoop> asyncio::EventLoop::make() {

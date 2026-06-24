@@ -15,6 +15,18 @@
     "tests"
   ],
   "features": {
+    "c-ares": {
+      "description": "Use c-ares for DNS resolution, enabling custom DNS server configuration",
+      "dependencies": [
+        "c-ares",
+        {
+          "name": "curl",
+          "features": [
+            "c-ares"
+          ]
+        }
+      ]
+    },
     "integration-samples": {
       "description": "Build integration samples",
       "dependencies": [

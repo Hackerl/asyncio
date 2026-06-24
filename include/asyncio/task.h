@@ -2,7 +2,6 @@
 #define ASYNCIO_TASK_H
 
 #include "event_loop.h"
-#include <list>
 #include <algorithm>
 #include <coroutine>
 #include <exception>
