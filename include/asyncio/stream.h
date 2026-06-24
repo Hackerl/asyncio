@@ -47,8 +47,9 @@ namespace asyncio {
             std::optional<std::error_code> ec;
         };
 
-    public:
         explicit Listener(std::unique_ptr<Core> core);
+
+    public:
         static Listener make(uv::Handle<uv_stream_t> stream);
 
         task::Task<void, std::error_code> accept(uv_stream_t *stream);

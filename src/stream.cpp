@@ -299,10 +299,10 @@ asyncio::Listener asyncio::Listener::make(uv::Handle<uv_stream_t> stream) {
         );
     }));
 
-    auto context = std::make_unique<Core>(std::move(stream));
-    context->stream->data = context.get();
+    auto core = std::make_unique<Core>(std::move(stream));
+    core->stream->data = core.get();
 
-    return Listener{std::move(context)};
+    return Listener{std::move(core)};
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst

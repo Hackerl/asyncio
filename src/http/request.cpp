@@ -196,7 +196,7 @@ void asyncio::http::Requests::Core::recycle() {
     }
 }
 
-void asyncio::http::Requests::Core::setTimer(const long ms) {
+void asyncio::http::Requests::Core::updateTimer(const long ms) {
     if (ms == -1) {
         zero::error::guard(uv::expected([&] {
             return uv_timer_stop(timer.raw());
@@ -226,7 +226,7 @@ void asyncio::http::Requests::Core::setTimer(const long ms) {
     }));
 }
 
-void asyncio::http::Requests::Core::handle(const curl_socket_t s, const int action, Context *context) {
+void asyncio::http::Requests::Core::updatePoll(const curl_socket_t socket, const int action, Context *context) {
     if (action == CURL_POLL_REMOVE) {
         if (!context)
             return;
@@ -238,7 +238,7 @@ void asyncio::http::Requests::Core::handle(const curl_socket_t s, const int acti
         delete context;
 
         zero::error::guard(expected([&] {
-            return curl_multi_assign(multi, s, nullptr);
+            return curl_multi_assign(multi, socket, nullptr);
         }));
 
         return;
@@ -248,14 +248,14 @@ void asyncio::http::Requests::Core::handle(const curl_socket_t s, const int acti
         auto poll = std::make_unique<uv_poll_t>();
 
         zero::error::guard(uv::expected([&] {
-            return uv_poll_init_socket(getEventLoop()->raw(), poll.get(), s);
+            return uv_poll_init_socket(getEventLoop()->raw(), poll.get(), socket);
         }));
 
-        context = new Context{uv::Handle{std::move(poll)}, this, s};
+        context = new Context{uv::Handle{std::move(poll)}, this, socket};
         context->poll->data = context;
 
         zero::error::guard(expected([&] {
-            return curl_multi_assign(multi, s, context);
+            return curl_multi_assign(multi, socket, context);
         }));
     }
 
@@ -263,7 +263,7 @@ void asyncio::http::Requests::Core::handle(const curl_socket_t s, const int acti
         return uv_poll_start(
             context->poll.raw(),
             (action & CURL_POLL_IN ? UV_READABLE : 0) | (action & CURL_POLL_OUT ? UV_WRITABLE : 0),
-            [](auto *handle, const int status, const int e) {
+            [](auto *handle, const int status, const int events) {
                 const auto ctx = static_cast<const Context *>(handle->data);
                 const auto core = ctx->core;
 
@@ -275,10 +275,10 @@ void asyncio::http::Requests::Core::handle(const curl_socket_t s, const int acti
                 zero::error::guard(expected([&] {
                     return curl_multi_socket_action(
                         core->multi,
-                        ctx->s,
+                        ctx->socket,
                         status < 0
                             ? CURL_CSELECT_ERR
-                            : (e & UV_READABLE ? CURL_CSELECT_IN : 0) | (e & UV_WRITABLE ? CURL_CSELECT_OUT : 0),
+                            : (events & UV_READABLE ? CURL_CSELECT_IN : 0) | (events & UV_WRITABLE ? CURL_CSELECT_OUT : 0),
                         &core->running
                     );
                 }));
@@ -334,8 +334,8 @@ asyncio::http::Requests asyncio::http::Requests::make(Options options) {
             multi,
             CURLMOPT_SOCKETFUNCTION,
             static_cast<curl_socket_callback>(
-                [](CURL *, const curl_socket_t s, const int action, void *ctx, void *socketContext) {
-                    static_cast<Core *>(ctx)->handle(s, action, static_cast<Core::Context *>(socketContext));
+                [](CURL *, const curl_socket_t socket, const int action, void *ctx, void *socketContext) {
+                    static_cast<Core *>(ctx)->updatePoll(socket, action, static_cast<Core::Context *>(socketContext));
                     return 0;
                 }
             )
@@ -351,7 +351,7 @@ asyncio::http::Requests asyncio::http::Requests::make(Options options) {
             multi,
             CURLMOPT_TIMERFUNCTION,
             static_cast<curl_multi_timer_callback>([](CURLM *, const long ms, void *ctx) {
-                static_cast<Core *>(ctx)->setTimer(ms);
+                static_cast<Core *>(ctx)->updateTimer(ms);
                 return 0;
             })
         );

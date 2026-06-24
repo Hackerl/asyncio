@@ -122,7 +122,7 @@ namespace asyncio::http {
             struct Context {
                 uv::Handle<uv_poll_t> poll;
                 Core *core{};
-                curl_socket_t s{};
+                curl_socket_t socket{};
             };
 
             ~Core();
@@ -133,12 +133,13 @@ namespace asyncio::http {
             CURLM *multi;
 
             void recycle();
-            void setTimer(long ms);
-            void handle(curl_socket_t s, int action, Context *context);
+            void updateTimer(long ms);
+            void updatePoll(curl_socket_t socket, int action, Context *context);
         };
 
-    public:
         explicit Requests(std::unique_ptr<Core> core);
+
+    public:
         static Requests make(Options options = {});
 
     private:
