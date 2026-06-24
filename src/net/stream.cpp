@@ -88,6 +88,7 @@ asyncio::net::TCPStream::connect(const std::string host, const std::uint16_t por
         host,
         std::to_string(port),
         addrinfo{
+            .ai_flags = AI_ADDRCONFIG,
             .ai_family = AF_UNSPEC,
             .ai_socktype = SOCK_STREAM
         }

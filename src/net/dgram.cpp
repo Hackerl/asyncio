@@ -81,6 +81,7 @@ asyncio::net::UDPSocket::connect(const std::string host, const std::uint16_t por
         host,
         std::to_string(port),
         addrinfo{
+            .ai_flags = AI_ADDRCONFIG,
             .ai_family = AF_UNSPEC,
             .ai_socktype = SOCK_DGRAM
         }
@@ -353,6 +354,7 @@ asyncio::net::UDPSocket::writeTo(const std::span<const std::byte> data, std::str
         std::move(host),
         std::to_string(port),
         addrinfo{
+            .ai_flags = AI_ADDRCONFIG,
             .ai_family = AF_UNSPEC,
             .ai_socktype = SOCK_DGRAM
         }
