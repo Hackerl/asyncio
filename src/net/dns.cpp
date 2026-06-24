@@ -91,7 +91,7 @@ namespace asyncio::net::dns {
 void asyncio::net::dns::Resolver::Core::updateTimer() {
     timeval tv{};
 
-    if (const auto *ptr = ares_timeout(channel.get(), nullptr, &tv))
+    if (const auto *ptr = ares_timeout(channel.get(), nullptr, &tv)) {
         zero::error::guard(uv::expected([&] {
             return uv_timer_start(
                 timer.raw(),
@@ -104,10 +104,12 @@ void asyncio::net::dns::Resolver::Core::updateTimer() {
                 0
             );
         }));
-    else
+    }
+    else {
         zero::error::guard(uv::expected([&] {
             return uv_timer_stop(timer.raw());
         }));
+    }
 }
 
 void asyncio::net::dns::Resolver::Core::updatePoll(const ares_socket_t socket, const int readable, const int writable) {
