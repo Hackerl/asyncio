@@ -9,6 +9,10 @@
 #include <asyncio/net/tls.h>
 #endif
 
+#ifdef ASYNCIO_ENABLE_C_ARES
+#include <asyncio/net/dns.h>
+#endif
+
 using namespace std::chrono_literals;
 
 constexpr auto DefaultConnectTimeout = 30s;
@@ -641,6 +645,18 @@ asyncio::http::Requests::prepare(std::string method, const URL &url, const std::
             return curl_easy_setopt(easy, CURLOPT_KEYPASSWD, password->c_str());
         }));
     }
+
+#ifdef ASYNCIO_ENABLE_C_ARES
+    if (const auto &servers = net::dns::getServers(); !servers.empty()) {
+        zero::error::guard(expected([&] {
+            return curl_easy_setopt(
+                easy,
+                CURLOPT_DNS_SERVERS,
+                to_string(fmt::join(servers, ",")).c_str()
+            );
+        }));
+    }
+#endif
 
     for (const auto &hook: hooks) {
         Z_EXPECT(hook(*connection));

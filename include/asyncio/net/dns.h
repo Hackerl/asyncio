@@ -12,6 +12,10 @@ namespace asyncio::net::dns {
 
     public:
         static Resolver make();
+        static Resolver &current();
+
+        [[nodiscard]] const std::vector<std::string> &getServers() const;
+        std::expected<void, std::error_code> setServers(std::vector<std::string> servers);
 
         void cancelAll();
 
@@ -25,7 +29,11 @@ namespace asyncio::net::dns {
 
     private:
         std::unique_ptr<Core> mCore;
+        std::vector<std::string> mServers;
     };
+
+    const std::vector<std::string> &getServers();
+    std::expected<void, std::error_code> setServers(std::vector<std::string> servers);
 #endif
 
     task::Task<std::vector<Address>, std::error_code>

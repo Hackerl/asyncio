@@ -86,8 +86,6 @@ namespace asyncio::net::dns {
         void updateTimer();
         void updatePoll(ares_socket_t socket, int readable, int writable);
     };
-
-    thread_local std::optional<Resolver> threadResolver;
 }
 
 void asyncio::net::dns::Resolver::Core::updateTimer() {
@@ -201,6 +199,35 @@ asyncio::net::dns::Resolver asyncio::net::dns::Resolver::make() {
 
     core->channel.reset(channel);
     return Resolver{std::move(core)};
+}
+
+asyncio::net::dns::Resolver &asyncio::net::dns::Resolver::current() {
+    thread_local std::optional<Resolver> resolver;
+
+    if (!resolver) {
+        resolver = make();
+        getEventLoop()->onDestroy([] {
+            resolver.reset();
+        });
+    }
+
+    return *resolver;
+}
+
+const std::vector<std::string> &asyncio::net::dns::Resolver::getServers() const {
+    return mServers;
+}
+
+std::expected<void, std::error_code> asyncio::net::dns::Resolver::setServers(std::vector<std::string> servers) {
+    Z_EXPECT(expected([&] {
+        return ares_set_servers_csv(
+            mCore->channel.get(),
+            to_string(fmt::join(servers, ",")).c_str()
+        );
+    }));
+
+    mServers = std::move(servers);
+    return {};
 }
 
 // ReSharper disable once CppMemberFunctionMayBeConst
@@ -321,6 +348,14 @@ asyncio::net::dns::Resolver::lookupIPv6(std::string host) {
             | std::ranges::to<std::vector>();
     });
 }
+
+const std::vector<std::string> &asyncio::net::dns::getServers() {
+    return Resolver::current().getServers();
+}
+
+std::expected<void, std::error_code> asyncio::net::dns::setServers(std::vector<std::string> servers) {
+    return Resolver::current().setServers(std::move(servers));
+}
 #endif
 
 asyncio::task::Task<std::vector<asyncio::net::Address>, std::error_code>
@@ -330,14 +365,7 @@ asyncio::net::dns::getAddressInfo(
     const std::optional<addrinfo> hints
 ) {
 #ifdef ASYNCIO_ENABLE_C_ARES
-    if (!threadResolver) {
-        threadResolver = Resolver::make();
-        getEventLoop()->onDestroy([] {
-            threadResolver.reset();
-        });
-    }
-
-    co_return co_await threadResolver->getAddressInfo(std::move(node), std::move(service), hints);
+    co_return co_await Resolver::current().getAddressInfo(std::move(node), std::move(service), hints);
 #else
     Promise<std::vector<Address>, uv::Error> promise;
     uv_getaddrinfo_t request{.data = &promise};
