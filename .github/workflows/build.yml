@@ -2,7 +2,15 @@ name: asyncio
 on: [ push ]
 jobs:
   linux:
+    name: linux (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: default
+            cmake_args: "[]"
+          - name: c-ares
+            cmake_args: "['-DASYNCIO_ENABLE_C_ARES=ON', '-DVCPKG_MANIFEST_FEATURES=c-ares']"
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -20,13 +28,14 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ github.job }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          key: ${{ github.job }}-${{ matrix.name }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
           restore-keys: |
-            ${{ github.job }}-vcpkg-binary-cache-
+            ${{ github.job }}-${{ matrix.name }}-vcpkg-binary-cache-
       - name: Build and test
         uses: lukka/run-cmake@v10
         with:
           configurePreset: debug-asan
+          configurePresetAdditionalArgs: ${{ matrix.cmake_args }}
           buildPreset: debug-asan
           testPreset: debug-asan
         env:
