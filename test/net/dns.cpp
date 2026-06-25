@@ -2,11 +2,12 @@
 #include <asyncio/net/dns.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
-ASYNC_TEST_CASE("get address info", "[net::dns]") {
+ASYNC_TEST_CASE("get address info", "[net::dns][integration]") {
     const auto result = co_await asyncio::net::dns::getAddressInfo(
-        "localhost",
-        "http",
+        "one.one.one.one",
+        "domain",
         addrinfo{
+            .ai_flags = AI_ADDRCONFIG,
             .ai_family = AF_UNSPEC,
             .ai_socktype = SOCK_STREAM
         }
@@ -14,55 +15,62 @@ ASYNC_TEST_CASE("get address info", "[net::dns]") {
     REQUIRE(result);
 
     REQUIRE_THAT(
-        *result,
-        Catch::Matchers::AllMatch(Catch::Matchers::Predicate<asyncio::net::Address>([&](const auto &address) {
+        *result
+        | std::views::transform([](const auto &address) {
             return std::visit(
-                []<typename T>(const T &arg) -> bool {
-                    if constexpr (std::is_same_v<T, asyncio::net::IPv4Address>)
-                        return arg.ip == asyncio::net::LocalhostIPv4 && arg.port == 80;
-                    else if constexpr (std::is_same_v<T, asyncio::net::IPv6Address>)
-                        return arg.ip == asyncio::net::LocalhostIPv6 && arg.port == 80;
-                    else
-                        std::abort();
+                [](const auto &arg) {
+                    return fmt::to_string(arg);
                 },
                 address
             );
-        }))
+        }),
+        Catch::Matchers::Contains("1.1.1.1:53") &&
+        Catch::Matchers::Contains("1.0.0.1:53")
     );
 }
 
-ASYNC_TEST_CASE("lookup IP", "[net]") {
-    const auto result = co_await asyncio::net::dns::lookupIP("localhost");
+ASYNC_TEST_CASE("lookup IP", "[net::dns][integration]") {
+    const auto result = co_await asyncio::net::dns::lookupIP("one.one.one.one");
     REQUIRE(result);
 
     REQUIRE_THAT(
-        *result,
-        Catch::Matchers::AllMatch(Catch::Matchers::Predicate<asyncio::net::IP>([&](const auto &ip) {
+        *result
+        | std::views::transform([](const auto &address) {
             return std::visit(
-                []<typename T>(const T &arg) -> bool {
-                    if constexpr (std::is_same_v<T, asyncio::net::IPv4>)
-                        return arg == asyncio::net::LocalhostIPv4;
-                    else if constexpr (std::is_same_v<T, asyncio::net::IPv6>)
-                        return arg == asyncio::net::LocalhostIPv6;
-                    else
-                        std::abort();
+                [](const auto &arg) {
+                    return zero::os::net::stringify(arg);
                 },
-                ip
+                address
             );
-        }))
+        }),
+        Catch::Matchers::Contains("1.1.1.1") &&
+        Catch::Matchers::Contains("1.0.0.1")
     );
 }
 
-ASYNC_TEST_CASE("lookup IPv4", "[net]") {
-    const auto result = co_await asyncio::net::dns::lookupIPv4("localhost");
+ASYNC_TEST_CASE("lookup IPv4", "[net::dns][integration]") {
+    const auto result = co_await asyncio::net::dns::lookupIPv4("one.one.one.one");
     REQUIRE(result);
-    REQUIRE_THAT(*result, Catch::Matchers::SizeIs(1));
-    REQUIRE(result->front() == asyncio::net::LocalhostIPv4);
+
+    REQUIRE_THAT(
+        *result
+        | std::views::transform([](const auto &address) {
+            return zero::os::net::stringify(address);
+        }),
+        Catch::Matchers::Contains("1.1.1.1") &&
+        Catch::Matchers::Contains("1.0.0.1")
+    );
 }
 
-ASYNC_TEST_CASE("lookup IPv6", "[net]") {
-    if (const auto result = co_await asyncio::net::dns::lookupIPv6("localhost"); result && !result->empty()) {
-        REQUIRE_THAT(*result, Catch::Matchers::SizeIs(1));
-        REQUIRE(result->front() == asyncio::net::LocalhostIPv6);
+ASYNC_TEST_CASE("lookup IPv6", "[net::dns][integration]") {
+    if (const auto result = co_await asyncio::net::dns::lookupIPv6("one.one.one.one"); result && !result->empty()) {
+        REQUIRE_THAT(
+            *result
+            | std::views::transform([](const auto &address) {
+                return zero::os::net::stringify(address);
+            }),
+            Catch::Matchers::Contains("2606:4700:4700::1111") &&
+            Catch::Matchers::Contains("2606:4700:4700::1001")
+        );
     }
 }
