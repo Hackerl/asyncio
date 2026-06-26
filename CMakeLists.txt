@@ -63,11 +63,12 @@ add_library(
 )
 
 if (ASYNCIO_EMBED_CA_CERT)
-    set(ca_cert_file ${CMAKE_CURRENT_BINARY_DIR}/cacert.pem)
-    set(ca_cert_header ${CMAKE_CURRENT_SOURCE_DIR}/include/ca_cert.h)
+    set(ca_cert_pem ${CMAKE_CURRENT_BINARY_DIR}/cacert.pem)
+    set(ca_cert_header_directory ${CMAKE_CURRENT_BINARY_DIR}/ca-cert)
+    set(ca_cert_header_file ${ca_cert_header_directory}/ca_cert.h)
 
-    if (NOT EXISTS ${ca_cert_file})
-        file(DOWNLOAD "https://curl.se/ca/cacert.pem" ${ca_cert_file} STATUS download_status)
+    if (NOT EXISTS ${ca_cert_pem})
+        file(DOWNLOAD "https://curl.se/ca/cacert.pem" ${ca_cert_pem} STATUS download_status)
         list(GET download_status 0 status_code)
         if (NOT status_code EQUAL 0)
             list(GET download_status 1 error_message)
@@ -75,14 +76,14 @@ if (ASYNCIO_EMBED_CA_CERT)
         endif ()
     endif ()
 
-    if (NOT EXISTS ${ca_cert_header})
-        file(READ ${ca_cert_file} content)
+    if (NOT EXISTS ${ca_cert_header_file})
+        file(READ ${ca_cert_pem} content)
         string(REPLACE "\n" "\\n\"\n\"" content "${content}")
-        file(WRITE ${ca_cert_header} "constexpr std::string_view CACert = \"${content}\";")
+        file(WRITE ${ca_cert_header_file} "constexpr std::string_view CACert = \"${content}\";")
     endif ()
 
-    set(EXCLUDE_HEADERS ${EXCLUDE_HEADERS} PATTERN "ca_cert.h" EXCLUDE)
     target_compile_definitions(asyncio PUBLIC ASYNCIO_EMBED_CA_CERT)
+    target_include_directories(asyncio PRIVATE ${ca_cert_header_directory})
 endif ()
 
 if (ASYNCIO_ENABLE_STACKTRACE)
@@ -130,7 +131,6 @@ install(
         DIRECTORY
         include/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        ${EXCLUDE_HEADERS}
 )
 
 install(
