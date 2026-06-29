@@ -223,6 +223,120 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
     }
 }
 
+ASYNC_TEST_CASE("websocket stream adapter", "[http::websocket]") {
+    auto listener = co_await asyncio::error::guard(asyncio::net::TCPListener::listen("127.0.0.1", 0));
+    const auto address = co_await asyncio::error::guard(listener.address());
+
+    auto url = co_await asyncio::error::guard(asyncio::http::URL::from("http://127.0.0.1"));
+    url.port(std::get<asyncio::net::IPv4Address>(address).port);
+
+    auto [server, ws] = co_await all(
+        asyncio::task::spawn([&]() -> asyncio::task::Task<Server> {
+            auto stream = co_await asyncio::error::guard(listener.accept());
+            co_return co_await Server::accept(std::move(stream));
+        }),
+        asyncio::task::spawn([&]() -> asyncio::task::Task<asyncio::http::ws::WebSocket> {
+            co_return co_await asyncio::error::guard(asyncio::http::ws::WebSocket::connect(url));
+        })
+    );
+
+    asyncio::http::ws::WebSocket::StreamAdapter adapter{std::move(ws)};
+
+    SECTION("read") {
+        const auto payload = GENERATE(take(1, randomBytes(1, 102400)));
+
+        auto task = asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+            co_await server.writeMessage(asyncio::http::ws::Opcode::Binary, payload);
+
+            const auto code = htons(std::to_underlying(asyncio::http::ws::CloseCode::NormalClosure));
+
+            co_await server.writeMessage(
+                asyncio::http::ws::Opcode::Close,
+                {reinterpret_cast<const std::byte *>(&code), sizeof(code)}
+            );
+        });
+
+        REQUIRE(co_await adapter.readAll() == payload);
+        co_await task;
+    }
+
+    SECTION("write") {
+        const auto payload = GENERATE(take(1, randomBytes(1, 102400)));
+
+        auto task = server.readMessage();
+
+        REQUIRE(co_await adapter.write(payload) == payload.size());
+
+        const auto [opcode, data] = co_await task;
+        REQUIRE(opcode == asyncio::http::ws::Opcode::Binary);
+        REQUIRE(data == payload);
+    }
+
+    SECTION("text with handler") {
+        const auto binary = GENERATE(take(1, randomBytes(1, 102400)));
+        const auto text = GENERATE(take(1, randomString(1, 102400)));
+
+        std::optional<std::string> received;
+
+        adapter.onText([&](std::string msg) -> asyncio::task::Task<void, std::error_code> {
+            received = std::move(msg);
+            co_return {};
+        });
+
+        auto task = asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+            co_await server.writeMessage(
+                asyncio::http::ws::Opcode::Binary,
+                std::span{binary}.subspan(0, binary.size() / 2)
+            );
+
+            co_await server.writeMessage(asyncio::http::ws::Opcode::Text, std::as_bytes(std::span{text}));
+
+            co_await server.writeMessage(
+                asyncio::http::ws::Opcode::Binary,
+                std::span{binary}.subspan(binary.size() / 2)
+            );
+        });
+
+        std::vector<std::byte> data(binary.size());
+        REQUIRE(co_await adapter.readExactly(data));
+
+        co_await task;
+        REQUIRE(data == binary);
+        REQUIRE(received == text);
+    }
+
+    SECTION("text without handler") {
+        const auto payload = GENERATE(take(1, randomString(1, 102400)));
+
+        auto task = server.writeMessage(asyncio::http::ws::Opcode::Text, std::as_bytes(std::span{payload}));
+
+        REQUIRE_ERROR(
+            co_await adapter.readAll(),
+            asyncio::http::ws::WebSocket::StreamAdapter::Error::UnexpectedTextMessage
+        );
+
+        co_await task;
+    }
+
+    SECTION("close") {
+        auto task = asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+            const auto [opcode, data] = co_await server.readMessage();
+            REQUIRE(opcode == asyncio::http::ws::Opcode::Close);
+
+            REQUIRE(
+                static_cast<asyncio::http::ws::CloseCode>(
+                    ntohs(*reinterpret_cast<const std::uint16_t *>(data.data()))
+                ) == asyncio::http::ws::CloseCode::NormalClosure
+            );
+
+            co_await server.writeMessage(opcode, data);
+        });
+
+        REQUIRE(co_await adapter.close());
+        co_await task;
+    }
+}
+
 ASYNC_TEST_CASE("message deflate", "[http::websocket]") {
     const auto windowBits = GENERATE(9, 10, 11, 12, 13, 14, 15);
 

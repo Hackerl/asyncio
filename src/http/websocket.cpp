@@ -664,4 +664,58 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(c
     co_return {};
 }
 
-Z_DEFINE_ERROR_CATEGORY_INSTANCES(asyncio::http::ws::WebSocket::Error, asyncio::http::ws::CloseCode)
+asyncio::http::ws::WebSocket::StreamAdapter::StreamAdapter(WebSocket websocket)
+    : mWebSocket{std::move(websocket)}, mPendingOffset{0} {
+}
+
+void asyncio::http::ws::WebSocket::StreamAdapter::onText(TextHandler textHandler) {
+    mTextHandler = std::move(textHandler);
+}
+
+asyncio::task::Task<std::size_t, std::error_code>
+asyncio::http::ws::WebSocket::StreamAdapter::read(const std::span<std::byte> data) {
+    if (mPendingOffset == mPending.size()) {
+        while (true) {
+            auto message = co_await mWebSocket.readMessage();
+
+            if (!message) {
+                if (const auto &error = message.error(); error != CloseCode::NormalClosure)
+                    co_return std::unexpected{error};
+
+                co_return 0;
+            }
+
+            if (message->opcode == Opcode::Binary) {
+                mPending = std::move(std::get<std::vector<std::byte>>(message->data));
+                mPendingOffset = 0;
+                break;
+            }
+
+            if (!mTextHandler)
+                co_return std::unexpected{Error::UnexpectedTextMessage};
+
+            Z_CO_EXPECT(co_await mTextHandler(std::move(std::get<std::string>(message->data))));
+        }
+    }
+
+    const auto n = std::min(data.size(), mPending.size() - mPendingOffset);
+    std::ranges::copy(std::span{mPending}.subspan(mPendingOffset, n), data.data());
+    mPendingOffset += n;
+    co_return n;
+}
+
+asyncio::task::Task<std::size_t, std::error_code>
+asyncio::http::ws::WebSocket::StreamAdapter::write(const std::span<const std::byte> data) {
+    Z_CO_EXPECT(co_await mWebSocket.sendBinary(data));
+    co_return data.size();
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::StreamAdapter::close() {
+    co_return co_await mWebSocket.close(CloseCode::NormalClosure);
+}
+
+Z_DEFINE_ERROR_CATEGORY_INSTANCES(
+    asyncio::http::ws::WebSocket::Error,
+    asyncio::http::ws::CloseCode,
+    asyncio::http::ws::WebSocket::StreamAdapter::Error
+)

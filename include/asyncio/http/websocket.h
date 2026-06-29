@@ -188,6 +188,8 @@ namespace asyncio::http::ws {
         };
 
     public:
+        class StreamAdapter;
+
         Z_DEFINE_ERROR_CODE_INNER(
             Error,
             "asyncio::http::ws::WebSocket",
@@ -236,8 +238,37 @@ namespace asyncio::http::ws {
         std::shared_ptr<ICloseable> mCloseable;
         std::optional<DeflateExtension> mDeflateExtension;
     };
+
+    class WebSocket::StreamAdapter : public IReader, public IWriter, public ICloseable {
+    public:
+        Z_DEFINE_ERROR_CODE_INNER(
+            Error,
+            "asyncio::http::ws::WebSocket::StreamAdapter",
+            UnexpectedTextMessage, "Unexpected text message"
+        )
+
+        using TextHandler = std::function<task::Task<void, std::error_code>(std::string)>;
+
+        explicit StreamAdapter(WebSocket websocket);
+
+        void onText(TextHandler textHandler);
+
+        task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
+        task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
+        task::Task<void, std::error_code> close() override;
+
+    private:
+        WebSocket mWebSocket;
+        TextHandler mTextHandler;
+        std::vector<std::byte> mPending;
+        std::size_t mPendingOffset;
+    };
 }
 
-Z_DECLARE_ERROR_CODES(asyncio::http::ws::CloseCode, asyncio::http::ws::WebSocket::Error)
+Z_DECLARE_ERROR_CODES(
+    asyncio::http::ws::CloseCode,
+    asyncio::http::ws::WebSocket::Error,
+    asyncio::http::ws::WebSocket::StreamAdapter::Error
+);
 
 #endif //ASYNCIO_WEBSOCKET_H
