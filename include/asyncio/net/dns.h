@@ -11,6 +11,10 @@ namespace asyncio::net::dns {
         explicit Resolver(std::unique_ptr<Core> core);
 
     public:
+        Resolver(Resolver &&) noexcept;
+        Resolver &operator=(Resolver &&) noexcept;
+        ~Resolver();
+
         static Resolver make();
         static Resolver &current();
 

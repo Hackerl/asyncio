@@ -176,6 +176,10 @@ void asyncio::net::dns::Resolver::Core::updatePoll(const ares_socket_t socket, c
 asyncio::net::dns::Resolver::Resolver(std::unique_ptr<Core> core) : mCore{std::move(core)} {
 }
 
+asyncio::net::dns::Resolver::Resolver(Resolver &&) noexcept = default;
+asyncio::net::dns::Resolver &asyncio::net::dns::Resolver::operator=(Resolver &&) noexcept = default;
+asyncio::net::dns::Resolver::~Resolver() = default;
+
 asyncio::net::dns::Resolver asyncio::net::dns::Resolver::make() {
     auto timer = std::make_unique<uv_timer_t>();
 
