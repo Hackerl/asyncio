@@ -31,9 +31,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
 
         SECTION("normal") {
             const auto size = GENERATE_REF(take(1, random(1uz, input.size() * 2)));
-
-            std::vector<std::byte> data;
-            data.resize(size);
+            std::vector<std::byte> data(size);
 
             const auto n = co_await reader.read(data);
             REQUIRE(n == std::min(size, input.size()));
@@ -56,8 +54,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
             const auto limit = std::min(input.size(), capacity);
             const auto size = GENERATE_REF(take(1, random(1uz, limit)));
 
-            std::vector<std::byte> data;
-            data.resize(size);
+            std::vector<std::byte> data(size);
 
             REQUIRE(co_await reader.peek(data));
             REQUIRE_THAT(data, Catch::Matchers::RangeEquals(std::span{input.data(), size}));
@@ -66,9 +63,7 @@ ASYNC_TEST_CASE("buffer reader", "[buffer]") {
 
         SECTION("invalid argument") {
             const auto size = GENERATE_REF(take(1, random(capacity + 1, capacity * 2)));
-
-            std::vector<std::byte> data;
-            data.resize(size);
+            std::vector<std::byte> data(size);
             REQUIRE_ERROR(co_await reader.peek(data), std::errc::invalid_argument);
         }
     }

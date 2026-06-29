@@ -23,8 +23,7 @@ ASYNC_TEST_CASE("file", "[fs]") {
     SECTION("read") {
         co_await asyncio::error::guard(asyncio::fs::write(path, content));
 
-        std::vector<std::byte> data;
-        data.resize(content.size());
+        std::vector<std::byte> data(content.size());
 
         REQUIRE(co_await file.read(data) == content.size());
         REQUIRE(data == content);

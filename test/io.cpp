@@ -22,20 +22,14 @@ ASYNC_TEST_CASE("read exactly", "[io]") {
 
     SECTION("normal") {
         asyncio::BytesReader reader{input};
-
-        std::vector<std::byte> data;
-        data.resize(input.size());
-
+        std::vector<std::byte> data(input.size());
         REQUIRE(co_await reader.readExactly(data));
         REQUIRE(data == input);
     }
 
     SECTION("unexpected eof") {
         asyncio::BytesReader reader{{}};
-
-        std::vector<std::byte> data;
-        data.resize(input.size());
-
+        std::vector<std::byte> data(input.size());
         REQUIRE_ERROR(co_await reader.readExactly(data), asyncio::IOError::UnexpectedEOF);
     }
 }
@@ -67,9 +61,7 @@ ASYNC_TEST_CASE("bytes reader", "[io]") {
     const auto input = GENERATE(take(10, randomBytes(1, 102400)));
 
     asyncio::BytesReader reader{input};
-
-    std::vector<std::byte> data;
-    data.resize(input.size());
+    std::vector<std::byte> data(input.size());
 
     REQUIRE(co_await reader.read(data) == input.size());
     REQUIRE(data == input);

@@ -45,8 +45,7 @@ ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
     SECTION("read") {
         auto task = server.writeAll(input);
 
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         REQUIRE(co_await client.readExactly(data));
         co_await asyncio::error::guard(std::move(task));
@@ -55,8 +54,7 @@ ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
     }
 
     SECTION("write") {
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         auto task = server.readExactly(data);
 
@@ -77,8 +75,7 @@ ASYNC_TEST_CASE("TCP stream", "[net::tcp]") {
         {
             auto task = server.writeAll(input);
 
-            std::vector<std::byte> data;
-            data.resize(input.size());
+            std::vector<std::byte> data(input.size());
 
             REQUIRE(co_await client.readExactly(data));
             REQUIRE(co_await task);
@@ -136,8 +133,7 @@ ASYNC_TEST_CASE("named pipe stream", "[net]") {
     SECTION("read") {
         auto task = server.writeAll(input);
 
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         REQUIRE(co_await client.readExactly(data));
         co_await asyncio::error::guard(std::move(task));
@@ -146,8 +142,7 @@ ASYNC_TEST_CASE("named pipe stream", "[net]") {
     }
 
     SECTION("write") {
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         auto task = server.readExactly(data);
 
@@ -215,8 +210,7 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
     SECTION("read") {
         auto task = server.writeAll(input);
 
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         REQUIRE(co_await client.readExactly(data));
         co_await asyncio::error::guard(std::move(task));
@@ -225,8 +219,7 @@ ASYNC_TEST_CASE("UNIX domain stream", "[net]") {
     }
 
     SECTION("write") {
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         auto task = server.readExactly(data);
 
@@ -295,8 +288,7 @@ ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
     SECTION("read") {
         auto task = server.writeAll(input);
 
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         REQUIRE(co_await client.readExactly(data));
         co_await asyncio::error::guard(std::move(task));
@@ -305,8 +297,7 @@ ASYNC_TEST_CASE("abstract UNIX domain stream", "[net]") {
     }
 
     SECTION("write") {
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         auto task = server.readExactly(data);
 

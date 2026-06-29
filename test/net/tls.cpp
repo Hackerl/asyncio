@@ -164,8 +164,7 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
     SECTION("read") {
         auto task = server.writeAll(input);
 
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         REQUIRE(co_await client.readExactly(data));
         co_await asyncio::error::guard(std::move(task));
@@ -174,8 +173,7 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
     }
 
     SECTION("write") {
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         auto task = server.readExactly(data);
 
@@ -197,8 +195,7 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
         {
             auto task = server.writeAll(input);
 
-            std::vector<std::byte> data;
-            data.resize(input.size());
+            std::vector<std::byte> data(input.size());
 
             REQUIRE(co_await client.readExactly(data));
             REQUIRE(co_await task);

@@ -33,8 +33,7 @@ ASYNC_TEST_CASE("UDP socket", "[net::dgram]") {
             co_await asyncio::error::guard(peer.writeTo(input, destination)) != input.size())
             throw co_await asyncio::error::StacktraceError<std::runtime_error>::make("Failed to send data");
 
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         REQUIRE(co_await socket.read(data) == input.size());
         REQUIRE(data == input);
@@ -51,8 +50,7 @@ ASYNC_TEST_CASE("UDP socket", "[net::dgram]") {
             co_await asyncio::error::guard(peer.writeTo(input, destination)) != input.size())
             throw co_await asyncio::error::StacktraceError<std::runtime_error>::make("Failed to send data");
 
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         const auto result = co_await socket.readFrom(data);
         REQUIRE(result);
@@ -67,8 +65,7 @@ ASYNC_TEST_CASE("UDP socket", "[net::dgram]") {
 
         REQUIRE(co_await socket.writeTo(input, destination) == input.size());
 
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         const auto [n, address] = co_await asyncio::error::guard(peer.readFrom(data));
         REQUIRE(n == input.size());
@@ -98,8 +95,7 @@ ASYNC_TEST_CASE("connected UDP socket", "[net]") {
 
         REQUIRE(co_await socket.write(input) == input.size());
 
-        std::vector<std::byte> data;
-        data.resize(input.size());
+        std::vector<std::byte> data(input.size());
 
         const auto [n, address] = co_await asyncio::error::guard(peer.readFrom(data));
         REQUIRE(n == input.size());
