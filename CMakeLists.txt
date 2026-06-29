@@ -112,11 +112,11 @@ target_include_directories(
 target_link_libraries(
         asyncio
         PRIVATE
+        ZLIB::ZLIB
         $<$<PLATFORM_ID:Windows>:crypt32>
         $<$<BOOL:${ASYNCIO_ENABLE_C_ARES}>:c-ares::cares>
         PUBLIC
         zero::zero
-        ZLIB::ZLIB
         OpenSSL::SSL
         OpenSSL::Crypto
         CURL::libcurl

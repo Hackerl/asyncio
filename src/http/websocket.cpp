@@ -8,6 +8,7 @@
 #include <zero/utility.h>
 #include <zero/encoding/base64.h>
 #include <openssl/sha.h>
+#include <zlib.h>
 #include <random>
 #include <map>
 
@@ -156,9 +157,16 @@ void asyncio::http::ws::Header::mask(const bool mask) {
     mBytes[1] |= MaskBit;
 }
 
-asyncio::http::ws::Compressor::Compressor(std::unique_ptr<z_stream, void(*)(z_stream *)> stream)
-    : mStream{std::move(stream)} {
+struct asyncio::http::ws::Compressor::Stream {
+    std::unique_ptr<z_stream, void (*)(z_stream *)> core;
+};
+
+asyncio::http::ws::Compressor::Compressor(std::unique_ptr<Stream> stream) : mStream{std::move(stream)} {
 }
+
+asyncio::http::ws::Compressor::Compressor(Compressor &&) noexcept = default;
+asyncio::http::ws::Compressor &asyncio::http::ws::Compressor::operator=(Compressor &&) noexcept = default;
+asyncio::http::ws::Compressor::~Compressor() = default;
 
 std::expected<asyncio::http::ws::Compressor, std::error_code>
 asyncio::http::ws::Compressor::make(const int windowBits) {
@@ -175,13 +183,15 @@ asyncio::http::ws::Compressor::make(const int windowBits) {
         return std::unexpected{static_cast<ZLIBError>(result)};
 
     return Compressor{
-        {
-            stream.release(),
-            [](auto *s) {
-                deflateEnd(s);
-                delete s;
+        std::make_unique<Stream>(
+            std::unique_ptr<z_stream, void (*)(z_stream *)>{
+                stream.release(),
+                [](auto *s) {
+                    deflateEnd(s);
+                    delete s;
+                }
             }
-        }
+        )
     };
 }
 
@@ -191,22 +201,22 @@ asyncio::http::ws::Compressor::compress(const std::span<const std::byte> data) {
     co_return co_await toThreadPool([&] {
         std::vector<std::byte> output;
 
-        mStream->avail_in = data.size();
-        mStream->next_in = reinterpret_cast<Bytef *>(const_cast<std::byte *>(data.data()));
+        mStream->core->avail_in = data.size();
+        mStream->core->next_in = reinterpret_cast<Bytef *>(const_cast<std::byte *>(data.data()));
 
         do {
             std::array<std::byte, 16384> buffer; // NOLINT(*-pro-type-member-init)
 
-            mStream->avail_out = buffer.size();
-            mStream->next_out = reinterpret_cast<Bytef *>(buffer.data());
+            mStream->core->avail_out = buffer.size();
+            mStream->core->next_out = reinterpret_cast<Bytef *>(buffer.data());
 
-            if (const auto result = deflate(mStream.get(), Z_SYNC_FLUSH); result != Z_OK && result != Z_BUF_ERROR)
+            if (const auto result = deflate(mStream->core.get(), Z_SYNC_FLUSH); result != Z_OK && result != Z_BUF_ERROR)
                 throw zero::error::StacktraceError<std::system_error>{static_cast<ZLIBError>(result)};
 
-            output.append_range(std::span{buffer.data(), buffer.size() - mStream->avail_out});
+            output.append_range(std::span{buffer.data(), buffer.size() - mStream->core->avail_out});
         }
-        while (mStream->avail_out == 0);
-        assert(mStream->avail_in == 0);
+        while (mStream->core->avail_out == 0);
+        assert(mStream->core->avail_in == 0);
 
         return output;
     });
@@ -214,13 +224,20 @@ asyncio::http::ws::Compressor::compress(const std::span<const std::byte> data) {
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 void asyncio::http::ws::Compressor::reset() {
-    if (const auto result = deflateReset(mStream.get()); result != Z_OK)
+    if (const auto result = deflateReset(mStream->core.get()); result != Z_OK)
         throw zero::error::StacktraceError<std::system_error>{static_cast<ZLIBError>(result)};
 }
 
-asyncio::http::ws::Decompressor::Decompressor(std::unique_ptr<z_stream, void(*)(z_stream *)> stream)
-    : mStream{std::move(stream)} {
+struct asyncio::http::ws::Decompressor::Stream {
+    std::unique_ptr<z_stream, void (*)(z_stream *)> core;
+};
+
+asyncio::http::ws::Decompressor::Decompressor(std::unique_ptr<Stream> stream) : mStream{std::move(stream)} {
 }
+
+asyncio::http::ws::Decompressor::Decompressor(Decompressor &&) noexcept = default;
+asyncio::http::ws::Decompressor &asyncio::http::ws::Decompressor::operator=(Decompressor &&) noexcept = default;
+asyncio::http::ws::Decompressor::~Decompressor() = default;
 
 std::expected<asyncio::http::ws::Decompressor, std::error_code>
 asyncio::http::ws::Decompressor::make(const int windowBits) {
@@ -230,13 +247,15 @@ asyncio::http::ws::Decompressor::make(const int windowBits) {
         return std::unexpected{static_cast<ZLIBError>(result)};
 
     return Decompressor{
-        {
-            stream.release(),
-            [](auto *s) {
-                inflateEnd(s);
-                delete s;
+        std::make_unique<Stream>(
+            std::unique_ptr<z_stream, void (*)(z_stream *)>{
+                stream.release(),
+                [](auto *s) {
+                    inflateEnd(s);
+                    delete s;
+                }
             }
-        }
+        )
     };
 }
 
@@ -248,22 +267,22 @@ asyncio::http::ws::Decompressor::decompress(const std::span<const std::byte> dat
             std::vector<std::byte> output;
             output.reserve(data.size() * 2);
 
-            mStream->avail_in = data.size();
-            mStream->next_in = reinterpret_cast<Bytef *>(const_cast<std::byte *>(data.data()));
+            mStream->core->avail_in = data.size();
+            mStream->core->next_in = reinterpret_cast<Bytef *>(const_cast<std::byte *>(data.data()));
 
             do {
                 std::array<std::byte, 16384> buffer; // NOLINT(*-pro-type-member-init)
 
-                mStream->avail_out = buffer.size();
-                mStream->next_out = reinterpret_cast<Bytef *>(buffer.data());
+                mStream->core->avail_out = buffer.size();
+                mStream->core->next_out = reinterpret_cast<Bytef *>(buffer.data());
 
-                if (const auto result = inflate(mStream.get(), Z_SYNC_FLUSH);
+                if (const auto result = inflate(mStream->core.get(), Z_SYNC_FLUSH);
                     result != Z_OK && result != Z_STREAM_END && result != Z_BUF_ERROR)
                     return std::unexpected{static_cast<ZLIBError>(result)};
 
-                output.append_range(std::span{buffer.data(), buffer.size() - mStream->avail_out});
+                output.append_range(std::span{buffer.data(), buffer.size() - mStream->core->avail_out});
             }
-            while (mStream->avail_out == 0);
+            while (mStream->core->avail_out == 0);
 
             return output;
         })
@@ -272,7 +291,7 @@ asyncio::http::ws::Decompressor::decompress(const std::span<const std::byte> dat
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 void asyncio::http::ws::Decompressor::reset() {
-    if (const auto result = inflateReset(mStream.get()); result != Z_OK)
+    if (const auto result = inflateReset(mStream->core.get()); result != Z_OK)
         throw zero::error::StacktraceError<std::system_error>{static_cast<ZLIBError>(result)};
 }
 

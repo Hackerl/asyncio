@@ -6,7 +6,6 @@
 #include <asyncio/net/tls.h>
 #include <asyncio/http/url.h>
 #include <asyncio/sync/mutex.h>
-#include <zlib.h>
 
 namespace asyncio::http::ws {
     enum class CloseCode {
@@ -131,8 +130,14 @@ namespace asyncio::http::ws {
     };
 
     class Compressor {
+        struct Stream;
+
+        explicit Compressor(std::unique_ptr<Stream> stream);
+
     public:
-        explicit Compressor(std::unique_ptr<z_stream, void (*)(z_stream *)> stream);
+        Compressor(Compressor &&) noexcept;
+        Compressor &operator=(Compressor &&) noexcept;
+        ~Compressor();
 
         static std::expected<Compressor, std::error_code> make(int windowBits);
 
@@ -140,12 +145,18 @@ namespace asyncio::http::ws {
         void reset();
 
     private:
-        std::unique_ptr<z_stream, void (*)(z_stream *)> mStream;
+        std::unique_ptr<Stream> mStream;
     };
 
     class Decompressor {
+        struct Stream;
+
+        explicit Decompressor(std::unique_ptr<Stream> stream);
+
     public:
-        explicit Decompressor(std::unique_ptr<z_stream, void (*)(z_stream *)> stream);
+        Decompressor(Decompressor &&) noexcept;
+        Decompressor &operator=(Decompressor &&) noexcept;
+        ~Decompressor();
 
         static std::expected<Decompressor, std::error_code> make(int windowBits);
 
@@ -153,7 +164,7 @@ namespace asyncio::http::ws {
         void reset();
 
     private:
-        std::unique_ptr<z_stream, void (*)(z_stream *)> mStream;
+        std::unique_ptr<Stream> mStream;
     };
 
     struct DeflateConfig {
