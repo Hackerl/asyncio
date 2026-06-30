@@ -130,9 +130,9 @@ namespace asyncio::http::ws {
     };
 
     class Compressor {
-        struct Stream;
+        struct Core;
 
-        explicit Compressor(std::unique_ptr<Stream> stream);
+        explicit Compressor(std::unique_ptr<Core> core);
 
     public:
         Compressor(Compressor &&) noexcept;
@@ -145,13 +145,13 @@ namespace asyncio::http::ws {
         void reset();
 
     private:
-        std::unique_ptr<Stream> mStream;
+        std::unique_ptr<Core> mCore;
     };
 
     class Decompressor {
-        struct Stream;
+        struct Core;
 
-        explicit Decompressor(std::unique_ptr<Stream> stream);
+        explicit Decompressor(std::unique_ptr<Core> core);
 
     public:
         Decompressor(Decompressor &&) noexcept;
@@ -164,7 +164,7 @@ namespace asyncio::http::ws {
         void reset();
 
     private:
-        std::unique_ptr<Stream> mStream;
+        std::unique_ptr<Core> mCore;
     };
 
     struct DeflateConfig {
