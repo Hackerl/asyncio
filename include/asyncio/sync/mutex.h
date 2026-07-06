@@ -5,6 +5,16 @@
 
 namespace asyncio::sync {
     class Mutex {
+    public:
+        Mutex() = default;
+
+        Mutex(const Mutex &rhs) = delete;
+        Mutex(Mutex &&rhs) = default;
+
+        Mutex &operator=(const Mutex &rhs) = delete;
+        Mutex &operator=(Mutex &&rhs) noexcept = default;
+
+    private:
         void wakeup() const;
 
     public:

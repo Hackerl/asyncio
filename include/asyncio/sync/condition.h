@@ -6,15 +6,16 @@
 namespace asyncio::sync {
     class Condition {
     public:
+        Condition() = default;
+
+        Condition(const Condition &rhs) = delete;
+        Condition(Condition &&rhs) = default;
+
+        Condition &operator=(const Condition &rhs) = delete;
+        Condition &operator=(Condition &&rhs) noexcept = default;
+
         task::Task<void, std::error_code> wait(Mutex &mutex);
-
-        task::Task<void, std::error_code> wait(Mutex &mutex, const std::function<bool()> predicate) {
-            while (!predicate()) {
-                Z_CO_EXPECT(co_await wait(mutex));
-            }
-
-            co_return {};
-        }
+        task::Task<void, std::error_code> wait(Mutex &mutex, std::function<bool()> predicate);
 
         void notify();
         void broadcast();

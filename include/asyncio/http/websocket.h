@@ -232,7 +232,7 @@ namespace asyncio::http::ws {
 
     private:
         State mState;
-        std::unique_ptr<sync::Mutex> mMutex;
+        sync::Mutex mMutex;
         std::shared_ptr<IReader> mReader;
         std::shared_ptr<IWriter> mWriter;
         std::shared_ptr<ICloseable> mCloseable;

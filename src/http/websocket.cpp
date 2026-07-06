@@ -300,8 +300,7 @@ asyncio::http::ws::WebSocket::WebSocket(
     std::shared_ptr<IWriter> writer,
     std::shared_ptr<ICloseable> closeable,
     std::optional<DeflateExtension> deflateExtension
-) : mState{State::Connected}, mMutex{std::make_unique<sync::Mutex>()},
-    mReader{std::move(reader)}, mWriter{std::move(writer)}, mCloseable{std::move(closeable)},
+) : mState{State::Connected}, mReader{std::move(reader)}, mWriter{std::move(writer)}, mCloseable{std::move(closeable)},
     mDeflateExtension{std::move(deflateExtension)} {
 }
 
@@ -508,8 +507,8 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
 
 asyncio::task::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
-    Z_CO_EXPECT(co_await mMutex->lock());
-    Z_DEFER(mMutex->unlock());
+    Z_CO_EXPECT(co_await mMutex.lock());
+    Z_DEFER(mMutex.unlock());
 
     if (mState == State::Closed || (mState == State::Closing && message.opcode != Opcode::Close))
         co_return std::unexpected{Error::ConnectionClosed};

@@ -6,6 +6,14 @@
 namespace asyncio::sync {
     class Event {
     public:
+        Event() = default;
+
+        Event(const Event &rhs) = delete;
+        Event(Event &&rhs) = default;
+
+        Event &operator=(const Event &rhs) = delete;
+        Event &operator=(Event &&rhs) noexcept = default;
+
         task::Task<void, std::error_code> wait();
 
         void set();

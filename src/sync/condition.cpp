@@ -39,6 +39,15 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Condition::wait(Mutex 
     co_return {};
 }
 
+asyncio::task::Task<void, std::error_code>
+asyncio::sync::Condition::wait(Mutex &mutex, const std::function<bool()> predicate) {
+    while (!predicate()) {
+        Z_CO_EXPECT(co_await wait(mutex));
+    }
+
+    co_return {};
+}
+
 void asyncio::sync::Condition::notify() {
     ++mCounter;
 
