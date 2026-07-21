@@ -186,7 +186,7 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
     auto second = asyncio::Pipe::from(fds[1]);
     fds[1] = -1;
 
-    return PseudoConsole{*std::move(pc), {std::move(first), std::move(second)}};
+    return PseudoConsole{*std::move(pc), Pipe{std::move(first), std::move(second)}};
 #else
     auto &resource = pc->master();
 
