@@ -74,7 +74,7 @@ std::array<asyncio::Stream, 2> asyncio::Stream::pair() {
     }));
     sockets[1] = -1;
 
-    return std::array{Stream{std::move(firstHandle)}, Stream{std::move(secondHandle)}};
+    return {Stream{std::move(firstHandle)}, Stream{std::move(secondHandle)}};
 #else
     Z_DEFER(
         for (const auto &fd: sockets) {
@@ -135,7 +135,7 @@ std::array<asyncio::Stream, 2> asyncio::Stream::pair() {
     }));
     sockets[1] = -1;
 
-    return std::array{Stream{std::move(firstHandle)}, Stream{std::move(secondHandle)}};
+    return {Stream{std::move(firstHandle)}, Stream{std::move(secondHandle)}};
 #endif
 }
 

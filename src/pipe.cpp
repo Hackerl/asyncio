@@ -120,7 +120,7 @@ std::array<asyncio::Pipe, 2> asyncio::pipe() {
     auto writer = Pipe::from(fds[1]);
     fds[1] = -1;
 
-    return std::array{std::move(reader), std::move(writer)};
+    return {std::move(reader), std::move(writer)};
 }
 
 asyncio::PipeListener::PipeListener(Listener listener) : Listener(std::move(listener)) {
