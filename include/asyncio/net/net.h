@@ -137,12 +137,12 @@ namespace asyncio::net {
 
     template<typename T, typename U>
         requires (
-            zero::meta::Trait<T, IReader> &&
-            zero::meta::Trait<T, IWriter> &&
-            zero::meta::Trait<T, IHalfCloseable> &&
-            zero::meta::Trait<U, IReader> &&
-            zero::meta::Trait<U, IWriter> &&
-            zero::meta::Trait<U, IHalfCloseable>
+            zero::meta::Implements<T, IReader> &&
+            zero::meta::Implements<T, IWriter> &&
+            zero::meta::Implements<T, IHalfCloseable> &&
+            zero::meta::Implements<U, IReader> &&
+            zero::meta::Implements<U, IWriter> &&
+            zero::meta::Implements<U, IHalfCloseable>
         )
     task::Task<std::array<std::size_t, 2>, std::error_code>
     copyBidirectional(T &first, U &second) {

@@ -212,7 +212,7 @@ namespace asyncio::http {
             co_return co_await perform(*std::move(connection));
         }
 
-        template<zero::meta::Trait<IReader> T>
+        template<zero::meta::Implements<IReader> T>
         task::Task<Response, std::error_code> request(
             const std::string method,
             const URL url,
@@ -241,7 +241,7 @@ namespace asyncio::http {
                 return curl_easy_setopt(easy, CURLOPT_READDATA, connection->get());
             }));
 
-            if constexpr (zero::meta::Trait<T, ISeekable>) {
+            if constexpr (zero::meta::Implements<T, ISeekable>) {
                 if (const auto length = co_await std::invoke(&ISeekable::length, payload)) {
                     co_await error::guard(expected([&] {
                         return curl_easy_setopt(easy, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(*length));

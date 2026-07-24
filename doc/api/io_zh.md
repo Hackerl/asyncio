@@ -261,7 +261,7 @@ virtual task::Task<void, std::error_code> flush() = 0;
 ## Function `copy`
 
 ```c++
-task::Task<std::size_t, std::error_code> copy(zero::meta::Trait<IReader> auto &reader, zero::meta::Trait<IWriter> auto &writer);
+task::Task<std::size_t, std::error_code> copy(zero::meta::Implements<IReader> auto &reader, zero::meta::Implements<IWriter> auto &writer);
 ```
 
 从 `reader` 读取数据，然后写入到 `writer` 中，直到 `read` 返回 `0` 或 `write` 发生了错误，返回实际复制的字节数。

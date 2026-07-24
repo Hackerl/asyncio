@@ -225,8 +225,8 @@ void asyncio::process::PseudoConsole::resize(const short rows, const short colum
 }
 
 std::expected<asyncio::process::ChildProcess, std::error_code>
-asyncio::process::PseudoConsole::spawn(const Command &command) {
-    return mPseudoConsole.spawn(command.mCommand).transform([](zero::os::process::ChildProcess &&process) {
+asyncio::process::PseudoConsole::spawn(Command command) {
+    return mPseudoConsole.spawn(std::move(command.mCommand)).transform([](zero::os::process::ChildProcess &&process) {
         return ChildProcess{Process{std::move(process.impl())}, {}};
     });
 }
@@ -239,8 +239,8 @@ asyncio::process::Command::Command(std::filesystem::path path) : mCommand{std::m
 }
 
 std::expected<asyncio::process::ChildProcess, std::error_code>
-asyncio::process::Command::spawn(const std::array<StdioType, 3> &defaultTypes) const {
-    auto child = mCommand.spawn(defaultTypes);
+asyncio::process::Command::spawn(const std::array<Stdio, 3> &defaultStdio) const {
+    auto child = mCommand.spawn(defaultStdio);
     Z_EXPECT(child);
 
     std::array<std::optional<Pipe>, 3> stdio;
@@ -335,12 +335,8 @@ const std::vector<zero::os::Resource> &asyncio::process::Command::inheritedResou
     return mCommand.inheritedResources();
 }
 
-const std::vector<zero::os::Resource::Native> &asyncio::process::Command::inheritedNativeResources() const {
-    return mCommand.inheritedNativeResources();
-}
-
 std::expected<asyncio::process::ChildProcess, std::error_code> asyncio::process::Command::spawn() const {
-    return spawn({StdioType::Inherit, StdioType::Inherit, StdioType::Inherit});
+    return spawn({Stdio::inherit(), Stdio::inherit(), Stdio::inherit()});
 }
 
 asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::process::Command::status() const {
@@ -355,7 +351,7 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
 }
 
 asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process::Command::output() const {
-    auto child = spawn({StdioType::Null, StdioType::Piped, StdioType::Piped});
+    auto child = spawn({Stdio::null(), Stdio::piped(), Stdio::piped()});
     Z_CO_EXPECT(child);
 
     if (auto input = std::exchange(child->stdInput(), std::nullopt))

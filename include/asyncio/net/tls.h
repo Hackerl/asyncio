@@ -217,7 +217,7 @@ namespace asyncio::net::tls {
     )
 
     template<typename T>
-        requires (zero::meta::Trait<T, IReader> && zero::meta::Trait<T, IWriter>)
+        requires (zero::meta::Implements<T, IReader> && zero::meta::Implements<T, IWriter>)
     class TLS final : public IReader, public IWriter, public ICloseable, public IHalfCloseable {
     public:
         TLS(T stream, std::unique_ptr<SSL, decltype(&SSL_free)> ssl)
@@ -405,7 +405,7 @@ namespace asyncio::net::tls {
             co_return {};
         }
 
-        task::Task<void, std::error_code> closeUnderlying() requires zero::meta::Trait<T, ICloseable> {
+        task::Task<void, std::error_code> closeUnderlying() requires zero::meta::Implements<T, ICloseable> {
             co_return co_await std::invoke(&ICloseable::close, mStream);
         }
 
@@ -417,9 +417,9 @@ namespace asyncio::net::tls {
 
     template<typename T>
         requires (
-            zero::meta::Trait<T, IReader> &&
-            zero::meta::Trait<T, IWriter> &&
-            zero::meta::Trait<T, ICloseable>
+            zero::meta::Implements<T, IReader> &&
+            zero::meta::Implements<T, IWriter> &&
+            zero::meta::Implements<T, ICloseable>
         )
     task::Task<TLS<T>, std::error_code> connect(
         T stream,
@@ -463,9 +463,9 @@ namespace asyncio::net::tls {
 
     template<typename T>
         requires (
-            zero::meta::Trait<T, IReader> &&
-            zero::meta::Trait<T, IWriter> &&
-            zero::meta::Trait<T, ICloseable>
+            zero::meta::Implements<T, IReader> &&
+            zero::meta::Implements<T, IWriter> &&
+            zero::meta::Implements<T, ICloseable>
         )
     task::Task<TLS<T>, std::error_code> accept(T stream, const Context context) {
         std::unique_ptr<SSL, decltype(&SSL_free)> ssl{SSL_new(context.get()), SSL_free};

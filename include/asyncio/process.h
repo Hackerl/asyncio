@@ -58,7 +58,7 @@ namespace asyncio::process {
 #endif
 
         void resize(short rows, short columns);
-        std::expected<ChildProcess, std::error_code> spawn(const Command &command);
+        std::expected<ChildProcess, std::error_code> spawn(Command command);
 
         Pipe &master();
 
@@ -69,13 +69,13 @@ namespace asyncio::process {
 
     class Command {
     public:
-        using StdioType = zero::os::process::Command::StdioType;
+        using Stdio = zero::os::process::Command::Stdio;
 
         explicit Command(std::filesystem::path path);
 
     private:
         [[nodiscard]] std::expected<ChildProcess, std::error_code>
-        spawn(const std::array<StdioType, 3> &defaultTypes) const;
+        spawn(const std::array<Stdio, 3> &defaultStdio) const;
 
     public:
         template<zero::meta::Mutable Self>
@@ -127,41 +127,90 @@ namespace asyncio::process {
         }
 
         template<zero::meta::Mutable Self>
-        Self &&inheritedNativeResource(this Self &&self, const zero::os::Resource::Native resource) {
-            self.mCommand.inheritedNativeResource(resource);
+        Self &&stdInput(this Self &&self, Stdio stdio) {
+            self.mCommand.stdInput(std::move(stdio));
             return std::forward<Self>(self);
         }
 
         template<zero::meta::Mutable Self>
-        Self &&inheritedNativeResources(this Self &&self, std::vector<zero::os::Resource::Native> resource) {
-            self.mCommand.inheritedNativeResources(std::move(resource));
+        Self &&stdOutput(this Self &&self, Stdio stdio) {
+            self.mCommand.stdOutput(std::move(stdio));
             return std::forward<Self>(self);
         }
 
         template<zero::meta::Mutable Self>
-        Self &&stdInput(this Self &&self, StdioType type) {
-            self.mCommand.stdInput(type);
+        Self &&stdError(this Self &&self, Stdio stdio) {
+            self.mCommand.stdError(std::move(stdio));
+            return std::forward<Self>(self);
+        }
+
+#ifdef _WIN32
+        template<zero::meta::Mutable Self>
+        Self &&creationFlags(this Self &&self, const DWORD flags) {
+            self.mCommand.creationFlags(flags);
             return std::forward<Self>(self);
         }
 
         template<zero::meta::Mutable Self>
-        Self &&stdOutput(this Self &&self, StdioType type) {
-            self.mCommand.stdOutput(type);
+        Self &&showWindow(this Self &&self, const WORD show) {
+            self.mCommand.showWindow(show);
             return std::forward<Self>(self);
         }
 
         template<zero::meta::Mutable Self>
-        Self &&stdError(this Self &&self, StdioType type) {
-            self.mCommand.stdError(type);
+        Self &&rawAttribute(this Self &&self, const DWORD_PTR attribute, const PVOID value, const SIZE_T size) {
+            self.mCommand.rawAttribute(attribute, value, size);
             return std::forward<Self>(self);
         }
+#else
+        template<zero::meta::Mutable Self>
+        Self &&setSID(this Self &&self) {
+            self.mCommand.setSID();
+            return std::forward<Self>(self);
+        }
+
+        template<zero::meta::Mutable Self>
+        Self &&arg0(this Self &&self, std::string name) {
+            self.mCommand.arg0(std::move(name));
+            return std::forward<Self>(self);
+        }
+
+        template<zero::meta::Mutable Self>
+        Self &&processGroup(this Self &&self, const pid_t pgid) {
+            self.mCommand.processGroup(pgid);
+            return std::forward<Self>(self);
+        }
+
+        template<zero::meta::Mutable Self>
+        Self &&uid(this Self &&self, const uid_t uid) {
+            self.mCommand.uid(uid);
+            return std::forward<Self>(self);
+        }
+
+        template<zero::meta::Mutable Self>
+        Self &&gid(this Self &&self, const gid_t gid) {
+            self.mCommand.gid(gid);
+            return std::forward<Self>(self);
+        }
+
+        template<zero::meta::Mutable Self>
+        Self &&groups(this Self &&self, std::vector<gid_t> groups) {
+            self.mCommand.groups(std::move(groups));
+            return std::forward<Self>(self);
+        }
+
+        template<zero::meta::Mutable Self>
+        Self &&preExec(this Self &&self, std::function<std::expected<void, std::error_code>()> f) {
+            self.mCommand.preExec(std::move(f));
+            return std::forward<Self>(self);
+        }
+#endif
 
         [[nodiscard]] const std::filesystem::path &program() const;
         [[nodiscard]] const std::vector<std::string> &args() const;
         [[nodiscard]] const std::optional<std::filesystem::path> &currentDirectory() const;
         [[nodiscard]] const std::map<std::string, std::optional<std::string>> &envs() const;
         [[nodiscard]] const std::vector<zero::os::Resource> &inheritedResources() const;
-        [[nodiscard]] const std::vector<zero::os::Resource::Native> &inheritedNativeResources() const;
 
         [[nodiscard]] std::expected<ChildProcess, std::error_code> spawn() const;
         [[nodiscard]] task::Task<ExitStatus, std::error_code> status() const;
