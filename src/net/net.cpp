@@ -22,7 +22,7 @@ asyncio::net::IPv4Address::from(const std::string &ip, const std::uint16_t port)
         return uv_inet_pton(AF_INET, ip.c_str(), ipv4.data());
     }));
 
-    return IPv4Address{ipv4, port};
+    return IPv4Address{.ip = ipv4, .port = port};
 }
 
 asyncio::net::IPv6Address asyncio::net::IPv6Address::from(const IPv4Address &ipv4) {
@@ -47,9 +47,9 @@ asyncio::net::IPv6Address::from(const std::string &ip, const std::uint16_t port)
     }));
 
     if (pos == std::string::npos)
-        return IPv6Address{ipv6, port};
+        return IPv6Address{.ip = ipv6, .port = port};
 
-    return IPv6Address{ipv6, port, ip.substr(pos + 1)};
+    return IPv6Address{.ip = ipv6, .port = port, .zone = ip.substr(pos + 1)};
 }
 
 std::expected<asyncio::net::IPAddress, std::error_code>

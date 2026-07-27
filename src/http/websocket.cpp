@@ -466,7 +466,7 @@ asyncio::http::ws::WebSocket::readFrame() {
     }
 
     Z_CO_EXPECT(co_await mReader->readExactly(data));
-    co_return Frame{header, std::move(data)};
+    co_return Frame{.header = header, .data = std::move(data)};
 }
 
 asyncio::task::Task<asyncio::http::ws::InternalMessage, std::error_code>
@@ -502,7 +502,7 @@ asyncio::http::ws::WebSocket::readInternalMessage() {
             decompressor.reset();
     }
 
-    co_return InternalMessage{frame->header.opcode(), std::move(frame->data)};
+    co_return InternalMessage{.opcode = frame->header.opcode(), .data = std::move(frame->data)};
 }
 
 asyncio::task::Task<void, std::error_code>
@@ -580,19 +580,19 @@ asyncio::http::ws::WebSocket::readMessage() {
 
         if (const auto opcode = message->opcode; opcode == Opcode::Text) {
             co_return Message{
-                message->opcode,
-                std::string{reinterpret_cast<const char *>(message->data.data()), message->data.size()}
+                .opcode = message->opcode,
+                .data = std::string{reinterpret_cast<const char *>(message->data.data()), message->data.size()}
             };
         }
         else if (opcode == Opcode::Binary) {
-            co_return Message{message->opcode, std::move(message->data)};
+            co_return Message{.opcode = message->opcode, .data = std::move(message->data)};
         }
         else if (opcode == Opcode::Ping) {
-            Z_CO_EXPECT(co_await writeInternalMessage({Opcode::Pong, std::move(message->data)}));
+            Z_CO_EXPECT(co_await writeInternalMessage({.opcode = Opcode::Pong, .data = std::move(message->data)}));
         }
         else if (opcode == Opcode::Close) {
             mState = State::Closing;
-            Z_CO_EXPECT(co_await writeInternalMessage({Opcode::Close, message->data}));
+            Z_CO_EXPECT(co_await writeInternalMessage({.opcode = Opcode::Close, .data = message->data}));
             mState = State::Closed;
 
             if (message->data.size() < 2)
@@ -614,8 +614,8 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMe
     if (message.opcode == Opcode::Text) {
         const auto &text = std::get<std::string>(message.data);
         co_return co_await writeInternalMessage({
-                message.opcode,
-                {
+                .opcode = message.opcode,
+                .data = {
                     reinterpret_cast<const std::byte *>(text.data()),
                     reinterpret_cast<const std::byte *>(text.data()) + text.size()
                 }
@@ -624,18 +624,18 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::writeMe
     }
 
     co_return co_await writeInternalMessage({
-        message.opcode,
-        std::move(std::get<std::vector<std::byte>>(message.data))
+        .opcode = message.opcode,
+        .data = std::move(std::get<std::vector<std::byte>>(message.data))
     });
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::sendText(std::string text) {
-    return writeMessage({Opcode::Text, std::move(text)});
+    return writeMessage({.opcode = Opcode::Text, .data = std::move(text)});
 }
 
 asyncio::task::Task<void, std::error_code>
 asyncio::http::ws::WebSocket::sendBinary(const std::span<const std::byte> data) {
-    return writeMessage({Opcode::Binary, std::vector<std::byte>{data.begin(), data.end()}});
+    return writeMessage({.opcode = Opcode::Binary, .data = std::vector<std::byte>{data.begin(), data.end()}});
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
@@ -645,8 +645,8 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(c
     const auto c = htons(static_cast<std::uint16_t>(code));
 
     Z_CO_EXPECT(co_await writeInternalMessage({
-        Opcode::Close,
-        {reinterpret_cast<const std::byte *>(&c), reinterpret_cast<const std::byte *>(&c) + sizeof(c)}}
+        .opcode = Opcode::Close,
+        .data = {reinterpret_cast<const std::byte *>(&c), reinterpret_cast<const std::byte *>(&c) + sizeof(c)}}
     ));
 
     while (true) {

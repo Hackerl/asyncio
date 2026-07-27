@@ -406,8 +406,8 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     Z_CO_EXPECT(status);
 
     co_return Output{
-        *status,
-        std::move(result->at(0)),
-        std::move(result->at(1))
+        .status = *status,
+        .out = std::move(result->at(0)),
+        .err = std::move(result->at(1))
     };
 }
