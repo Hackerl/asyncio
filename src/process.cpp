@@ -188,7 +188,7 @@ asyncio::process::PseudoConsole::make(const short rows, const short columns) {
 
     return PseudoConsole{*std::move(pc), Pipe{std::move(first), std::move(second)}};
 #else
-    auto &resource = pc->master();
+    auto resource = pc->master().duplicate();
 
     auto fd = zero::error::guard(uv::expected([&] {
         return uv_open_osfhandle(resource.fd());
