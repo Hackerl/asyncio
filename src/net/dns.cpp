@@ -181,6 +181,21 @@ asyncio::net::dns::Resolver &asyncio::net::dns::Resolver::operator=(Resolver &&)
 asyncio::net::dns::Resolver::~Resolver() = default;
 
 asyncio::net::dns::Resolver asyncio::net::dns::Resolver::make() {
+    static std::once_flag flag;
+
+    std::call_once(
+        flag,
+        [] {
+            zero::error::guard(expected([] {
+                return ares_library_init(ARES_LIB_INIT_ALL);;
+            }));
+
+            std::atexit([] {
+                ares_library_cleanup();
+            });
+        }
+    );
+
     auto timer = std::make_unique<uv_timer_t>();
 
     zero::error::guard(uv::expected([&] {
