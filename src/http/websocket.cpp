@@ -76,7 +76,7 @@ namespace {
         if (it == headers.end())
             return std::nullopt;
 
-        const auto items = zero::strings::split(it->second, ';')
+        const auto items = zero::strings::split(it->second, ";")
             | std::views::transform(zero::strings::trim)
             | std::ranges::to<std::vector>();
 
