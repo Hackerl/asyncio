@@ -133,7 +133,7 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
         asyncio::net::tls::ServerConfig{}
         .verifyClient(true)
         .rootCAs({ca})
-        .certKeyPairs({{std::move(serverCert), std::move(serverKey)}})
+        .certKeyPairs({{.cert = std::move(serverCert), .key = std::move(serverKey)}})
         .build()
     );
 
@@ -143,7 +143,7 @@ ASYNC_TEST_CASE("tls stream", "[net::tls]") {
     auto clientContext = co_await asyncio::error::guard(
         asyncio::net::tls::ClientConfig{}
         .rootCAs({ca})
-        .certKeyPairs({{std::move(clientCert), std::move(clientKey)}})
+        .certKeyPairs({{.cert = std::move(clientCert), .key = std::move(clientKey)}})
         .build()
     );
 

@@ -2,6 +2,7 @@
 #include <asyncio/time.h>
 #include <zero/cmdline.h>
 
+// ReSharper disable once CppUseInternalLinkage
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     using namespace std::chrono_literals;
     using namespace std::string_view_literals;

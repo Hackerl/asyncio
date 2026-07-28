@@ -343,8 +343,8 @@ asyncio::task::Task<asyncio::process::ExitStatus, std::error_code> asyncio::proc
     auto child = spawn();
     Z_CO_EXPECT(child);
     co_return co_await task::Cancellable{
-        child->wait(),
-        [&] {
+        .awaitable = child->wait(),
+        .cancel = [&] {
             return child->kill();
         }
     };
@@ -398,8 +398,8 @@ asyncio::task::Task<asyncio::process::Output, std::error_code> asyncio::process:
     }
 
     const auto status = co_await task::Cancellable{
-        child->wait(),
-        [&] {
+        .awaitable = child->wait(),
+        .cancel = [&] {
             return child->kill();
         }
     };

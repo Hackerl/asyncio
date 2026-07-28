@@ -3,6 +3,7 @@
 #include <zero/cmdline.h>
 #include <httplib.h>
 
+// ReSharper disable once CppUseInternalLinkage
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 

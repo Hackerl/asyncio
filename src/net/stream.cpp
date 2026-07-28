@@ -625,7 +625,11 @@ std::expected<asyncio::net::UnixStream::Credential, std::error_code> asyncio::ne
     if (length != sizeof(cred))
         return std::unexpected{std::error_code{errno, std::system_category()}};
 
-    return Credential{cred.uid, cred.gid, cred.pid};
+    return Credential{
+        .uid = cred.uid,
+        .gid = cred.gid,
+        .pid = cred.pid
+    };
 #elifdef __APPLE__
     Credential credential;
     const auto fd = mPipe.fd();

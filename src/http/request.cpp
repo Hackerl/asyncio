@@ -130,8 +130,8 @@ asyncio::http::Response::read(const std::span<std::byte> data) {
     }));
 
     co_return co_await task::Cancellable{
-        std::move(future),
-        [this]() -> std::expected<void, std::error_code> {
+        .awaitable = std::move(future),
+        .cancel = [this]() -> std::expected<void, std::error_code> {
             auto &promise = mConnection->downstream.promise;
 
             if (!promise)
@@ -255,7 +255,12 @@ void asyncio::http::Requests::Core::updatePoll(const curl_socket_t socket, const
             return uv_poll_init_socket(getEventLoop()->raw(), poll.get(), socket);
         }));
 
-        context = new Context{uv::Handle{std::move(poll)}, this, socket};
+        context = new Context{
+            .poll = uv::Handle{std::move(poll)},
+            .core = this,
+            .socket = socket
+        };
+
         context->poll->data = context;
 
         zero::error::guard(expected([&] {
@@ -683,8 +688,8 @@ asyncio::http::Requests::perform(std::shared_ptr<Connection> connection) {
     );
 
     Z_CO_EXPECT(co_await task::Cancellable{
-        connection->promise.getFuture(),
-        [&promise = connection->promise]() -> std::expected<void, std::error_code> {
+        .awaitable = connection->promise.getFuture(),
+        .cancel = [&promise = connection->promise]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
                 return std::unexpected{task::Error::CancellationTooLate};
 

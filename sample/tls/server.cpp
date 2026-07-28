@@ -4,52 +4,55 @@
 #include <zero/cmdline.h>
 #include <zero/formatter.h>
 
-asyncio::task::Task<void> handle(asyncio::net::TCPStream stream, asyncio::net::tls::Context context) {
-    fmt::print("Connection: {}\n", co_await asyncio::error::guard(stream.remoteAddress()));
+namespace {
+    asyncio::task::Task<void> handle(asyncio::net::TCPStream stream, asyncio::net::tls::Context context) {
+        fmt::print("Connection: {}\n", co_await asyncio::error::guard(stream.remoteAddress()));
 
-    auto tls = co_await asyncio::error::guard(asyncio::net::tls::accept(std::move(stream), std::move(context)));
+        auto tls = co_await asyncio::error::guard(asyncio::net::tls::accept(std::move(stream), std::move(context)));
 
-    while (true) {
-        std::string message;
-        message.resize(1024);
+        while (true) {
+            std::string message;
+            message.resize(1024);
 
-        const auto n = co_await asyncio::error::guard(tls.read(std::as_writable_bytes(std::span{message})));
+            const auto n = co_await asyncio::error::guard(tls.read(std::as_writable_bytes(std::span{message})));
 
-        if (n == 0)
-            break;
+            if (n == 0)
+                break;
 
-        message.resize(n);
+            message.resize(n);
 
-        fmt::print("Received message: {}\n", message);
-        co_await asyncio::error::guard(tls.writeAll(std::as_bytes(std::span{message})));
+            fmt::print("Received message: {}\n", message);
+            co_await asyncio::error::guard(tls.writeAll(std::as_bytes(std::span{message})));
+        }
     }
-}
 
-asyncio::task::Task<void>
-serve(asyncio::net::TCPListener listener, const asyncio::net::tls::Context context) {
-    std::expected<void, std::error_code> result;
-    asyncio::task::TaskGroup group;
+    asyncio::task::Task<void>
+    serve(asyncio::net::TCPListener listener, const asyncio::net::tls::Context context) {
+        std::expected<void, std::error_code> result;
+        asyncio::task::TaskGroup group;
 
-    while (true) {
-        auto stream = co_await listener.accept();
+        while (true) {
+            auto stream = co_await listener.accept();
 
-        if (!stream) {
-            result = std::unexpected{stream.error()};
-            break;
+            if (!stream) {
+                result = std::unexpected{stream.error()};
+                break;
+            }
+
+            auto task = handle(*std::move(stream), context);
+
+            group.add(task);
+            task.future().fail([](const auto &e) {
+                fmt::print(stderr, "Unhandled exception: {}\n", e);
+            });
         }
 
-        auto task = handle(*std::move(stream), context);
-
-        group.add(task);
-        task.future().fail([](const auto &e) {
-            fmt::print(stderr, "Unhandled exception: {}\n", e);
-        });
+        co_await group;
+        co_await asyncio::error::guard(std::move(result));
     }
-
-    co_await group;
-    co_await asyncio::error::guard(std::move(result));
 }
 
+// ReSharper disable once CppUseInternalLinkage
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
@@ -83,7 +86,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     auto context = co_await asyncio::error::guard(
         config
         .verifyClient(verifyClient)
-        .certKeyPairs({{std::move(cert), std::move(key)}})
+        .certKeyPairs({{.cert = std::move(cert), .key = std::move(key)}})
         .build()
     );
 

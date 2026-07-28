@@ -18,8 +18,8 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Mutex::lock() {
     mPending.push_back(promise);
 
     const auto result = co_await task::Cancellable{
-        promise->getFuture(),
-        [=]() -> std::expected<void, std::error_code> {
+        .awaitable = promise->getFuture(),
+        .cancel = [=]() -> std::expected<void, std::error_code> {
             if (promise->isFulfilled())
                 return std::unexpected{task::Error::CancellationTooLate};
 

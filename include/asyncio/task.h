@@ -369,18 +369,18 @@ namespace asyncio::task {
         }
 
         [[nodiscard]] Awaitable<bool> await_transform(const Cancelled) const {
-            return {Future<bool>::resolved(mFrame->cancelled)};
+            return {.future = Future<bool>::resolved(mFrame->cancelled)};
         }
 
         [[nodiscard]] Awaitable<void> await_transform(const Lock) const {
             mFrame->locked = true;
-            return {Future<void>::resolved()};
+            return {.future = Future<void>::resolved()};
         }
 
         [[nodiscard]] Awaitable<void> await_transform(const Unlock) const {
             assert(mFrame->locked);
             mFrame->locked = false;
-            return {Future<void>::resolved()};
+            return {.future = Future<void>::resolved()};
         }
 
 #ifdef ASYNCIO_ENABLE_STACKTRACE
@@ -583,7 +583,7 @@ namespace asyncio::task {
 #endif
         {
             if (group.mFrames.empty())
-                return {Future<void>::resolved()};
+                return {.future = Future<void>::resolved()};
 
             const auto promise = std::make_shared<asyncio::Promise<void>>();
             const auto count = std::make_shared<std::size_t>(group.mFrames.size());

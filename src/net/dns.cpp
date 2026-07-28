@@ -63,7 +63,7 @@ namespace asyncio::net::dns {
         requires requires(F &&f) {
             { std::invoke(std::forward<F>(f)) } -> std::same_as<int>;
         }
-    std::expected<std::invoke_result_t<F>, std::error_code> expected(F &&f) {
+    static std::expected<std::invoke_result_t<F>, std::error_code> expected(F &&f) {
         const auto result = std::invoke(std::forward<F>(f));
 
         if (result != ARES_SUCCESS)
@@ -187,7 +187,7 @@ asyncio::net::dns::Resolver asyncio::net::dns::Resolver::make() {
         flag,
         [] {
             zero::error::guard(expected([] {
-                return ares_library_init(ARES_LIB_INIT_ALL);;
+                return ares_library_init(ARES_LIB_INIT_ALL);
             }));
 
             std::atexit([] {
@@ -266,7 +266,12 @@ asyncio::net::dns::Resolver::getAddressInfo(
     Promise<std::vector<Address>, ARESError> promise;
 
     const auto aresHints = hints.transform([](const auto &value) {
-        return ares_addrinfo_hints{value.ai_flags, value.ai_family, value.ai_socktype, value.ai_protocol};
+        return ares_addrinfo_hints{
+            .ai_flags = value.ai_flags,
+            .ai_family = value.ai_family,
+            .ai_socktype = value.ai_socktype,
+            .ai_protocol = value.ai_protocol
+        };
     });
 
     ares_getaddrinfo(
@@ -428,8 +433,8 @@ asyncio::net::dns::getAddressInfo(
     }));
 
     co_return co_await task::Cancellable{
-        promise.getFuture(),
-        [&]() -> std::expected<void, std::error_code> {
+        .awaitable = promise.getFuture(),
+        .cancel = [&]() -> std::expected<void, std::error_code> {
             Z_EXPECT(uv::expected([&] {
                 return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
             }));

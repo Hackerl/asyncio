@@ -259,7 +259,7 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
         Promise<std::pair<std::size_t, Address>, std::error_code> promise;
     };
 
-    Context context{data};
+    Context context{.data = data};
     mUDP->data = &context;
 
     Z_CO_EXPECT(uv::expected([&] {
@@ -296,8 +296,8 @@ asyncio::net::UDPSocket::readFrom(const std::span<std::byte> data) {
     }));
 
     co_return co_await task::Cancellable{
-        context.promise.getFuture(),
-        [&]() -> std::expected<void, std::error_code> {
+        .awaitable = context.promise.getFuture(),
+        .cancel = [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())
                 return std::unexpected{task::Error::CancellationTooLate};
 

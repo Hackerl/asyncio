@@ -6,8 +6,8 @@
 ASYNC_TEST_CASE("cancellable task - error", "[task]") {
     asyncio::Promise<void, std::error_code> promise;
     auto task = from(asyncio::task::Cancellable{
-        asyncio::task::from(promise.getFuture()),
-        [&]() -> std::expected<void, std::error_code> {
+        .awaitable = asyncio::task::from(promise.getFuture()),
+        .cancel = [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
                 return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -23,8 +23,8 @@ ASYNC_TEST_CASE("cancel task - error", "[task]") {
     SECTION("success") {
         asyncio::Promise<void, std::error_code> promise;
         auto task = from(asyncio::task::Cancellable{
-            promise.getFuture(),
-            [&]() -> std::expected<void, std::error_code> {
+            .awaitable = promise.getFuture(),
+            .cancel = [&]() -> std::expected<void, std::error_code> {
                 if (promise.isFulfilled())
                     return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -58,8 +58,8 @@ ASYNC_TEST_CASE("automatically cancel at next suspension point - error", "[task]
     auto task = asyncio::task::spawn([&]() -> asyncio::task::Task<void, std::error_code> {
         Z_CO_EXPECT(co_await promise1.getFuture());
         co_return co_await asyncio::task::Cancellable{
-            promise2.getFuture(),
-            [&]() -> std::expected<void, std::error_code> {
+            .awaitable = promise2.getFuture(),
+            .cancel = [&]() -> std::expected<void, std::error_code> {
                 promise2.reject(asyncio::task::Error::Cancelled);
                 return {};
             }
@@ -78,8 +78,8 @@ ASYNC_TEST_CASE("check if the current task has been cancelled - error", "[task]"
         REQUIRE_FALSE(co_await asyncio::task::cancelled);
 
         const auto result = co_await asyncio::task::Cancellable{
-            promise.getFuture(),
-            [&]() -> std::expected<void, std::error_code> {
+            .awaitable = promise.getFuture(),
+            .cancel = [&]() -> std::expected<void, std::error_code> {
                 promise.reject(asyncio::task::Error::Cancelled);
                 return {};
             }
@@ -100,8 +100,8 @@ ASYNC_TEST_CASE("lock task - error", "[task]") {
         co_await asyncio::task::lock;
 
         const auto result = co_await asyncio::task::Cancellable{
-            promise.getFuture(),
-            [&]() -> std::expected<void, std::error_code> {
+            .awaitable = promise.getFuture(),
+            .cancel = [&]() -> std::expected<void, std::error_code> {
                 promise.reject(asyncio::task::Error::Cancelled);
                 return {};
             }
@@ -151,8 +151,8 @@ ASYNC_TEST_CASE("task all - error", "[task]") {
 
         auto task = all(std::array{
             from(asyncio::task::Cancellable{
-                promise1.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -161,8 +161,8 @@ ASYNC_TEST_CASE("task all - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -196,8 +196,8 @@ ASYNC_TEST_CASE("task all - error", "[task]") {
 
         auto task = all(std::array{
             from(asyncio::task::Cancellable{
-                promise1.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -206,8 +206,8 @@ ASYNC_TEST_CASE("task all - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -248,8 +248,8 @@ ASYNC_TEST_CASE("task variadic all - error", "[task]") {
 
             auto task = all(
                 from(asyncio::task::Cancellable{
-                    promise1.getFuture(),
-                    [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise1.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -258,8 +258,8 @@ ASYNC_TEST_CASE("task variadic all - error", "[task]") {
                     }
                 }),
                 from(asyncio::task::Cancellable{
-                    promise2.getFuture(),
-                    [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise2.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -293,7 +293,8 @@ ASYNC_TEST_CASE("task variadic all - error", "[task]") {
 
             auto task = all(
                 from(asyncio::task::Cancellable{
-                    promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise1.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -302,7 +303,8 @@ ASYNC_TEST_CASE("task variadic all - error", "[task]") {
                     }
                 }),
                 from(asyncio::task::Cancellable{
-                    promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise2.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -342,7 +344,8 @@ ASYNC_TEST_CASE("task variadic all - error", "[task]") {
 
         auto task = all(
             from(asyncio::task::Cancellable{
-                promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -351,7 +354,8 @@ ASYNC_TEST_CASE("task variadic all - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -360,7 +364,8 @@ ASYNC_TEST_CASE("task variadic all - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise3.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise3.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise3.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -402,8 +407,8 @@ ASYNC_TEST_CASE("task allSettled - error", "[task]") {
 
         auto task = allSettled(std::array{
             from(asyncio::task::Cancellable{
-                promise1.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -412,8 +417,8 @@ ASYNC_TEST_CASE("task allSettled - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -447,7 +452,8 @@ ASYNC_TEST_CASE("task allSettled - error", "[task]") {
 
         auto task = allSettled(std::array{
             from(asyncio::task::Cancellable{
-                promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -456,7 +462,8 @@ ASYNC_TEST_CASE("task allSettled - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -492,7 +499,8 @@ ASYNC_TEST_CASE("task variadic allSettled - error", "[task]") {
 
     auto task = allSettled(
         from(asyncio::task::Cancellable{
-            promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+            .awaitable = promise1.getFuture(),
+            .cancel = [&]() -> std::expected<void, std::error_code> {
                 if (promise1.isFulfilled())
                     return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -501,7 +509,8 @@ ASYNC_TEST_CASE("task variadic allSettled - error", "[task]") {
             }
         }),
         from(asyncio::task::Cancellable{
-            promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+            .awaitable = promise2.getFuture(),
+            .cancel = [&]() -> std::expected<void, std::error_code> {
                 if (promise2.isFulfilled())
                     return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -510,7 +519,8 @@ ASYNC_TEST_CASE("task variadic allSettled - error", "[task]") {
             }
         }),
         from(asyncio::task::Cancellable{
-            promise3.getFuture(), [&]() -> std::expected<void, std::error_code> {
+            .awaitable = promise3.getFuture(),
+            .cancel = [&]() -> std::expected<void, std::error_code> {
                 if (promise3.isFulfilled())
                     return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -548,8 +558,8 @@ ASYNC_TEST_CASE("task any - error", "[task]") {
 
         auto task = any(std::array{
             from(asyncio::task::Cancellable{
-                promise1.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -558,8 +568,8 @@ ASYNC_TEST_CASE("task any - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -601,7 +611,8 @@ ASYNC_TEST_CASE("task any - error", "[task]") {
 
         auto task = any(std::array{
             from(asyncio::task::Cancellable{
-                promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -610,7 +621,8 @@ ASYNC_TEST_CASE("task any - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -655,7 +667,8 @@ ASYNC_TEST_CASE("task variadic any - error", "[task]") {
 
             auto task = any(
                 from(asyncio::task::Cancellable{
-                    promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise1.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -664,7 +677,8 @@ ASYNC_TEST_CASE("task variadic any - error", "[task]") {
                     }
                 }),
                 from(asyncio::task::Cancellable{
-                    promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise2.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -706,7 +720,8 @@ ASYNC_TEST_CASE("task variadic any - error", "[task]") {
 
             auto task = any(
                 from(asyncio::task::Cancellable{
-                    promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise1.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -715,7 +730,8 @@ ASYNC_TEST_CASE("task variadic any - error", "[task]") {
                     }
                 }),
                 from(asyncio::task::Cancellable{
-                    promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise2.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -760,8 +776,8 @@ ASYNC_TEST_CASE("task variadic any - error", "[task]") {
 
         auto task = any(
             from(asyncio::task::Cancellable{
-                promise1.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -770,8 +786,8 @@ ASYNC_TEST_CASE("task variadic any - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -780,8 +796,8 @@ ASYNC_TEST_CASE("task variadic any - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise3.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise3.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise3.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -849,7 +865,8 @@ ASYNC_TEST_CASE("task race - error", "[task]") {
 
         auto task = race(std::array{
             from(asyncio::task::Cancellable{
-                promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -858,7 +875,8 @@ ASYNC_TEST_CASE("task race - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -890,7 +908,8 @@ ASYNC_TEST_CASE("task race - error", "[task]") {
 
         auto task = race(std::array{
             from(asyncio::task::Cancellable{
-                promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -899,7 +918,8 @@ ASYNC_TEST_CASE("task race - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -934,7 +954,8 @@ ASYNC_TEST_CASE("task variadic race - error", "[task]") {
 
             auto task = race(
                 from(asyncio::task::Cancellable{
-                    promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise1.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -943,7 +964,8 @@ ASYNC_TEST_CASE("task variadic race - error", "[task]") {
                     }
                 }),
                 from(asyncio::task::Cancellable{
-                    promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise2.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -975,7 +997,8 @@ ASYNC_TEST_CASE("task variadic race - error", "[task]") {
 
             auto task = race(
                 from(asyncio::task::Cancellable{
-                    promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise1.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise1.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -984,7 +1007,8 @@ ASYNC_TEST_CASE("task variadic race - error", "[task]") {
                     }
                 }),
                 from(asyncio::task::Cancellable{
-                    promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise2.getFuture(),
+                    .cancel = [&]() -> std::expected<void, std::error_code> {
                         if (promise2.isFulfilled())
                             return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -1019,7 +1043,8 @@ ASYNC_TEST_CASE("task variadic race - error", "[task]") {
 
         auto task = race(
             from(asyncio::task::Cancellable{
-                promise1.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise1.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise1.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -1028,7 +1053,8 @@ ASYNC_TEST_CASE("task variadic race - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise2.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise2.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise2.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 
@@ -1037,7 +1063,8 @@ ASYNC_TEST_CASE("task variadic race - error", "[task]") {
                 }
             }),
             from(asyncio::task::Cancellable{
-                promise3.getFuture(), [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise3.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     if (promise3.isFulfilled())
                         return std::unexpected{asyncio::task::Error::CancellationTooLate};
 

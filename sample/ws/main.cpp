@@ -2,6 +2,7 @@
 #include <zero/cmdline.h>
 #include <zero/encoding/hex.h>
 
+// ReSharper disable once CppUseInternalLinkage
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 

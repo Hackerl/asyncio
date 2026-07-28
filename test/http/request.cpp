@@ -281,7 +281,7 @@ ASYNC_TEST_CASE("requests", "[http::request]") {
                 }
 
                 SECTION("serializable object") {
-                    auto response = co_await requests.post(url, People{"jack", 18});
+                    auto response = co_await requests.post(url, People{.name = "jack", .age = 18});
                     REQUIRE(response);
                     co_await asyncio::error::guard(response->readAll());
                 }

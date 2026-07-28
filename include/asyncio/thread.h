@@ -60,8 +60,8 @@ namespace asyncio {
         Z_DEFER(thread.join());
 
         co_return co_await task::Cancellable{
-            promise.getFuture(),
-            [&] {
+            .awaitable = promise.getFuture(),
+            .cancel = [&] {
                 return cancel(thread.native_handle());
             }
         };
@@ -84,7 +84,7 @@ namespace asyncio {
                 Promise<int> promise;
             };
 
-            Context context{std::move(f)};
+            Context context{.function = std::move(f)};
             uv_work_t request{.data = &context};
 
             co_await error::guard(uv::expected([&] {
@@ -101,8 +101,8 @@ namespace asyncio {
             }));
 
             if (const auto status = co_await task::Cancellable{
-                context.promise.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = context.promise.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     Z_EXPECT(uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }));
@@ -122,7 +122,7 @@ namespace asyncio {
                 std::optional<T> result;
             };
 
-            Context context{std::move(f)};
+            Context context{.function = std::move(f)};
             uv_work_t request{.data = &context};
 
             co_await error::guard(uv::expected([&] {
@@ -140,8 +140,8 @@ namespace asyncio {
             }));
 
             if (const auto status = co_await task::Cancellable{
-                context.promise.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = context.promise.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     Z_EXPECT(uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }));
@@ -167,7 +167,7 @@ namespace asyncio {
                 Promise<int> promise;
             };
 
-            Context context{std::move(f)};
+            Context context{.function = std::move(f)};
             uv_work_t request{.data = &context};
 
             co_await error::guard(uv::expected([&] {
@@ -184,8 +184,8 @@ namespace asyncio {
             }));
 
             if (const auto status = co_await task::Cancellable{
-                context.promise.getFuture(),
-                [&] {
+                .awaitable = context.promise.getFuture(),
+                .cancel = [&] {
                     return uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }).transform([](const auto &) {
@@ -207,7 +207,7 @@ namespace asyncio {
                 std::optional<T> result;
             };
 
-            Context context{std::move(f)};
+            Context context{.function = std::move(f)};
             uv_work_t request{.data = &context};
 
             co_await error::guard(uv::expected([&] {
@@ -225,8 +225,8 @@ namespace asyncio {
             }));
 
             if (const auto status = co_await task::Cancellable{
-                context.promise.getFuture(),
-                [&] {
+                .awaitable = context.promise.getFuture(),
+                .cancel = [&] {
                     return uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }).transform([](const auto &) {
@@ -255,7 +255,7 @@ namespace asyncio {
                 std::exception_ptr exception;
             };
 
-            Context context{std::move(f)};
+            Context context{.function = std::move(f)};
             uv_work_t request{.data = &context};
 
             co_await error::guard(uv::expected([&] {
@@ -279,8 +279,8 @@ namespace asyncio {
             }));
 
             if (const auto status = co_await task::Cancellable{
-                context.promise.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = context.promise.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     Z_EXPECT(uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }));
@@ -302,7 +302,7 @@ namespace asyncio {
                 std::exception_ptr exception;
             };
 
-            Context context{std::move(f)};
+            Context context{.function = std::move(f)};
             uv_work_t request{.data = &context};
 
             co_await error::guard(uv::expected([&] {
@@ -326,8 +326,8 @@ namespace asyncio {
             }));
 
             if (const auto status = co_await task::Cancellable{
-                context.promise.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = context.promise.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     Z_EXPECT(uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }));
@@ -357,7 +357,7 @@ namespace asyncio {
                 std::exception_ptr exception;
             };
 
-            Context context{std::move(f)};
+            Context context{.function = std::move(f)};
             uv_work_t request{.data = &context};
 
             co_await error::guard(uv::expected([&] {
@@ -381,8 +381,8 @@ namespace asyncio {
             }));
 
             if (const auto status = co_await task::Cancellable{
-                context.promise.getFuture(),
-                [&] {
+                .awaitable = context.promise.getFuture(),
+                .cancel = [&] {
                     return uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }).transform([](const auto &) {
@@ -406,7 +406,7 @@ namespace asyncio {
                 std::exception_ptr exception;
             };
 
-            Context context{std::move(f)};
+            Context context{.function = std::move(f)};
             uv_work_t request{.data = &context};
 
             co_await error::guard(uv::expected([&] {
@@ -430,8 +430,8 @@ namespace asyncio {
             }));
 
             if (const auto status = co_await task::Cancellable{
-                context.promise.getFuture(),
-                [&] {
+                .awaitable = context.promise.getFuture(),
+                .cancel = [&] {
                     return uv::expected([&] {
                         return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
                     }).transform([](const auto &) {

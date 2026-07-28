@@ -56,8 +56,8 @@ asyncio::task::Task<int, std::error_code> asyncio::Poll::on(const int events) {
     }));
 
     co_return co_await task::Cancellable{
-        promise.getFuture(),
-        [&]() -> std::expected<void, std::error_code> {
+        .awaitable = promise.getFuture(),
+        .cancel = [&]() -> std::expected<void, std::error_code> {
             if (promise.isFulfilled())
                 return std::unexpected{task::Error::CancellationTooLate};
 

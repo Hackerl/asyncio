@@ -10,8 +10,8 @@ asyncio::task::Task<void, std::error_code> asyncio::sync::Condition::wait(Mutex 
     mPending.push_back(promise);
 
     const auto result = co_await task::Cancellable{
-        promise->getFuture(),
-        [=, this]() -> std::expected<void, std::error_code> {
+        .awaitable = promise->getFuture(),
+        .cancel = [=, this]() -> std::expected<void, std::error_code> {
             if (mPending.remove(promise) == 0)
                 return std::unexpected{task::Error::CancellationTooLate};
 

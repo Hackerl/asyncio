@@ -99,7 +99,9 @@ TEST_CASE("unix address", "[net]") {
 
 TEST_CASE("convert network address to socket address", "[net]") {
     SECTION("IPv4") {
-        const auto address = socketAddressFrom(asyncio::net::IPv4Address{asyncio::net::LocalhostIPv4, 80});
+        const auto address = socketAddressFrom(
+            asyncio::net::IPv4Address{.ip = asyncio::net::LocalhostIPv4, .port = 80}
+        );
         REQUIRE(address);
 
         const auto ptr = reinterpret_cast<const sockaddr_in *>(address->first.get());
@@ -120,7 +122,9 @@ TEST_CASE("convert network address to socket address", "[net]") {
         if (index == 0)
             throw zero::error::StacktraceError<std::runtime_error>{"Failed to get interface index"};
 
-        const auto address = socketAddressFrom(asyncio::net::IPv6Address{asyncio::net::LocalhostIPv6, 80, zone});
+        const auto address = socketAddressFrom(
+            asyncio::net::IPv6Address{.ip = asyncio::net::LocalhostIPv6, .port = 80, .zone = zone}
+        );
         REQUIRE(address);
 
         const auto ptr = reinterpret_cast<const sockaddr_in6 *>(address->first.get());

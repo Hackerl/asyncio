@@ -1,6 +1,7 @@
 #include <asyncio/http/request.h>
 #include <zero/cmdline.h>
 
+// ReSharper disable once CppUseInternalLinkage
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     zero::Cmdline cmdline;
 
@@ -60,7 +61,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
                 if (tokens.size() != 2)
                     continue;
 
-                if (tokens[1].starts_with("@"))
+                if (tokens[1].starts_with('@'))
                     data[tokens[0]] = std::filesystem::path(tokens[1].substr(1));
                 else
                     data[tokens[0]] = tokens[1];

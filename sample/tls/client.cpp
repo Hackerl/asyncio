@@ -3,6 +3,7 @@
 #include <asyncio/time.h>
 #include <zero/cmdline.h>
 
+// ReSharper disable once CppUseInternalLinkage
 asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     using namespace std::chrono_literals;
     using namespace std::string_view_literals;
@@ -36,7 +37,7 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     if (certFile && keyFile) {
         auto cert = co_await asyncio::error::guard(asyncio::net::tls::Certificate::loadFile(*certFile));
         auto key = co_await asyncio::error::guard(asyncio::net::tls::PrivateKey::loadFile(*keyFile));
-        config.certKeyPairs({{std::move(cert), std::move(key)}});
+        config.certKeyPairs({{.cert = std::move(cert), .key = std::move(key)}});
     }
 
     config.insecure(insecure);

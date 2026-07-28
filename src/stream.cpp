@@ -145,7 +145,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
         Promise<std::size_t, std::error_code> promise;
     };
 
-    Context context{data};
+    Context context{.data = data};
     mStream->data = &context;
 
     Z_CO_EXPECT(uv::expected([&] {
@@ -179,8 +179,8 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
     }));
 
     co_return co_await task::Cancellable{
-        context.promise.getFuture(),
-        [&]() -> std::expected<void, std::error_code> {
+        .awaitable = context.promise.getFuture(),
+        .cancel = [&]() -> std::expected<void, std::error_code> {
             if (context.promise.isFulfilled())
                 return std::unexpected{task::Error::CancellationTooLate};
 
