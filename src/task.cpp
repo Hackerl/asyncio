@@ -137,20 +137,15 @@ bool asyncio::task::TaskGroup::cancelled() const {
 std::expected<void, std::error_code> asyncio::task::TaskGroup::cancel() {
     mCancelled = true;
 
-    const auto errors = mFrames
-        | std::views::filter([](const auto &frame) {
-            return !frame->finished;
-        })
-        | std::views::transform([](const auto &frame) {
-            return frame->cancelAll();
-        })
-        | std::views::filter([](const auto &result) {
-            return !result;
-        })
-        | std::ranges::views::transform([](const auto &result) {
-            return result.error();
-        })
-        | std::ranges::to<std::list>();
+    std::list<std::error_code> errors;
+
+    for (const auto &frame: mFrames) {
+        if (frame->finished)
+            continue;
+
+        if (const auto result = frame->cancelAll(); !result)
+            errors.push_back(result.error());
+    }
 
     if (!errors.empty())
         return std::unexpected{errors.back()};
