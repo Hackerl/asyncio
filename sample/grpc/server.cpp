@@ -32,8 +32,8 @@ namespace {
                 mReader->Read(&element, &promise);
 
                 if (!co_await asyncio::task::Cancellable{
-                    promise.getFuture(),
-                    [this]() -> std::expected<void, std::error_code> {
+                    .awaitable = promise.getFuture(),
+                    .cancel = [this]() -> std::expected<void, std::error_code> {
                         mContext->TryCancel();
                         return {};
                     }
@@ -77,8 +77,8 @@ namespace {
             mWriter->Write(element, &promise);
 
             if (!co_await asyncio::task::Cancellable{
-                promise.getFuture(),
-                [this]() -> std::expected<void, std::error_code> {
+                .awaitable = promise.getFuture(),
+                .cancel = [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
                     return {};
                 }
@@ -108,8 +108,8 @@ namespace {
             mStream->Read(&element, &promise);
 
             if (!co_await asyncio::task::Cancellable{
-                promise.getFuture(),
-                [this]() -> std::expected<void, std::error_code> {
+                .awaitable = promise.getFuture(),
+                .cancel = [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
                     return {};
                 }
@@ -130,8 +130,8 @@ namespace {
             mStream->Write(element, &promise);
 
             if (!co_await asyncio::task::Cancellable{
-                promise.getFuture(),
-                [this]() -> std::expected<void, std::error_code> {
+                .awaitable = promise.getFuture(),
+                .cancel = [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
                     return {};
                 }
@@ -224,8 +224,8 @@ namespace {
                         }
 
                         if (!co_await asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
+                            .awaitable = promise.getFuture(),
+                            .cancel = [&]() -> std::expected<void, std::error_code> {
                                 context->TryCancel();
                                 return {};
                             }
@@ -311,8 +311,8 @@ namespace {
                         }
 
                         if (!co_await asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
+                            .awaitable = promise.getFuture(),
+                            .cancel = [&]() -> std::expected<void, std::error_code> {
                                 context->TryCancel();
                                 return {};
                             }
@@ -393,8 +393,8 @@ namespace {
                         }
 
                         if (!co_await asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
+                            .awaitable = promise.getFuture(),
+                            .cancel = [&]() -> std::expected<void, std::error_code> {
                                 context->TryCancel();
                                 return {};
                             }
@@ -474,8 +474,8 @@ namespace {
                         }
 
                         if (!co_await asyncio::task::Cancellable{
-                            promise.getFuture(),
-                            [&]() -> std::expected<void, std::error_code> {
+                            .awaitable = promise.getFuture(),
+                            .cancel = [&]() -> std::expected<void, std::error_code> {
                                 context->TryCancel();
                                 return {};
                             }

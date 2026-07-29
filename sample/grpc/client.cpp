@@ -34,8 +34,8 @@ namespace {
             grpc::ClientReadReactor<T>::StartRead(&element);
 
             if (!co_await asyncio::task::Cancellable{
-                std::move(future),
-                [this]() -> std::expected<void, std::error_code> {
+                .awaitable = std::move(future),
+                .cancel = [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
                     return {};
                 }
@@ -87,8 +87,8 @@ namespace {
             grpc::ClientWriteReactor<T>::StartWrite(&element);
 
             co_return co_await asyncio::task::Cancellable{
-                std::move(future),
-                [this]() -> std::expected<void, std::error_code> {
+                .awaitable = std::move(future),
+                .cancel = [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
                     return {};
                 }
@@ -103,8 +103,8 @@ namespace {
             grpc::ClientWriteReactor<T>::StartWritesDone();
 
             co_return co_await asyncio::task::Cancellable{
-                std::move(future),
-                [this]() -> std::expected<void, std::error_code> {
+                .awaitable = std::move(future),
+                .cancel = [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
                     return {};
                 }
@@ -160,8 +160,8 @@ namespace {
             grpc::ClientBidiReactor<RequestElement, ResponseElement>::StartRead(&element);
 
             if (!co_await asyncio::task::Cancellable{
-                std::move(future),
-                [this]() -> std::expected<void, std::error_code> {
+                .awaitable = std::move(future),
+                .cancel = [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
                     return {};
                 }
@@ -179,8 +179,8 @@ namespace {
             grpc::ClientBidiReactor<RequestElement, ResponseElement>::StartWrite(&element);
 
             co_return co_await asyncio::task::Cancellable{
-                std::move(future),
-                [this]() -> std::expected<void, std::error_code> {
+                .awaitable = std::move(future),
+                .cancel = [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
                     return {};
                 }
@@ -195,8 +195,8 @@ namespace {
             grpc::ClientBidiReactor<RequestElement, ResponseElement>::StartWritesDone();
 
             co_return co_await asyncio::task::Cancellable{
-                std::move(future),
-                [this]() -> std::expected<void, std::error_code> {
+                .awaitable = std::move(future),
+                .cancel = [this]() -> std::expected<void, std::error_code> {
                     mContext->TryCancel();
                     return {};
                 }
@@ -256,8 +256,8 @@ namespace {
             );
 
             if (const auto result = co_await asyncio::task::Cancellable{
-                promise.getFuture(),
-                [&]() -> std::expected<void, std::error_code> {
+                .awaitable = promise.getFuture(),
+                .cancel = [&]() -> std::expected<void, std::error_code> {
                     context->TryCancel();
                     return {};
                 }
