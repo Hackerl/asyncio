@@ -37,7 +37,6 @@ constexpr auto MaskBit = std::byte{0x80};
 
 constexpr auto WebSocketScheme = "http";
 constexpr auto WebSocketSecureScheme = "https";
-constexpr auto WebSocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 constexpr auto WebSocketCompressionThreshold = 128;
 
@@ -47,6 +46,8 @@ Z_DECLARE_ERROR_CODE(ZLIBError)
 Z_DEFINE_ERROR_CATEGORY_INSTANCE(ZLIBError)
 
 namespace {
+    constexpr auto WebSocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
     std::expected<void, std::error_code>
     validateWebSocketAccept(const std::map<std::string, std::string> &headers, const std::string &key) {
         const auto it = headers.find("sec-websocket-accept");

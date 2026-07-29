@@ -8,16 +8,16 @@
 #include <openssl/sha.h>
 #include <regex>
 
-constexpr auto WebSocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-constexpr auto MaskingKeyLength = 4;
-
-constexpr auto TwoBytePayloadLength = 126;
-constexpr auto EightBytePayloadLength = 127;
-
-constexpr auto MaxSingleBytePayloadLength = 125;
-constexpr auto MaxTwoBytePayloadLength = std::numeric_limits<std::uint16_t>::max();
-
 namespace {
+    constexpr auto WebSocketMagic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    constexpr auto MaskingKeyLength = 4;
+
+    constexpr auto TwoBytePayloadLength = 126;
+    constexpr auto EightBytePayloadLength = 127;
+
+    constexpr auto MaxSingleBytePayloadLength = 125;
+    constexpr auto MaxTwoBytePayloadLength = std::numeric_limits<std::uint16_t>::max();
+
     class Server {
     public:
         explicit Server(asyncio::net::TCPStream stream) : mStream{std::move(stream)} {
