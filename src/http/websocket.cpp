@@ -90,6 +90,14 @@ namespace {
             if (item == "server_no_context_takeover") {
                 config.serverNoContextTakeover = true;
             }
+            else if (item == "client_no_context_takeover") {
+                config.clientNoContextTakeover = true;
+            }
+            else if (item.starts_with("server_max_window_bits=")) {
+                const auto windowBits = zero::strings::toNumber<int>(item.substr(23));
+                Z_EXPECT(windowBits);
+                config.serverMaxWindowBits = *windowBits;
+            }
             else if (item.starts_with("client_max_window_bits=")) {
                 const auto windowBits = zero::strings::toNumber<int>(item.substr(23));
                 Z_EXPECT(windowBits);
@@ -522,7 +530,8 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
 
     if (mDeflateExtension && (message.opcode == Opcode::Text || message.opcode == Opcode::Binary)
         && message.data.size() >= WebSocketCompressionThreshold) {
-        auto compressed = co_await mDeflateExtension->compressor.compress(message.data);
+        auto &[config, compressor, decompressor] = *mDeflateExtension;
+        auto compressed = co_await compressor.compress(message.data);
         Z_CO_EXPECT(compressed);
 
         assert(compressed->size() > 4);
@@ -530,6 +539,9 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
 
         message.data = *std::move(compressed);
         header.rsv1(true);
+
+        if (config.clientNoContextTakeover)
+            compressor.reset();
     }
 
     std::size_t extendedBytes{};
