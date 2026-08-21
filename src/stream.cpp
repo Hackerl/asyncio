@@ -225,6 +225,8 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
 
     // If an error occurs but some data has been written, the amount written should be returned,
     // but I have no way of knowing how much data has been written.
+    // Since libuv 1.53.0, uv_write supports cancellation via uv_cancel, and uv_write_nwritten
+    // can be called in the write callback to retrieve the number of bytes actually written so far.
     Z_CO_EXPECT(co_await promise.getFuture());
     co_return data.size();
 }

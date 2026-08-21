@@ -73,7 +73,15 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::read(const 
         );
     }));
 
-    co_return co_await promise.getFuture();
+    co_return co_await task::Cancellable{
+        .awaitable = promise.getFuture(),
+        .cancel = [&]() -> std::expected<void, std::error_code> {
+            Z_EXPECT(uv::expected([&] {
+                return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
+            }));
+            return {};
+        }
+    };
 }
 
 asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const std::span<const std::byte> data) {
@@ -108,7 +116,15 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::fs::File::write(const
         );
     }));
 
-    co_return co_await promise.getFuture();
+    co_return co_await task::Cancellable{
+        .awaitable = promise.getFuture(),
+        .cancel = [&]() -> std::expected<void, std::error_code> {
+            Z_EXPECT(uv::expected([&] {
+                return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
+            }));
+            return {};
+        }
+    };
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::fs::File::close() {
@@ -202,7 +218,15 @@ asyncio::fs::open(const std::filesystem::path path, const int flags, const int m
         );
     }));
 
-    const auto file = co_await promise.getFuture();
+    const auto file = co_await task::Cancellable{
+        .awaitable = promise.getFuture(),
+        .cancel = [&]() -> std::expected<void, std::error_code> {
+            Z_EXPECT(uv::expected([&] {
+                return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
+            }));
+            return {};
+        }
+    };
     Z_CO_EXPECT(file);
 
     co_return File{*file};
