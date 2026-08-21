@@ -364,7 +364,7 @@ asyncio::net::dns::Resolver::lookupIPv6(std::string host) {
             .ai_flags = AI_ADDRCONFIG,
             .ai_family = AF_INET6
         }
-    ).transform([](std::span<const Address> addresses) {
+    ).transform([](const auto &addresses) {
         return addresses
             | std::views::transform(
                 [](const auto &address) {
