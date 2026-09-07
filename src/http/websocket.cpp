@@ -756,11 +756,11 @@ asyncio::http::ws::WebSocket::StreamAdapter::write(const std::span<const std::by
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::StreamAdapter::close() {
-    co_return co_await mWebSocket.close(CloseCode::NormalClosure);
+    co_return co_await mWebSocket.close();
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::StreamAdapter::shutdown() {
-    co_return co_await mWebSocket.shutdown(CloseCode::NormalClosure);
+    co_return co_await mWebSocket.shutdown();
 }
 
 Z_DEFINE_ERROR_CATEGORY_INSTANCES(

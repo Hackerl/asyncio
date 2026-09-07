@@ -229,8 +229,8 @@ namespace asyncio::http::ws {
         [[nodiscard]] task::Task<void, std::error_code> sendText(std::string text);
         [[nodiscard]] task::Task<void, std::error_code> sendBinary(std::span<const std::byte> data);
 
-        task::Task<void, std::error_code> shutdown(CloseCode code);
-        task::Task<void, std::error_code> close(CloseCode code);
+        task::Task<void, std::error_code> shutdown(CloseCode code = CloseCode::NormalClosure);
+        task::Task<void, std::error_code> close(CloseCode code = CloseCode::NormalClosure);
         task::Task<void, std::error_code> closeUnderlying();
 
     private:
