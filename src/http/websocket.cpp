@@ -519,7 +519,10 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     Z_CO_EXPECT(co_await mMutex.lock());
     Z_DEFER(mMutex.unlock());
 
-    if (mState == State::Closed || (mState == State::Closing && message.opcode != Opcode::Close))
+    if (mState == State::Closing && message.opcode != Opcode::Close && message.opcode != Opcode::Pong)
+        co_return std::unexpected{Error::ConnectionClosed};
+
+    if (mState == State::Closed && message.opcode != Opcode::Close)
         co_return std::unexpected{Error::ConnectionClosed};
 
     Header header;
@@ -583,9 +586,9 @@ asyncio::http::ws::WebSocket::writeInternalMessage(InternalMessage message) {
     co_return co_await mWriter->writeAll(message.data);
 }
 
-asyncio::task::Task<asyncio::http::ws::Message, std::error_code>
+asyncio::task::Task<std::expected<asyncio::http::ws::Message, asyncio::http::ws::CloseCode>, std::error_code>
 asyncio::http::ws::WebSocket::readMessage() {
-    assert(mState == State::Connected);
+    assert(mState == State::Connected || mState == State::Closing);
 
     while (true) {
         auto message = co_await readInternalMessage();
@@ -604,14 +607,20 @@ asyncio::http::ws::WebSocket::readMessage() {
             Z_CO_EXPECT(co_await writeInternalMessage({.opcode = Opcode::Pong, .data = std::move(message->data)}));
         }
         else if (opcode == Opcode::Close) {
-            mState = State::Closing;
-            Z_CO_EXPECT(co_await writeInternalMessage({.opcode = Opcode::Close, .data = message->data}));
-            mState = State::Closed;
+            if (mState == State::Connected)
+                mState = State::PeerClosing;
+            else if (mState == State::Closing)
+                mState = State::Closed;
+            else
+                throw co_await error::StacktraceError<std::runtime_error>::make(
+                    fmt::format("Unexpected WebSocket state: {}", std::to_underlying(mState))
+                );
 
             if (message->data.size() < 2)
-                co_return std::unexpected{CloseCode::NormalClosure};
+                co_return std::expected<Message, CloseCode>{std::unexpect, CloseCode::NormalClosure};
 
-            co_return std::unexpected{
+            co_return std::expected<Message, CloseCode>{
+                std::unexpect,
                 static_cast<CloseCode>(ntohs(*reinterpret_cast<const std::uint16_t *>(message->data.data())))
             };
         }
@@ -651,20 +660,40 @@ asyncio::http::ws::WebSocket::sendBinary(const std::span<const std::byte> data) 
     return writeMessage({.opcode = Opcode::Binary, .data = std::vector<std::byte>{data.begin(), data.end()}});
 }
 
-asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
-    assert(mState == State::Connected);
+asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::shutdown(const CloseCode code) {
+    if (mState == State::Connected)
+        mState = State::Closing;
+    else if (mState == State::PeerClosing)
+        mState = State::Closed;
+    else
+        throw co_await error::StacktraceError<std::runtime_error>::make(
+            fmt::format("Unexpected WebSocket state: {}", std::to_underlying(mState))
+        );
 
-    mState = State::Closing;
     const auto c = htons(static_cast<std::uint16_t>(code));
 
-    Z_CO_EXPECT(co_await writeInternalMessage({
+    co_return co_await writeInternalMessage({
         .opcode = Opcode::Close,
-        .data = {reinterpret_cast<const std::byte *>(&c), reinterpret_cast<const std::byte *>(&c) + sizeof(c)}}
-    ));
+        .data = {reinterpret_cast<const std::byte *>(&c), reinterpret_cast<const std::byte *>(&c) + sizeof(c)}
+    });
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(const CloseCode code) {
+    Z_CO_EXPECT(co_await shutdown(code));
+
+    if (mState == State::Closed)
+        co_return {};
+
+    assert(mState == State::Closing);
 
     while (true) {
         const auto message = co_await readInternalMessage();
         Z_CO_EXPECT(message);
+
+        if (message->opcode == Opcode::Ping) {
+            Z_CO_EXPECT(co_await writeInternalMessage({.opcode = Opcode::Pong, .data = message->data}));
+            continue;
+        }
 
         if (message->opcode == Opcode::Close) {
             mState = State::Closed;
@@ -672,8 +701,12 @@ asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::close(c
         }
     }
 
-    Z_CO_EXPECT(co_await mCloseable->close());
     co_return {};
+}
+
+// ReSharper disable once CppMemberFunctionMayBeConst
+asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::closeUnderlying() {
+    co_return co_await mCloseable->close();
 }
 
 asyncio::http::ws::WebSocket::StreamAdapter::StreamAdapter(WebSocket websocket)
@@ -688,7 +721,7 @@ asyncio::task::Task<std::size_t, std::error_code>
 asyncio::http::ws::WebSocket::StreamAdapter::read(const std::span<std::byte> data) {
     if (mPendingOffset == mPending.size()) {
         while (true) {
-            auto message = co_await mWebSocket.readMessage();
+            auto message = zero::flatten(co_await mWebSocket.readMessage());
 
             if (!message) {
                 if (const auto &error = message.error(); error != CloseCode::NormalClosure)
@@ -724,6 +757,10 @@ asyncio::http::ws::WebSocket::StreamAdapter::write(const std::span<const std::by
 
 asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::StreamAdapter::close() {
     co_return co_await mWebSocket.close(CloseCode::NormalClosure);
+}
+
+asyncio::task::Task<void, std::error_code> asyncio::http::ws::WebSocket::StreamAdapter::shutdown() {
+    co_return co_await mWebSocket.shutdown(CloseCode::NormalClosure);
 }
 
 Z_DEFINE_ERROR_CATEGORY_INSTANCES(

@@ -3,6 +3,7 @@
 #include <asyncio/net/stream.h>
 #include <asyncio/buffer.h>
 #include <asyncio/binary.h>
+#include <zero/utility.h>
 #include <zero/encoding/base64.h>
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <openssl/sha.h>
@@ -148,78 +149,85 @@ ASYNC_TEST_CASE("websocket", "[http::websocket]") {
 
     SECTION("send text") {
         const auto payload = GENERATE(take(1, randomString(1, 102400)));
-        auto task = ws.sendText(payload);
+        auto task = server.readMessage();
 
-        const auto [opcode, data] = co_await server.readMessage();
+        REQUIRE(co_await ws.sendText(payload));
+
+        const auto [opcode, data] = co_await task;
         REQUIRE(opcode == asyncio::http::ws::Opcode::Text);
         REQUIRE(std::string_view{reinterpret_cast<const char *>(data.data()), data.size()} == payload);
-
-        REQUIRE(co_await task);
     }
 
     SECTION("send binary") {
         const auto payload = GENERATE(take(1, randomBytes(1, 102400)));
-        auto task = ws.sendBinary(payload);
+        auto task = server.readMessage();
 
-        const auto [opcode, data] = co_await server.readMessage();
+        REQUIRE(co_await ws.sendBinary(payload));
+
+        const auto [opcode, data] = co_await task;
         REQUIRE(opcode == asyncio::http::ws::Opcode::Binary);
         REQUIRE(data == payload);
-
-        REQUIRE(co_await task);
     }
 
     SECTION("read message") {
         SECTION("text") {
             const auto payload = GENERATE(take(1, randomString(1, 102400)));
-            auto task = ws.readMessage();
+            auto task = server.writeMessage(asyncio::http::ws::Opcode::Text, std::as_bytes(std::span{payload}));
 
-            co_await server.writeMessage(asyncio::http::ws::Opcode::Text, std::as_bytes(std::span{payload}));
-
-            const auto message = co_await task;
+            const auto message = zero::flatten(co_await ws.readMessage());
             REQUIRE(message);
             REQUIRE(message->opcode == asyncio::http::ws::Opcode::Text);
             REQUIRE(std::get<std::string>(message->data) == payload);
+
+            co_await task;
         }
 
         SECTION("binary") {
             const auto payload = GENERATE(take(1, randomBytes(1, 102400)));
-            auto task = ws.readMessage();
+            auto task = server.writeMessage(asyncio::http::ws::Opcode::Binary, payload);
 
-            co_await server.writeMessage(asyncio::http::ws::Opcode::Binary, payload);
-
-            const auto message = co_await task;
+            const auto message = zero::flatten(co_await ws.readMessage());
             REQUIRE(message);
             REQUIRE(message->opcode == asyncio::http::ws::Opcode::Binary);
             REQUIRE(std::get<std::vector<std::byte>>(message->data) == payload);
+
+            co_await task;
+        }
+
+        SECTION("closed") {
+            auto task = asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+                const auto code = htons(std::to_underlying(asyncio::http::ws::CloseCode::NormalClosure));
+
+                co_await server.writeMessage(
+                    asyncio::http::ws::Opcode::Close,
+                    {reinterpret_cast<const std::byte *>(&code), sizeof(code)}
+                );
+            });
+
+            const auto message = co_await ws.readMessage();
+            REQUIRE(message);
+            REQUIRE_ERROR(*message, asyncio::http::ws::CloseCode::NormalClosure);
+
+            co_await task;
         }
     }
 
-    SECTION("client close") {
-        auto task = ws.close(asyncio::http::ws::CloseCode::NormalClosure);
+    SECTION("close") {
+        auto task = asyncio::task::spawn([&]() -> asyncio::task::Task<void> {
+            const auto [opcode, data] = co_await server.readMessage();
+            REQUIRE(opcode == asyncio::http::ws::Opcode::Close);
 
-        const auto [opcode, data] = co_await server.readMessage();
-        REQUIRE(opcode == asyncio::http::ws::Opcode::Close);
+            REQUIRE(
+                static_cast<asyncio::http::ws::CloseCode>(
+                    ntohs(*reinterpret_cast<const std::uint16_t *>(data.data()))
+                ) == asyncio::http::ws::CloseCode::NormalClosure
+            );
 
-        REQUIRE(
-            static_cast<asyncio::http::ws::CloseCode>(ntohs(*reinterpret_cast<const std::uint16_t *>(data.data()))) ==
-            asyncio::http::ws::CloseCode::NormalClosure
-        );
+            co_await server.writeMessage(opcode, data);
+        });
 
-        co_await server.writeMessage(opcode, data);
-        REQUIRE(co_await task);
-    }
-
-    SECTION("server close") {
-        auto task = ws.readMessage();
-
-        const auto code = htons(std::to_underlying(asyncio::http::ws::CloseCode::NormalClosure));
-
-        co_await server.writeMessage(
-            asyncio::http::ws::Opcode::Close,
-            {reinterpret_cast<const std::byte *>(&code), sizeof(code)}
-        );
-
-        REQUIRE_ERROR(co_await task, asyncio::http::ws::CloseCode::NormalClosure);
+        REQUIRE(co_await ws.close(asyncio::http::ws::CloseCode::NormalClosure));
+        co_await task;
     }
 }
 
@@ -265,7 +273,7 @@ ASYNC_TEST_CASE("websocket stream adapter", "[http::websocket]") {
 
         auto task = server.readMessage();
 
-        REQUIRE(co_await adapter.write(payload) == payload.size());
+        REQUIRE(co_await adapter.writeAll(payload));
 
         const auto [opcode, data] = co_await task;
         REQUIRE(opcode == asyncio::http::ws::Opcode::Binary);

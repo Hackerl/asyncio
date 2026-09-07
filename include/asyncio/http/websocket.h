@@ -184,6 +184,7 @@ namespace asyncio::http::ws {
         enum class State {
             Connected,
             Closing,
+            PeerClosing,
             Closed
         };
 
@@ -222,13 +223,15 @@ namespace asyncio::http::ws {
         [[nodiscard]] task::Task<void, std::error_code> writeInternalMessage(InternalMessage message);
 
     public:
-        [[nodiscard]] task::Task<Message, std::error_code> readMessage();
+        [[nodiscard]] task::Task<std::expected<Message, CloseCode>, std::error_code> readMessage();
         [[nodiscard]] task::Task<void, std::error_code> writeMessage(Message message);
 
         [[nodiscard]] task::Task<void, std::error_code> sendText(std::string text);
         [[nodiscard]] task::Task<void, std::error_code> sendBinary(std::span<const std::byte> data);
 
+        task::Task<void, std::error_code> shutdown(CloseCode code);
         task::Task<void, std::error_code> close(CloseCode code);
+        task::Task<void, std::error_code> closeUnderlying();
 
     private:
         State mState;
@@ -239,7 +242,7 @@ namespace asyncio::http::ws {
         std::optional<DeflateExtension> mDeflateExtension;
     };
 
-    class WebSocket::StreamAdapter : public IReader, public IWriter, public ICloseable {
+    class WebSocket::StreamAdapter : public IReader, public IWriter, public ICloseable, public IHalfCloseable {
     public:
         Z_DEFINE_ERROR_CODE_INNER(
             Error,
@@ -256,6 +259,7 @@ namespace asyncio::http::ws {
         task::Task<std::size_t, std::error_code> read(std::span<std::byte> data) override;
         task::Task<std::size_t, std::error_code> write(std::span<const std::byte> data) override;
         task::Task<void, std::error_code> close() override;
+        task::Task<void, std::error_code> shutdown() override;
 
     private:
         WebSocket mWebSocket;

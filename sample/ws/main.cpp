@@ -14,11 +14,14 @@ asyncio::task::Task<void> asyncMain(const int argc, char *argv[]) {
     auto ws = co_await asyncio::error::guard(asyncio::http::ws::WebSocket::connect(url));
 
     while (true) {
-        auto message = co_await ws.readMessage();
+        auto message = co_await asyncio::error::guard(ws.readMessage());
 
         if (!message) {
-            if (const auto &error = message.error(); error != asyncio::http::ws::CloseCode::NormalClosure)
-                throw co_await asyncio::error::StacktraceError<std::system_error>::make(error);
+            const auto code = message.error();
+            co_await asyncio::error::guard(ws.shutdown(code));
+
+            if (code != asyncio::http::ws::CloseCode::NormalClosure)
+                throw co_await asyncio::error::StacktraceError<std::system_error>::make(code);
 
             break;
         }
