@@ -138,7 +138,7 @@ Install `asyncio` from the [`vcpkg` private registry](https://github.com/Hackerl
        {
          "kind": "git",
          "repository": "https://github.com/Hackerl/vcpkg-registry",
-         "baseline": "ce9239b6879555471e4c2d70aed45b254b26e02f",
+         "baseline": "3e7fa5ec4b3fda71dc35cfcb4e105933d7355ed9",
          "packages": [
            "asyncio",
            "zero"
