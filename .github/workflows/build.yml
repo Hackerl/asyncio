@@ -3,7 +3,7 @@ on: [ push ]
 jobs:
   linux:
     name: linux (${{ matrix.name }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         include:
@@ -45,7 +45,7 @@ jobs:
 
   # `REQUIRE(co_await expr)` unexpectedly repeats execution in GCC, so skip unit testing for now.
   linux-static:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -193,7 +193,7 @@ jobs:
           SDKROOT: iphoneos
 
   android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -223,7 +223,7 @@ jobs:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
   ohos:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v5
