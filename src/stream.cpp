@@ -196,7 +196,7 @@ asyncio::task::Task<std::size_t, std::error_code> asyncio::Stream::read(const st
 
 asyncio::task::Task<std::size_t, std::error_code>
 asyncio::Stream::write(const std::span<const std::byte> data) {
-    Promise<void, std::error_code> promise;
+    Promise<std::size_t, std::error_code> promise;
     uv_write_t request{.data = &promise};
 
     Z_CO_EXPECT(uv::expected([&] {
@@ -211,24 +211,39 @@ asyncio::Stream::write(const std::span<const std::byte> data) {
             &buffer,
             1,
             [](auto *req, const int status) {
-                const auto p = static_cast<Promise<void, std::error_code> *>(req->data);
+                const auto p = static_cast<Promise<std::size_t, std::error_code> *>(req->data);
 
                 if (status < 0) {
-                    p->reject(static_cast<uv::Error>(status));
+                    if (status != UV_ECANCELED) {
+                        p->reject(static_cast<uv::Error>(status));
+                        return;
+                    }
+
+                    const auto n = uv_write_nwritten(req);
+
+                    if (n == 0) {
+                        p->reject(static_cast<uv::Error>(status));
+                        return;
+                    }
+
+                    p->resolve(n);
                     return;
                 }
 
-                p->resolve();
+                p->resolve(uv_write_nwritten(req));
             }
         );
     }));
 
-    // If an error occurs but some data has been written, the amount written should be returned,
-    // but I have no way of knowing how much data has been written.
-    // Since libuv 1.53.0, uv_write supports cancellation via uv_cancel, and uv_write_nwritten
-    // can be called in the write callback to retrieve the number of bytes actually written so far.
-    Z_CO_EXPECT(co_await promise.getFuture());
-    co_return data.size();
+    co_return co_await task::Cancellable{
+        .awaitable = promise.getFuture(),
+        .cancel = [&]() -> std::expected<void, std::error_code> {
+            Z_EXPECT(uv::expected([&] {
+                return uv_cancel(reinterpret_cast<uv_req_t *>(&request));
+            }));
+            return {};
+        }
+    };
 }
 
 asyncio::task::Task<void, std::error_code> asyncio::Stream::close() {
