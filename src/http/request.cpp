@@ -1,7 +1,6 @@
 #include <asyncio/http/request.h>
 #include <asyncio/fs.h>
 #include <zero/defer.h>
-#include <fmt/ranges.h>
 
 #ifdef ASYNCIO_EMBED_CA_CERT
 #include <ca_cert.h>

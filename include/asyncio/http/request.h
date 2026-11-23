@@ -2,7 +2,6 @@
 #define ASYNCIO_REQUEST_H
 
 #include "url.h"
-#include <map>
 #include <variant>
 #include <asyncio/io.h>
 #include <asyncio/error.h>

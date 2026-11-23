@@ -10,7 +10,6 @@
 #include <openssl/sha.h>
 #include <zlib.h>
 #include <random>
-#include <map>
 
 #ifdef __ANDROID__
 #include <endian.h>
