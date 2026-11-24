@@ -166,13 +166,27 @@ std::expected<void, std::error_code> asyncio::net::TCPStream::noDelay(const bool
 }
 
 std::expected<void, std::error_code>
-asyncio::net::TCPStream::keepalive(const bool enable, const std::optional<std::chrono::seconds> delay) {
+asyncio::net::TCPStream::keepalive(const std::optional<std::chrono::seconds> delay) {
     using namespace std::chrono_literals;
     Z_EXPECT(uv::expected([&] {
         return uv_tcp_keepalive(
             reinterpret_cast<uv_tcp_t *>(mStream.mStream.raw()),
-            enable,
-            delay.value_or(0s).count()
+            delay.has_value(),
+            static_cast<unsigned int>(delay.value_or(0s).count())
+        );
+    }));
+    return {};
+}
+
+std::expected<void, std::error_code>
+asyncio::net::TCPStream::keepalive(const std::optional<KeepaliveOptions> &options) {
+    Z_EXPECT(uv::expected([&] {
+        return uv_tcp_keepalive_ex(
+            reinterpret_cast<uv_tcp_t *>(mStream.mStream.raw()),
+            options.has_value(),
+            options ? static_cast<unsigned int>(options->idle.count()) : 0,
+            options ? static_cast<unsigned int>(options->interval.count()) : 0,
+            options ? options->count : 0
         );
     }));
     return {};

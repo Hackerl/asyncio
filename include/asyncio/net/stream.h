@@ -7,6 +7,12 @@
 namespace asyncio::net {
     class TCPStream final : public ISocket, public IHalfCloseable {
     public:
+        struct KeepaliveOptions {
+            std::chrono::seconds idle;
+            std::chrono::seconds interval;
+            unsigned int count;
+        };
+
         explicit TCPStream(Stream stream);
 
     private:
@@ -27,7 +33,10 @@ namespace asyncio::net {
         std::expected<void, std::error_code> noDelay(bool enable);
 
         std::expected<void, std::error_code>
-        keepalive(bool enable, std::optional<std::chrono::seconds> delay = std::nullopt);
+        keepalive(std::optional<std::chrono::seconds> delay = std::nullopt);
+
+        std::expected<void, std::error_code>
+        keepalive(const std::optional<KeepaliveOptions> &options = std::nullopt);
 
         std::expected<void, std::error_code> simultaneousAccepts(bool enable);
 

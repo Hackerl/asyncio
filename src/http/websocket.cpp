@@ -17,8 +17,6 @@
 
 using namespace std::chrono_literals;
 
-constexpr auto DefaultTCPKeepAliveDelay = 60s;
-
 constexpr auto SwitchingProtocolsStatus = 101;
 constexpr auto MaskingKeyLength = 4;
 
@@ -38,6 +36,12 @@ constexpr auto WebSocketScheme = "http";
 constexpr auto WebSocketSecureScheme = "https";
 
 constexpr auto WebSocketCompressionThreshold = 128;
+
+constexpr asyncio::net::TCPStream::KeepaliveOptions DefaultTCPKeepaliveOptions = {
+    .idle = 60s,
+    .interval = 10s,
+    .count = 3
+};
 
 Z_DEFINE_ERROR_TRANSFORMER(ZLIBError, "zlib", zError)
 Z_DECLARE_ERROR_CODE(ZLIBError)
@@ -331,7 +335,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
                 return std::make_shared<net::TCPStream>(std::move(value));
             });
         Z_CO_EXPECT(stream);
-        Z_CO_EXPECT(stream.value()->keepalive(true, DefaultTCPKeepAliveDelay));
+        Z_CO_EXPECT(stream.value()->keepalive(DefaultTCPKeepaliveOptions));
         reader = *stream;
         writer = *stream;
         closeable = *std::move(stream);
@@ -339,7 +343,7 @@ asyncio::http::ws::WebSocket::connect(const URL url, std::optional<net::tls::Con
     else if (scheme == WebSocketSecureScheme) {
         auto stream = co_await net::TCPStream::connect(*host, *port);
         Z_CO_EXPECT(stream);
-        Z_CO_EXPECT(stream->keepalive(true, DefaultTCPKeepAliveDelay));
+        Z_CO_EXPECT(stream->keepalive(DefaultTCPKeepaliveOptions));
 
         if (!context) {
             auto ctx = net::tls::ClientConfig{}.build();
