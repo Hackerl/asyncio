@@ -272,6 +272,14 @@ namespace asyncio::net::tls {
         }
 
     public:
+        SSL *raw() {
+            return mSSL.get();
+        }
+
+        [[nodiscard]] const SSL *raw() const {
+            return mSSL.get();
+        }
+
         task::Task<std::size_t, std::error_code> handshake() {
             while (true) {
                 const auto result = SSL_do_handshake(mSSL.get());
